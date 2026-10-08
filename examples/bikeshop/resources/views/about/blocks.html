@@ -11,7 +11,6 @@
 {% from "blocks/month_calendar.html" import month_calendar %}
 {% from "blocks/availability.html" import availability %}
 {% from "blocks/datetime_range.html" import datetime_range %}
-{% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
 {% from "blocks/swatches.html" import swatches %}
 {% from "blocks/history.html" import history %}
 {% from "blocks/compare_plans.html" import compare_plans %}
@@ -30,7 +29,7 @@
 
   <nav aria-label="{{ t('blocks.page.contents') }}">
     <ul class="bs-showcase__toc" role="list">
-      {%- for anchor, name in [["gallery", "gallery"], ["form", "range_slider · quantity · keypad · datetime_range · date_picker_blocked · swatches"], ["filter", "range_slider (GET)"], ["kanban", "kanban"], ["calendar", "month_calendar"], ["availability", "availability"], ["history", "history"], ["plans", "compare_plans"]] %}
+      {%- for anchor, name in [["gallery", "gallery"], ["form", "range_slider · quantity · keypad · datetime_range · swatches"], ["filter", "range_slider (GET)"], ["kanban", "kanban"], ["calendar", "month_calendar"], ["availability", "availability"], ["history", "history"], ["plans", "compare_plans"]] %}
       <li><a class="rx-button rx-button--secondary rx-button--small" href="#{{ anchor }}">{{ name }}</a></li>
       {%- endfor %}
     </ul>
@@ -73,12 +72,6 @@
                hint=none, id=none, bag=none)') }}
       </div>
       <div class="bs-showcase__pair">
-        <div class="bs-showcase__demo">
-          {{ date_picker_blocked("visit_on", "Workshop visit", closed, closed_weekdays=[0], min=today, max=max_day, required=true) }}
-          <p class="rx-hint">{{ t('blocks.page.blocked') }}</p>
-          {{ signature('date_picker_blocked(name, label, disabled_dates=[], closed_weekdays=[], value=none,
-                    min=none, max=none, hint=none, required=false, id=none, bag=none)') }}
-        </div>
         <div class="bs-showcase__demo">
           {%- set chips = {"hx-get": route('about.blocks.variant'), "hx-trigger": "change", "hx-target": "#variant", "hx-swap": "outerHTML", "hx-include": "closest form"} %}
           {{ swatches("size", "Frame size", sizes, selected="M", attrs=chips, required=true) }}

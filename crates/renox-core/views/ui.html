@@ -283,8 +283,14 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 
 {#- A date field with a calendar beside it: type 2026-10-02, or pick a day.
     Sent as YYYY-MM-DD, like <input type="date"> (a `NaiveDate`). `min` and
-    `max` limit the calendar. Without JavaScript it is a plain text field. -#}
-{% macro date_picker(name, label, value=none, min=none, max=none, hint=none, required=false, placeholder="YYYY-MM-DD", attrs={}, id=none, disabled=false, readonly=false, span=none, bag=none) -%}
+    `max` limit the calendar. Without JavaScript it is a plain text field.
+    Days that can't be chosen (closed, full, booked): `disabled_dates`, a
+    list of "YYYY-MM-DD", and `closed_weekdays`, the weekdays never open (0
+    is Sunday … 6 Saturday, chrono's `num_days_from_sunday`). The calendar
+    greys them out and the arrow keys step over them; typed in, one is
+    pointed out at once and the browser won't send the form. The server
+    must still refuse them (`none_of`). -#}
+{% macro date_picker(name, label, value=none, min=none, max=none, hint=none, required=false, placeholder="YYYY-MM-DD", attrs={}, id=none, disabled=false, readonly=false, span=none, bag=none, disabled_dates=none, closed_weekdays=none) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name, bag=bag) %}
 {%- set current = old(name, value if value is defined and value is not none else "") | string %}
@@ -295,6 +301,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     <input class="rx-input" id="{{ id }}" name="{{ name }}" type="text" inputmode="numeric" autocomplete="off" value="{{ current }}" placeholder="{{ placeholder }}" pattern="\d{4}-\d{2}-\d{2}" data-rx-date
       {%- if min %} data-min="{{ min }}"{% endif %}
       {%- if max %} data-max="{{ max }}"{% endif %}
+      {%- if disabled_dates or closed_weekdays %} data-rx-disabled-dates='{{ (disabled_dates or []) | map("string") | list | tojson }}' data-rx-closed-weekdays='{{ (closed_weekdays or []) | tojson }}' data-rx-unavailable="{{ t('ui.date_unavailable') }}"{% endif %}
       {%- if required %} required aria-required="true"{% endif %}
       {%- if disabled %} disabled{% endif %}
       {%- if readonly %} readonly{% endif %}

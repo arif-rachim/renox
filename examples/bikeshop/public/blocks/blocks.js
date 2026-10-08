@@ -822,56 +822,6 @@
     updateDatetime(field);
   }
 
-  // ---------- date_picker_blocked ----------
-
-  function setupBlocked(box) {
-    if (box.hasAttribute("data-bs-ready")) return;
-    box.setAttribute("data-bs-ready", "");
-    var dates = {};
-    var closed = [];
-    try {
-      JSON.parse(box.getAttribute("data-bs-blocked") || "[]").forEach(function (d) {
-        dates[d] = true;
-      });
-      closed = JSON.parse(box.getAttribute("data-bs-closed") || "[]");
-    } catch (_) {}
-    function blocked(iso) {
-      return !!dates[iso] || closed.indexOf(new Date(iso + "T00:00:00Z").getUTCDay()) !== -1;
-    }
-    var calendar = box.querySelector("calendar-date");
-    if (calendar && window.customElements) {
-      // Cally's days are UTC dates.
-      customElements.whenDefined("calendar-date").then(function () {
-        calendar.isDateDisallowed = function (date) {
-          return blocked(date.toISOString().slice(0, 10));
-        };
-      });
-    }
-    var input = box.querySelector("[data-bs-blocked-input]");
-    var slot = box.querySelector(".rx-error");
-    var message = box.getAttribute("data-bs-message") || "";
-    var ours = false;
-    function check() {
-      var value = input.value.trim();
-      if (ISO.test(value) && blocked(value)) {
-        input.setCustomValidity(message);
-        input.setAttribute("aria-invalid", "true");
-        if (slot) slot.textContent = message;
-        ours = true;
-      } else if (ours) {
-        input.setCustomValidity("");
-        input.removeAttribute("aria-invalid");
-        if (slot) slot.textContent = "";
-        ours = false;
-      }
-    }
-    if (input) {
-      input.addEventListener("input", check);
-      input.addEventListener("change", check);
-      check();
-    }
-  }
-
   // ---------- Setting up ----------
 
   function setup(root) {
@@ -887,7 +837,6 @@
       if (board) prepareCards(board);
     }
     each(root, "[data-bs-datetime]", setupDatetime);
-    each(root, "[data-bs-blocked]", setupBlocked);
   }
 
   window.BikeshopBlocks = { setup: setup };

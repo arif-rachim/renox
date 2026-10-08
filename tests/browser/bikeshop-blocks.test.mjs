@@ -81,7 +81,6 @@ const BLOCKS = [
   '.bs-month',
   '.bs-availability',
   '[data-bs-datetime][data-bs-ready]',
-  '[data-bs-blocked][data-bs-ready]',
   '.bs-swatches--size',
   '.bs-swatches--colour',
   '.bs-history',
@@ -251,7 +250,7 @@ for (const csp of ['relaxed', 'strict']) {
         page.assertClean();
       }));
 
-    test('the date and time range fills its two fields; closed days are refused', () =>
+    test('the date and time range fills its two fields and refuses an end before its start', () =>
       browser.with(async (page) => {
         await page.goto(`${app.url}${PAGE}`);
         const day = await isoIn(page, 7);
@@ -285,33 +284,6 @@ for (const csp of ['relaxed', 'strict']) {
         assert.equal(await page.eval(() => document.querySelector('[data-bs-dt-summary]').hasAttribute('data-bs-invalid')), true);
         assert.equal(await page.eval(() => document.querySelector('#bs-starts_at-range-end-time').getAttribute('aria-invalid')), 'true');
 
-        // Closed days: the calendar refuses them (Sundays and the training days).
-        const closed = await page.eval(() => JSON.parse(document.querySelector('[data-bs-blocked]').dataset.bsBlocked));
-        await page.waitFor(() => typeof document.querySelector('[data-bs-blocked] calendar-date').isDateDisallowed === 'function');
-        const refused = await page.eval((days) => {
-          const cal = document.querySelector('[data-bs-blocked] calendar-date');
-          const utc = (iso) => new Date(`${iso}T00:00:00Z`);
-          return days.map((d) => cal.isDateDisallowed(utc(d)));
-        }, closed);
-        assert.deepEqual(refused, closed.map(() => true));
-        const sunday = await page.eval(() => {
-          const d = new Date();
-          d.setDate(d.getDate() + ((7 - d.getDay()) % 7 || 7));
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        });
-        assert.equal(await page.eval((iso) => document.querySelector('[data-bs-blocked] calendar-date').isDateDisallowed(new Date(`${iso}T00:00:00Z`)), sunday), true);
-        // Its days are greyed out in the calendar too (opened from its button).
-        await page.click('[data-bs-blocked] .rx-affix__button');
-        await page.waitFor(() => document.querySelector('#rx-visit_on-calendar').matches(':popover-open'));
-        await page.press('Escape');
-        // Typed in, a closed day is pointed out and the browser won't send it.
-        await page.type('#rx-visit_on', closed[0]);
-        assert.equal(await page.eval(() => document.querySelector('#rx-visit_on').getAttribute('aria-invalid')), 'true');
-        assert.equal(await page.eval(() => document.querySelector('#rx-visit_on').validity.customError), true);
-        assert.match(await page.text('#rx-visit_on-error'), /can't be booked/);
-        const open = await isoIn(page, 1);
-        await page.type('#rx-visit_on', open, { clear: true });
-        assert.equal(await page.eval(() => document.querySelector('#rx-visit_on').validity.customError), false);
         page.assertClean();
       }));
 
@@ -337,15 +309,6 @@ for (const csp of ['relaxed', 'strict']) {
       browser.with(async (page) => {
         await page.goto(`${app.url}${PAGE}`);
         const day = await isoIn(page, 1);
-        const visit = await page.eval(() => {
-          const closed = JSON.parse(document.querySelector('[data-bs-blocked]').dataset.bsBlocked);
-          for (let n = 1; n < 14; n++) {
-            const d = new Date();
-            d.setDate(d.getDate() + n);
-            const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            if (d.getDay() !== 0 && !closed.includes(iso)) return iso;
-          }
-        });
         await page.click('[data-bs-quantity] [data-bs-step="1"]');
         await page.focus('[data-bs-keypad] [data-bs-key="7"]');
         await page.press('4');
@@ -359,7 +322,6 @@ for (const csp of ['relaxed', 'strict']) {
             s.dispatchEvent(new Event('change', { bubbles: true }));
           }
         });
-        await page.type('#rx-visit_on', visit);
         // The keypad's Enter key sends the form.
         await page.click('[data-bs-keypad] [data-bs-key="enter"]');
         await page.waitFor(() => location.hash === '#form' && document.querySelector('.rx-alert'));

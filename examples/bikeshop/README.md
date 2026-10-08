@@ -95,7 +95,7 @@ Paths are relative to this folder.
 | Renting: `datetime_range` and `availability` blocks, two overlap checks (form hook + `Db::begin_immediate` + `lock_for_update`) | `/rent`, `/rentals`, `/rentals/{code}` | [src/app/rentals/reserve.rs](src/app/rentals/reserve.rs), [src/app/rentals/booking.rs](src/app/rentals/booking.rs), [src/app/rentals/pricing.rs](src/app/rentals/pricing.rs) |
 | ID check: `Upload`, `Encrypted<String>`, reviewed by staff | `/rentals/identity` | [src/app/rentals/identity.rs](src/app/rentals/identity.rs) |
 | My bikes and their service history (`has_many`, the `history` block) | `/bikes`, `/bikes/{bike}` | [src/app/workshop/bikes.rs](src/app/workshop/bikes.rs) |
-| Booking a service within the workshop's capacity (`date_picker_blocked` block) | `/service/book`, `/service/{order}` | [src/app/workshop/booking.rs](src/app/workshop/booking.rs), [src/app/workshop/capacity.rs](src/app/workshop/capacity.rs) |
+| Booking a service within the workshop's capacity (the kit's `date_picker` with `disabled_dates` and `closed_weekdays`) | `/service/book`, `/service/{order}` | [src/app/workshop/booking.rs](src/app/workshop/booking.rs), [src/app/workshop/capacity.rs](src/app/workshop/capacity.rs) |
 | Approving extra work from a signed, single-use link | `/service/approve/{extra}` | [src/app/workshop/approval.rs](src/app/workshop/approval.rs) |
 | Service plans with renox-billing (Stripe, Xendit, a demo gateway), the `compare_plans` and `month_calendar` blocks | `/plans`, `/plans/subscribe`, `/plans/mine`, `/plans/mine/{subscription}` | [src/app/plans/](src/app/plans/) |
 | Accounts: Renox's `Auth` (login, register, reset, verification), account sections (`Registry::account_section`), language, privacy (download, delete) | `/login`, `/register`, `/account` | [src/app/accounts/](src/app/accounts/) |
@@ -254,7 +254,6 @@ blocks send plain fields, so `Valid<T>` reads them; the server still checks ever
 | `month_calendar(month, events, url, param, today, first_day, label, heading)` | A month of events, a list on phones | a plan's visits |
 | `availability(columns, rows, label, corner)` | Resources × hours/days, booked and free slots | renting |
 | `datetime_range(name_start, name_end, label, …)` | Two date pickers + time selects, the duration shown | renting, walk-ins |
-| `date_picker_blocked(name, label, disabled_dates, closed_weekdays, …)` | The kit's `date_picker` with days that can't be picked | service booking |
 | `swatches(name, label, options, selected, kind, attrs)` | Size or colour chips as radios | product page |
 | `history(items, label, date_format)` | A vertical timeline | a bike's service history |
 | `compare_plans(plans, features, highlight, …)` | Pricing cards and a comparison table | service plans |

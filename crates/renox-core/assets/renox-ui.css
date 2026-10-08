@@ -719,7 +719,12 @@
 .rx-calendar calendar-month::part(today) { font-weight: 700; color: var(--rx-accent-text); }
 .rx-calendar calendar-month::part(selected) { color: var(--rx-on-accent); }
 .rx-calendar calendar-month::part(outside) { color: var(--rx-tertiary-label); }
-.rx-calendar calendar-month::part(disallowed) { color: var(--rx-tertiary-label); opacity: 0.5; }
+/* A day that can't be chosen (out of range, `disabled_dates`, `closed_weekdays`):
+   faint and struck through, a shape and not colour alone. */
+.rx-calendar calendar-month::part(disallowed) {
+  color: var(--rx-tertiary-label); opacity: 0.6; cursor: not-allowed;
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
 
 /* A small square button with an icon (rows' tools). */
 .rx-icon-button {

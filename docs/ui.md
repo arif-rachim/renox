@@ -198,7 +198,7 @@ field uses a sensible default.
 | `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices. Each ticked option sends `name` once. So the form's field in Rust is a `Vec`, with `#[serde(default)]` (when nothing is ticked, nothing is sent). |
 | `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons; the pressed ones are filled and checked. Without `multiple`, one choice (a radio group underneath). With `multiple`, several (checkboxes underneath). |
 | `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` when the file is required, an `Option<Upload>` when it may be left out (an edit form keeping the current file), and a `Vec<Upload>` with `multiple`. |
-| `date_picker(name, label, value=…, min=…, max=…, placeholder="YYYY-MM-DD", readonly=…)` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. Without JavaScript it is a plain text field. |
+| `date_picker(name, label, value=…, min=…, max=…, placeholder="YYYY-MM-DD", readonly=…, disabled_dates=[…], closed_weekdays=[…])` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. `disabled_dates` and `closed_weekdays` are days that can't be chosen: see [Days that can't be chosen](#days-that-cant-be-chosen). Without JavaScript it is a plain text field. |
 | `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them. Check them on the server with `required_if`. Without JavaScript they stay visible. |
 | `select(…, multiple=true, searchable=true)` | Pick several values (a `Vec`), with a box to type in that filters the options. The chosen ones show as chips (small rounded labels). The browser's own select stays underneath: the form sends the same thing, and it works without JavaScript. |
 | `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long to put in the page. With `editable`, what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (with the pencil). See [Options from the server](#options-from-the-server) below. |
@@ -395,6 +395,48 @@ impl Validate for Checkout {
 
 `required_if(…)` makes the field required only when the condition is true.
 
+### Days that can't be chosen
+
+A booking form shouldn't offer a day the shop is closed or already full. `date_picker` takes
+those days, and examples/bikeshop's workshop booking uses them:
+
+```html
+{% from "renox/ui.html" import date_picker %}
+{{ date_picker("day", "Visit day", min="2026-10-06", max="2026-11-30", required=true,
+               disabled_dates=["2026-10-12", "2026-10-13"], closed_weekdays=[0]) }}
+```
+
+- `disabled_dates` is a list of days (`"YYYY-MM-DD"`, or `NaiveDate`s from the handler).
+- `closed_weekdays` are the weekdays that are never open: 0 is Sunday, 1 Monday … 6 Saturday,
+  as chrono's `weekday().num_days_from_sunday()` counts them.
+
+The calendar shows those days faint and struck through, and they can't be picked. The arrow
+keys step over them: from a Tuesday before two closed days, → lands on the Friday after. A
+closed day typed or pasted into the field is pointed out at once, under the field ("That day
+can't be chosen: pick another one", the text `ui.date_unavailable`), and the browser won't
+send the form until it's changed.
+
+That is only a help: anyone can send any date. The server refuses them too:
+
+```rust
+# use renox::prelude::*;
+# use renox::chrono::{Datelike, NaiveDate};
+# struct Booking { day: Option<NaiveDate>, full: Vec<NaiveDate> }
+/// The booking form: a day that is open and not full.
+impl Validate for Booking {
+    fn rules(&self, v: &mut Validator) {
+        let sunday = self.day.is_some_and(|d| d.weekday().num_days_from_sunday() == 0);
+        v.field("day", &self.day)
+            .required()
+            .none_of(&self.full)
+            .rule(!sunday, "We're closed on Sundays.");
+    }
+}
+```
+
+When the full days come from the database, check them in the form's `after` hook instead
+(see [docs/validation.md](validation.md#hooks-prepare-authorize-after)).
+
 ### Buttons, surfaces and other parts
 
 The rest of the kit's everyday components:
@@ -534,7 +576,7 @@ can change or translate them in `lang/<locale>.json` (for example `es.json` for 
   ("Skip to content"), `ui.main_navigation`, `ui.errors_title`, `ui.loading`, `ui.back` (the
   wizard and `page_header`'s back link) and `ui.next` (the wizard);
 - the fields: `ui.show_password`, `ui.hide_password`, `ui.copy`, `ui.copied`,
-  `ui.choose_file`, `ui.choose_files`, `ui.current_file`, `ui.choose_date`,
+  `ui.choose_file`, `ui.choose_files`, `ui.current_file`, `ui.choose_date`, `ui.date_unavailable`,
   `ui.previous_month`, `ui.next_month`, `ui.remove`, `ui.add_row`, `ui.move_up`,
   `ui.move_down`, `ui.key` and `ui.value`;
 - the searchable select: `ui.search`, `ui.no_results`, `ui.searching`, `ui.load_failed`,

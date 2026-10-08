@@ -14,7 +14,6 @@ const APPROVAL: &str = "examples/bikeshop/src/app/workshop/approval.rs";
 const TASKS: &str = "examples/bikeshop/src/app/workshop/tasks.rs";
 const NOTIFY: &str = "examples/bikeshop/src/app/rentals/notify.rs";
 const HISTORY: &str = "examples/bikeshop/resources/views/blocks/history.html";
-const BLOCKED: &str = "examples/bikeshop/resources/views/blocks/date_picker_blocked.html";
 const TESTS: &str = "examples/bikeshop/tests/workshop.rs";
 const BROWSER: &str = "tests/browser/bikeshop-workshop.test.mjs";
 
@@ -146,9 +145,9 @@ pub fn entries() -> Vec<Explanation> {
             flow: Flow::Service,
             features: &[
                 Feature {
-                    api: "blocks: date_picker_blocked",
+                    api: "UI kit: date_picker (disabled_dates, closed_weekdays)",
                     why: "The kit's `date_picker` with the full days and the store's closed \
-                          weekdays greyed out (Cally's `isDateDisallowed`), so people pick a day \
+                          weekdays greyed out and skipped by the arrow keys, so people pick a day \
                           with room instead of learning it from an error; the server checks \
                           again, since anyone can send any date.",
                 },
@@ -205,7 +204,6 @@ pub fn entries() -> Vec<Explanation> {
                 CAPACITY,
                 NOTIFY,
                 "examples/bikeshop/resources/views/workshop/book.html",
-                BLOCKED,
                 TESTS,
             ],
         },
@@ -398,7 +396,7 @@ pub fn entries() -> Vec<Explanation> {
                           has too many customers to send them all with the page.",
                 },
                 Feature {
-                    api: "blocks: date_picker_blocked",
+                    api: "UI kit: date_picker (disabled_dates, closed_weekdays)",
                     why: "The store's closed weekdays and the days too full for a half-hour \
                           job can't be picked; the exact check, for the tasks chosen, runs on \
                           the server.",
@@ -422,7 +420,6 @@ pub fn entries() -> Vec<Explanation> {
                 BOARD,
                 CAPACITY,
                 "examples/bikeshop/resources/views/workshop/walk_in.html",
-                BLOCKED,
                 TESTS,
             ],
         },

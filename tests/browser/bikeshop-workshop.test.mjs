@@ -59,9 +59,9 @@ describe('booking a service', () => {
       await page.waitFor(() => /min\)/.test(document.querySelector('#booking-live')?.textContent || ''), { message: 'the estimate' });
       // The first day from the day after tomorrow that is neither full nor closed.
       const day = await page.eval(() => {
-        const box = document.querySelector('[data-bs-blocked]');
-        const blocked = JSON.parse(box.dataset.bsBlocked || '[]');
-        const closed = JSON.parse(box.dataset.bsClosed || '[]');
+        const box = document.querySelector('#rx-day');
+        const blocked = JSON.parse(box.dataset.rxDisabledDates || '[]');
+        const closed = JSON.parse(box.dataset.rxClosedWeekdays || '[]');
         for (let n = 2; n < 40; n++) {
           const d = new Date(Date.now() + n * 86400_000);
           const iso = d.toISOString().slice(0, 10);
@@ -71,7 +71,7 @@ describe('booking a service', () => {
       });
       assert.ok(day, 'a day with room');
       await page.eval((d) => {
-        const input = document.querySelector('[data-bs-blocked] input[name=day]');
+        const input = document.querySelector('#rx-day');
         input.value = d;
       }, day);
       assert.ok(await fitsWidth(page), 'the booking form fits a phone');

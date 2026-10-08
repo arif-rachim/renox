@@ -194,6 +194,7 @@ fn views() -> tempfile::TempDir {
 {{ file("docs", "Documents", multiple=true, required=true) }}
 {{ date_picker("on", "Delivery date", value="2026-10-02", min="2026-10-01", max="2026-12-31") }}
 {{ date_picker("back", "Return date") }}
+{{ date_picker("visit", "Visit", disabled_dates=["2026-10-07", "2026-10-08"], closed_weekdays=[0, 6]) }}
 </form>"#,
     );
     write(
@@ -499,7 +500,11 @@ async fn form_fields_buttons_files_dates_and_conditions() {
         .assert_see(r#"name="on" type="text" inputmode="numeric" autocomplete="off" value="2026-10-02""#)
         .assert_see(r#"popovertarget="rx-on-calendar""#)
         .assert_see(r#"value="2026-10-02" min="2026-10-01" max="2026-12-31">"#)
-        .assert_see(r#"<calendar-date class="rx-calendar" locale="en" first-day-of-week="1">"#);
+        .assert_see(r#"<calendar-date class="rx-calendar" locale="en" first-day-of-week="1">"#)
+        // Days that can't be chosen, for the script, with the message it shows.
+        .assert_see(r#"data-rx-disabled-dates='["2026-10-07","2026-10-08"]' data-rx-closed-weekdays='[0,6]' data-rx-unavailable="That day can&#39;t be chosen: pick another one.""#);
+    // A picker without them carries none.
+    assert_eq!(html.matches("data-rx-disabled-dates").count(), 1, "{html}");
     // The calendar's script once per page, however many pickers.
     assert_eq!(html.matches("/_renox/cally-").count(), 1, "{html}");
     let tail = html.split("src=\"/_renox/cally-").nth(1).unwrap();

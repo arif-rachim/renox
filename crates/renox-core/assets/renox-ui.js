@@ -1058,10 +1058,124 @@
       slot.textContent = day.getFullYear() + "-" + String(day.getMonth() + 1).padStart(2, "0");
     }
   }
+  // Days that can't be chosen (`disabled_dates`, `closed_weekdays`): a test
+  // per field, read once from its data-rx-* attributes. Null: every day is open.
+  var closedTests = new WeakMap();
+  function closedTest(input) {
+    if (!input || !input.hasAttribute("data-rx-disabled-dates")) return null;
+    if (closedTests.has(input)) return closedTests.get(input);
+    var dates = {}, weekdays = [];
+    try {
+      JSON.parse(input.getAttribute("data-rx-disabled-dates") || "[]").forEach(function (d) { dates[d] = true; });
+      weekdays = JSON.parse(input.getAttribute("data-rx-closed-weekdays") || "[]");
+    } catch (e) { /* a broken list closes nothing */ }
+    var test = function (iso) {
+      return !!dates[iso] || weekdays.indexOf(new Date(iso + "T00:00:00Z").getUTCDay()) >= 0;
+    };
+    closedTests.set(input, test);
+    return test;
+  }
+
+  function isoOf(date) { return date.toISOString().slice(0, 10); }
+  function addDays(iso, n) {
+    var d = new Date(iso + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return isoOf(d);
+  }
+  function inRange(cal, iso) {
+    var min = cal.getAttribute("min"), max = cal.getAttribute("max");
+    return (!min || iso >= min) && (!max || iso <= max);
+  }
+  // The first open day from `iso` going `step` days at a time (a year at
+  // most), then one day at a time (a week down onto a closed weekday finds
+  // the next open day), else null.
+  function openDay(cal, closed, iso, step) {
+    var tries = [step, step > 0 ? 1 : -1];
+    for (var t = 0; t < tries.length; t++) {
+      var day = iso;
+      for (var i = 0; i < 400 && inRange(cal, day); i++) {
+        if (!closed(day)) return day;
+        day = addDays(day, tries[t]);
+      }
+    }
+    return null;
+  }
+  function calendarInput(cal) {
+    var pop = cal.closest && cal.closest("[data-rx-calendar-for]");
+    return pop ? document.getElementById(pop.getAttribute("data-rx-calendar-for")) : null;
+  }
+  function focusDay(cal, iso) {
+    cal.focusedDate = iso;
+    calendarHeading(cal, iso);
+    setTimeout(function () { if (cal.focus) cal.focus(); });
+  }
+
+  // Cally's day is a UTC date; it greys out and won't pick what this refuses.
+  function setupDatePicker(input) {
+    var closed = closedTest(input);
+    var pop = closed && document.getElementById(input.id + "-calendar");
+    var cal = pop && pop.querySelector("calendar-date");
+    if (cal && window.customElements) {
+      customElements.whenDefined("calendar-date").then(function () {
+        cal.isDateDisallowed = function (date) { return closed(isoOf(date)); };
+      });
+    }
+    if (closed) checkDate(input);
+  }
+
+  // A closed day typed in: the field's error says so, and the browser
+  // won't send the form. Only clears the error it set itself.
+  var ownDateError = new WeakSet();
+  function checkDate(input) {
+    var closed = closedTest(input);
+    if (!closed) return;
+    var value = input.value.trim();
+    var slot = document.getElementById(input.id + "-error");
+    var message = input.getAttribute("data-rx-unavailable") || "";
+    if (ISO_DATE.test(value) && closed(value)) {
+      input.setCustomValidity(message);
+      input.setAttribute("aria-invalid", "true");
+      if (slot) slot.textContent = message;
+      ownDateError.add(input);
+    } else if (ownDateError.has(input)) {
+      input.setCustomValidity("");
+      input.removeAttribute("aria-invalid");
+      if (slot) slot.textContent = "";
+      ownDateError.delete(input);
+    }
+  }
+  ["input", "change"].forEach(function (type) {
+    document.addEventListener(type, function (event) {
+      var input = event.target;
+      if (input.hasAttribute && input.hasAttribute("data-rx-disabled-dates")) checkDate(input);
+    });
+  });
+
+  // The arrow keys step over closed days: Cally moves the focus one day (or
+  // week) and this moves it on, the same way, to the next open day.
+  var lastStep = new WeakMap();
+  var STEPS = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 7, ArrowUp: -7, PageDown: 1, PageUp: -1, Home: 1, End: -1 };
+  document.addEventListener("keydown", function (event) {
+    // The key comes from inside <calendar-month>, in its <calendar-date>.
+    var cal = event.target.closest && event.target.closest("calendar-date.rx-calendar");
+    if (!cal || !(event.key in STEPS)) return;
+    var step = STEPS[event.key];
+    if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && getComputedStyle(cal).direction === "rtl") step = -step;
+    lastStep.set(cal, { step: step, from: cal.focusedDate ? String(cal.focusedDate) : null });
+  }, true);
+
   // Moving the focus (arrows, the month buttons) changes the month shown.
   document.addEventListener("focusday", function (event) {
     var cal = event.target;
-    if (cal.classList && cal.classList.contains("rx-calendar")) calendarHeading(cal, event.detail);
+    if (!cal.classList || !cal.classList.contains("rx-calendar")) return;
+    var closed = closedTest(calendarInput(cal));
+    var moved = lastStep.get(cal);
+    lastStep.delete(cal);
+    if (closed && moved && event.detail instanceof Date && closed(isoOf(event.detail))) {
+      var next = openDay(cal, closed, isoOf(event.detail), moved.step);
+      if (next || moved.from) { focusDay(cal, next || moved.from); return; }
+    }
+    calendarHeading(cal, event.detail);
   }, true);
 
   // The calendar opens under its field (above it when there's no room),
@@ -1073,7 +1187,14 @@
     var cal = pop.querySelector("calendar-date");
     if (!input || !cal) return;
     if (ISO_DATE.test(input.value)) { cal.value = input.value; cal.focusedDate = input.value; }
-    calendarHeading(cal, ISO_DATE.test(input.value) ? input.value : cal.getAttribute("min") > today() ? cal.getAttribute("min") : null);
+    var start = ISO_DATE.test(input.value) ? input.value : cal.getAttribute("min") > today() ? cal.getAttribute("min") : null;
+    // Opened on a closed day (none chosen yet): the focus starts on the next open one.
+    var closed = closedTest(input);
+    if (closed && !ISO_DATE.test(input.value)) {
+      var open = openDay(cal, closed, start || today(), 1);
+      if (open) { cal.focusedDate = open; start = open; }
+    }
+    calendarHeading(cal, start);
     var box = (input.closest(".rx-affix") || input).getBoundingClientRect();
     var height = pop.offsetHeight, width = pop.offsetWidth;
     var top = box.bottom + 6;
@@ -2019,6 +2140,7 @@
     scope.querySelectorAll("[data-rx-chart]").forEach(setupChart);
     if (root.matches && root.matches("[data-rx-key]")) setupKey(root);
     scope.querySelectorAll("[data-rx-key]").forEach(setupKey);
+    scope.querySelectorAll("[data-rx-disabled-dates]").forEach(setupDatePicker);
     applyAllWhen(scope);
   }
 

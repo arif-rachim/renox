@@ -367,10 +367,6 @@
       "minutes": ":n min",
       "order": "The end must come after the start."
     },
-    "blocked": {
-      "unavailable": "That day can't be booked: pick another one.",
-      "hint": "Days we can't take are greyed out on the calendar."
-    },
     "swatches": {
       "sold_out": "sold out"
     },
@@ -404,7 +400,6 @@
       "quantity": "A number with − and + buttons.",
       "keypad": "A counter's number pad, typing into the amount.",
       "datetime": "A start and an end with hours, sent as two date-times.",
-      "blocked": "The kit's date picker with closed days.",
       "swatches": "Variants as chips; a change asks the server for the price and stock.",
       "send": "Send the form",
       "received": "The server accepted: :summary",
@@ -423,8 +418,6 @@
       "out_of_stock": "Out of stock",
       "booked": "Booking :slot (a demo: nothing is saved).",
       "errors": {
-        "past_day": "Pick today or a day after it.",
-        "closed_day": "The shop is closed that day: pick another one.",
         "past_start": "A rental can't start in the past."
       }
     }

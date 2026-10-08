@@ -314,6 +314,7 @@ part is a macro: you import it into a template, then call it like a function.
     {{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pickup"]], selected="courier") }}
     {% call show_when("delivery", "courier") %}{{ input("address", "Address") }}{% endcall %} {# required_if #}
     {{ date_picker("ships_on", "Ships on") }} {# NaiveDate #}
+    {{ date_picker("visit_on", "Visit", disabled_dates=full_days, closed_weekdays=[0]) }} {# 0 = Sunday; also none_of on the server #}
     {{ file("photo", "Photo", accept="image/*", preview=true) }} {# enctype="multipart/form-data" #}
     {{ input("api_key", "API key", value=key, readonly=true, copyable=true) }}
     {{ tags_input("keywords", "Keywords") }} {# Vec<String> + #[serde(default)] #}

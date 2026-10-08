@@ -250,6 +250,10 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.choose_files", "Choose files or drop them here"),
             ("ui.current_file", "Current file"),
             ("ui.choose_date", "Choose a date"),
+            (
+                "ui.date_unavailable",
+                "That day can't be chosen: pick another one.",
+            ),
             ("ui.previous_month", "Previous month"),
             ("ui.next_month", "Next month"),
             ("ui.search", "Search"),

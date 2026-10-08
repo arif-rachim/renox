@@ -1,7 +1,6 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, confirm, action_sheet, select, empty, table, link_button %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, confirm, action_sheet, select, empty, table, link_button, date_picker %}
 {% from "blocks/month_calendar.html" import month_calendar %}
-{% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
 {% from "plans/_parts.html" import assets, status as status_badge, visit_status %}
 {% block seo %}{{ seo(title=t('plans.show.title', bike=bike.name)) }}{% endblock %}
 
@@ -32,7 +31,7 @@
             {%- if row.changeable %}
             <div class="bs-visit__actions">
               {% call action_sheet("move-" ~ row.visit.id, t('plans.show.move'), route('plans.visits.move', row.visit.id), t('plans.show.move_title'), description=t('plans.show.move_text'), size="small") %}
-                {{ date_picker_blocked("day", t('plans.fields.day'), full, closed_weekdays=closed, value=row.day, min=min_day, max=max_day, required=true, id="move-day-" ~ row.visit.id) }}
+                {{ date_picker("day", t('plans.fields.day'), disabled_dates=full, closed_weekdays=closed, value=row.day, min=min_day, max=max_day, required=true, id="move-day-" ~ row.visit.id) }}
               {% endcall %}
               {{ confirm("skip-" ~ row.visit.id, t('plans.show.skip'), route('plans.visits.skip', row.visit.id), t('plans.show.skip_title'), t('plans.show.skip_text'), confirm_label=t('plans.show.skip'), cancel_label=t('plans.show.keep'), method="POST", size="small", modal_icon=none) }}
             </div>

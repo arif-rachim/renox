@@ -250,10 +250,6 @@
 .bs-datetime__summary:empty { display: none; }
 .bs-datetime__summary[data-bs-invalid] { color: var(--rx-danger-text); }
 
-/* ---------- date_picker_blocked ---------- */
-
-.bs-blocked { display: grid; min-width: 0; }
-
 /* ---------- swatches ---------- */
 
 .bs-swatches { border: 0; margin: 0; padding: 0; min-width: 0; }

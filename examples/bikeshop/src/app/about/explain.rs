@@ -96,8 +96,8 @@ pub fn entries() -> Vec<Explanation> {
             purpose: "Every UI block the bike shop adds to Renox's kit, working, with its \
                   macro's signature: a photo gallery, a two-handle range, a quantity \
                   stepper, a counter keypad, a kanban board, a month calendar, an \
-                  availability timeline, a date and time range, a date picker with closed \
-                  days, variant chips, a history timeline and plan cards. The other pages \
+                  availability timeline, a date and time range, variant chips, a history \
+                  timeline and plan cards. The other pages \
                   use them; this one shows them side by side.",
             who: "Developers who want one of the blocks on their own page, and anyone \
               checking how they look and behave (keyboard, phone, dark mode).",
@@ -127,9 +127,8 @@ pub fn entries() -> Vec<Explanation> {
                       digits, one date-time per end, a radio's value), so \
                       `Valid<BlocksForm>` reads them like any form: `between(1, 5)`, \
                       `gt(\"starts_at\", …)` for the end, and `one_of` without the \
-                      sold-out size. Its `after` hook refuses closed days and past dates \
-                      again on the server: the greyed-out calendar is only a help, and \
-                      anyone can send any date.",
+                      sold-out size. Its `after` hook refuses a rental starting in the \
+                      past again on the server: anyone can send any date.",
                 },
                 Feature {
                     api: "Query<T>",

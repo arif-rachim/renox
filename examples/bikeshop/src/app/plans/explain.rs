@@ -292,9 +292,9 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Bike shop blocks",
                     why: "The kit has no calendar of events, so the shop's `month_calendar` \
                           block shows the upcoming visits on a month grid that turns into a \
-                          list on a phone; \"Move\" uses the `date_picker_blocked` block, \
-                          the kit's date picker with the full and closed days greyed out (the \
-                          server checks again).",
+                          list on a phone; \"Move\" uses the kit's `date_picker` with \
+                          `disabled_dates` and `closed_weekdays`: the full and closed days are \
+                          greyed out (the server checks again).",
                 },
                 Feature {
                     api: "UI kit: action_sheet",
@@ -327,7 +327,6 @@ pub fn entries() -> Vec<Explanation> {
                 DEMO,
                 "examples/bikeshop/resources/views/plans/show.html",
                 "examples/bikeshop/resources/views/blocks/month_calendar.html",
-                "examples/bikeshop/resources/views/blocks/date_picker_blocked.html",
                 TESTS,
                 BROWSER,
             ],

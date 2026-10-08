@@ -539,7 +539,7 @@
       "who": "Clientes con una bici registrada.",
       "under_hood": "Al cargar: las bicis del cliente, las tiendas, las tareas y los pedidos de taller del periodo en la tienda elegida (una consulta, sumada por día en Rust) para los días completos. Al reservar: `Valid<BookForm>` con su hook `after`, luego `capacity::book` (fila de la tienda bloqueada, los minutos del día sumados de nuevo, el pedido de taller y sus tareas escritos), la confirmación y una redirección a la página del pedido de taller. La tarea programada `workshop:reminders` se lo recuerda al cliente la tarde anterior.",
       "features": {
-        "0": "El `date_picker` del kit con los días completos y los días que la tienda cierra en gris (`isDateDisallowed` de Cally), para que la gente elija un día con hueco en lugar de enterarse por un error; el servidor lo vuelve a comprobar, porque cualquiera puede enviar cualquier fecha.",
+        "0": "El `date_picker` del kit con los días completos y los días que la tienda cierra en gris y saltados por las flechas, para que la gente elija un día con hueco en lugar de enterarse por un error; el servidor lo vuelve a comprobar, porque cualquiera puede enviar cualquier fecha.",
         "1": "Las tareas como `checkbox_list` (un `Vec<i64>`, cada una con su tiempo y precio como pista), los paquetes como `radio` con una línea sobre lo que incluye cada uno: ambos se leen de un vistazo y son campos de formulario normales que funcionan sin JavaScript.",
         "2": "El formulario hace `hx-get` a esta misma página en cada cambio y solo sustituye el selector de día y el presupuesto (`hx-select=\"#booking-live\"`), porque los días completos dependen de la tienda y de los minutos elegidos. Un solo handler sirve la página y la actualización, sin API JSON.",
         "3": "El hook `after` comprueba que la bici es del cliente, que se ha elegido algo y que el día tiene hueco (`capacity::check_day`): la primera comprobación de capacidad, que pone el error junto al campo.",
@@ -625,13 +625,13 @@
     },
     "about.blocks": {
       "title": "Bloques de la tienda",
-      "purpose": "Cada bloque de interfaz que la tienda de bicis añade al kit de Renox, funcionando, con la firma de su macro: una galería de fotos, un rango con dos tiradores, un selector de cantidad, un teclado de mostrador, un tablero kanban, un calendario mensual, una línea de disponibilidad, un rango de fecha y hora, un selector de fecha con días cerrados, chips de variante, una línea de historial y tarjetas de planes. Las demás páginas los usan; esta los muestra uno al lado de otro.",
+      "purpose": "Cada bloque de interfaz que la tienda de bicis añade al kit de Renox, funcionando, con la firma de su macro: una galería de fotos, un rango con dos tiradores, un selector de cantidad, un teclado de mostrador, un tablero kanban, un calendario mensual, una línea de disponibilidad, un rango de fecha y hora, chips de variante, una línea de historial y tarjetas de planes. Las demás páginas los usan; esta los muestra uno al lado de otro.",
       "who": "Desarrolladores que quieren uno de los bloques en su propia página, y cualquiera que compruebe cómo se ven y se comportan (teclado, móvil, modo oscuro).",
       "under_hood": "Sin base de datos. `src/app/about/blocks.rs` prepara los datos de la demo (un mes de visitas en días fijos del mes que se muestre, las reservas de hoy, un tablero del taller) y dibuja `about/blocks.html`. `public/blocks/blocks.js` prepara cada bloque a partir de sus atributos `data-bs-*`, en la página y en lo que htmx inserte (`htmx:load`), sin handlers en línea, así que funciona con `CSP=strict`. Enviar el formulario hace `POST /about/blocks/form`: `Valid<T>` lo comprueba, y si todo está bien redirige de vuelta al formulario con un mensaje flash (no se guarda nada); mover una tarjeta del kanban envía la tarjeta, la columna y la posición a `POST /about/blocks/kanban`, que responde `204` (o un `422` que devuelve la tarjeta a su sitio).",
       "features": {
         "0": "El kit no tiene galería, kanban ni calendario, y el dueño eligió construirlos en el ejemplo y no en Renox: macros en `resources/views/blocks/`, escritas como las del kit (argumentos con nombre, clases `bs-` sobre los tokens `--rx-*` del kit), con una hoja de estilos y un script en `public/blocks/`, para que puedan pasar a un crate más adelante. Una página importa uno como un componente del kit (`{% from \"blocks/gallery.html\" import gallery %}`); por dentro, los bloques llaman a las propias macros del kit (`sheet`, `date_picker`).",
         "1": "La foto ampliada de la galería se abre en el `sheet` del kit: el foco entra y vuelve, y Escape y el fondo lo cierran. El bloque reutiliza el diálogo del kit en lugar de escribir otro.",
-        "2": "Cada bloque de formulario envía campos normales (un número, los dígitos del teclado, una fecha y hora por extremo, el valor de un radio), así que `Valid<BlocksForm>` los lee como cualquier formulario: `between(1, 5)`, `gt(\"starts_at\", …)` para el final, y `one_of` sin la talla agotada. Su hook `after` vuelve a rechazar en el servidor los días cerrados y las fechas pasadas: el calendario en gris es solo una ayuda, y cualquiera puede enviar cualquier fecha.",
+        "2": "Cada bloque de formulario envía campos normales (un número, los dígitos del teclado, una fecha y hora por extremo, el valor de un radio), así que `Valid<BlocksForm>` los lee como cualquier formulario: `between(1, 5)`, `gt(\"starts_at\", …)` para el final, y `one_of` sin la talla agotada. Su hook `after` vuelve a rechazar en el servidor un alquiler que empieza en el pasado: cualquiera puede enviar cualquier fecha.",
         "3": "El filtro de precio es un formulario GET: los dos tiradores del rango se convierten en `?price_min=…&price_max=…`, las flechas del calendario en `?month=…` y un hueco libre de la línea de disponibilidad en `?slot=…`. Cada estado tiene su propia URL, y un mes que no se puede mostrar vuelve al actual.",
         "4": "Un chip de variante pide a `GET /about/blocks/variant` el precio y el stock (`hx-get` con `hx-include`) e inserta `about/_variant.html`, no la página entera. Las flechas del calendario son enlaces con boost y `hx-select=\"#calendar\"`, así que solo cambia el calendario. Mover una tarjeta del kanban es un POST de htmx desde un formulario oculto, que recibe la cabecera CSRF de Renox como cualquier petición htmx.",
         "5": "Las diapositivas de la galería y las tarjetas del kanban se deslizan con Motion sobre `transform`; con `prefers-reduced-motion` saltan directamente."
@@ -1899,7 +1899,7 @@
         "1": "Saltar o mover una visita exige el plan al día. El guard `require_subscription` de renox-billing comprueba la suscripción `default` de un usuario; aquí cada bici tiene la suya, así que las rutas de visitas preguntan `Billing::of(…).named(\"bike-…\").subscribed()` y devuelven al cliente con un mensaje mientras haya un pago pendiente, como haría el guard.",
         "2": "Las visitas de esta página las creó `plans:visits`, una tarea que corre cada mañana a las 06:00 y reserva las visitas de la semana siguiente como órdenes de trabajo; la misma ejecución registra las visitas perdidas y termina los planes cuyo último día ya pasó. Reservar solo una semana por delante hace que un cambio de plan, una pausa o una retención surtan efecto en la siguiente ejecución, con pocas órdenes de trabajo que deshacer.",
         "3": "Mover una visita es la propia reprogramación del taller: una transacción que toma la fila de la tienda, comprueba que el día tiene hueco para los minutos de la visita y la mueve, así que un plan no puede sobrecargar el taller.",
-        "4": "El kit no tiene calendario de eventos, así que el bloque `month_calendar` de la tienda muestra las próximas visitas en una cuadrícula mensual que se convierte en lista en el móvil; \"Mover\" usa el bloque `date_picker_blocked`, el selector de fecha del kit con los días llenos y cerrados en gris (el servidor vuelve a comprobarlo).",
+        "4": "El kit no tiene calendario de eventos, así que el bloque `month_calendar` de la tienda muestra las próximas visitas en una cuadrícula mensual que se convierte en lista en el móvil; \"Mover\" usa el `date_picker` del kit con `disabled_dates` y `closed_weekdays`: los días llenos y cerrados salen en gris (el servidor vuelve a comprobarlo).",
         "5": "\"Mover\" y \"Cambiar de plan\" abren un panel con su formulario (un 422 se queda en el panel, un éxito recarga la página con un aviso); \"Saltar\" y \"Cancelar\" preguntan antes con el `confirm` del kit."
       }
     },
@@ -2163,10 +2163,6 @@
       "minutes": ":n min",
       "order": "El final debe ser posterior al inicio."
     },
-    "blocked": {
-      "unavailable": "Ese día no se puede reservar: elige otro.",
-      "hint": "Los días que no podemos atender aparecen en gris en el calendario."
-    },
     "swatches": {
       "sold_out": "agotado"
     },
@@ -2200,7 +2196,6 @@
       "quantity": "Un número con botones − y +.",
       "keypad": "El teclado numérico del mostrador, que escribe en el importe.",
       "datetime": "Un inicio y un fin con horas, enviados como dos fechas con hora.",
-      "blocked": "El selector de fechas del kit con días cerrados.",
       "swatches": "Variantes como fichas; al cambiar se piden al servidor el precio y el stock.",
       "send": "Enviar el formulario",
       "received": "El servidor lo aceptó: :summary",
@@ -2219,8 +2214,6 @@
       "out_of_stock": "Agotado",
       "booked": "Reserva de :slot (una demostración: no se guarda nada).",
       "errors": {
-        "past_day": "Elige hoy o un día posterior.",
-        "closed_day": "La tienda está cerrada ese día: elige otro.",
         "past_start": "Un alquiler no puede empezar en el pasado."
       }
     }
@@ -4625,6 +4618,7 @@
     "choose_files": "Elige archivos o suéltalos aquí",
     "current_file": "Archivo actual",
     "choose_date": "Elige una fecha",
+    "date_unavailable": "Ese día no se puede elegir: elige otro.",
     "previous_month": "Mes anterior",
     "next_month": "Mes siguiente",
     "search": "Buscar",
