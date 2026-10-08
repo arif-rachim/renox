@@ -48,7 +48,7 @@ const boxes = (page) =>
       const r = el.getBoundingClientRect();
       return { left: r.left, right: r.right, width: r.width, height: r.height, top: r.top };
     };
-    return { dock: box(document.querySelector('#explain-dock')), main: box(document.querySelector('#main')), width: innerWidth };
+    return { dock: box(document.querySelector('#explain-dock')), main: box(document.querySelector('#main')), width: document.documentElement.clientWidth };
   });
 
 async function dark(page, on) {
@@ -88,7 +88,10 @@ describe('the docked panel at 1440 px', () => {
       const share = dock.width / width;
       assert.ok(share >= 0.28 && share <= 0.42, `the panel takes ${Math.round(share * 100)}% of the width`);
       // Under the public bar, which keeps the whole width, down to the bottom.
-      const bar = await page.eval(() => document.querySelector('.rx-navbar').getBoundingClientRect());
+      const bar = await page.eval(() => {
+        const r = document.querySelector('.rx-navbar').getBoundingClientRect();
+        return { bottom: r.bottom, width: r.width };
+      });
       assert.ok(Math.abs(dock.top - bar.bottom) < 2, `the panel starts under the bar (${dock.top}, ${bar.bottom})`);
       assert.ok(Math.abs(bar.width - width) < 2, 'the bar spans the panel too');
       assert.ok(Math.abs(dock.top + dock.height - 900) < 2, 'down to the bottom');

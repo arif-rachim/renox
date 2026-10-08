@@ -110,9 +110,11 @@
 /* ---------- The content (docked or in the sheet) ---------- */
 
 .bs-explain { display: grid; gap: var(--rx-space-6); min-width: 0; }
-.bs-explain__purpose { margin: 0; font: var(--rx-type-lead); color: var(--rx-label); }
+.bs-explain__purpose { font: var(--rx-type-lead); color: var(--rx-label); }
 .bs-explain__who { display: grid; gap: var(--rx-space-2); }
-.bs-explain__who > p { margin: 0; font: var(--rx-type-note); color: var(--rx-secondary-label); }
+.bs-explain__who-text { font: var(--rx-type-note); color: var(--rx-secondary-label); }
+.bs-explain__purpose p, .bs-explain__who-text p { margin: 0; }
+.bs-explain__purpose code, .bs-explain__who-text code { font-family: var(--rx-mono); font-size: 0.9em; background: var(--rx-fill); border-radius: 4px; padding: 1px 4px; overflow-wrap: anywhere; }
 .bs-explain__section { display: grid; gap: var(--rx-space-3); min-width: 0; }
 .bs-explain__heading {
   margin: 0; font: var(--rx-type-caption); text-transform: var(--rx-caption-case);

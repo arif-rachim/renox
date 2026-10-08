@@ -267,7 +267,12 @@ fn every_code_sample_is_a_short_region_that_exists() {
     let mut shown = HashSet::new();
     for e in explain::all() {
         let route = e.route;
-        if e.code.len() > 3 {
+        if e.code.is_empty() {
+            problems.push(format!(
+                "`{route}`: no code sample: mark the handler (and the template's key part) \
+                 and name them in `code`"
+            ));
+        } else if e.code.len() > 3 {
             problems.push(format!(
                 "`{route}`: {} code samples, keep to three",
                 e.code.len()

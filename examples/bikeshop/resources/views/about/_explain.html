@@ -9,9 +9,10 @@
 {% from "renox/ui.html" import badge, tabs, tab_panel, icon_button %}
 {% macro explain(about, explain_id) -%}
 <div class="bs-explain">
-  <p class="bs-explain__purpose">{{ about.purpose }}</p>
+  {#- Both may hold Markdown (`code`, **bold**). -#}
+  <div class="bs-explain__purpose">{{ about.purpose | markdown }}</div>
   <div class="bs-explain__who">
-    <p>{{ about.who }}</p>
+    <div class="bs-explain__who-text">{{ about.who | markdown }}</div>
     <span class="bs-badges" aria-label="{{ t('about.panel.roles') }}">{% for role in about.audience %}{{ badge(role.label) }}{% endfor %}{{ badge(about.flow.label, kind="info") }}</span>
   </div>
 
