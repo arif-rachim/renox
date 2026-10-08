@@ -1,11 +1,5 @@
-/* Bike shop blocks: the styles of resources/views/blocks/date_picker_blocked.html
-   and of the /about/blocks showcase page. The other blocks moved to the
-   renox-blocks crate (#347), which loads its own stylesheet. Classes start
-   with `bs-`, on the kit's tokens (--rx-*). */
-
-/* ---------- date_picker_blocked ---------- */
-
-.bs-blocked { display: grid; min-width: 0; }
+/* The styles of the /about/blocks showcase page (the blocks themselves are
+   renox-blocks'; the date picker with closed days is the kit's date_picker). */
 
 /* ---------- /about/blocks (the blocks' showcase page) ---------- */
 

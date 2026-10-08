@@ -1,6 +1,5 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, select, radio, checkbox_list, textarea, button, form_errors, empty, link_button %}
-{% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
+{% from "renox/ui.html" import page_header, card, select, radio, checkbox_list, textarea, button, form_errors, empty, link_button, date_picker %}
 {% from "workshop/_parts.html" import styles %}
 {% block seo %}{{ seo(title=t('workshop.book.title'), description=t('workshop.book.lead')) }}{% endblock %}
 
@@ -31,7 +30,7 @@
       {% endcall %}
       <div id="booking-live" class="bs-booking__summary rx-stack" aria-live="polite" data-bs-reveal>
         {% call card(title=t('workshop.book.when')) %}
-          {{ date_picker_blocked("day", t('workshop.fields.day'), full, closed_weekdays=closed, value=day, min=min_day, max=max_day, required=true, hint=t('workshop.book.day_hint', minutes=capacity or 0)) }}
+          {{ date_picker("day", t('workshop.fields.day'), disabled_dates=full, closed_weekdays=closed, value=day, min=min_day, max=max_day, required=true, hint=t('workshop.book.day_hint', minutes=capacity or 0)) }}
         {% endcall %}
         {% call card(title=t('workshop.book.estimate')) %}
           {%- if chosen %}

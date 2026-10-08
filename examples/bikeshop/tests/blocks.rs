@@ -15,13 +15,9 @@ fn today(app: &TestApp) -> NaiveDate {
     blocks::today(&app.state().config)
 }
 
-/// A day the demo shop is open, `from` days ahead or later.
+/// The day `from` days ahead.
 fn open_day(app: &TestApp, from: i64) -> NaiveDate {
-    let today = today(app);
-    (from..from + 14)
-        .map(|n| today + Duration::days(n))
-        .find(|d| !blocks::is_closed(today, *d))
-        .unwrap()
+    today(app) + Duration::days(from)
 }
 
 #[renox::test]
@@ -38,7 +34,6 @@ async fn the_page_shows_every_block_with_its_signature() {
         "class=\"rx-month\"",
         "class=\"rx-availability\"",
         "data-rx-datetime-range",
-        "data-bs-blocked",
         "rx-swatches--size",
         "rx-swatches--colour",
         "class=\"rx-history\"",
@@ -56,7 +51,6 @@ async fn the_page_shows_every_block_with_its_signature() {
         "month_calendar(month, events=[]",
         "availability(columns, rows",
         "datetime_range(name_start, name_end",
-        "date_picker_blocked(name, label, disabled_dates=[]",
         "swatches(name, label, options",
         "history(items",
         "compare_plans(plans, features=[]",
@@ -85,7 +79,6 @@ async fn the_blocks_render_their_fields_for_valid_t() {
         .assert_see(r#"name="quantity" type="number""#)
         .assert_see(r#"type="hidden" name="starts_at""#)
         .assert_see(r#"type="hidden" name="ends_at""#)
-        .assert_see(r#"name="visit_on""#)
         .assert_see(r#"type="radio" name="size" value="M" checked"#)
         // The sold-out size is shown, disabled and said to be sold out.
         .assert_see(r#"name="size" value="XL" disabled"#)
@@ -96,9 +89,6 @@ async fn the_blocks_render_their_fields_for_valid_t() {
         .assert_see("Book Trail 5 at 09:00")
         // The variant chips ask for the price and the stock.
         .assert_see(r#"hx-get="/about/blocks/variant""#);
-    // The closed days, for the calendar to grey out.
-    let closed = blocks::closed_days(today(&app));
-    page.assert_see(&format!("data-bs-blocked='[\"{}\"", closed[0]));
 }
 
 #[renox::test]
@@ -155,7 +145,6 @@ async fn the_price_filter_and_a_free_slot_come_back_in_the_address() {
 async fn the_form_blocks_are_accepted_when_valid() {
     let app = TestApp::new(bikeshop::app()).await;
     let start = open_day(&app, 1);
-    let visit = open_day(&app, 1).to_string();
     let starts_at = format!("{start}T10:00");
     let ends_at = format!("{}T12:30", start + Duration::days(1));
     app.post(
@@ -165,7 +154,6 @@ async fn the_form_blocks_are_accepted_when_valid() {
             ("paid", "350000"),
             ("starts_at", &starts_at),
             ("ends_at", &ends_at),
-            ("visit_on", &visit),
             ("size", "M"),
             ("colour", "sand"),
         ],
@@ -181,7 +169,6 @@ async fn the_form_blocks_are_accepted_when_valid() {
 async fn the_server_refuses_what_the_blocks_only_discourage() {
     let app = TestApp::new(bikeshop::app()).await;
     let today = today(&app);
-    let closed = blocks::closed_days(today)[0].to_string();
     let start = open_day(&app, 1);
     let starts_at = format!("{start}T10:00");
     let before = format!("{start}T09:00");
@@ -191,7 +178,6 @@ async fn the_server_refuses_what_the_blocks_only_discourage() {
             ("paid", "1000".to_owned()),
             ("starts_at", starts_at.clone()),
             ("ends_at", format!("{start}T11:00")),
-            ("visit_on", open_day(&app, 1).to_string()),
             ("size", "S".to_owned()),
             ("colour", "teal".to_owned()),
         ];
@@ -203,12 +189,11 @@ async fn the_server_refuses_what_the_blocks_only_discourage() {
         form
     };
     for (field, value) in [
-        ("visit_on", closed.clone()),                          // a closed day
-        ("visit_on", (today - Duration::days(1)).to_string()), // the past
-        ("size", "XL".to_owned()),                             // sold out
-        ("ends_at", before.clone()),                           // ends before it starts
-        ("quantity", "9".to_owned()),                          // over the stepper's max
-        ("paid", "12a".to_owned()),                            // not digits
+        ("starts_at", format!("{}T10:00", today - Duration::days(1))), // the past
+        ("size", "XL".to_owned()),                                     // sold out
+        ("ends_at", before.clone()),                                   // ends before it starts
+        ("quantity", "9".to_owned()),                                  // over the stepper's max
+        ("paid", "12a".to_owned()),                                    // not digits
     ] {
         let form = good(field, value);
         let pairs: Vec<(&str, &str)> = form.iter().map(|(k, v)| (*k, v.as_str())).collect();

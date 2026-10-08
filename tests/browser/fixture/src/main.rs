@@ -183,6 +183,11 @@ impl Module for Pages {
                 Redirect::to("/widgets")
             })
             .get("/overlays", || async { view("overlays.html", context! {}) })
+            // The navbar with a phone tab bar and a search behind a button.
+            .get("/tabs", || async { view("tabs.html", context! {}) })
+            .name("tabs.home")
+            .get("/tabs/orders", || async { view("tabs.html", context! {}) })
+            .name("tabs.orders")
             .post("/toast", || async {
                 Toast::warning("Stock is low.")
                     .link("Unsafe", "javascript:alert(1)")

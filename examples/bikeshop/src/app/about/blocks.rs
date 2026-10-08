@@ -11,8 +11,8 @@
 //! This page shows each block with demo data and its macro's signature.
 //! The routes behind the demos:
 //! - `POST /about/blocks/form`: the form blocks (quantity, keypad, date and
-//!   time range, a date picker with closed days, variant chips), read with
-//!   `Valid<T>` and checked again on the server;
+//!   time range, variant chips), read with `Valid<T>` and checked again on
+//!   the server;
 //! - `GET /about/blocks/variant`: the price and stock of a variant, the
 //!   fragment the variant chips ask for with htmx;
 //! - `POST /about/blocks/kanban`: a card moved on the demo board (nothing is
@@ -49,17 +49,6 @@ pub fn not_pages() -> Vec<NotAPage> {
 /// test's `travel` moves it).
 pub fn today(config: &renox::Config) -> NaiveDate {
     config.timezone.local(renox::db::now().timestamp()).date()
-}
-
-/// The demo's closed days: Sundays, and two days of a staff training
-/// (three and four days from now).
-pub fn closed_days(today: NaiveDate) -> Vec<NaiveDate> {
-    vec![today + Duration::days(3), today + Duration::days(4)]
-}
-
-/// Whether the demo shop is closed on `day`.
-pub fn is_closed(today: NaiveDate, day: NaiveDate) -> bool {
-    day.weekday().num_days_from_sunday() == 0 || closed_days(today).contains(&day)
 }
 
 /// The variants of the demo bike, and the one sold out.
@@ -321,7 +310,6 @@ async fn page(State(state): State<AppState>, Query(query): Query<PageQuery>) -> 
         .collect();
     let (price, stock) = variant_of("M", "teal");
 
-    let closed: Vec<String> = closed_days(today).iter().map(|d| d.to_string()).collect();
     let price_filter = match (query.price_min, query.price_max) {
         (Some(low), Some(high)) => Some(context! { low, high }),
         _ => None,
@@ -344,7 +332,6 @@ async fn page(State(state): State<AppState>, Query(query): Query<PageQuery>) -> 
             colours,
             price,
             stock,
-            closed,
             columns => board(),
             price_filter,
             price_min => PRICE_MIN,
@@ -365,8 +352,6 @@ pub struct BlocksForm {
     pub starts_at: Option<NaiveDateTime>,
     /// From `datetime_range`.
     pub ends_at: Option<NaiveDateTime>,
-    /// From `date_picker_blocked`.
-    pub visit_on: Option<NaiveDate>,
     /// From the size `swatches`.
     pub size: Option<String>,
     /// From the colour `swatches`.
@@ -381,7 +366,6 @@ impl Validate for BlocksForm {
         v.field("ends_at", &self.ends_at)
             .required()
             .gt("starts_at", &self.starts_at);
-        v.field("visit_on", &self.visit_on).required();
         // The sold-out size can't be bought, whatever the page sent.
         let sizes: Vec<&str> = SIZES
             .iter()
@@ -393,18 +377,10 @@ impl Validate for BlocksForm {
         v.field("colour", &self.colour).required().one_of(&colours);
     }
 
-    // The checks that need the shop's date: the page greys out the closed
-    // days, but anyone can send any date, so the server refuses them too.
+    // The check that needs the shop's date: anyone can send any date.
     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
         let today = today(&form.state.config);
         let lang = form.state.current_lang();
-        if let Some(day) = self.visit_on {
-            if day < today {
-                errors.add("visit_on", lang.t("blocks.page.errors.past_day", &[]));
-            } else if is_closed(today, day) {
-                errors.add("visit_on", lang.t("blocks.page.errors.closed_day", &[]));
-            }
-        }
         if let Some(start) = self.starts_at
             && start.date() < today
         {
@@ -416,7 +392,7 @@ impl Validate for BlocksForm {
 
 async fn submit(session: Session, lang: Lang, Valid(form): Valid<BlocksForm>) -> Result<Response> {
     let summary = format!(
-        "{} × {} {}, paid {}, rental {} → {}, visit on {}",
+        "{} × {} {}, paid {}, rental {} → {}",
         form.quantity.unwrap_or_default(),
         form.size.as_deref().unwrap_or_default(),
         form.colour.as_deref().unwrap_or_default(),
@@ -427,7 +403,6 @@ async fn submit(session: Session, lang: Lang, Valid(form): Valid<BlocksForm>) ->
         form.ends_at
             .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
             .unwrap_or_default(),
-        form.visit_on.map(|d| d.to_string()).unwrap_or_default(),
     );
     session.flash(
         "status",

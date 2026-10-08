@@ -42,8 +42,8 @@ const visible = (page, selector) =>
  *  The tab is clicked through the DOM: on CI, mouse events sent to a page with
  *  a live notification stream sometimes never reach it (#317, #327). */
 async function openMenu(page) {
-  await page.point('.bs-tabbar [data-rx-open="site-menu"]');
-  await page.eval(() => document.querySelector('.bs-tabbar [data-rx-open="site-menu"]').click());
+  await page.point('.rx-tabbar [data-rx-open="site-menu"]');
+  await page.eval(() => document.querySelector('.rx-tabbar [data-rx-open="site-menu"]').click());
   await page.waitFor(
     () => {
       const menu = document.querySelector('#site-menu');
@@ -85,18 +85,25 @@ describe('bikeshop on a phone', () => {
       }
       assert.ok(await visible(page, '#nav-cart'), 'the cart stays');
       assert.ok(await visible(page, '.rx-navbar [data-rx-open="about-page"]'), '"About this page" stays');
-      assert.ok(await visible(page, '.bs-tabbar'), 'the tab bar shows');
-      assert.equal(await page.eval(() => document.querySelector('.bs-tabbar [aria-current=page]')?.textContent.trim()), 'Shop');
+      assert.ok(await visible(page, '.rx-tabbar'), 'the tab bar shows');
+      assert.equal(await page.eval(() => document.querySelector('.rx-tabbar [aria-current=page]')?.textContent.trim()), 'Shop');
+      // Scrolled to the end, the footer sits above the tab bar, not under it.
+      const [footerBottom, barTop] = await page.eval(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        return [document.querySelector('.bs-footer').getBoundingClientRect().bottom, document.querySelector('.rx-tabbar').getBoundingClientRect().top];
+      });
+      assert.ok(footerBottom <= barTop, `the footer clears the tab bar (${footerBottom} > ${barTop})`);
+      await page.eval(() => window.scrollTo(0, 0));
       await shot(page, 'mobile-01-shop');
 
       // The search button opens the box under the bar and focuses it; Escape closes it.
-      await page.click('[data-bs-search-toggle]');
+      await page.click('[data-rx-search-toggle]');
       await page.waitFor(() => document.activeElement?.id === 'nav-search', { message: 'the search box focused' });
-      assert.equal(await page.eval(() => document.querySelector('[data-bs-search-toggle]').getAttribute('aria-expanded')), 'true');
+      assert.equal(await page.eval(() => document.querySelector('[data-rx-search-toggle]').getAttribute('aria-expanded')), 'true');
       await shot(page, 'mobile-02-search');
       await page.press('Escape');
-      await page.waitFor(() => !document.querySelector('.rx-navbar').classList.contains('bs-searching'), { message: 'the search box closed' });
-      assert.equal(await page.eval(() => document.activeElement?.hasAttribute('data-bs-search-toggle')), true, 'the focus goes back to the button');
+      await page.waitFor(() => !document.querySelector('.rx-navbar').classList.contains('rx-navbar--searching'), { message: 'the search box closed' });
+      assert.equal(await page.eval(() => document.activeElement?.hasAttribute('data-rx-search-toggle')), true, 'the focus goes back to the button');
 
       // The menu tab: the other links, the language and logging in.
       await openMenu(page);
@@ -109,7 +116,7 @@ describe('bikeshop on a phone', () => {
       await page.click('#site-menu form:nth-of-type(2) button');
       // Mid-load the document may have no root element yet, hence the `?.`.
       await page.waitFor(() => document.documentElement?.lang === 'es', { message: 'Spanish' });
-      assert.equal(await page.eval(() => document.querySelector('.bs-tabbar__tab span').textContent.trim()), 'Inicio');
+      assert.equal(await page.eval(() => document.querySelector('.rx-tabbar__label').textContent.trim()), 'Inicio');
       await openMenu(page);
       await page.click('#site-menu form:nth-of-type(1) button');
       await page.waitFor(() => document.documentElement?.lang === 'en', { message: 'English again' });
@@ -148,8 +155,8 @@ describe('bikeshop on a phone', () => {
       assert.ok(await visible(page, '.rx-navbar__links'), 'the links in the bar');
       assert.ok(await visible(page, '#nav-search'), 'the search box in the bar');
       assert.ok(await visible(page, '[aria-controls="language-menu"]'), 'the language in the bar');
-      assert.equal(await visible(page, '.bs-tabbar'), false, 'no tab bar');
-      assert.equal(await visible(page, '[data-bs-search-toggle]'), false, 'no search button');
+      assert.equal(await visible(page, '.rx-tabbar'), false, 'no tab bar');
+      assert.equal(await visible(page, '[data-rx-search-toggle]'), false, 'no search button');
     }));
 });
 

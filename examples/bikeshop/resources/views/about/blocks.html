@@ -6,7 +6,6 @@
     public/blocks/). -#}
 {% from "renox/ui.html" import page_header, card, input, button, link_button, alert, form_errors %}
 {% from "renox-blocks/blocks.html" import gallery, range_slider, quantity, keypad, kanban, month_calendar, availability, datetime_range, swatches, history, compare_plans %}
-{% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
 {% block seo %}{{ seo(title=t('blocks.page.title'), description=t('blocks.page.lead')) }}{% endblock %}
 
 {%- macro signature(text) -%}
@@ -22,7 +21,7 @@
 
   <nav aria-label="{{ t('blocks.page.contents') }}">
     <ul class="bs-showcase__toc" role="list">
-      {%- for anchor, name in [["gallery", "gallery"], ["form", "range_slider · quantity · keypad · datetime_range · date_picker_blocked · swatches"], ["filter", "range_slider (GET)"], ["kanban", "kanban"], ["calendar", "month_calendar"], ["availability", "availability"], ["history", "history"], ["plans", "compare_plans"]] %}
+      {%- for anchor, name in [["gallery", "gallery"], ["form", "range_slider · quantity · keypad · datetime_range · swatches"], ["filter", "range_slider (GET)"], ["kanban", "kanban"], ["calendar", "month_calendar"], ["availability", "availability"], ["history", "history"], ["plans", "compare_plans"]] %}
       <li><a class="rx-button rx-button--secondary rx-button--small" href="#{{ anchor }}">{{ name }}</a></li>
       {%- endfor %}
     </ul>
@@ -65,12 +64,6 @@
                hint=none, id=none, bag=none)') }}
       </div>
       <div class="bs-showcase__pair">
-        <div class="bs-showcase__demo">
-          {{ date_picker_blocked("visit_on", "Workshop visit", closed, closed_weekdays=[0], min=today, max=max_day, required=true) }}
-          <p class="rx-hint">{{ t('blocks.page.blocked') }}</p>
-          {{ signature('date_picker_blocked(name, label, disabled_dates=[], closed_weekdays=[], value=none,
-                    min=none, max=none, hint=none, required=false, id=none, bag=none)') }}
-        </div>
         <div class="bs-showcase__demo">
           {%- set chips = {"hx-get": route('about.blocks.variant'), "hx-trigger": "change", "hx-target": "#variant", "hx-swap": "outerHTML", "hx-include": "closest form"} %}
           {{ swatches("size", "Frame size", sizes, selected="M", attrs=chips, required=true) }}
