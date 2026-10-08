@@ -837,9 +837,9 @@ PostgreSQL suite 2.5x slower (reconnects).
 - `README.md`: agents don't edit it (§4.11); the owner keeps it. What follows is for the owner.
   It is compiled (`ReadMe`): keep its Rust blocks complete. It's the front page, so it
   sells: tagline, why, GIF, 3-line quick start, a short taste, fold-out feature tour, comparison
-  with Loco/Axum, then status. Keep claims true (checked against the code). Since
-  1.0.0-rc.1 it has the crates.io/docs.rs badges, installs from crates.io (`--version` while
-  1.0 is a release candidate) and has a "Use Renox with Claude Code" section. Its docs links
+  with Loco/Axum, then status. Keep claims true (checked against the code). It has
+  the crates.io/docs.rs badges, installs with `cargo install renox-cli` (no `--version` since
+  1.0.0, #139) and has a "Use Renox with Claude Code" section that clones the release's tag. Its docs links
   stay repository files (they work on GitHub and crates.io, and the site rewrites them to its
   own pages); the top and "Documentation" point readers at https://docs.renox.rs (#141),
   which is also the crates' `homepage`.
@@ -930,9 +930,9 @@ PostgreSQL suite 2.5x slower (reconnects).
   (release-site.yml: on pushes to main that touch the docs, builds site/ for the owner's server,
   which pulls it),
   **semver checks** (pull requests:
-  `cargo semver-checks -p renox-core -p renox --baseline-rev origin/<base> --release-type
-  minor`, informational until the first release; install it with `cargo install --locked
-  cargo-semver-checks` to run it locally).
+  `cargo semver-checks -p renox-core -p renox --release-type minor` against the latest
+  release on crates.io; it fails on a breaking change since 1.0.0 (#139); install it with
+  `cargo install --locked cargo-semver-checks` to run it locally).
 - MSRV is `rust-version` in the workspace `Cargo.toml` (1.94, set by sqlx 0.9); the `msrv` job
   uses the same number, so raise both together and note it in the PR description.
 - After pushing, watch CI (`gh run watch <id> -R arif-rachim/renox --exit-status`) and tick the
@@ -1361,8 +1361,10 @@ picks the build, not the terminal.
   plugins renox-oauth/-admin/-billing (#147/#148/#155) and roles per branch (#244), with the
   workspace at `1.0.0-rc.5`, published (tag `v1.0.0-rc.5`). Then the coverage epic (#246:
   #277, #280, #291, #293, #295) and its fixes, with the workspace set to `1.0.0-rc.6`
-  (published when the owner runs `cargo publish`). Left: 1.0.0 when the owner is happy with
-  the rc (ask before every `cargo publish`).
+  (published). Then the bike shop (#231), its design system and one example (#343, #351), and
+  **1.0.0: released 2026-10-08** (#356, tag `v1.0.0`, the ten crates on crates.io including
+  the new renox-blocks, a GitHub release; #138). After it, #139: no `--version` anywhere, the
+  semver job against crates.io. Ask the owner before every `cargo publish`.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
