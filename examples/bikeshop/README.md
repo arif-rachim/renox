@@ -243,11 +243,8 @@ on the kit's tokens, and the crate's script loads a block's code only on pages t
 (Web Animations on `transform`, nothing under `prefers-reduced-motion`, no inline handlers, so
 `CSP=strict` works).
 
-One block is still the shop's own: `date_picker_blocked`, in
-[resources/views/blocks/](resources/views/blocks/) with its behaviour in
-[public/blocks/blocks.js](public/blocks/blocks.js) and its style in
-[public/blocks/blocks.css](public/blocks/blocks.css) (`bs-` classes, `data-bs-*` attributes).
-Form blocks send plain fields, so `Valid<T>` reads them; the server still checks every value.
+The workshop's booking days (full and closed days greyed out) are the kit's own `date_picker`
+with `disabled_dates` and `closed_weekdays`. Form blocks send plain fields, so `Valid<T>` reads them; the server still checks every value.
 [`/about/blocks`](src/app/about/blocks.rs) shows each one working.
 
 | Macro | What it is | Used on |
@@ -368,7 +365,7 @@ $ cargo run -- schedule:list
   As in every example, `renox.workspace = true` means the Dockerfile builds in an app made by
   `rnx new`, not in this repository's folder.
 - **CSP:** every page works under `CSP=strict` (scripts load from the app with the page's nonce,
-  behaviour lives in the app's scripts under [public/](public/) (`app.js`, `blocks/blocks.js`, one per area; renox-blocks' module), no inline handlers;
+  behaviour lives in the app's scripts under [public/](public/) (`app.js`, one per area; renox-blocks' module), no inline handlers;
   `tests/browser/bikeshop-walk.test.mjs` walks the main pages under it with a clean console).
 
 ## Tests

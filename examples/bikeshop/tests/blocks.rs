@@ -1,5 +1,4 @@
-//! The blocks (renox-blocks, and the shop's own date picker with closed
-//! days in `resources/views/blocks/`) on `/about/blocks`:
+//! The blocks of renox-blocks on `/about/blocks`:
 //! every block renders with its demo data, the month calendar works out its
 //! grid in the template, and the demo routes behind the blocks check what
 //! they get on the server (the form blocks through `Valid<T>`, the variant
@@ -57,12 +56,12 @@ async fn the_page_shows_every_block_with_its_signature() {
     ] {
         page.assert_see(signature);
     }
-    // The crate's stylesheet and loader, once; the layouts still load the
-    // shop's own (the date picker with closed days).
+    // The crate's stylesheet and loader, once; the layouts load the
+    // showcase page's own styles.
     page.assert_see("/_renox/blocks/blocks-")
         .assert_see("data-renox-blocks")
         .assert_see("blocks/blocks.css")
-        .assert_see("blocks/blocks.js");
+        .assert_dont_see("blocks/blocks.js");
     assert_eq!(page.text().matches("data-renox-blocks").count(), 1);
     // Its "About this page" panel.
     page.assert_see("id=\"about-page\"")

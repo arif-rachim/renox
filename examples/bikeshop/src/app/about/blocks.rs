@@ -4,9 +4,9 @@
 //! two-handle range, a kanban board, a month calendar…). They were built in
 //! this example first, then moved to the `renox-blocks` crate (#347):
 //! macros in `renox-blocks/blocks.html`, a script and a stylesheet the
-//! crate serves to the pages that use them. One block is still the shop's
-//! own: the date picker with closed days (`resources/views/blocks/`,
-//! `public/blocks/`).
+//! crate serves to the pages that use them. The date picker with closed
+//! days became the kit's own `date_picker` (`disabled_dates`,
+//! `closed_weekdays`, #345).
 //!
 //! This page shows each block with demo data and its macro's signature.
 //! The routes behind the demos:

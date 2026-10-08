@@ -114,7 +114,8 @@ pub fn entries() -> Vec<Explanation> {
                       macros use `rx-` classes on the kit's `--rx-*` tokens and call the \
                       kit's own macros (`sheet`, `date_picker`); a page loads a block's \
                       script only when it has that block. The date picker with closed \
-                      days is still the shop's own, in `resources/views/blocks/`.",
+                      days became the kit's own `date_picker` (`disabled_dates`, \
+                      `closed_weekdays`).",
                 },
                 Feature {
                     api: "UI kit: sheet",
@@ -183,7 +184,6 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-blocks/assets/parts/gallery.js",
                 "crates/renox-blocks/assets/parts/kanban.js",
                 "crates/renox-blocks/assets/blocks.css",
-                "examples/bikeshop/resources/views/blocks/date_picker_blocked.html",
                 "examples/bikeshop/tests/blocks.rs",
                 "tests/browser/bikeshop-blocks.test.mjs",
                 "tests/browser/blocks.test.mjs",

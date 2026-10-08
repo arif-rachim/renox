@@ -370,8 +370,8 @@ examples/                  workspace members, each with a README.md and its own 
                            catalog, home, multistore, plans, rentals, reports, sales, staff,
                            stock, workshop; src/seed/ (`db:seed`, `demo:seed --size large`,
                            test fixtures); the blocks from renox-blocks (#347; /about/blocks
-                           shows them), plus its own date_picker_blocked in
-                           resources/views/blocks/ + public/blocks/; public/vendor/motion (motion.dev, vendored); errors/
+                           shows them; public/blocks/blocks.css styles that page);
+                           public/vendor/motion (motion.dev, vendored); errors/
                            (default + 503); migrations for SQLite and PostgreSQL;
                            Dockerfile + deploy/ (make:deploy); tests/<area>.rs,
                            tests/queries.rs (main pages on the large seed, no N+1),
