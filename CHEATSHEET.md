@@ -294,8 +294,9 @@ part is a macro: you import it into a template, then call it like a function.
    Also thumbnail(src), menu_button(label) in a menu, hide_label=true on input, textarea,
    select or checkbox (label kept for screen readers; the other fields don't take it),
    <body class="rx-page rx-page--fill"> for a page that fills the window.
-   Themes: the warm default (Inter + Poppins, served by Renox); data-rx-theme="classic" on <html>
-   for the first look; your CSS uses the type scale: font: var(--rx-type-heading) (also -display,
+   Themes: the editorial default (teal, cream, pill buttons; Inter + Poppins, served by Renox);
+   data-rx-theme="warm" (indigo, before 1.1) or "classic" (the first look) on <html>; tokens
+   --rx-accent-2, --rx-tint, --rx-accent-soft, --rx-ink, --rx-type-hero, --rx-type-section; your CSS uses the type scale: font: var(--rx-type-heading) (also -display,
    -title, -lead, -body, -label, -note, -caption) and the brand token --rx-accent. #}
 {% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, tags_input, key_value, repeater, form_grid, button, confirm, table, form_errors %}
 {# Several steps: {% call wizard("id", [["a", "First"], ["b", "Second"]], submit_label="Save") %} with wizard_step("id", "a") blocks #}

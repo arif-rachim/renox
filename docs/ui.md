@@ -585,13 +585,36 @@ The look is a set of tokens on `:root` (in renox-ui.css):
 - the button shape;
 - and a type scale (the sizes of text).
 
-The default theme is "warm". `data-rx-theme="classic"` on `<html>` brings back the kit's
-first look: system fonts, Apple's web blue, cool greys, pill-shaped buttons, no hairlines and
-no small capitals.
+The default theme is **"editorial"** (from the bike shop example):
+- a cream page and white surfaces;
+- a teal accent with a terracotta second accent;
+- large Poppins headlines;
+- pill buttons and generous corners.
+
+Inside an app shell (`rx-shell`: a sidebar and dense pages) the buttons are rounded rectangles.
+
+Two other themes are a `data-rx-theme` on `<html>` away:
+- `"warm"` is the default before 1.1: an indigo accent on warm paper, rounded-rectangle
+  buttons.
+- `"classic"` is the kit's first look: system fonts, Apple's web blue, cool greys, pill-shaped
+  buttons, no hairlines and no small capitals.
 
 ```html
-<html lang="{{ app.locale }}" data-rx-theme="classic">
+<html lang="{{ app.locale }}" data-rx-theme="warm">
 ```
+
+Besides the colours every theme has, the editorial theme brings tokens for pages that sell or
+tell a story. Every theme defines them:
+
+| Token | For |
+|---|---|
+| `--rx-accent-2`, `--rx-accent-2-text` | a second accent (a badge, a word in a headline) |
+| `--rx-tint` | a sand-coloured band or photo background |
+| `--rx-accent-soft` | a soft accent background (an icon's circle) |
+| `--rx-ink` | a dark band, such as a footer |
+| `--rx-type-hero`, `--rx-type-section` | a landing page's headline, a section's heading |
+
+Every text colour keeps 4.5:1 on every background (WCAG AA), in light and dark.
 
 An app's own `:root` tokens, in a stylesheet loaded after `renox_ui()`, win over either
 theme. So a brand colour stays when the theme changes. examples/shop keeps its brown this
@@ -604,10 +627,10 @@ family) in `rem`. Because it uses `rem`, it follows the reader's own text size s
 
 The kit's components use these roles, and an app can too: `font: var(--rx-type-heading)`.
 
-| Token | For | Warm | Classic |
+| Token | For | Editorial and warm | Classic |
 |---|---|---|---|
 | `--rx-type-display` | the figure that matters: a stat, a total | Poppins 600, 32 px | system 600, 28 px |
-| `--rx-type-title` | a page's title (`rx-title`, `page_header`) | Poppins 600, 28 px | system 700, 22 px |
+| `--rx-type-title` | a page's title (`rx-title`, `page_header`) | Poppins 700, 30–40 px (warm: 600, 28 px) | system 700, 22 px |
 | `--rx-type-heading` | a card, widget, sheet or grid title | Poppins 600, 17 px | system 600, 19 px |
 | `--rx-type-lead` | the line under a page's title | Inter 400, 16 px | system 400, 15 px |
 | `--rx-type-body` | text, table cells, fields | Inter 400, 15 px | system 400, 17 px |
@@ -617,7 +640,7 @@ The kit's components use these roles, and an app can too: `font: var(--rx-type-h
 
 (600 and 700 are font weights: how bold the text is. 400 is normal.)
 
-What the warm theme makes stand out:
+What the editorial and warm themes make stand out:
 
 - A stat's figure is the largest thing on its card. On a small card it shrinks rather than
   breaking in the middle of the number. Its change is shown in a tinted pill.

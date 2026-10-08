@@ -756,5 +756,7 @@ async fn the_kit_serves_its_fonts_and_preloads_the_text_one() {
     let css = app.get(&css_url).await.text();
     assert!(css.contains("/_renox/fonts/poppins-latin-600-4.003.woff2"));
     assert!(css.contains(r#":root:where([data-rx-theme="classic"])"#));
+    assert!(css.contains(r#":root:where([data-rx-theme="warm"])"#));
+    assert!(css.contains("--rx-type-hero:"));
     assert!(css.contains("--rx-type-display:"));
 }

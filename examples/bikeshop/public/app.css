@@ -1,13 +1,7 @@
 /* The bike shop's own styles, on top of the Renox UI kit (rx-* classes, docs/ui.md).
-   Only two things live here:
-   1. The brand: a deep teal replaces the kit's accent. White on the button colour is
-      6.1:1 (5.5:1 in dark mode), the link colour 6.9:1 on the page (9.5:1 in dark mode),
-      so both pass WCAG AA.
-   2. The page structure, as CSS grids spaced with the kit's tokens (--rx-space-*).
-      Type and spacing are the kit's: no font sizes or spacing values of our own. */
-:root { --rx-accent: #0b6e66; --rx-accent-hover: #0d7a71; --rx-accent-pressed: #095b55; --rx-accent-text: #0a5f58; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --rx-accent: #0f766e; --rx-accent-hover: #12837a; --rx-accent-pressed: #0b625b; --rx-accent-text: #5fd4c6; } }
-:root[data-theme="dark"] { --rx-accent: #0f766e; --rx-accent-hover: #12837a; --rx-accent-pressed: #0b625b; --rx-accent-text: #5fd4c6; }
+   The brand (the teal accent) is the kit's default theme since #344; what lives here
+   is the page structure, as CSS grids spaced with the kit's tokens (--rx-space-*).
+   Type and spacing are the kit's: no font sizes or spacing values of our own. */
 
 /* The public layout: the bar, the page, the footer, top to bottom. */
 .bs-public { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; min-height: 100vh; min-height: 100dvh; }

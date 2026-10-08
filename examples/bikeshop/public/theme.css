@@ -3,61 +3,11 @@
    Poppins headlines with one coloured phrase, pill buttons and generous
    corners, and real photos (public/images/CREDITS.md).
 
-   1. Brand tokens: the kit's own (--rx-*) set to the shop's values, so every
-      kit component follows; and four of the shop's (--bs-*) for what the kit
-      has no token for (the second accent, sand, the hero's headline size).
-      Contrast (WCAG AA): white on teal 6.1:1 and on terracotta 4.9:1; the
-      terracotta text colour 5.1:1 and secondary text 5.1:1 on the cream page.
-   2. The public pages' parts (`bs-` classes) and how kit components look on
-      them (`.bs-public …`). The staff side keeps its layout and takes the
-      colours only. Layouts stay CSS grids spaced with the kit's tokens. */
-
-:root {
-  --bs-clay: #b8532e;
-  --bs-clay-text: #a84a28;
-  --bs-sand: #ece4d5;
-  --bs-teal-soft: #dcebe7;
-  --bs-ink: #1f2421;
-  --bs-hero: 700 clamp(2.5rem, 1.6rem + 3.6vw, 4.25rem)/1.02 var(--rx-font-display);
-  --bs-section: 700 clamp(1.75rem, 1.3rem + 1.6vw, 2.625rem)/1.05 var(--rx-font-display);
-
-  --rx-bg: #f6f1e8;
-  --rx-surface: #fffdf9;
-  --rx-surface-raised: #ffffff;
-  --rx-label: #1f2421;
-  --rx-secondary-label: #6b665d;
-  --rx-fill: rgba(107, 92, 70, 0.09);
-  --rx-fill-strong: rgba(107, 92, 70, 0.16);
-  --rx-separator: rgba(70, 58, 40, 0.1);
-  --rx-border: rgba(70, 58, 40, 0.2);
-  --rx-material: rgba(246, 241, 232, 0.86);
-  --rx-material-thick: rgba(246, 241, 232, 0.97);
-  --rx-focus: rgba(11, 110, 102, 0.35);
-  --rx-shadow: 0 1px 2px rgba(60, 45, 25, 0.04), 0 4px 14px rgba(60, 45, 25, 0.05);
-  --rx-shadow-raised: 0 18px 44px rgba(60, 45, 25, 0.16), 0 2px 8px rgba(60, 45, 25, 0.06);
-  --rx-radius-s: 12px;
-  --rx-radius: 18px;
-  --rx-radius-l: 24px;
-  --rx-badge-radius: 999px;
-  --rx-type-title: 700 clamp(1.875rem, 1.5rem + 1.2vw, 2.5rem)/1.08 var(--rx-font-display);
-  --rx-title-tracking: -0.035em;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bs-clay: #b8532e; --bs-clay-text: #e8916b; --bs-sand: #2a2620; --bs-teal-soft: #17302c; --bs-ink: #0f0e0c;
-    --rx-bg: #151412; --rx-surface: #1d1b18; --rx-surface-raised: #26231f; --rx-label: #f3efe8; --rx-secondary-label: #bdb5a8;
-    --rx-material: rgba(21, 20, 18, 0.86); --rx-material-thick: rgba(21, 20, 18, 0.97);
-  }
-}
-:root[data-theme="dark"] {
-  --bs-clay: #b8532e; --bs-clay-text: #e8916b; --bs-sand: #2a2620; --bs-teal-soft: #17302c; --bs-ink: #0f0e0c;
-  --rx-bg: #151412; --rx-surface: #1d1b18; --rx-surface-raised: #26231f; --rx-label: #f3efe8; --rx-secondary-label: #bdb5a8;
-  --rx-material: rgba(21, 20, 18, 0.86); --rx-material-thick: rgba(21, 20, 18, 0.97);
-}
-
-/* Pill buttons on the public pages and the sign-in pages (the staff side keeps
-   the kit's rounded rectangles: denser tables and toolbars). */
-.bs-public, .bs-auth { --rx-button-radius: 999px; --rx-button-padding: 10px 22px; }
+   Since #344 that look is the Renox kit's default theme, so its tokens
+   (`--rx-accent-2`, `--rx-tint`, `--rx-type-hero`…) come from the kit. This
+   file keeps the public pages' parts (`bs-` classes) and how kit components
+   look on them (`.bs-public …`). The staff side is the kit's `rx-shell`.
+   Layouts stay CSS grids spaced with the kit's tokens. */
 
 /* ---------- the bar and the page ---------- */
 
@@ -74,9 +24,9 @@
 .bs-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--rx-space-8); align-items: center; }
 .bs-hero--compact { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
 .bs-hero__text { display: grid; gap: var(--rx-space-4); align-content: center; }
-.bs-hero__eyebrow { margin: 0; font: 700 0.8125rem/1.3 var(--rx-font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--bs-clay-text); }
-.bs-hero__title { margin: 0; font: var(--bs-hero); letter-spacing: -0.04em; color: var(--rx-label); text-wrap: balance; }
-.bs-hero--compact .bs-hero__title { font: var(--bs-section); letter-spacing: -0.035em; }
+.bs-hero__eyebrow { margin: 0; font: 700 0.8125rem/1.3 var(--rx-font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--rx-accent-2-text); }
+.bs-hero__title { margin: 0; font: var(--rx-type-hero); letter-spacing: -0.04em; color: var(--rx-label); text-wrap: balance; }
+.bs-hero--compact .bs-hero__title { font: var(--rx-type-section); letter-spacing: -0.035em; }
 .bs-hero__title em { font-style: normal; color: var(--rx-accent-text); }
 .bs-hero__lead { margin: 0; max-width: 34rem; font: 400 1.1875rem/1.6 var(--rx-font); color: var(--rx-secondary-label); }
 .bs-hero--compact .bs-hero__lead { font-size: 1.0625rem; }
@@ -84,7 +34,7 @@
 .bs-hero__figures { display: grid; grid-auto-flow: column; justify-content: start; gap: var(--rx-space-8); margin: var(--rx-space-2) 0 0; padding: 0; list-style: none; color: var(--rx-secondary-label); font: var(--rx-type-note); }
 .bs-hero__figures b { display: block; color: var(--rx-label); font: 700 1.375rem/1.2 var(--rx-font-display); }
 .bs-hero__art { position: relative; min-height: 0; }
-.bs-hero__photo { display: block; width: 100%; height: auto; max-height: 34rem; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 13rem var(--rx-radius-l) var(--rx-radius-l) var(--rx-radius-l); background: var(--bs-sand); }
+.bs-hero__photo { display: block; width: 100%; height: auto; max-height: 34rem; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 13rem var(--rx-radius-l) var(--rx-radius-l) var(--rx-radius-l); background: var(--rx-tint); }
 .bs-hero--compact .bs-hero__photo { aspect-ratio: 3 / 2; max-height: 22rem; border-radius: 8rem var(--rx-radius-l) var(--rx-radius-l) var(--rx-radius-l); }
 .bs-hero__inset { position: absolute; height: auto; right: calc(-1 * var(--rx-space-4)); bottom: var(--rx-space-8); width: 38%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--rx-radius-l); border: 6px solid var(--rx-bg); box-shadow: var(--rx-shadow-raised); }
 .bs-hero__badge {
@@ -92,7 +42,7 @@
   padding: var(--rx-space-3) var(--rx-space-4); border-radius: var(--rx-radius-l); background: var(--rx-surface-raised); box-shadow: var(--rx-shadow-raised); font: var(--rx-type-note); color: var(--rx-secondary-label);
 }
 .bs-hero__badge b { display: block; color: var(--rx-label); font: var(--rx-type-label); }
-.bs-hero__badge-icon { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--bs-teal-soft); color: var(--rx-accent-text); }
+.bs-hero__badge-icon { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--rx-accent-soft); color: var(--rx-accent-text); }
 @media (max-width: 52rem) {
   .bs-hero, .bs-hero--compact { grid-template-columns: minmax(0, 1fr); gap: var(--rx-space-6); }
   .bs-hero__photo { aspect-ratio: 4 / 3; max-height: 22rem; border-radius: 9rem var(--rx-radius-l) var(--rx-radius-l) var(--rx-radius-l); }
@@ -109,8 +59,8 @@
 
 .bs-section { display: grid; gap: var(--rx-space-5); }
 .bs-section__head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--rx-space-3); }
-.bs-section__title { margin: 0; font: var(--bs-section); letter-spacing: -0.035em; color: var(--rx-label); }
-.bs-section__title em { font-style: italic; font-weight: 500; color: var(--bs-clay-text); }
+.bs-section__title { margin: 0; font: var(--rx-type-section); letter-spacing: -0.035em; color: var(--rx-label); }
+.bs-section__title em { font-style: italic; font-weight: 500; color: var(--rx-accent-2-text); }
 .bs-section__more { color: var(--rx-accent-text); font: 600 0.9375rem/1.3 var(--rx-font); text-decoration: none; white-space: nowrap; }
 .bs-section__more:hover { text-decoration: underline; }
 
@@ -122,12 +72,12 @@
   background: var(--rx-surface-raised); color: var(--rx-label); border: 1px solid var(--rx-separator); font: 500 0.9375rem/1 var(--rx-font); text-decoration: none;
 }
 .bs-pill:hover { border-color: var(--rx-border); }
-.bs-pill--on { background: var(--bs-ink); border-color: var(--bs-ink); color: #fff; }
+.bs-pill--on { background: var(--rx-ink); border-color: var(--rx-ink); color: #fff; }
 .bs-pill:focus-visible { outline: 2px solid var(--rx-focus); outline-offset: 2px; }
 
 /* Category tiles: a photo with the name over its dark foot. */
 .bs-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); gap: var(--rx-space-4); }
-.bs-tile { position: relative; display: grid; align-content: end; min-height: 13rem; padding: var(--rx-space-5); border-radius: var(--rx-radius-l); overflow: hidden; color: #fff; text-decoration: none; background: var(--bs-ink); isolation: isolate; }
+.bs-tile { position: relative; display: grid; align-content: end; min-height: 13rem; padding: var(--rx-space-5); border-radius: var(--rx-radius-l); overflow: hidden; color: #fff; text-decoration: none; background: var(--rx-ink); isolation: isolate; }
 .bs-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; transition: transform 0.5s var(--rx-ease); }
 .bs-tile::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(12, 10, 8, 0.78), rgba(12, 10, 8, 0.05) 65%); }
 .bs-tile:hover img { transform: scale(1.04); }
@@ -138,11 +88,11 @@
 /* Three service tiles: one on a photo, one teal, one terracotta. */
 .bs-services { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: var(--rx-space-5); }
 .bs-service { position: relative; display: grid; align-content: space-between; gap: var(--rx-space-6); min-height: 17rem; padding: var(--rx-space-8); border-radius: calc(var(--rx-radius-l) + 4px); overflow: hidden; color: #fff; isolation: isolate; }
-.bs-service--photo { background: var(--bs-ink); }
+.bs-service--photo { background: var(--rx-ink); }
 .bs-service--photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
 .bs-service--photo::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(12, 10, 8, 0.82), rgba(12, 10, 8, 0.35)); }
 .bs-service--teal { background: var(--rx-accent); }
-.bs-service--clay { background: var(--bs-clay); }
+.bs-service--clay { background: var(--rx-accent-2); }
 .bs-service__title { margin: 0; font: 700 1.75rem/1.1 var(--rx-font-display); letter-spacing: -0.03em; }
 .bs-service__text { margin: var(--rx-space-2) 0 0; font: 400 1rem/1.55 var(--rx-font); color: rgba(255, 255, 255, 0.9); max-width: 26rem; }
 .bs-service .rx-button { justify-self: start; --rx-button-secondary-bg: #fff; --rx-button-secondary-fg: #1f2421; --rx-button-secondary-hover: #f3efe8; --rx-button-secondary-ring: none; }
@@ -150,7 +100,7 @@
 /* The stores strip. */
 .bs-stores { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); gap: var(--rx-space-4); margin: 0; padding: 0; list-style: none; }
 .bs-store { display: grid; gap: var(--rx-space-3); }
-.bs-store img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--rx-radius-l); background: var(--bs-sand); }
+.bs-store img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--rx-radius-l); background: var(--rx-tint); }
 .bs-store__name { margin: 0; font: var(--rx-type-heading); color: var(--rx-label); }
 .bs-store__text { margin: 0; font: var(--rx-type-note); color: var(--rx-secondary-label); }
 
@@ -158,7 +108,7 @@
 
 .bs-public .rx-media-card { background: none; border: 0; box-shadow: none; border-radius: 0; overflow: visible; }
 .bs-public .rx-media-card__link { gap: var(--rx-space-3); align-content: start; }
-.bs-public .rx-media-card__image { aspect-ratio: 4 / 3; border-radius: var(--rx-radius-l); background: var(--bs-sand); transition: transform 0.35s var(--rx-ease), box-shadow 0.35s var(--rx-ease); }
+.bs-public .rx-media-card__image { aspect-ratio: 4 / 3; border-radius: var(--rx-radius-l); background: var(--rx-tint); transition: transform 0.35s var(--rx-ease), box-shadow 0.35s var(--rx-ease); }
 .bs-public .rx-media-card__link:hover .rx-media-card__image { transform: translateY(-3px); box-shadow: var(--rx-shadow-raised); }
 .bs-public .rx-media-card__link:focus-visible { outline: none; }
 .bs-public .rx-media-card__link:focus-visible .rx-media-card__image { outline: 3px solid var(--rx-accent); outline-offset: 3px; }
@@ -194,7 +144,7 @@
   .bs-public .bs-tabbar {
     inset: auto var(--rx-space-3) calc(var(--rx-space-3) + env(safe-area-inset-bottom)) var(--rx-space-3);
     padding: var(--rx-space-2) var(--rx-space-1); border: 0; border-radius: calc(var(--rx-radius-l) - 2px);
-    background: var(--bs-ink); box-shadow: 0 12px 30px rgba(20, 15, 10, 0.28);
+    background: var(--rx-ink); box-shadow: 0 12px 30px rgba(20, 15, 10, 0.28);
   }
   .bs-public .bs-tabbar__tab { color: rgba(255, 255, 255, 0.72); gap: 3px; }
   .bs-public .bs-tabbar__tab svg { width: 2.75rem; height: 1.75rem; padding: 0.25rem 0.75rem; border-radius: 999px; box-sizing: border-box; }

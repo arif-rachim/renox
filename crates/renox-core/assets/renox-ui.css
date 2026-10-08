@@ -11,10 +11,12 @@
 @font-face { font-family: "Poppins"; font-style: normal; font-weight: 600; font-display: swap; src: url("/_renox/fonts/poppins-latin-600-4.003.woff2") format("woff2"); }
 @font-face { font-family: "Poppins"; font-style: normal; font-weight: 700; font-display: swap; src: url("/_renox/fonts/poppins-latin-700-4.003.woff2") format("woff2"); }
 
-/* The default theme ("warm"): Inter for text and Poppins for titles, a warm
-   paper background, white surfaces with a hairline and a soft shadow, an
-   indigo accent. `data-rx-theme="classic"` on <html> keeps the kit's first
-   look (system fonts, Apple's blue, pill buttons): see the end of this block. */
+/* The default theme ("editorial", from the bike shop example, #344): Inter
+   for text and large Poppins headlines, a cream page, white surfaces with a
+   hairline and a soft shadow, a teal accent with a terracotta second accent,
+   pill buttons and generous corners. `data-rx-theme="warm"` on <html> keeps
+   the look before 1.1 (an indigo accent), `data-rx-theme="classic"` the kit's
+   first one (system fonts, Apple's blue): see the end of this block. */
 :root {
   --rx-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --rx-font-display: "Poppins", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -22,52 +24,62 @@
 
   /* Semantic colors (light). Text colors keep 4.5:1 on their backgrounds
      (WCAG AA); white text keeps 4.5:1 on the accent. */
-  --rx-accent: #4f46e5;
-  --rx-accent-hover: #4338ca;
-  --rx-accent-pressed: #3730a3;
-  --rx-accent-text: #4338ca;
+  --rx-accent: #0b6e66;
+  --rx-accent-hover: #0d7a71;
+  --rx-accent-pressed: #095b55;
+  --rx-accent-text: #0a5f58;
   --rx-on-accent: #ffffff;
   --rx-danger: #d70015;
   --rx-danger-pressed: #b8000f;
   --rx-danger-text: #c00013;
   --rx-success: #1f7a37;
   --rx-warning: #b93d00;
-  --rx-info: #4f46e5;
+  --rx-info: #0a5f58;
 
-  --rx-label: #1c1917;
-  --rx-secondary-label: #57534e;
+  /* The second accent, a tint and a soft accent for highlights; the ink of
+     dark bands (a footer); a hero's and a section's headline. */
+  --rx-accent-2: #b8532e;
+  --rx-accent-2-text: #a84a28;
+  --rx-tint: #ece4d5;
+  --rx-accent-soft: #dcebe7;
+  --rx-ink: #1f2421;
+  --rx-type-hero: 700 clamp(2.5rem, 1.6rem + 3.6vw, 4.25rem)/1.02 var(--rx-font-display);
+  --rx-type-section: 700 clamp(1.75rem, 1.3rem + 1.6vw, 2.625rem)/1.05 var(--rx-font-display);
+
+  --rx-label: #1f2421;
+  --rx-secondary-label: #6b665d;
   --rx-tertiary-label: #8a847e;
-  --rx-bg: #f7f5f2;
-  --rx-surface: #ffffff;
+  --rx-bg: #f6f1e8;
+  --rx-surface: #fffdf9;
   --rx-surface-raised: #ffffff;
-  --rx-fill: rgba(120, 113, 108, 0.1);
-  --rx-fill-strong: rgba(120, 113, 108, 0.18);
-  --rx-separator: rgba(41, 37, 36, 0.09);
-  --rx-border: rgba(41, 37, 36, 0.18);
-  --rx-material: rgba(255, 255, 255, 0.82);
-  --rx-material-thick: rgba(255, 255, 255, 0.96);
+  --rx-fill: rgba(107, 92, 70, 0.09);
+  --rx-fill-strong: rgba(107, 92, 70, 0.16);
+  --rx-separator: rgba(70, 58, 40, 0.1);
+  --rx-border: rgba(70, 58, 40, 0.2);
+  --rx-material: rgba(246, 241, 232, 0.86);
+  --rx-material-thick: rgba(246, 241, 232, 0.97);
   --rx-scrim: rgba(28, 25, 23, 0.36);
-  --rx-focus: rgba(79, 70, 229, 0.3);
-  --rx-shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 2px 8px rgba(28, 25, 23, 0.05);
-  --rx-shadow-raised: 0 12px 40px rgba(28, 25, 23, 0.16), 0 2px 8px rgba(28, 25, 23, 0.06);
+  --rx-focus: rgba(11, 110, 102, 0.35);
+  --rx-shadow: 0 1px 2px rgba(60, 45, 25, 0.04), 0 4px 14px rgba(60, 45, 25, 0.05);
+  --rx-shadow-raised: 0 18px 44px rgba(60, 45, 25, 0.16), 0 2px 8px rgba(60, 45, 25, 0.06);
 
-  /* Surfaces (cards, tables, lists) get a hairline; buttons are rounded
-     rectangles; the secondary button is a white one with a border. */
+  /* Surfaces (cards, tables, lists) get a hairline; buttons are pills (an
+     app shell, `rx-shell`, makes them rounded rectangles: denser toolbars); the secondary button is a white one with a border. */
   --rx-surface-border: 1px solid var(--rx-separator);
-  --rx-button-radius: 10px;
-  --rx-button-padding: 9px 18px;
+  --rx-button-radius: 999px;
+  --rx-button-padding: 10px 22px;
   --rx-button-secondary-bg: var(--rx-surface);
   --rx-button-secondary-hover: var(--rx-bg);
   --rx-button-secondary-fg: var(--rx-label);
   --rx-button-secondary-ring: inset 0 0 0 1px var(--rx-border), 0 1px 2px rgba(28, 25, 23, 0.05);
   --rx-input-shadow: 0 1px 2px rgba(28, 25, 23, 0.04);
-  --rx-badge-radius: 6px;
+  --rx-badge-radius: 999px;
   --rx-sidebar-bg: var(--rx-surface);
 
   /* Shape and space: a 4 px grid. */
-  --rx-radius-s: 10px;
-  --rx-radius: 14px;
-  --rx-radius-l: 18px;
+  --rx-radius-s: 12px;
+  --rx-radius: 18px;
+  --rx-radius-l: 24px;
   --rx-space-1: 4px;
   --rx-space-2: 8px;
   --rx-space-3: 12px;
@@ -82,7 +94,7 @@
      height, family), in rem so it follows the reader's text size. Use them
      in an app's own CSS too: `font: var(--rx-type-heading)`. */
   --rx-type-display: 600 2rem/1.1 var(--rx-font-display);       /* the figure that matters: a stat, a total */
-  --rx-type-title: 600 1.75rem/1.2 var(--rx-font-display);      /* a page's title */
+  --rx-type-title: 700 clamp(1.875rem, 1.5rem + 1.2vw, 2.5rem)/1.08 var(--rx-font-display);      /* a page's title */
   --rx-type-heading: 600 1.0625rem/1.35 var(--rx-font-display); /* a card, widget or sheet title */
   --rx-type-lead: 400 1rem/1.5 var(--rx-font);                  /* the line under a page's title */
   --rx-type-body: 400 0.9375rem/1.55 var(--rx-font);            /* text, table cells, fields */
@@ -91,7 +103,7 @@
   --rx-type-caption: 600 0.6875rem/1.3 var(--rx-font);          /* small capitals over figures and columns */
   --rx-caption-case: uppercase;
   --rx-caption-tracking: 0.07em;
-  --rx-title-tracking: -0.025em;
+  --rx-title-tracking: -0.035em;
   --rx-body-tracking: -0.006em;
   /* Sizes components use on their own (buttons, cells, menus). */
   --rx-text-body: 0.9375rem;   /* 15 */
@@ -106,60 +118,62 @@
 
   /* Chart series, in this order (checked for colour blindness, light and
      dark); grid and baseline hairlines. */
-  --rx-chart-1: #4f46e5; --rx-chart-2: #eb6834; --rx-chart-3: #1baf7a;
+  --rx-chart-1: #0b6e66; --rx-chart-2: #eb6834; --rx-chart-3: #1baf7a;
   --rx-chart-4: #eda100; --rx-chart-5: #e87ba4; --rx-chart-6: #008300;
   --rx-chart-other: #8e8e93;
-  --rx-chart-grid: rgba(41, 37, 36, 0.1);
-  --rx-chart-base: rgba(41, 37, 36, 0.34);
+  --rx-chart-grid: rgba(70, 58, 40, 0.1);
+  --rx-chart-base: rgba(70, 58, 40, 0.34);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --rx-scheme: dark;
-    --rx-accent: #6366f1;
-    --rx-accent-hover: #818cf8;
-    --rx-accent-pressed: #4f46e5;
-    --rx-accent-text: #a5b4fc;
+    --rx-accent-2-text: #e8916b; --rx-tint: #2a2620; --rx-accent-soft: #17302c; --rx-ink: #0f0e0c;
+    --rx-accent: #0f766e;
+    --rx-accent-hover: #12837a;
+    --rx-accent-pressed: #0b625b;
+    --rx-accent-text: #5fd4c6;
     --rx-danger: #d70015;
     --rx-danger-pressed: #b8000f;
     --rx-danger-text: #ff6961;
     --rx-success: #30d158;
     --rx-warning: #ff9f0a;
-    --rx-info: #a5b4fc;
-    --rx-label: #f5f5f4;
-    --rx-secondary-label: #b8b2ad;
+    --rx-info: #5fd4c6;
+    --rx-label: #f3efe8;
+    --rx-secondary-label: #bdb5a8;
     --rx-tertiary-label: #8a847e;
-    --rx-bg: #12100f;
-    --rx-surface: #1c1a18;
+    --rx-bg: #151412;
+    --rx-surface: #1d1b18;
     --rx-surface-raised: #26231f;
     --rx-fill: rgba(245, 245, 244, 0.08);
     --rx-fill-strong: rgba(245, 245, 244, 0.14);
     --rx-separator: rgba(245, 245, 244, 0.08);
     --rx-border: rgba(245, 245, 244, 0.18);
-    --rx-material: rgba(28, 26, 24, 0.82);
-    --rx-material-thick: rgba(28, 26, 24, 0.96);
+    --rx-material: rgba(21, 20, 18, 0.86);
+    --rx-material-thick: rgba(21, 20, 18, 0.97);
     --rx-scrim: rgba(0, 0, 0, 0.6);
-    --rx-focus: rgba(129, 140, 248, 0.45);
+    --rx-focus: rgba(95, 212, 198, 0.45);
     --rx-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     --rx-shadow-raised: 0 12px 40px rgba(0, 0, 0, 0.6);
     --rx-button-secondary-ring: inset 0 0 0 1px var(--rx-border);
     --rx-input-shadow: none;
-    --rx-chart-1: #818cf8; --rx-chart-2: #d95926; --rx-chart-3: #199e70;
+    --rx-chart-1: #2fb3a3; --rx-chart-2: #d95926; --rx-chart-3: #199e70;
     --rx-chart-4: #c98500; --rx-chart-5: #d55181; --rx-chart-6: #008300;
     --rx-chart-other: #8e8e93; --rx-chart-grid: rgba(245, 245, 244, 0.1); --rx-chart-base: rgba(245, 245, 244, 0.3);
   }
 }
 :root[data-theme="dark"] {
   --rx-scheme: dark;
-  --rx-accent: #6366f1; --rx-accent-hover: #818cf8; --rx-accent-pressed: #4f46e5; --rx-accent-text: #a5b4fc;
-  --rx-danger-text: #ff6961; --rx-success: #30d158; --rx-warning: #ff9f0a; --rx-info: #a5b4fc;
-  --rx-label: #f5f5f4; --rx-secondary-label: #b8b2ad; --rx-tertiary-label: #8a847e;
-  --rx-bg: #12100f; --rx-surface: #1c1a18; --rx-surface-raised: #26231f; --rx-fill: rgba(245, 245, 244, 0.08);
+  --rx-accent-2-text: #e8916b; --rx-tint: #2a2620; --rx-accent-soft: #17302c; --rx-ink: #0f0e0c;
+  --rx-accent: #0f766e; --rx-accent-hover: #12837a; --rx-accent-pressed: #0b625b; --rx-accent-text: #5fd4c6;
+  --rx-danger-text: #ff6961; --rx-success: #30d158; --rx-warning: #ff9f0a; --rx-info: #5fd4c6;
+  --rx-label: #f3efe8; --rx-secondary-label: #bdb5a8; --rx-tertiary-label: #8a847e;
+  --rx-bg: #151412; --rx-surface: #1d1b18; --rx-surface-raised: #26231f; --rx-fill: rgba(245, 245, 244, 0.08);
   --rx-fill-strong: rgba(245, 245, 244, 0.14); --rx-separator: rgba(245, 245, 244, 0.08); --rx-border: rgba(245, 245, 244, 0.18);
-  --rx-material: rgba(28, 26, 24, 0.82); --rx-material-thick: rgba(28, 26, 24, 0.96); --rx-scrim: rgba(0, 0, 0, 0.6); --rx-focus: rgba(129, 140, 248, 0.45);
+  --rx-material: rgba(21, 20, 18, 0.86); --rx-material-thick: rgba(21, 20, 18, 0.97); --rx-scrim: rgba(0, 0, 0, 0.6); --rx-focus: rgba(95, 212, 198, 0.45);
   --rx-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); --rx-shadow-raised: 0 12px 40px rgba(0, 0, 0, 0.6);
   --rx-button-secondary-ring: inset 0 0 0 1px var(--rx-border); --rx-input-shadow: none;
-  --rx-chart-1: #818cf8; --rx-chart-2: #d95926; --rx-chart-3: #199e70;
+  --rx-chart-1: #2fb3a3; --rx-chart-2: #d95926; --rx-chart-3: #199e70;
   --rx-chart-4: #c98500; --rx-chart-5: #d55181; --rx-chart-6: #008300;
   --rx-chart-other: #8e8e93; --rx-chart-grid: rgba(245, 245, 244, 0.1); --rx-chart-base: rgba(245, 245, 244, 0.3);
 }
@@ -225,6 +239,45 @@
   --rx-scrim: rgba(0, 0, 0, 0.55); --rx-focus: rgba(64, 156, 255, 0.55);
   --rx-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); --rx-shadow-raised: 0 8px 32px rgba(0, 0, 0, 0.5);
   --rx-chart-1: #3987e5; --rx-chart-grid: rgba(235, 235, 245, 0.1); --rx-chart-base: rgba(235, 235, 245, 0.3);
+}
+
+/* The "warm" theme: the default before 1.1 (an indigo accent on warm paper,
+   rounded-rectangle buttons). Put `data-rx-theme="warm"` on <html>. Like
+   classic, its selectors weigh no more than the default's (`:where`). */
+:root:where([data-rx-theme="warm"]) {
+  --rx-accent: #4f46e5; --rx-accent-hover: #4338ca; --rx-accent-pressed: #3730a3;
+  --rx-accent-text: #4338ca; --rx-info: #4f46e5; --rx-focus: rgba(79, 70, 229, 0.3);
+  --rx-label: #1c1917; --rx-secondary-label: #57534e; --rx-bg: #f7f5f2; --rx-surface: #ffffff;
+  --rx-surface-raised: #ffffff; --rx-fill: rgba(120, 113, 108, 0.1);
+  --rx-fill-strong: rgba(120, 113, 108, 0.18); --rx-separator: rgba(41, 37, 36, 0.09);
+  --rx-border: rgba(41, 37, 36, 0.18); --rx-material: rgba(255, 255, 255, 0.82);
+  --rx-material-thick: rgba(255, 255, 255, 0.96);
+  --rx-shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 2px 8px rgba(28, 25, 23, 0.05);
+  --rx-shadow-raised: 0 12px 40px rgba(28, 25, 23, 0.16), 0 2px 8px rgba(28, 25, 23, 0.06);
+  --rx-button-radius: 10px; --rx-button-padding: 9px 18px; --rx-badge-radius: 6px;
+  --rx-radius-s: 10px; --rx-radius: 14px; --rx-radius-l: 18px;
+  --rx-type-title: 600 1.75rem/1.2 var(--rx-font-display); --rx-title-tracking: -0.025em;
+  --rx-chart-1: #4f46e5; --rx-chart-grid: rgba(41, 37, 36, 0.1);
+  --rx-chart-base: rgba(41, 37, 36, 0.34); --rx-accent-2: #c2410c; --rx-accent-2-text: #c2410c;
+  --rx-tint: #efebe5; --rx-accent-soft: #e0e7ff; --rx-ink: #1c1917;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):where([data-rx-theme="warm"]) {
+    --rx-accent: #6366f1; --rx-accent-hover: #818cf8; --rx-accent-pressed: #4f46e5;
+    --rx-accent-text: #a5b4fc; --rx-info: #a5b4fc; --rx-focus: rgba(129, 140, 248, 0.45);
+    --rx-label: #f5f5f4; --rx-secondary-label: #b8b2ad; --rx-bg: #12100f; --rx-surface: #1c1a18;
+    --rx-surface-raised: #26231f; --rx-material: rgba(28, 26, 24, 0.82);
+    --rx-material-thick: rgba(28, 26, 24, 0.96); --rx-chart-1: #818cf8; --rx-accent-2-text: #fb923c;
+    --rx-tint: #26231f; --rx-accent-soft: #1e1b4b; --rx-ink: #0c0a09;
+  }
+}
+:root[data-theme="dark"]:where([data-rx-theme="warm"]) {
+  --rx-accent: #6366f1; --rx-accent-hover: #818cf8; --rx-accent-pressed: #4f46e5;
+  --rx-accent-text: #a5b4fc; --rx-info: #a5b4fc; --rx-focus: rgba(129, 140, 248, 0.45);
+  --rx-label: #f5f5f4; --rx-secondary-label: #b8b2ad; --rx-bg: #12100f; --rx-surface: #1c1a18;
+  --rx-surface-raised: #26231f; --rx-material: rgba(28, 26, 24, 0.82);
+  --rx-material-thick: rgba(28, 26, 24, 0.96); --rx-chart-1: #818cf8; --rx-accent-2-text: #fb923c;
+  --rx-tint: #26231f; --rx-accent-soft: #1e1b4b; --rx-ink: #0c0a09;
 }
 
 /* Increase contrast: solid separators, darker secondary text. */
@@ -303,6 +356,9 @@
 }
 
 /* A back office: the sidebar, then the main column. */
+/* In the default theme, an app shell (a sidebar and dense pages) has
+   rounded-rectangle buttons. */
+:where(:root:not([data-rx-theme])) .rx-shell { --rx-button-radius: 10px; --rx-button-padding: 9px 18px; }
 .rx-shell { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; min-height: 100dvh; }
 .rx-shell__main { min-width: 0; display: flex; flex-direction: column; }
 .rx-shell__content { width: 100%; max-width: 80rem; padding: var(--rx-space-6); display: grid; gap: var(--rx-space-5); align-content: start; min-width: 0; }
