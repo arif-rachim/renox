@@ -49,7 +49,10 @@
 - `rnx new <name> --starter` (files in crates/renox-cli/stubs/starter/): a whole app to start
   from: sidebar layout with the notification bell, email verification, roles (`Permissions`),
   a dashboard, a users page that changes roles, the activity log (`Audit`), `users:admin`,
-  a seeder and tests. `rnx new <name> --notifications`: the plain app with the bell
+  a seeder and tests; its pages use page patterns the app owns (the bike shop's: hero,
+  section heading, feature cards, figures, summary, steps, empty states, in
+  stubs/starter/resources/views/patterns.html + public/patterns.css), and the login page
+  lists the seeded accounts in local only (stubs/starter/src/app/demo.rs). `rnx new <name> --notifications`: the plain app with the bell
   (`Auth::new().notifications()` and `notification_bell` in its layout).
 
 - [tests/browser](tests/browser): Renox's own JavaScript tested in headless Chrome over the

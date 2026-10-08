@@ -871,8 +871,11 @@ file. Sanctum's tokens are part of it too.
 For what Breeze and Jetstream scaffold around those pages, `rnx new desk --starter` writes the
 starter kit:
 
-- a sidebar layout with the notification bell;
-- a dashboard;
+- a sidebar layout with the notification bell, and the kit's tab bar on phones;
+- a public home page and branded sign-in pages, made of page patterns the app owns
+  (`resources/views/patterns.html` and `public/patterns.css`: a hero, section headings,
+  feature cards, a figures strip, a summary with totals, steps, empty states);
+- a dashboard with a welcome card and stat cards;
 - roles (`admin`, `member`);
 - a users page where admins change roles;
 - the activity log;

@@ -1,6 +1,10 @@
-//! The public front page. Signed-in people go on to `/dashboard`.
+//! The public front page (`resources/views/home/index.html`, in
+//! `layouts/public.html`), made of the app's page patterns
+//! (`resources/views/patterns.html`). Signed-in people go on to `/dashboard`.
 
 use renox::prelude::*;
+
+use super::roles::ROLES;
 
 pub struct Home;
 
@@ -14,6 +18,11 @@ impl Module for Home {
     }
 }
 
-async fn index() -> View {
-    view("home/index.html", context! {})
+/// The page, with the figures its strip shows.
+async fn index(State(db): State<Db>) -> Result<View> {
+    let people = User::query().count(&db).await?;
+    Ok(view(
+        "home/index.html",
+        context! { people, roles => ROLES.len() },
+    ))
 }

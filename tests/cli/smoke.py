@@ -217,6 +217,11 @@ def starter(base, database, binary):
     expect("the verification page", newcomer.get("/verify-email"), 200)
 
     subprocess.run([binary, "db:seed"], check=True, capture_output=True)
+    # APP_ENV=local (.env): the login page lists the seeded people to log in with a tap.
+    expect("the login page lists the seeded accounts", Browser(base).get("/login"), 200,
+           see=["Seeded accounts", 'data-demo-email="admin@example.com"'])
+    expect("the home page's patterns", Browser(base).get("/"), 200,
+           see=["<em>ready to grow.</em>", "rx-tabbar", "app-showcase"])
     admin = Browser(base)
     login(admin, "admin@example.com", "password123", "/dashboard")
     every_page_answers(admin, routes, "the admin")

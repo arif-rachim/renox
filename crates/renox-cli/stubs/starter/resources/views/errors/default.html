@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" if auth.check else "layouts/public.html" %}
+{#- Every error page (404, 403, 500…), in the app's layout: the sidebar one
+    when logged in, the public one for guests. Add errors/404.html and
+    friends for one status; `status`, `reason` and `detail` are set (with
+    APP_DEBUG also `request_line` and `template`). -#}
+{% block seo %}<title>{{ status }} {{ reason }} · {{ app.name }}</title>{% endblock %}
+{% block content %}
+{% from "patterns.html" import empty_state %}
+{%- set fallback = t('errors.not_found') if status == 404 else t('errors.other') %}
+<div class="app-panel">
+  {{ empty_state("circle-alert" if status >= 500 else "map", reason, detail or fallback, action_href=route('home'), action_label=t('errors.home'), action_icon="house") }}
+</div>
+{% endblock %}
