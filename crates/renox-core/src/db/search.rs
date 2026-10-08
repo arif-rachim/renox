@@ -109,15 +109,38 @@ fn fts_table<M: Model>() -> String {
     format!("{}_search", M::TABLE)
 }
 
-/// The match expression for the one bound value (`terms`): each word as a
-/// prefix, all of them required. Built in SQL from the bound words, so
-/// the value is the same on both databases.
+/// The value `Query::search` binds: the words (`terms`), then, after a
+/// unit separator, the text as typed (control characters left out, at most
+/// 200 characters). One value for both databases; each takes what it needs.
+pub(crate) fn bound(text: &str) -> Option<String> {
+    let words = terms(text)?;
+    let typed: String = text.chars().filter(|c| !c.is_control()).take(200).collect();
+    Some(format!("{words}{SEPARATOR}{}", typed.trim()))
+}
+
+/// Between the words and the typed text in `bound`'s value.
+const SEPARATOR: char = '\u{1f}';
+
+/// The match expression for the one bound value (`bound`).
+///
+/// SQLite: each word as a prefix, all of them required. PostgreSQL: the
+/// same, or the text as typed read by PostgreSQL's own parser, which splits
+/// it the way it split the row: it reads `-1` in `GIR-JER-0001-1` and
+/// `-12.5` in `SKU-12.5` as signed numbers, so a code typed whole matches
+/// only that way (#304). Built in SQL from the bound value, read once in a
+/// subquery so the statement has a single `?`.
 fn match_expression(dialect: Dialect) -> &'static str {
     match dialect {
         // "cof"* "tea"*
-        Dialect::Sqlite => "('\"' || replace(?, ' ', '\"* \"') || '\"*')",
-        // cof:* & tea:*
-        Dialect::Postgres => "(replace(?, ' ', ':* & ') || ':*')",
+        Dialect::Sqlite => {
+            "(SELECT '\"' || replace(substr(v, 1, instr(v, char(31)) - 1), ' ', '\"* \"') || '\"*' \
+             FROM (SELECT ? AS v))"
+        }
+        // cof:* & tea:*, or what PostgreSQL makes of the typed text
+        Dialect::Postgres => {
+            "(SELECT to_tsquery(c, replace(split_part(v, chr(31), 1), ' ', ':* & ') || ':*') \
+             || plainto_tsquery(c, split_part(v, chr(31), 2)) FROM (SELECT ?::text AS v, %CONFIG% AS c) AS s)"
+        }
     }
 }
 
@@ -137,10 +160,9 @@ pub(crate) fn filter_sql<M: Model>(dialect: Dialect) -> String {
             fts = quote(&fts_table::<M>()),
         ),
         Dialect::Postgres => format!(
-            "{}.\"search_vector\" @@ to_tsquery({}, {})",
+            "{}.\"search_vector\" @@ {}",
             quote(M::TABLE),
-            config_literal::<M>(),
-            match_expression(dialect)
+            match_expression(dialect).replace("%CONFIG%", &config_literal::<M>())
         ),
     }
 }
@@ -171,10 +193,9 @@ pub(crate) fn rank_sql<M: Model>(dialect: Dialect) -> String {
             )
         }
         Dialect::Postgres => format!(
-            "ts_rank({}.\"search_vector\", to_tsquery({}, {})) DESC",
+            "ts_rank({}.\"search_vector\", {}) DESC",
             quote(M::TABLE),
-            config_literal::<M>(),
-            match_expression(dialect)
+            match_expression(dialect).replace("%CONFIG%", &config_literal::<M>())
         ),
     }
 }

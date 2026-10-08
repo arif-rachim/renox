@@ -487,7 +487,7 @@ async fn the_weekly_report_covers_seven_days() {
     }
     // Runs it by name, as `my-app schedule:run weekly-sales` does: this also
     // checks that the task is registered.
-    app.kernel().run_scheduled("weekly-sales").await.unwrap();
+    app.run_scheduled("weekly-sales").await.unwrap();
     app.run_jobs().await;
     let report = reports(&app)
         .into_iter()
@@ -508,11 +508,11 @@ async fn a_report_already_running_is_not_sent_twice() {
         .cache
         .lock("sales-report:1", std::time::Duration::from_secs(60));
     let held = lock.try_acquire().await.unwrap().unwrap(); // another run holds it
-    app.kernel().run_scheduled("daily-sales").await.unwrap();
+    app.run_scheduled("daily-sales").await.unwrap();
     assert!(app.queued_jobs().await.is_empty());
 
     held.release().await.unwrap();
-    app.kernel().run_scheduled("daily-sales").await.unwrap();
+    app.run_scheduled("daily-sales").await.unwrap();
     assert_eq!(app.queued_jobs().await, ["renox.send-mail-via"]);
     assert!(!lock.is_held().await.unwrap(), "released after the run");
 }
@@ -524,7 +524,7 @@ async fn a_failed_report_alerts_someone() {
         .execute(app.db())
         .await
         .unwrap();
-    assert!(app.kernel().run_scheduled("daily-sales").await.is_err());
+    assert!(app.run_scheduled("daily-sales").await.is_err());
     app.run_jobs().await;
     app.assert_mail_sent("admin@example.com", "A sales report failed");
 }

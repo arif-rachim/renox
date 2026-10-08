@@ -1737,7 +1737,7 @@ fn card_number(raw: &str) -> Result<u64> {
 
 Jobs and scheduled tasks run inside `rnx serve` / `my-app serve` (`QUEUE_WORKERS`, `SCHEDULER`).
 `schedule:list` shows each task's next run and zone, `schedule:run NAME` runs one now (also
-`kernel.run_scheduled(name)` in tests). `.module(renox::queue::Dashboard)` adds `/_renox/queue`
+`app.run_scheduled(name)` in tests, at the travelled time). `.module(renox::queue::Dashboard)` adds `/_renox/queue`
 (waiting jobs, throughput, failed jobs to retry or forget, batches) for users who pass the
 `view-queue-dashboard` gate (`renox::queue::DASHBOARD_GATE`); `state.queue.stats()` has the same
 numbers for monitoring.
@@ -2238,7 +2238,7 @@ bytes, e.g. signed webhooks), `request().without_csrf()`, `logout()`, `csrf_toke
 `assert_not_found`, `assert_dont_see`, `assert_database_missing` / `assert_database_count`,
 `queued_jobs()`, `run_jobs()`, `run_all_jobs()` (retries and delayed jobs too), `sent_mail()` /
 `assert_mail_sent`, `session_cookie()` / `use_session_cookie(…)` (play a second device),
-`app.kernel().run_scheduled("task")`, `confirm_password()`, `fake_http()`,
+`app.run_scheduled("task")` (at the travelled time), `confirm_password()`, `fake_http()`,
 `assert_authenticated(Some(&user))` (`None`: as anyone), `assert_session_has("cart")`,
 `session_get::<T>("cart")`, `travel_back()`, `assert_notified_to("guest@example.com", "kind")`,
 `emitted::<E>()` / `notifications()` (what the fakes recorded), `mailer()`, and

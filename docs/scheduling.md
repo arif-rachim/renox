@@ -324,7 +324,8 @@ Each function returns how many rows it deleted (`Result<u64>`).
 ### Testing a task
 
 `TestApp` (the test helper) doesn't start the scheduler. Instead, run a task by name with
-`kernel().run_scheduled(name)` (the same as `schedule:run`), then check what it did:
+`run_scheduled(name)` (the same as `schedule:run`, at the time `travel` moved the clock to),
+then check what it did:
 
 ```rust
 use renox::prelude::*;
@@ -343,7 +344,7 @@ fn app() -> App {
 /// Runs the task once, and checks that the count is 1.
 async fn the_task_counts() -> Result {
     let app = TestApp::new(app()).await;
-    app.kernel().run_scheduled("count").await?;
+    app.run_scheduled("count").await?;
     assert_eq!(app.state().cache.get::<i64>("runs").await?, Some(1));
     Ok(())
 }

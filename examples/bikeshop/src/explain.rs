@@ -251,14 +251,12 @@ pub fn for_route(route: &str) -> Option<Explanation> {
 /// (`request.route`), else by its address (`request.path`) against the
 /// explanations' path patterns.
 ///
-/// Why the address too: Renox names the current route from its path alone,
-/// so `GET /account` reports the alphabetically first name of every route
-/// on `/account` (`account.destroy`, the `DELETE`), and `GET /products/{id}`
-/// would report `products.destroy` rather than `products.show`. Only GET
-/// pages are explained, so a name without an explanation falls back to the
-/// GET page at that address. When paths overlap (`/products/new` and
-/// `/products/{id}`), the pattern with more fixed segments wins, as in the
-/// router.
+/// Why the address too: a page whose route has no name (or no explanation
+/// of its own) still finds the GET page explained at that address. (The
+/// current route's name follows the request's method since Renox #299, so
+/// `GET /account` is `account.show`, not the `DELETE`'s `account.destroy`.)
+/// When paths overlap (`/products/new` and `/products/{id}`), the pattern
+/// with more fixed segments wins, as in the router.
 pub fn resolve(route: Option<&str>, path: &str) -> Option<Explanation> {
     let all = all();
     if let Some(found) = route.and_then(|r| all.iter().find(|e| e.route == r)) {

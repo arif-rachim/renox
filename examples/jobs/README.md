@@ -114,7 +114,7 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
   `daily_at("21:00", ...)` narrowed by `.weekdays()` and `.timezone("Asia/Jakarta")` (instead
   of `APP_TIMEZONE`, with DST handled for zones that have it); `weekly_sales` uses a cron
   expression, `cron("30 7 * * 1", ...)` (Mondays at 07:30). Tests call them directly or by
-  name with `app.kernel().run_scheduled("weekly-sales")`, which is also what
+  name with `app.run_scheduled("weekly-sales")`, which is also what
   `schedule:run` does.
 - **A mailer of its own.** The sales reports go out through `App::mailer("reports", …)`
   (`state.queue_mail_via("reports", mail)`), configured with `REPORTS_MAILER`,

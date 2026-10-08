@@ -804,9 +804,7 @@ async fn unpaid_orders_are_cancelled_after_three_days() {
 
     // What the scheduler runs at 03:00 (`schedule:run cancel-unpaid-orders`),
     // on the moved clock.
-    app.at_travelled_time(app.kernel().run_scheduled("cancel-unpaid-orders"))
-        .await
-        .unwrap();
+    app.run_scheduled("cancel-unpaid-orders").await.unwrap();
     assert_eq!(status(&app, old.id).await, OrderStatus::Cancelled);
     assert_eq!(status(&app, recent.id).await, OrderStatus::Pending);
     assert_eq!(stock(&app, coffee.id).await, 4);

@@ -320,3 +320,53 @@ async fn translations_choose_plural_ranges() {
         .await
         .assert_see("No messages;3 messages;Lots of messages;");
 }
+
+/// Routes sharing one path, one per method (#299).
+struct Things;
+
+impl Module for Things {
+    fn name(&self) -> &'static str {
+        "things"
+    }
+
+    fn routes(&self) -> Routes {
+        async fn named(route: CurrentRoute) -> String {
+            route.name().unwrap_or("none").to_owned()
+        }
+        async fn page() -> View {
+            view("route.html", context! {})
+        }
+        Routes::new().resource(
+            "/things",
+            "things",
+            renox::Resource::new()
+                .show(page)
+                .update(named)
+                .destroy(named),
+        )
+    }
+}
+
+/// The current route's name is the one of the route the request's method
+/// reached, on a path several routes share (it was the first name in
+/// alphabetical order: `things.destroy` for every one of them).
+#[renox::test]
+async fn the_current_route_follows_the_requests_method() {
+    let views = tempfile::tempdir().unwrap();
+    std::fs::write(
+        views.path().join("route.html"),
+        "{{ request.route }}|{% if route_is('things.show') %}show{% else %}not show{% endif %}",
+    )
+    .unwrap();
+    let path = views.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Things), move |c| c.views_path = path).await;
+    app.get("/things/1")
+        .await
+        .assert_ok()
+        .assert_see("things.show|show");
+    app.put("/things/1", &[]).await.assert_see("things.update");
+    app.patch("/things/1", &[])
+        .await
+        .assert_see("things.update");
+    app.delete("/things/1").await.assert_see("things.destroy");
+}

@@ -564,7 +564,7 @@ impl<M: Model> Query<M> {
             self.error.get_or_insert(problem);
             return self;
         }
-        if let Some(terms) = super::search::terms(words) {
+        if let Some(terms) = super::search::bound(words) {
             self.filters.push(Filter::Search {
                 sqlite: super::search::filter_sql::<M>(Dialect::Sqlite),
                 postgres: super::search::filter_sql::<M>(Dialect::Postgres),
@@ -581,7 +581,7 @@ impl<M: Model> Query<M> {
             self.error.get_or_insert(problem);
             return self;
         }
-        if let Some(terms) = super::search::terms(words) {
+        if let Some(terms) = super::search::bound(words) {
             self.order.push(Order::Relevance {
                 sqlite: super::search::rank_sql::<M>(Dialect::Sqlite),
                 postgres: super::search::rank_sql::<M>(Dialect::Postgres),

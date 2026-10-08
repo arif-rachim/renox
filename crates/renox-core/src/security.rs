@@ -205,7 +205,15 @@ const ETAG_LIMIT: u64 = 2 * 1024 * 1024;
 
 /// Adds an `ETag` to a rendered page, or turns it into a 304 when the
 /// browser's `If-None-Match` names it.
-async fn etag(res: Response, method: &Method, if_none_match: Option<HeaderValue>) -> Response {
+///
+/// The request's CSP nonce is masked before hashing: it changes on every
+/// request, so a page with scripts would otherwise never match (#306).
+async fn etag(
+    res: Response,
+    method: &Method,
+    if_none_match: Option<HeaderValue>,
+    nonce: &str,
+) -> Response {
     use axum::body::HttpBody as _;
     use axum::http::StatusCode;
     let wanted = res.extensions().get::<WantsEtag>().is_some()
@@ -224,7 +232,7 @@ async fn etag(res: Response, method: &Method, if_none_match: Option<HeaderValue>
     let Ok(bytes) = axum::body::to_bytes(body, ETAG_LIMIT as usize).await else {
         return (StatusCode::INTERNAL_SERVER_ERROR, "could not read the page").into_response();
     };
-    let hash = crate::webhook::sha256_hex(&bytes);
+    let hash = crate::webhook::sha256_hex(&without(&bytes, nonce.as_bytes()));
     let tag = format!("\"{}\"", &hash[..32]);
     let matches = if_none_match
         .as_ref()
@@ -244,6 +252,22 @@ async fn etag(res: Response, method: &Method, if_none_match: Option<HeaderValue>
         return Response::from_parts(parts, axum::body::Body::empty());
     }
     Response::from_parts(parts, axum::body::Body::from(bytes))
+}
+
+/// `bytes` with every `needle` left out (all of `bytes` when `needle` is
+/// empty).
+fn without<'a>(bytes: &'a [u8], needle: &[u8]) -> std::borrow::Cow<'a, [u8]> {
+    if needle.is_empty() || !bytes.windows(needle.len()).any(|w| w == needle) {
+        return std::borrow::Cow::Borrowed(bytes);
+    }
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut rest = bytes;
+    while let Some(at) = rest.windows(needle.len()).position(|w| w == needle) {
+        out.extend_from_slice(&rest[..at]);
+        rest = &rest[at + needle.len()..];
+    }
+    out.extend_from_slice(rest);
+    std::borrow::Cow::Owned(out)
 }
 
 fn trusted_hosts(config: &Config) -> Vec<String> {
@@ -288,12 +312,13 @@ pub(crate) async fn middleware(
         .get(axum::http::header::IF_NONE_MATCH)
         .cloned();
     let mut res = next.run(req).await;
-    res = etag(res, &method, if_none_match).await;
+    res = etag(res, &method, if_none_match, &nonce).await;
     // Errors from outside the view layer (e.g. CSRF's 419) for API clients.
     if wants_json && let Some(page) = res.extensions_mut().remove::<crate::error::ErrorPage>() {
         res = page.json(state.config.debug);
     }
 
+    let not_modified = res.status() == axum::http::StatusCode::NOT_MODIFIED;
     let headers = res.headers_mut();
     let mut set = |name: HeaderName, value: &str| {
         if !headers.contains_key(&name)
@@ -308,7 +333,11 @@ pub(crate) async fn middleware(
     if security.hsts {
         set(STRICT_TRANSPORT_SECURITY, "max-age=31536000");
     }
-    if let Some(policy) = &security.policy {
+    // Not on a 304: the browser keeps the policy it stored with the page,
+    // whose nonce is the one in that page.
+    if let Some(policy) = &security.policy
+        && !not_modified
+    {
         set(CONTENT_SECURITY_POLICY, &policy.replace(NONCE, &nonce));
     }
     res
@@ -324,6 +353,14 @@ mod tests {
     use axum::response::IntoResponse;
 
     use super::*;
+
+    /// What the ETag hashes: the page without the request's nonce.
+    #[test]
+    fn the_nonce_is_left_out_of_the_hash() {
+        assert_eq!(&*without(b"a-NONCE-b-NONCE", b"NONCE"), b"a--b-");
+        assert_eq!(&*without(b"plain", b"NONCE"), b"plain");
+        assert_eq!(&*without(b"plain", b""), b"plain");
+    }
 
     /// A page body that claims a size, then fails while being read.
     struct Broken;
@@ -348,7 +385,7 @@ mod tests {
     async fn an_etag_page_that_cant_be_read_is_a_500() {
         let mut res = (StatusCode::OK, Body::new(Broken)).into_response();
         res.extensions_mut().insert(WantsEtag);
-        let res = etag(res, &Method::GET, None).await;
+        let res = etag(res, &Method::GET, None, "").await;
         assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

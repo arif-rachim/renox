@@ -201,6 +201,10 @@ let grid = Grid::new("posts")
 
 ## Limits and notes
 
+- Codes with hyphens or dots (`GIR-JER-0001-1`, `SKU-12.5`) are found typed whole or in part
+  on both databases. SQLite splits them into words; PostgreSQL's parser reads `-1` or
+  `-12.5` as one signed number, so on PostgreSQL the search also asks for the text as typed,
+  read by that parser.
 - Searchable columns are text columns (`TEXT`, `VARCHAR`). On PostgreSQL an integer column
   works too; a date doesn't.
 - SQLite's FTS5 table uses the table's `rowid`, so the table must not be `WITHOUT ROWID` (any
