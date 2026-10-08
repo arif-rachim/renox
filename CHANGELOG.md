@@ -10,6 +10,86 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.0.0 · 2026-10-08
+
+The first stable release. From here Renox follows semantic versioning
+([docs/stability.md](docs/stability.md)). Since rc.6 it has gained a flagship example, the
+bike shop, whose look and components became Renox's design system.
+
+**Breaking changes and behaviour changes**
+
+- **`AppState` is one `Arc` (#334):** a clone takes about 12 ns, and a bare route answers 3.3×
+  the requests per second. Moving a field out of a state no longer compiles:
+  `let db = state.db;` becomes `let db = state.db.clone();` (or `&state.db`).
+- **USD is the default currency (#335):** `APP_CURRENCY` defaults to `USD`.
+  - Template money formatting (`| money`, `entry(format="money")`, `chart(format="money")`)
+    takes the currency's smallest unit, as the data grid already did.
+  - An app with a 2-decimal currency that passed whole units adds `divide_by=1`, or stores
+    cents.
+  - An app that relied on the old IDR default sets `APP_CURRENCY=IDR`.
+- **The kit's default theme is "editorial" (#344):** a cream page, a teal accent with a
+  terracotta second accent, large Poppins headlines, and pill buttons (rounded rectangles
+  inside `rx-shell`). The look before is `data-rx-theme="warm"` on `<html>`; `classic` is
+  unchanged.
+- **`disabled_reason` (#308):** `disabled=false` now leaves the button enabled, without the
+  reason.
+
+**Added**
+
+- **renox-blocks (#347):** a new plugin crate with eleven interactive components. Each
+  block's code loads only on pages that use it. The guide is [docs/blocks.md](docs/blocks.md).
+  - Input: `quantity`, `range_slider`, `keypad`, `swatches`, `datetime_range`.
+  - Display: `gallery`, `history`, `compare_plans`.
+  - Scheduling: `month_calendar`, `availability`, `kanban`.
+- **Icons (#346):** `icon(name, size, label)` draws 112 Lucide icons (ISC licence).
+  `sidebar_link`, `stat` and `empty` take `icon=`.
+- **The navbar on phones (#346):** `navbar(…, tabs=…, tabs_label=…)` adds a bottom tab bar
+  under 36rem; `nav_search` puts search behind a button there.
+- **Closed days in the date picker (#345):** `date_picker(…, disabled_dates=…,
+  closed_weekdays=…)`. The keyboard skips those days, and a typed one is refused.
+- **New theme tokens:** `--rx-accent-2`, `--rx-accent-2-text`, `--rx-tint`, `--rx-accent-soft`,
+  `--rx-ink`, `--rx-type-hero`, `--rx-type-section`.
+- **`rnx new --starter` page patterns (#348):** hero, feature cards, figures, steps, empty
+  states and stat cards, owned by the app (`resources/views/patterns.html`,
+  `public/patterns.css`). It also gets a public home page with the phone tab bar, a dashboard
+  welcome card, sign-in pages beside CSS art, and the seeded accounts on /login in local only.
+- **Testing:** `TestApp::run_scheduled(name)` runs a task at the travelled time (#311). Templates
+  get an `app.currency` global.
+- **Benchmarks (#333):** benchmarks/ compares Renox, bare Axum and Laravel (FPM and Octane),
+  reproducibly. Results are in benchmarks/RESULTS.md.
+
+**Changed**
+
+- **The kit loads rarely used parts on demand (#349):** charts and the period filter, the
+  wizard, the repeater/key-value and tags. A plain page's `renox-ui.js` shrinks from 97.8 to
+  76.0 KB (24.5 to 20.3 KB gzipped). A repeater already at its `max` renders its add button
+  disabled.
+- **One example (#351):** examples/bikeshop is the complete use case, and examples/hello the
+  smallest app. The other fifteen examples are removed. Before they went, what they showed and
+  bikeshop lacked moved into it:
+  - each store's page on its own host (`Routes::domain`);
+  - `/about/fields`, every input type ↔ Rust ↔ SQLite ↔ PostgreSQL, with files on the local
+    disk or S3;
+  - `/about/htmx`, every htmx recipe live.
+
+  Every bikeshop page explains itself beside its code: the samples are cut from the source at
+  build time.
+- **The docs live at [docs.renox.rs](https://docs.renox.rs) (#331),** and the landing page and
+  blog at [renox.rs](https://renox.rs) (`www/`, #337).
+
+**Fixed**
+
+- **#299:** the current route's name (`request.route`, `route_is`, `CurrentRoute`) follows the
+  request's method.
+- **#306:** `Routes::etag` answers 304 for pages that carry a CSP nonce.
+- **#304:** a code typed whole with hyphens (`GIR-JER-0001-1`) is found by search on
+  PostgreSQL.
+- **#318:** `t(key, count=…)` with a count that isn't a whole number prints it instead of
+  `:count`.
+- **#327:** browser tests: clicks that never reached the page are retried, then sent through
+  the DOM.
+- **Flaky tests:** several in the bike shop and the scheduler.
+
 ## 1.0.0-rc.6 · 2026-10-06
 
 The fixes found by testing every untested path (the coverage epic #246), and two UI kit

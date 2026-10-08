@@ -2,6 +2,7 @@
 title: "Meet the bike shop: a whole business built with Renox"
 description: Three stores that sell, rent and service bikes, with staff roles per store and reports. Renox's flagship example, live and explained.
 date: 2026-10-07
+updated: 2026-10-08
 author: Arif Rachim
 tags: examples, showcase
 ---
@@ -24,7 +25,7 @@ Behind the counter it **runs three stores**:
 
 ## Every page explains itself
 
-Each page has an **About this page** panel. It says what the page is for, who uses it, which Renox features it relies on and why, what happens under the hood, which guides to read and which source files to open. If you want to see how Renox does route model binding, rate limits, roles per tenant, live validation or a data grid with exports, there is a page that does it, and it tells you so.
+Each page has an **About this page** panel. Since Renox 1.0, it sits beside the page on a wide screen, with the code behind it: the handler, the template, the query, cut from the source when the app is built. It says what the page is for, who uses it, which Renox features it relies on and why, what happens under the hood, which guides to read and which source files to open. If you want to see how Renox does route model binding, rate limits, roles per tenant, live validation or a data grid with exports, there is a page that does it, and it tells you so.
 
 To try every side of the shop, log in with one of the demo accounts listed on [the login page](https://bikeshop.renox.rs/login): a customer, the owner, a manager, a cashier or a mechanic.
 

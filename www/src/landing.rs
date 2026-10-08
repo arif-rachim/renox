@@ -22,7 +22,7 @@ pub struct Metric {
 pub fn metrics() -> Vec<Metric> {
     vec![
         Metric {
-            value: 1522,
+            value: 1608,
             suffix: "",
             label: "tests",
         },
@@ -32,17 +32,17 @@ pub fn metrics() -> Vec<Metric> {
             label: "line coverage, enforced",
         },
         Metric {
-            value: 70,
+            value: 72,
             suffix: "",
             label: "UI kit components",
         },
         Metric {
-            value: 17,
+            value: 130,
             suffix: "",
-            label: "example apps",
+            label: "demo pages explained beside their code",
         },
         Metric {
-            value: 5,
+            value: 6,
             suffix: "",
             label: "official plugins",
         },
@@ -138,7 +138,7 @@ pub fn features() -> Vec<Feature> {
         Feature {
             icon: "▦",
             title: "UI kit, grid & HTMX",
-            text: "70 accessible components, a data grid with filters and exports, htmx and Alpine.js built in.",
+            text: "72 accessible components, 112 icons, an editorial theme, a data grid with exports, and renox-blocks; htmx and Alpine.js built in.",
             code: "{{ grid(orders) }}",
             doc: "ui",
         },

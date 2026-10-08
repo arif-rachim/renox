@@ -35,8 +35,8 @@ otherwise.
 Before 1.0, breaking changes were allowed. Each release's notes list them.
 
 New apps made by `rnx new` depend on the Renox version of the `rnx` that made them. An `rnx`
-installed from crates.io writes that version (`renox = "1.0.0-rc.6"`, or `"1.2"` for a final
-release, which lets `cargo update` take fixes and new features but never a breaking change). An
+installed from crates.io writes that version as `renox = "1.2"`, which lets `cargo update` take
+fixes and new features but never a breaking change. An
 `rnx` built from a Git checkout pins the app to that exact commit instead, so the Renox code
 doesn't change by itself.
 

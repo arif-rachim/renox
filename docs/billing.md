@@ -49,8 +49,8 @@ Add the crate next to `renox`, at the same version:
 
 ```toml
 [dependencies]
-renox = "1.0.0-rc.6"
-renox-billing = "1.0.0-rc.6"
+renox = "1.0"
+renox-billing = "1.0"
 ```
 
 Then add the module, next to the `Auth` module:
