@@ -15,6 +15,7 @@
     {%- if can('consignment.manage') %}{{ link_button(route('stock.consignments.create'), t('stock.consignments.new'), icon="box") }}{% endif %}
     {%- if can('purchasing.manage') %}{{ link_button(route('stock.purchasing.create'), t('stock.purchasing.new'), variant="primary", icon="plus") }}{% endif %}
   {% endcall %}
+  {# [explain:stock.index.template] #}
   {%- set tabs = namespace(items=[]) %}
   {%- for key in views %}
     {%- set tabs.items = tabs.items + [[route('stock.index', view=key), t('stock.index.view.' ~ key) ~ " (" ~ counts[key] ~ ")"]] %}
@@ -22,5 +23,6 @@
   {{ link_tabs(tabs.items, current=route('stock.index', view=tab), label=t('stock.index.views')) }}
   <p class="rx-subtitle">{{ t('stock.index.view_hint.' ~ tab) }}</p>
   {{ grid(stock) }}
+  {# [/explain:stock.index.template] #}
 </div>
 {% endblock %}

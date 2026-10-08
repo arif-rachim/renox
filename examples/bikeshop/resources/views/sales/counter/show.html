@@ -18,6 +18,7 @@
   {% block sale %}
   <div class="bs-counter" id="counter">
     <section class="bs-counter__left">
+      {# [explain:sales.counter.template] #}
       {% call card(t('sales.counter.find')) %}
         <form class="bs-counter__find" method="post" action="{{ route('sales.counter.add') }}">
           {{ csrf_field() }}
@@ -26,6 +27,7 @@
           {{ button(t('sales.counter.add'), variant="primary", key="a") }}
         </form>
       {% endcall %}
+      {# [/explain:sales.counter.template] #}
       {% call card(t('sales.counter.sale')) %}
         {%- if sale.changed %}{{ alert(t('sales.counter.changed'), kind="warning") }}{% endif %}
         {%- if sale.lines %}
@@ -74,6 +76,7 @@
           {%- if totals.discount > 0 %}<div><dt>{{ t('sales.checkout.plan_discount', percent=totals.discount_percent) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>{% endif %}
           <div class="bs-totals__total"><dt>{{ t('sales.orders.total') }}</dt><dd class="rx-num" data-bs-counter-total="{{ totals.total }}" data-bs-counter-scale="{{ scale }}">{{ totals.total | money }}</dd></div>
         </dl>
+        {# [explain:sales.counter.template] #}
         <form class="bs-counter__pay" method="post" action="{{ route('sales.counter.pay') }}" hx-boost="false" data-bs-change-label="{{ t('sales.counter.change') }}" data-bs-short-label="{{ t('sales.counter.short') }}">
           {{ csrf_field() }}
           {{ toggle_buttons("method", t('sales.counter.method'), [["cash", t('sales.method.cash')], ["card", t('sales.method.card')]], selected="cash", required=true) }}
@@ -81,6 +84,7 @@
           {{ keypad("rx-tendered", label=t('sales.counter.keypad'), decimal=(scale > 1), enter_label=t('sales.counter.pay')) }}
           {{ button(t('sales.counter.pay_amount', amount=(totals.total | money)), variant="primary", block=true, key="p", disabled_reason=(none if sale.lines else t('sales.counter.empty'))) }}
         </form>
+        {# [/explain:sales.counter.template] #}
       {% endcall %}
     </aside>
   </div>

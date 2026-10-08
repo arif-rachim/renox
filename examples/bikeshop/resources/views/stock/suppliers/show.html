@@ -8,11 +8,13 @@
 {% block content %}
 {{ styles() }}
 <div class="rx-stack">
+  {# [explain:stock.suppliers.show.template] #}
   {% call page_header(supplier.name, subtitle=t('stock.suppliers.lead_time', days=supplier.lead_days), back=route('stock.suppliers'), back_label=t('stock.suppliers.title')) %}
     {{ link_button(route('stock.suppliers.edit', supplier.id), t('stock.suppliers.edit'), icon="edit") }}
     {{ import_action("price-list", t('stock.import.button'), route('stock.suppliers.import', supplier.id), t('stock.import.title', supplier=supplier.name), description=t('stock.import.lead', rows=200), columns=columns, template_url=route('stock.suppliers.template')) }}
     {{ link_button(route('stock.purchasing.create', supplier=supplier.id), t('stock.purchasing.new'), variant="primary", icon="plus") }}
   {% endcall %}
+  {# [/explain:stock.suppliers.show.template] #}
   <div class="bs-split" data-bs-reveal>
     <div>
       {% call card(title=t('stock.suppliers.price_list'), subtitle=t('stock.suppliers.price_list_lead')) %}

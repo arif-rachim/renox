@@ -14,6 +14,7 @@
   {%- if suppliers.items %}
   <div class="rx-card">
   {% call table([t('stock.suppliers.name'), t('stock.suppliers.contact'), [t('stock.suppliers.lead_days'), "num"], [t('stock.suppliers.items'), "num"], [t('stock.suppliers.open'), "num"]], caption=t('stock.suppliers.title')) %}
+    {# [explain:stock.suppliers.template] #}
     {%- for row in suppliers.items %}
     <tr>
       <td><a class="rx-link" href="{{ route('stock.suppliers.show', row.supplier.id) }}">{{ row.supplier.name }}</a></td>
@@ -23,6 +24,7 @@
       <td class="rx-num">{{ row.open }}</td>
     </tr>
     {%- endfor %}
+    {# [/explain:stock.suppliers.template] #}
   {% endcall %}
   </div>
   {% from "renox/pagination.html" import pagination %}{{ pagination(suppliers) }}

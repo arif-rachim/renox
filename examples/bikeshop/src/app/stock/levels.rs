@@ -34,6 +34,7 @@ pub const VIEWS: [&str; 4] = ["own", "held", "away", "low"];
 /// The stock grid: one row per stock level (the `stock_overview` view),
 /// with the owner and location stores, sums under the quantity and value
 /// columns, grouping by category, exports, and cards on phones.
+// [explain:stock.index.grid]
 pub fn stock_grid(lang: &Lang) -> Grid {
     let t = |key: &str| lang.t(&format!("stock.fields.{key}"), &[]);
     Grid::new("stock")
@@ -45,6 +46,7 @@ pub fn stock_grid(lang: &Lang) -> Grid {
                 .searchable()
                 .link("/staff/stock/{id}"),
         )
+        // [/explain:stock.index.grid]
         .column(Column::text("sku", &t("sku")).searchable().copyable())
         .column(Column::text("size", &t("size")))
         .column(Column::text("category", &t("category")))
@@ -62,6 +64,7 @@ pub fn stock_grid(lang: &Lang) -> Grid {
             "location_store_id",
             "name",
         ))
+        // [explain:stock.index.grid]
         .column(Column::number("on_hand", &t("on_hand")).summary(Summary::Sum))
         .column(Column::number("reserved", &t("reserved")).summary(Summary::Sum))
         .column(
@@ -80,6 +83,7 @@ pub fn stock_grid(lang: &Lang) -> Grid {
         .cards_on_mobile()
         .empty_state(&lang.t("stock.index.empty", &[]), None)
 }
+// [/explain:stock.index.grid]
 
 /// `?view=` on the grid.
 #[derive(Deserialize, Default)]
@@ -90,6 +94,7 @@ pub struct StockQuery {
 
 /// The rows of one tab: always within what the person may see ("mine or
 /// at my store", `scopes_with`), then narrowed to the active store.
+// [explain:stock.index.handler]
 pub fn rows_of(tab: &str, store: i64) -> renox::db::Query<StockRow> {
     let rows = access::visible::<StockRow>(catalogue::STOCK_VIEW);
     match tab {
@@ -108,9 +113,11 @@ pub fn rows_of(tab: &str, store: i64) -> renox::db::Query<StockRow> {
             .where_eq("location_store_id", store),
     }
 }
+// [/explain:stock.index.handler]
 
 /// `GET /staff/stock` (`stock.index`): the grid, or its export
 /// (`?export=csv|xlsx|print` from the grid's menu).
+// [explain:stock.index.handler]
 pub async fn index(
     State(db): State<Db>,
     lang: Lang,
@@ -128,6 +135,7 @@ pub async fn index(
         return Ok(file);
     }
     let page = grid.page(rows_of(&tab, store), &request).await?;
+    // [/explain:stock.index.handler]
     // The counts on the tabs: four small queries.
     let mut counts = HashMap::new();
     for key in VIEWS {
@@ -167,6 +175,7 @@ pub struct Ability {
 /// by one store at one store, and every movement that made it, newest
 /// first, each linked to its source document. Visible to the staff of the
 /// owner **and** the location store; anyone else gets a 404.
+// [explain:stock.ledger.handler]
 pub async fn show(
     State(db): State<Db>,
     user: AuthUser,
@@ -184,6 +193,7 @@ pub async fn show(
         .order_by_desc("id")
         .paginate(&db, page, 25)
         .await?;
+    // [/explain:stock.ledger.handler]
     // The level after each movement: from today's level, walking back.
     let newer: i64 = StockMovement::where_eq("variant_id", level.variant_id)
         .where_eq("owner_store_id", level.owner_store_id)
@@ -258,6 +268,7 @@ pub async fn show(
             StoreAttr::Owner,
         ),
     ];
+    // [explain:stock.ledger.handler]
     let abilities: Vec<Ability> = actions
         .iter()
         .filter(|(action, ..)| level.consigned() || *action != "stock.abilities.recall")
@@ -274,6 +285,7 @@ pub async fn show(
         })
         .collect();
     let can_write_off = access::can(&user, catalogue::STOCK_ADJUST, StoreAttr::Owner, &level);
+    // [/explain:stock.ledger.handler]
     Ok(view(
         "stock/ledger.html",
         context! {
@@ -292,6 +304,7 @@ pub async fn show(
     ))
 }
 
+// [explain:stock.ledger.sources]
 /// The documents behind a page of movements, by `(table, id)`: one query
 /// per kind of document (`Morph::parents`), with a label and a link.
 async fn sources(
@@ -311,6 +324,7 @@ async fn sources(
             (format!("#{}", order.number), format!("/staff/orders/{id}")),
         );
     }
+    // [/explain:stock.ledger.sources]
     for (id, _) in REFERENCE
         .parents::<WorkOrder, _>(db, movements, key)
         .await?
@@ -347,8 +361,10 @@ async fn sources(
             (bike.frame_number.clone(), format!("/staff/fleet/{id}")),
         );
     }
+    // [explain:stock.ledger.sources]
     Ok(found)
 }
+// [/explain:stock.ledger.sources]
 
 /// The write-off form.
 #[derive(Deserialize, Validate, Debug)]
@@ -363,6 +379,7 @@ pub struct WriteOffForm {
 /// store writes goods off (broken, lost, given away), wherever they are.
 /// Only the **owner** may: for consigned goods at another store, that
 /// store may count them (a stock take) but not write them off. Audited.
+// [explain:stock.ledger.write_off]
 pub async fn write_off(
     State(state): State<AppState>,
     user: AuthUser,
@@ -377,6 +394,7 @@ pub async fn write_off(
     let staff = Staff::of_user(db, user.id).await?.map(|s| s.id);
     let mut tx = db.begin().await?;
     let taken = ledger::take(
+        // [/explain:stock.ledger.write_off]
         &mut tx,
         StockMovement {
             variant_id: level.variant_id,
@@ -390,6 +408,7 @@ pub async fn write_off(
         },
     )
     .await?;
+    // [explain:stock.ledger.write_off]
     let Some(movement) = taken else {
         return Err(abort(
             StatusCode::CONFLICT,
@@ -397,6 +416,7 @@ pub async fn write_off(
         ));
     };
     tx.commit().await?;
+    // [/explain:stock.ledger.write_off]
     crate::app::multistore::audit::record(
         &state,
         &user,

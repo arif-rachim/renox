@@ -53,6 +53,7 @@ fn store() -> Result<i64> {
     active_store::current().ok_or(Error::Forbidden)
 }
 
+// [explain:sales.counter.handler]
 fn load(session: &Session, store: i64) -> CounterSale {
     let mut sale: CounterSale = session.get(&key(store)).unwrap_or_default();
     sale.cart.store_id = Some(store);
@@ -62,7 +63,9 @@ fn load(session: &Session, store: i64) -> CounterSale {
 fn save(session: &Session, store: i64, sale: &CounterSale) -> Result {
     session.put(&key(store), sale)
 }
+// [/explain:sales.counter.handler]
 
+// [explain:sales.counter.handler]
 /// `GET /staff/counter` (`sales.counter`): the screen. With htmx (a change)
 /// only its `sale` block.
 pub async fn show(State(db): State<Db>, session: Session) -> Result<View> {
@@ -89,6 +92,7 @@ pub async fn show(State(db): State<Db>, session: Session) -> Result<View> {
     )
     .fragment("sale"))
 }
+// [/explain:sales.counter.handler]
 
 /// `GET /staff/counter/variants?q=` (`sales.counter.variants`): what the
 /// product search offers: an exact SKU (or barcode text) first, then the
@@ -346,11 +350,13 @@ pub async fn pay(
         }
         _ => None,
     };
+    // [explain:sales.counter.pay]
     if method == PaymentMethod::Cash && tendered.is_some_and(|t| t < totals.total) {
         let mut errors = renox::validation::Errors::default();
         errors.add("tendered", lang.t("sales.counter.not_enough", &[]));
         return Err(errors.into());
     }
+    // [/explain:sales.counter.pay]
     // Counter sales are taken by a member of staff (the ledger and the
     // payment name them).
     let staff_id = Staff::of_user(db, user.id)
@@ -419,6 +425,7 @@ pub async fn pay(
     OrderItem::insert_many(&mut tx, items).await?;
     tx.commit().await?;
 
+    // [explain:sales.counter.pay]
     // Paid at once; its PaymentSucceeded turns the reservation into a sale.
     payments::record_counter(
         &state,
@@ -448,4 +455,5 @@ pub async fn pay(
         Redirect::to(&format!("/orders/{}/invoice?receipt=1", order.id)),
     )
         .into_response())
+    // [/explain:sales.counter.pay]
 }

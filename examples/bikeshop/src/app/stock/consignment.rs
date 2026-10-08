@@ -102,6 +102,7 @@ fn open_statuses() -> Vec<ShipmentStatus> {
 
 /// `GET /staff/consignments` (`stock.consignments`): the active store's
 /// shipments, both ways. Three queries a page (count, page, line sums).
+// [explain:stock.consignments.handler]
 pub async fn index(
     State(db): State<Db>,
     Page(page): Page,
@@ -117,6 +118,7 @@ pub async fn index(
         q.where_eq("owner_store_id", store)
             .where_eq("location_store_id", store)
     });
+    // [/explain:stock.consignments.handler]
     let shipments = match tab.as_str() {
         "open" => shipments.where_in("status", open_statuses()),
         "transit" => shipments.where_in(
@@ -129,11 +131,13 @@ pub async fn index(
         ),
         _ => shipments,
     };
+    // [explain:stock.consignments.handler]
     let shipments = shipments
         .order_by_desc("updated_at")
         .order_by_desc("id")
         .paginate(&db, page, 25)
         .await?;
+    // [/explain:stock.consignments.handler]
     let lines = ConsignmentShipmentLine::query()
         .where_in(
             "shipment_id",
@@ -192,12 +196,14 @@ pub struct NewQuery {
 /// `GET /staff/consignments/new` (`stock.consignments.create`): send our
 /// goods to another store, or ask another store for its goods. The rows are
 /// the owner store's own goods on its shelf, with what is available.
+// [explain:stock.consignments.create.handler]
 pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let direction = match query.direction.as_deref() {
         Some("ask") => "ask",
         _ => "send",
     };
+    // [/explain:stock.consignments.create.handler]
     let others: Vec<Store> = Store::all_by_name(&db)
         .await?
         .into_iter()
@@ -208,6 +214,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .filter(|id| others.iter().any(|s| s.id == *id))
         .or_else(|| others.first().map(|s| s.id))
         .unwrap_or_default();
+    // [explain:stock.consignments.create.handler]
     let owner = if direction == "send" { store } else { other };
     let search = query.q.clone().unwrap_or_default();
     let rows = StockRow::where_eq("owner_store_id", owner)
@@ -227,6 +234,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .limit(100)
         .get(&db)
         .await?;
+    // [/explain:stock.consignments.create.handler]
     Ok(view(
         "stock/consignments/new.html",
         context! { direction, others, other, rows, q => search, variant => query.variant },
@@ -277,6 +285,7 @@ impl NewShipment {
     }
 }
 
+// [explain:stock.consignments.create.rules]
 impl Validate for NewShipment {
     fn rules(&self, v: &mut Validator) {
         v.field("direction", &self.direction)
@@ -287,6 +296,7 @@ impl Validate for NewShipment {
         v.nested("lines", &self.lines);
     }
 
+    // [/explain:stock.consignments.create.rules]
     /// The other store exists and isn't this one; something is asked for;
     /// no line wants more than the owner has available now.
     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
@@ -318,6 +328,7 @@ impl Validate for NewShipment {
             .into_iter()
             .map(|r| (r.variant_id, r.available))
             .collect();
+        // [explain:stock.consignments.create.rules]
         for (i, line) in self.wanted() {
             let available = levels.get(&line.variant).copied().unwrap_or(0);
             if line.quantity.unwrap_or(0) > available {
@@ -332,6 +343,7 @@ impl Validate for NewShipment {
         }
         Ok(())
     }
+    // [/explain:stock.consignments.create.rules]
 }
 
 /// `POST /staff/consignments` (`stock.consignments.store`): a request
@@ -423,8 +435,10 @@ pub struct LineView {
 /// shipment, its lines and its steps, and the buttons the person may press
 /// (each checked in the store that matters: approving and shipping in the
 /// owner store, receiving in the location store).
+// [explain:stock.consignments.show.handler]
 pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let shipment = access::find::<ConsignmentShipment>(&db, &user, id).await?;
+    // [/explain:stock.consignments.show.handler]
     let lines = ConsignmentShipmentLine::where_eq("shipment_id", shipment.id)
         .order_by("id")
         .get(&db)
@@ -442,6 +456,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
             }
         })
         .collect();
+    // [explain:stock.consignments.show.handler]
     let stores = store_names(&db).await?;
     let name = |id: i64| stores.get(&id).cloned().unwrap_or_default();
     let owner_may = |p: &str| access::can(&user, p, StoreAttr::Owner, &shipment);
@@ -455,6 +470,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
         "send_back": s == ShipmentStatus::RecallRequested && location_may(catalogue::CONSIGNMENT_MANAGE),
         "receive_back": s == ShipmentStatus::RecallSent && owner_may(catalogue::STOCK_RECEIVE),
     });
+    // [/explain:stock.consignments.show.handler]
     let reached = rank(s);
     let steps: Vec<_> = STEPS
         .iter()
@@ -490,6 +506,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
     ))
 }
 
+// [explain:stock.consignments.show.advance]
 /// Moves `shipment` from `from` to `to` (setting `columns` too), only if it
 /// is still `from`: `false` when someone was quicker.
 async fn advance(
@@ -508,6 +525,7 @@ async fn advance(
     shipment.status = to;
     Ok(true)
 }
+// [/explain:stock.consignments.show.advance]
 
 fn conflict(state: &AppState) -> Error {
     abort(

@@ -2,6 +2,7 @@
 {% extends "renox/mail/layout.html" %}
 {% from "renox/mail/components.html" import table, panel, button, divider %}
 {% block title %}{{ t('sales.mail.confirmation.subject', number=order.number) }}{% endblock %}
+{# [explain:sales.mails.template] #}
 {% block content %}
 <p>{{ t('sales.mail.hello', name=name) }}</p>
 <p>{{ t('sales.mail.confirmation.thanks', number=order.number) }}</p>
@@ -13,3 +14,4 @@
 {{ divider() }}
 {{ button(url, t('sales.mail.view_order')) }}
 {% endblock %}
+{# [/explain:sales.mails.template] #}

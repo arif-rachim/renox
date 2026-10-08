@@ -74,6 +74,7 @@ pub async fn index(State(db): State<Db>) -> Result<View> {
     Ok(view("stock/fleet.html", context! { shelf, options, bikes }))
 }
 
+// [explain:stock.fleet.form]
 /// A new bike for the fleet.
 #[derive(Deserialize, Validate, Debug)]
 pub struct ToFleetForm {
@@ -91,8 +92,10 @@ pub struct ToFleetForm {
     #[validate(required, min = 0)]
     pub deposit: Option<f64>,
 }
+// [/explain:stock.fleet.form]
 
 /// `POST /staff/stock/fleet` (`stock.fleet.store`).
+// [explain:stock.fleet.handler]
 pub async fn to_fleet(
     State(state): State<AppState>,
     user: AuthUser,
@@ -102,6 +105,7 @@ pub async fn to_fleet(
     let level =
         access::find::<super::model::StockLevel>(db, &user, form.level.unwrap_or_default()).await?;
     access::require(&user, catalogue::FLEET_MANAGE, StoreAttr::Owner, &level)?;
+    // [/explain:stock.fleet.handler]
     let lang = state.current_lang();
     if level.consigned() {
         // Another store's goods: only their owner may put them in a fleet.
@@ -109,6 +113,7 @@ pub async fn to_fleet(
     }
     let variant = ProductVariant::find_or_404(db, level.variant_id).await?;
     let staff = Staff::of_user(db, user.id).await?.map(|s| s.id);
+    // [explain:stock.fleet.handler]
     let mut tx = db.begin().await?;
     let taken = ledger::take(
         &mut tx,
@@ -124,6 +129,7 @@ pub async fn to_fleet(
         },
     )
     .await?;
+    // [/explain:stock.fleet.handler]
     let Some(mut movement) = taken else {
         return Err(abort(
             StatusCode::CONFLICT,
@@ -148,12 +154,14 @@ pub async fn to_fleet(
         },
     )
     .await?;
+    // [explain:stock.fleet.handler]
     movement.reference_type = Some(RentalBike::TABLE.into());
     movement.reference_id = Some(bike.id);
     movement
         .save_only(&mut tx, &["reference_type", "reference_id"])
         .await?;
     tx.commit().await?;
+    // [/explain:stock.fleet.handler]
     audit::record(
         &state,
         &user,
