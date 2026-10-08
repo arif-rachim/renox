@@ -1,7 +1,25 @@
 {
   "shop": {
     "name": "Bike Shop",
-    "footer": "A Renox example: three bike stores that sell, rent and service bikes."
+    "footer": "A Renox example: three bike stores that sell, rent and service bikes.",
+    "services": {
+      "buy": {
+        "title": "Bikes and gear",
+        "text": "From three stores' shelves"
+      },
+      "rent": {
+        "title": "Rentals",
+        "text": "By the hour or the day"
+      },
+      "repair": {
+        "title": "Workshop",
+        "text": "Tune-ups, repairs, fittings"
+      },
+      "plans": {
+        "title": "Service plans",
+        "text": "Visits booked for you"
+      }
+    }
   },
   "nav": {
     "home": "Home",
@@ -41,7 +59,10 @@
     "stores": {
       "title": "Three stores, working together",
       "text": "Staff help each other's stores, bikes move to where riders need them, and the stores settle up every month.",
-      "store": "The :name store"
+      "store": "The :name store",
+      "buy": "Buy",
+      "rent": "Rent",
+      "service": "Service"
     },
     "hero": {
       "eyebrow": "Three stores · one shop",
@@ -85,7 +106,15 @@
       "title": "Dashboard",
       "lead": "The back office of the three stores.",
       "empty_title": "Nothing here yet",
-      "empty_text": "Each store's sales, rentals, workshop and stock appear here as the example grows."
+      "empty_text": "Each store's sales, rentals, workshop and stock appear here as the example grows.",
+      "welcome": "Good to see you, :name.",
+      "ways": {
+        "label": "Today's work",
+        "rentals": "Pick-ups, bikes out and overdue",
+        "workshop": "Work orders by status",
+        "counter": "Sell at the till",
+        "stock": "What is on the shelves"
+      }
     },
     "two_factor": {
       "required": "Staff accounts need two-factor login. Turn it on below to open the back office."
@@ -97,7 +126,13 @@
       "stores": "Stores",
       "roles": "Roles",
       "audit": "Audit log",
-      "admin": "Admin panel"
+      "admin": "Admin panel",
+      "sections": {
+        "front": "Front desk",
+        "work": "Workshop and stock",
+        "stores": "Between stores",
+        "manage": "Manage"
+      }
     },
     "stores": {
       "title": "Stores",
@@ -937,7 +972,12 @@
       "none_text": "Try another time, another type or size, or another store.",
       "day": "The store's day",
       "taken": "Taken",
-      "eyebrow": "By the hour or the day"
+      "eyebrow": "By the hour or the day",
+      "perks": {
+        "stores": "Pick up and return at any of three stores",
+        "hours": "By the hour or the day, never more than a day's price",
+        "deposit": "The deposit comes back when the bike does"
+      }
     },
     "fields": {
       "store": "Store",
@@ -1368,7 +1408,22 @@
       "total": "Total (:minutes min)",
       "pick": "Pick a package or tasks to see the estimate.",
       "submit": "Book",
-      "booked": "Booked! We sent you a confirmation."
+      "booked": "Booked! We sent you a confirmation.",
+      "what": {
+        "label": "What the workshop does",
+        "repair": {
+          "title": "Repairs",
+          "text": "Brakes, gears, wheels and e-bike diagnostics"
+        },
+        "care": {
+          "title": "Clean and care",
+          "text": "Chain clean and lube, tyres, safety checks"
+        },
+        "tune": {
+          "title": "Tune-ups",
+          "text": "From a quick tune-up to a full overhaul"
+        }
+      }
     },
     "service": {
       "title": "Service #:number",

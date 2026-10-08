@@ -25,6 +25,6 @@
   {# [/explain:multistore.settlements.template] #}
   </div>
   {% from "renox/pagination.html" import pagination %}{{ pagination(pages) }}
-  {%- else %}<div class="rx-card">{{ empty(t('multistore.settlements.empty')) }}</div>{% endif %}
+  {%- else %}<div class="rx-card">{{ empty(t('multistore.settlements.empty'), icon="book-open") }}</div>{% endif %}
 </div>
 {% endblock %}

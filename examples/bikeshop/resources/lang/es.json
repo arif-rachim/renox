@@ -1,7 +1,25 @@
 {
   "shop": {
     "name": "Bike Shop",
-    "footer": "Un ejemplo de Renox: tres tiendas de bicicletas que venden, alquilan y reparan bicicletas."
+    "footer": "Un ejemplo de Renox: tres tiendas de bicicletas que venden, alquilan y reparan bicicletas.",
+    "services": {
+      "buy": {
+        "title": "Bicis y equipo",
+        "text": "De las estanterías de tres tiendas"
+      },
+      "rent": {
+        "title": "Alquiler",
+        "text": "Por horas o por días"
+      },
+      "repair": {
+        "title": "Taller",
+        "text": "Puestas a punto, reparaciones, ajustes"
+      },
+      "plans": {
+        "title": "Planes de servicio",
+        "text": "Visitas reservadas por ti"
+      }
+    }
   },
   "nav": {
     "home": "Inicio",
@@ -41,7 +59,10 @@
     "stores": {
       "title": "Tres tiendas que trabajan juntas",
       "text": "El personal ayuda en otras tiendas, las bicicletas van adonde hacen falta y las tiendas liquidan cuentas cada mes.",
-      "store": "Tienda :name"
+      "store": "Tienda :name",
+      "buy": "Comprar",
+      "rent": "Alquilar",
+      "service": "Taller"
     },
     "hero": {
       "eyebrow": "Tres tiendas · una sola tienda",
@@ -85,7 +106,15 @@
       "title": "Panel",
       "lead": "La trastienda de las tres tiendas.",
       "empty_title": "Aún no hay nada aquí",
-      "empty_text": "Las ventas, los alquileres, el taller y el stock de cada tienda aparecerán aquí a medida que crezca el ejemplo."
+      "empty_text": "Las ventas, los alquileres, el taller y el stock de cada tienda aparecerán aquí a medida que crezca el ejemplo.",
+      "welcome": "Qué bueno verte, :name.",
+      "ways": {
+        "label": "El trabajo de hoy",
+        "rentals": "Recogidas, bicis fuera y retrasos",
+        "workshop": "Órdenes de trabajo por estado",
+        "counter": "Vender en caja",
+        "stock": "Lo que hay en las estanterías"
+      }
     },
     "two_factor": {
       "required": "Las cuentas del personal necesitan el acceso en dos pasos. Actívalo abajo para abrir la trastienda."
@@ -97,7 +126,13 @@
       "stores": "Tiendas",
       "roles": "Roles",
       "audit": "Registro de auditoría",
-      "admin": "Panel de administración"
+      "admin": "Panel de administración",
+      "sections": {
+        "front": "Mostrador",
+        "work": "Taller y existencias",
+        "stores": "Entre tiendas",
+        "manage": "Gestión"
+      }
     },
     "stores": {
       "title": "Tiendas",
@@ -2734,7 +2769,12 @@
       "none_text": "Prueba otra hora, otro tipo o talla, u otra tienda.",
       "day": "El día de la tienda",
       "taken": "Ocupada",
-      "eyebrow": "Por horas o por días"
+      "eyebrow": "Por horas o por días",
+      "perks": {
+        "stores": "Recoge y devuelve en cualquiera de las tres tiendas",
+        "hours": "Por horas o por días, nunca más que el precio de un día",
+        "deposit": "La fianza vuelve cuando vuelve la bici"
+      }
     },
     "fields": {
       "store": "Tienda",
@@ -3165,7 +3205,22 @@
       "total": "Total (:minutes min)",
       "pick": "Elige un paquete o tareas para ver el presupuesto.",
       "submit": "Reservar",
-      "booked": "¡Reservado! Te enviamos una confirmación."
+      "booked": "¡Reservado! Te enviamos una confirmación.",
+      "what": {
+        "label": "Lo que hace el taller",
+        "repair": {
+          "title": "Reparaciones",
+          "text": "Frenos, cambios, ruedas y diagnóstico de e-bikes"
+        },
+        "care": {
+          "title": "Limpieza y cuidado",
+          "text": "Cadena limpia y lubricada, neumáticos, revisiones"
+        },
+        "tune": {
+          "title": "Puestas a punto",
+          "text": "De una puesta a punto rápida a una revisión completa"
+        }
+      }
     },
     "service": {
       "title": "Revisión #:number",

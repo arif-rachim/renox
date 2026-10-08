@@ -18,6 +18,8 @@
 {# [/explain:accounts.oauth_buttons] #}
 {# [explain:login.demo.template] #}
 {%- set demo = demo_logins | default(none) %}
+{%- from "renox/ui.html" import icon %}
+{%- set signs = {"shopper": "shopping-bag", "shop_owner": "shield-check", "store_manager": "store", "till": "scan-barcode", "workshop": "wrench", "two_stores": "handshake"} %}
 {%- if page == "login" and demo %}
 <section class="bs-demo-logins" aria-labelledby="demo-logins-title">
   <h2 class="bs-demo-logins__title" id="demo-logins-title">{{ t('accounts.demo.title') }}</h2>
@@ -26,6 +28,7 @@
     {%- for account in demo.accounts %}
     <li>
       <button class="bs-demo-logins__account" type="button" data-bs-demo-email="{{ account.email }}" data-bs-demo-password="{{ demo.password }}">
+        <span class="bs-icon-circle bs-icon-circle--small">{{ icon(signs[account.who] or "user", size=18) }}</span>
         <span class="bs-demo-logins__role">{{ t('accounts.demo.who.' ~ account.who) }}</span>
         <span class="bs-demo-logins__email">{{ account.email }}</span>
       </button>

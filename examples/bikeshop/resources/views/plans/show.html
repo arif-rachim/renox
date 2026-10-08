@@ -41,7 +41,7 @@
           {%- endfor %}
         </ul>
         {%- else %}
-        {{ empty(t('plans.show.no_upcoming'), t('plans.show.no_upcoming_text')) }}
+        {{ empty(t('plans.show.no_upcoming'), t('plans.show.no_upcoming_text'), icon="calendar") }}
         {%- endif %}
       {% endcall %}
       {# [/explain:plans.show.template] #}

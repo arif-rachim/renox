@@ -82,7 +82,7 @@ describe('bikeshop catalogue', () => {
       const after = await cards(page);
       assert.notDeepEqual(after, before, 'the results changed');
       assert.ok(await page.eval(() => !!document.querySelector('[data-bs-filters] summary')), 'the page was not reloaded');
-      assert.equal(await page.eval(() => document.querySelectorAll('.bs-chip').length), 1);
+      assert.equal(await page.eval(() => document.querySelectorAll('main .bs-chip').length), 1);
       // Sort: cheapest first.
       await page.eval(() => {
         const sort = document.querySelector('#filter-sort');
@@ -95,7 +95,7 @@ describe('bikeshop catalogue', () => {
       await page.click('.bs-chip');
       await page.waitFor(() => !location.search.includes('brand='));
       await page.settle();
-      assert.equal(await page.eval(() => document.querySelectorAll('.bs-chip').length), 0);
+      assert.equal(await page.eval(() => document.querySelectorAll('main .bs-chip').length), 0);
       // Back to the filtered page with the browser's history.
       await page.eval(() => history.back());
       await page.waitFor((b) => location.search.includes(`brand=${b}`), {}, brand);

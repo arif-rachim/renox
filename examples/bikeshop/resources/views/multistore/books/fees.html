@@ -37,7 +37,7 @@
         {%- set h = namespace(items=[]) %}
         {%- for e in changes %}{% set h.items = h.items + [{"time": e.at, "title": t('multistore.fees.changed', store=e.store, from=e.from, to=e.to), "by": e.by, "kind": "info"}] %}{% endfor %}
         {{ history(h.items, label=t('multistore.fees.history'), date_format="%d %b %Y %H:%M") }}
-        {%- else %}{{ empty(t('multistore.fees.no_history')) }}{% endif %}
+        {%- else %}{{ empty(t('multistore.fees.no_history'), icon="hand-coins") }}{% endif %}
       {% endcall %}
     </div>
   </div>

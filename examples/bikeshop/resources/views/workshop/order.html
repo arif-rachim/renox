@@ -22,7 +22,7 @@
             {%- if task.done %}{% set c.done = c.done + [task.id] %}{% endif %}
           {%- endfor %}
           {%- if tasks %}{{ checkbox_list("done", t('workshop.order.tasks_done'), c.options, selected=c.done) }}
-          {%- else %}{{ empty(t('workshop.order.no_tasks')) }}{% endif %}
+          {%- else %}{{ empty(t('workshop.order.no_tasks'), icon="clipboard-list") }}{% endif %}
           {%- if can_update and tasks %}{{ button(t('workshop.order.save_checklist'), variant="secondary", icon="check") }}{% endif %}
         {% endcall %}
       </form>

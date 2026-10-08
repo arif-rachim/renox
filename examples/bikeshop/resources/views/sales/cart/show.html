@@ -58,7 +58,7 @@
     {{ link_button(route('checkout.show'), t('sales.cart.checkout'), variant="primary", attrs={"data-rx-key": "c"}) }}
   </aside>
   {%- else %}
-  <div class="rx-card">{{ empty(t('sales.cart.empty_title'), t('sales.cart.empty_text'), route('catalog.index'), t('sales.cart.browse')) }}</div>
+  <div class="rx-card">{{ empty(t('sales.cart.empty_title'), t('sales.cart.empty_text'), route('catalog.index'), t('sales.cart.browse'), icon="shopping-cart") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

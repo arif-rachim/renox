@@ -14,6 +14,6 @@
   {%- endfor %}
 {% endcall %}
 {%- else %}
-{{ empty(t('admin_panel.empty_title'), t('admin_panel.empty_text')) }}
+{{ empty(t('admin_panel.empty_title'), t('admin_panel.empty_text'), icon="settings") }}
 {%- endif %}
 {% endblock %}

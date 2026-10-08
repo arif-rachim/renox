@@ -25,7 +25,7 @@
           {%- endfor %}
         {% endcall %}
         {% from "renox/pagination.html" import pagination %}{{ pagination(items) }}
-        {%- else %}{{ empty(t('stock.suppliers.no_items')) }}{% endif %}
+        {%- else %}{{ empty(t('stock.suppliers.no_items'), icon="package") }}{% endif %}
       {% endcall %}
     </div>
     <div>
@@ -43,7 +43,7 @@
           <li><div class="rx-list__main"><a class="rx-link" href="{{ route('stock.purchasing.show', o.id) }}">PO-{{ o.id }}</a><p class="rx-subtitle">{{ o.total | money }}</p></div>{{ order_status(o.status) }}</li>
           {%- endfor %}
         {% endcall %}
-        {%- else %}{{ empty(t('stock.suppliers.no_orders')) }}{% endif %}
+        {%- else %}{{ empty(t('stock.suppliers.no_orders'), icon="clipboard-list") }}{% endif %}
       {% endcall %}
     </div>
   </div>

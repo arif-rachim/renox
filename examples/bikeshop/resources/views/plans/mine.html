@@ -32,7 +32,7 @@
   </div>
   {# [/explain:plans.mine.template] #}
   {%- else %}
-  <div class="rx-card">{{ empty(t('plans.mine.none'), t('plans.mine.none_text'), route('plans.index'), t('plans.index.title')) }}</div>
+  <div class="rx-card">{{ empty(t('plans.mine.none'), t('plans.mine.none_text'), route('plans.index'), t('plans.index.title'), icon="calendar-check") }}</div>
   {%- endif %}
   {%- if past %}
   {% call card(title=t('plans.mine.past')) %}

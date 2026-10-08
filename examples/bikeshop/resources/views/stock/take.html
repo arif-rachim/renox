@@ -36,7 +36,7 @@
     {{ button(t('stock.take.open'), variant="secondary") }}
   </form>
   {%- if not own and not held %}
-  <div class="rx-card">{{ empty(t('stock.take.nothing')) }}</div>
+  <div class="rx-card">{{ empty(t('stock.take.nothing'), icon="boxes") }}</div>
   {%- else %}
   <form method="post" action="{{ route('stock.take.store') }}" id="take-form" novalidate data-bs-reveal>
     {{ csrf_field() }}

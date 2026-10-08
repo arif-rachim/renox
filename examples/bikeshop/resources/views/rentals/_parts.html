@@ -13,19 +13,25 @@
 {{ badge(t('rentals.status.rental.' ~ key), kind=tones[key]) }}
 {%- endmacro %}
 
-{#- One rental in a list (`row` is a RentalRow): the bike, the code, the
-    customer and the period, its status, and a link (`href`). -#}
+{#- One rental in a list (`row` is a RentalRow): the bike and its status on
+    top, then the reservation code (a ULID, on a line of its own so a narrow
+    card never squeezes it beside a name), the customer as initials and
+    name, and the period with the store; and a link (`href`). -#}
 {% macro rental_item(row, href, show_customer=true) -%}
+{%- from "renox/ui.html" import icon %}
+{%- from "layouts/_avatar.html" import avatar %}
 <li>
   <div class="bs-rental">
     <a class="rx-link bs-rental__title" href="{{ href }}">{{ row.model or t('rentals.fields.bike') }}</a>
-    <p class="bs-rental__meta">
-      <span>{{ row.reservation_code }}</span>
-      {%- if show_customer and row.customer %} · {{ row.customer.name }}{% endif %}
-      · {{ row.starts_at | date('%d %b %H:%M') }} → {{ row.due_at | date('%d %b %H:%M') }}
-      {%- if row.operating_store %} · {{ row.operating_store.name }}{% endif %}
-    </p>
     <div class="bs-rental__side">{{ status(row, row.overdue) }}</div>
+    <p class="bs-rental__code"><span class="rx-visually-hidden">{{ t('rentals.fields.code') }} </span>{{ row.reservation_code }}</p>
+    {%- if show_customer and row.customer %}
+    <p class="bs-rental__who">{{ avatar(row.customer.name, size="s") }}<span>{{ row.customer.name }}</span></p>
+    {%- endif %}
+    <p class="bs-rental__meta">
+      <span class="bs-with-icon">{{ icon("clock", size=14) }}<span>{{ row.starts_at | date('%d %b %H:%M') }} → {{ row.due_at | date('%d %b %H:%M') }}</span></span>
+      {%- if row.operating_store %} <span class="bs-with-icon">{{ icon("map-pin", size=14) }}<span>{{ row.operating_store.name }}</span></span>{% endif %}
+    </p>
   </div>
 </li>
 {%- endmacro %}

@@ -21,7 +21,7 @@
       {%- endfor %}
     {% endcall %}
   {# [/explain:multistore.help.hours.template] #}
-    {%- else %}{{ empty(t('multistore.help.no_hours')) }}{% endif %}
+    {%- else %}{{ empty(t('multistore.help.no_hours'), icon="clock") }}{% endif %}
   {% endcall %}
 </div>
 {% endblock %}

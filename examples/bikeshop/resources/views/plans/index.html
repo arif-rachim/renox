@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, link_button %}
+{% from "renox/ui.html" import page_header, link_button, icon %}
 {% from "renox-blocks/blocks.html" import compare_plans %}
 {% from "plans/_parts.html" import assets %}
 {% from "layouts/_hero.html" import page_hero %}
@@ -17,9 +17,9 @@
     <section class="rx-card bs-plans-page__how" aria-labelledby="plans-how">
       <h2 class="rx-card__title" id="plans-how">{{ t('plans.index.how_title') }}</h2>
       <ol class="bs-plans-steps">
-        <li>{{ t('plans.index.how_1') }}</li>
-        <li>{{ t('plans.index.how_2') }}</li>
-        <li>{{ t('plans.index.how_3') }}</li>
+        {%- for n, sign in [[1, "bike"], [2, "calendar-check"], [3, "refresh-cw"]] %}
+        <li><span class="bs-icon-circle">{{ icon(sign) }}</span><span>{{ t('plans.index.how_' ~ n) }}</span></li>
+        {%- endfor %}
       </ol>
       <div class="bs-plans-page__actions">
         {%- if auth.check %}{{ link_button(route('plans.mine'), t('plans.mine.title'), variant="secondary") }}{% endif %}

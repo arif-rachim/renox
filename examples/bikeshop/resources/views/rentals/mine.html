@@ -24,7 +24,7 @@
       {%- for row in current %}{{ rental_item(row, route('rentals.show', row.reservation_code), show_customer=false) }}{% endfor %}
     {% endcall %}
     {%- else %}
-    <div class="rx-card">{{ empty(t('rentals.mine.none'), t('rentals.mine.none_text'), route('rentals.create'), t('rentals.search.title')) }}</div>
+    <div class="rx-card">{{ empty(t('rentals.mine.none'), t('rentals.mine.none_text'), route('rentals.create'), t('rentals.search.title'), icon="bike") }}</div>
     {%- endif %}
   </section>
   {# [/explain:rentals.mine.template] #}

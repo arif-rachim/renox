@@ -9,7 +9,7 @@
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('staff.catalog.fits_title', product=product.name), subtitle=category.name, back=route('admin.products.index'), back_label=t('staff.catalog.products')) }}
   {%- if gear %}
-  <div class="rx-card">{{ empty(t('staff.catalog.gear')) }}</div>
+  <div class="rx-card">{{ empty(t('staff.catalog.gear'), icon="tag") }}</div>
   {%- else %}
   {% call card(title=t('staff.catalog.fits_bikes') if part else t('staff.catalog.fits_parts')) %}
     {% call list(id="fits", label=t('staff.catalog.fits_title', product=product.name)) %}

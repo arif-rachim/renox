@@ -1,5 +1,5 @@
 {% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, link_tabs, link_button, action_group, menu_link %}
+{% from "renox/ui.html" import page_header, link_tabs, link_button, action_group, menu_link, stats, stat %}
 {% from "renox/grid.html" import grid %}
 {% from "stock/_parts.html" import styles %}
 {% block seo %}{{ seo(title=t('stock.index.title')) }}{% endblock %}
@@ -14,6 +14,13 @@
     {%- if can('stock.adjust') %}{{ link_button(route('stock.take'), t('stock.take.title'), icon="check") }}{% endif %}
     {%- if can('consignment.manage') %}{{ link_button(route('stock.consignments.create'), t('stock.consignments.new'), icon="box") }}{% endif %}
     {%- if can('purchasing.manage') %}{{ link_button(route('stock.purchasing.create'), t('stock.purchasing.new'), variant="primary", icon="plus") }}{% endif %}
+  {% endcall %}
+  {#- The four views at a glance, each a link to its tab. -#}
+  {%- set signs = {"own": "boxes", "held": "handshake", "away": "truck", "low": "triangle-alert"} %}
+  {% call stats(4) %}
+    {%- for key in views %}
+    {{ stat(t('stock.index.view.' ~ key), counts[key] | number, url=route('stock.index', view=key), icon=signs[key] or "package") }}
+    {%- endfor %}
   {% endcall %}
   {# [explain:stock.index.template] #}
   {%- set tabs = namespace(items=[]) %}

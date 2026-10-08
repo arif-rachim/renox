@@ -623,9 +623,10 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </nav>
 {%- endmacro %}
 
-{#- One link of a `sidebar` (as `nav_link`). -#}
-{% macro sidebar_link(href, label, active=false, badge=none) -%}
-<a class="rx-sidebar__link" href="{{ href }}"{% if active %} aria-current="page"{% endif %}><span>{{ label }}</span>{% if badge is not none and badge != "" %}<span class="rx-nav-badge">{{ badge }}</span>{% endif %}</a>
+{#- One link of a `sidebar` (as `nav_link`); `icon`: one of the kit's icons
+    before the label (`sidebar_link(route('orders'), "Orders", icon="receipt")`). -#}
+{% macro sidebar_link(href, label, active=false, badge=none, icon=none) -%}
+<a class="rx-sidebar__link" href="{{ href }}"{% if active %} aria-current="page"{% endif %}>{% if icon %}{{ renox_icon(icon, size=18) }}{% endif %}<span>{{ label }}</span>{% if badge is not none and badge != "" %}<span class="rx-nav-badge">{{ badge }}</span>{% endif %}</a>
 {%- endmacro %}
 
 {#- A heading between groups of sidebar links ("Admin"). -#}
@@ -1229,12 +1230,14 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     when it goes the `good` way ("up", "down", or "none" for neither) and red
     when not, against `delta_label` ("vs previous period"). `trend` draws a
     sparkline; `url` makes the figure a link; `hint` is a line without a
-    delta. -#}
-{% macro stat(label, value, delta=none, delta_label=none, good="up", trend=none, url=none, hint=none, decimals=1) -%}
+    delta; `icon` one of the kit's icons, in a tinted circle at the card's
+    corner. -#}
+{% macro stat(label, value, delta=none, delta_label=none, good="up", trend=none, url=none, hint=none, decimals=1, icon=none) -%}
 {%- set up = delta is not none and delta > 0 %}
 {%- set down = delta is not none and delta < 0 %}
 {%- set tone = "flat" if not (up or down) or good == "none" else ("good" if (up and good == "up") or (down and good == "down") else "bad") %}
-{%- if url %}<a class="rx-stat rx-stat--link" href="{{ url }}">{% else %}<div class="rx-stat">{% endif %}
+{%- if url %}<a class="rx-stat rx-stat--link{% if icon %} rx-stat--icon{% endif %}" href="{{ url }}">{% else %}<div class="rx-stat{% if icon %} rx-stat--icon{% endif %}">{% endif %}
+  {%- if icon %}<span class="rx-stat__icon">{{ renox_icon(icon, size=20) }}</span>{% endif %}
   <p class="rx-stat__label">{{ label }}</p>
   <p class="rx-stat__value">{{ value }}</p>
   {%- if delta is not none %}
@@ -1320,9 +1323,11 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </nav>
 {%- endmacro %}
 
-{#- What an empty list says: what goes here, and the way to add the first. -#}
-{% macro empty(title, message=none, action_href=none, action_label=none) -%}
+{#- What an empty list says: what goes here, and the way to add the first.
+    `icon`: one of the kit's icons, in a tinted circle above the title. -#}
+{% macro empty(title, message=none, action_href=none, action_label=none, icon=none) -%}
 <div class="rx-empty">
+  {%- if icon %}<span class="rx-empty__icon">{{ renox_icon(icon, size=24) }}</span>{% endif %}
   <p class="rx-empty__title">{{ title }}</p>
   {%- if message %}<p class="rx-empty__message">{{ message }}</p>{% endif %}
   {%- if action_href %}{{ link_button(action_href, action_label, variant="primary") }}{% endif %}

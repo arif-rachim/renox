@@ -54,7 +54,7 @@
           {%- endfor %}
         </ul>
         {%- else %}
-        {{ empty(t('sales.counter.empty'), t('sales.counter.empty_text')) }}
+        {{ empty(t('sales.counter.empty'), t('sales.counter.empty_text'), icon="scan-barcode") }}
         {%- endif %}
       {% endcall %}
     </section>
