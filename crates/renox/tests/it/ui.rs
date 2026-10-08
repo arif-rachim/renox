@@ -147,6 +147,7 @@ impl Module for Pages {
             .get("/components", || async {
                 view("components.html", context! { note => "hi" })
             })
+            .get("/icons", || async { view("icons.html", context! {}) })
     }
 }
 
@@ -246,6 +247,16 @@ fn views() -> tempfile::TempDir {
 {% call table(["Name", ["Total", "num"]]) %}<tr><td>x</td><td class="rx-num">1</td></tr>{% endcall %}
 {{ empty("Nothing yet", "Add one") }}{{ checkbox("agree", "I agree", switch=true) }}
 {{ select("size", "Size", [["s", "Small"], ["m", "Medium"]], selected="m") }}{{ textarea("bio", "Bio", value="about") }}"#,
+    );
+    write(
+        "icons.html",
+        r#"{% from "renox/ui.html" import icon, button %}
+<p id="plain">{{ icon("bike") }}</p>
+<p id="small">{{ icon("truck", size=16) }}</p>
+<p id="named">{{ icon("lock", label="Private & \"locked\"") }}</p>
+<p id="old">{{ icon("trash") }}</p>
+<p id="unknown">{{ icon("no-such-icon") }}</p>
+{{ button("Ship", icon="truck") }}"#,
     );
     dir
 }
@@ -466,6 +477,29 @@ async fn form_fields_choices_affixes_and_layout() {
         .assert_dont_see(r#"name="tags" value="a" checked>"#)
         .assert_see(r#"id="rx-news" name="news" value="on" checked"#)
         .assert_see(r#"id="rx-plan" name="plan" value="free" required aria-invalid="true""#);
+}
+
+#[renox::test]
+async fn the_icon_macro_draws_lucide_icons_hidden_unless_labelled() {
+    let (app, _dir) = app().await;
+    let page = app.get("/icons").await;
+    let html = page.text();
+    page.assert_ok()
+        // Decorative by default: hidden from screen readers, 20 px, the text's colour.
+        .assert_see(r#"<p id="plain"><svg class="rx-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><circle cx="18.5" cy="17.5" r="3.5"/>"#)
+        .assert_see(r#"<p id="small"><svg class="rx-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16""#)
+        // With a label: an image with that name, escaped.
+        .assert_see(r#"focusable="false" role="img" aria-label="Private &amp; &quot;locked&quot;">"#)
+        // The kit's older names still work; an unknown one draws nothing.
+        .assert_see(r#"<p id="old"><svg class="rx-icon""#)
+        .assert_see(r#"<p id="unknown"></p>"#)
+        // A button's icon comes from the same set.
+        .assert_see(r#"<span class="rx-button__icon" aria-hidden="true"><svg class="rx-icon""#);
+    let named = html.split(r#"<p id="named">"#).nth(1).unwrap();
+    assert!(
+        !named[..named.find("</svg>").unwrap()].contains("aria-hidden"),
+        "{named}"
+    );
 }
 
 #[renox::test]

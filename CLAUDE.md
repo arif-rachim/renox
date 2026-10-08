@@ -102,6 +102,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
+  src/icons.rs             the kit's icons: Lucide paths (lucide-static 1.53.0, ISC; assets/NOTICE,
+                           assets/lucide-LICENSE) drawn by `renox_icon`, behind ui.html's `icon(…)`
   src/view_filters.rs      built-in template filters `number`, `money`, `date`, `since`, `words`,
                            `markdown`; pub format_number, format_money (whole units;
                            the `money` filter takes the smallest unit, like the grid)

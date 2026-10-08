@@ -741,6 +741,9 @@
 .rx-icon-button--danger:hover { color: var(--rx-danger-text); background: color-mix(in srgb, var(--rx-danger) 10%, transparent); }
 .rx-icon-button:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; }
 @media (pointer: coarse) { .rx-icon-button { width: var(--rx-target); height: var(--rx-target); } }
+/* An icon (`icon(…)`): a line drawing in the text's colour, sitting on the
+   text's middle when it's inline; never squeezed in a flex row. */
+.rx-icon { display: inline-block; flex: none; vertical-align: middle; overflow: visible; }
 .rx-button svg { flex: none; }
 .rx-button:has(> svg) { gap: 6px; }
 

@@ -460,6 +460,43 @@ The rest of the kit's everyday components:
 | `notification_bell(count=none, id="rx-notifications")` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 | `event_stream()` | Opens the same live stream on a page without the bell, so the app's events (`state.broadcast(…)`) arrive as DOM events. Nothing for guests. See [docs/mail.md](mail.md#your-own-live-events). |
 
+### Icons
+
+The kit draws its icons from [Lucide](https://lucide.dev)'s line icons (ISC licence), inline
+in the page, in the text's colour:
+
+```html
+{% from "renox/ui.html" import icon %}
+<h2>{{ icon("bike") }} Workshop</h2>
+{{ icon("truck", size=16) }} Free delivery over $50
+{{ icon("lock", label="Private") }}
+```
+
+- `size` is in pixels (20 by default); the stroke is 1.75 at every size.
+- An icon is decorative: screen readers skip it (`aria-hidden`), since the text beside it says
+  the same. An icon that stands alone and means something gets a `label`, which makes it an
+  image with that name (`role="img"` and `aria-label`). A button with only an icon is an
+  `icon_button`, whose label does that.
+- Buttons, menu items and infolist actions take the same names (`icon="truck"`). The kit's
+  older short names still work there: `edit`, `trash`, `close`, `more`, `external`,
+  `refresh`, `prev`, `next`, `up`, `down`, `box` and `home`.
+- An unknown name draws nothing.
+
+The set has 91 icons, the ones a shop or a back office needs:
+
+- Navigation and actions: `menu`, `x`, `search`, `plus`, `minus`, `pencil`, `trash-2`, `check`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `external-link`, `download`, `upload`, `refresh-cw`, `settings`, `ellipsis`, `filter`, `sliders-horizontal`, `eye`, `eye-off`, `copy`, `log-in`, `log-out`, `house`, `bell`, `heart`, `star`, `printer`, `list`, `layout-dashboard`.
+- Shop and money: `shopping-cart`, `shopping-bag`, `tag`, `credit-card`, `receipt`, `package`, `boxes`, `truck`, `store`, `banknote`, `percent`, `gift`.
+- Bikes, service and places: `bike`, `wrench`, `hammer`, `gauge`, `droplets`, `ruler`, `key-round`, `lock`, `battery-charging`, `mountain`, `baby`, `hard-hat`, `lightbulb`, `building-2`, `route`, `map`, `map-pin`, `calendar`, `calendar-days`, `clock`, `history`.
+- People: `user`, `users`, `circle-user`, `shield`, `shield-check`.
+- Charts: `chart-column`, `chart-line`, `chart-pie`, `trending-up`, `trending-down`.
+- Files and messages: `file`, `file-text`, `folder`, `image`, `paperclip`, `clipboard-list`, `mail`, `phone`.
+- Status: `info`, `circle-check`, `circle-alert`, `triangle-alert`, `circle-x`, `circle-help`.
+
+Lucide has no bike types; for categories use the closest: `bike`, `mountain`, `building-2`
+(city), `battery-charging` (e-bikes), `baby` (kids), `hard-hat` (helmets), `lightbulb`
+(lights), `lock` (locks). Another Lucide icon is a line in `crates/renox-core/src/icons.rs`,
+copied from lucide-static's `icons/<name>.svg`.
+
 ### Navigation and page structure
 
 The frame of a page comes from the kit too. So an app writes no CSS for its navigation bar,
@@ -1221,10 +1258,9 @@ The action sheet's other options:
 These work on every button (`button`, `link_button`, `open_button`, `icon_button`), except
 the disabled reason at the end of the list:
 
-- **An icon** before the label, by name: `icon="plus"`. The kit's icons are `plus`, `edit`,
-  `trash`, `check`, `close`, `copy`, `download`, `upload`, `external`, `refresh`, `search`,
-  `settings`, `more`, `box`, `calendar`, `eye`, `up`, `down`, `prev`, `next`, and the
-  status icons `info`, `success`, `warning`, `error`.
+- **An icon** before the label, by name: `icon="plus"`. Any name of the kit's
+  [icons](#icons) works, and so do the status marks `info`, `success`, `warning` and
+  `error`.
 - **A count**: `badge=3`. A 0 is shown; an empty string or `none` isn't.
 - **A keyboard shortcut**: `key="mod+s"`.
   - `mod` is ⌘ on a Mac and Ctrl elsewhere. You can also use `ctrl`, `alt`, `shift`, and keys

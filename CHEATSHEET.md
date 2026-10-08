@@ -289,6 +289,7 @@ part is a macro: you import it into a template, then call it like a function.
 {{ page_header("Products", subtitle="All items", back=route('home')) }}
 {% call toolbar() %}{{ link_button(route('products.create'), "New product") }}{% endcall %} {# above a table #}
 {# in a table row: {% call row_actions() %}…icon buttons…{% endcall %}; also list(), card_grid() + media_card(href, title, image=…), link_tabs(items, current=…), progress(42) #}
+{# Icons (Lucide, docs/ui.md#icons): {% from "renox/ui.html" import icon %} {{ icon("bike") }} {{ icon("truck", size=16) }}; hidden from screen readers unless {{ icon("lock", label="Private") }}; the same names in icon="…" on buttons and menus #}
 {# A back office: <body class="rx-page rx-shell">, then {% call sidebar(app.name) %}{{ sidebar_section("Sales") }}{{ sidebar_link(…) }}{% endcall %}
    and <div class="rx-shell__main">{{ navbar(none, width="full", skip=false) }}<main class="rx-shell__content" id="main">…</main></div>.
    Also thumbnail(src), menu_button(label) in a menu, hide_label=true on input, textarea,
