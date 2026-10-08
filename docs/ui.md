@@ -145,7 +145,9 @@ Add the kit's stylesheet and script to the layout, and the toast region to the b
 ```
 
 - `renox_head()` adds what every Renox page needs in `<head>`.
-- `renox_ui()` adds the kit's stylesheet and script.
+- `renox_ui()` adds the kit's stylesheet and script. The script loads the parts few pages
+  have (charts and the period filter, the wizard, the repeater and key/value, tags) only when
+  a page, or what htmx swaps in, has one.
 - `{{ toasts() }}` is the place where toasts appear.
 
 ### A first form

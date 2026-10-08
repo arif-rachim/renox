@@ -11,6 +11,10 @@ import { ROOT } from './lib/app.mjs';
 
 const FILES = [
   'crates/renox-core/assets/renox-ui.js',
+  'crates/renox-core/assets/renox-ui-chart.js',
+  'crates/renox-core/assets/renox-ui-wizard.js',
+  'crates/renox-core/assets/renox-ui-repeater.js',
+  'crates/renox-core/assets/renox-ui-tags.js',
   'crates/renox-core/assets/renox-grid.js',
   'crates/renox-editors/assets/editors.js',
 ];
