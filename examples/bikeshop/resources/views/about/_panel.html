@@ -30,7 +30,8 @@
     {% endcall %}
   {% endcall %}
   <div class="rx-sheet__actions">
-    {{ link_button(route('about.pages'), t('about.index_link')) }}
+    {#- `about_base`: the shop's address on a store's own host (layouts/store.html). -#}
+    {{ link_button((about_base | default('')) ~ route('about.pages'), t('about.index_link')) }}
     {{ button(t('about.panel.close'), variant="primary", type="button", attrs={"data-rx-close": "about-page"}) }}
   </div>
 {% endcall %}

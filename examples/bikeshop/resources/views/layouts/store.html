@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  {% block seo %}{{ seo() }}{% endblock %}
+  {% include "layouts/_head.html" %}
+  {{ stack('head') }}
+</head>
+{#- The layout of a store's own page, on the store's host
+    (`{store}.BIKESHOP_STORE_DOMAIN`, src/app/home/stores.rs). That host has
+    only the store's page (Routes::domain), so every link to the shop is
+    absolute: `shop_url` and the others come from the handler, made from
+    APP_URL. Renox's own files (`renox_head()`, the kit) and `public/` are
+    served on every host, so the page looks like the shop. -#}
+<body class="rx-page bs-site">
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, link_button, icon_button %}
+  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
+  {#- The panel's link to the index of every page goes to the shop's host. -#}
+  {%- set about_base = shop_url | trim("/") %}
+  {% call navbar(t('shop.name'), href=shop_url, mark=true, width="full") %}
+    {% call nav_links() %}
+      {{ nav_link(catalog_url, t('nav.shop')) }}
+      {{ nav_link(rent_url, t('rentals.nav.rent')) }}
+      {{ nav_link(service_url, t('workshop.nav.book')) }}
+    {% endcall %}
+    <span class="rx-spacer"></span>
+    {%- if about %}{{ icon_button("info", t('about.button'), attrs={"data-rx-open": "about-page", "aria-haspopup": "dialog"}) }}{% endif %}
+  {% endcall %}
+  <main class="rx-container rx-container--wide" id="main">
+    <div class="rx-stack">{% block content %}{% endblock %}</div>
+  </main>
+  <footer class="rx-container rx-container--wide bs-footer">
+    <p class="rx-subtitle">{{ t('shop.footer') }}</p>
+    <a class="rx-link" href="{{ stores_url }}">{{ t('stores.site.all') }}</a>
+  </footer>
+  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {% include "layouts/_scripts.html" %}
+  {{ stack('scripts') }}
+</body>
+</html>

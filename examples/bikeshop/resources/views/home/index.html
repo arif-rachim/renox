@@ -65,10 +65,11 @@
       <p class="bs-store__text">{{ t('home.stores.text') }}</p></div>
     </div>
     <ul class="bs-stores" role="list">
-      {%- for name, slug in storefront.stores %}
+      {%- for name, slug, site in storefront.stores %}
       <li class="bs-store">
         <img src="/images/site/store-{{ slug }}.webp" alt="" width="1200" height="800" loading="lazy">
-        <h3 class="bs-store__name">{{ t('home.stores.store', name=name) }}</h3>
+        {#- Each store's own page lives on its own host (src/app/home/stores.rs). -#}
+        <h3 class="bs-store__name"><a class="bs-store__link" href="{{ site }}">{{ t('home.stores.store', name=name) }}</a></h3>
       </li>
       {%- endfor %}
     </ul>

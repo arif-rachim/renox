@@ -1,10 +1,12 @@
-//! The public home page and the language switch.
+//! The public home page, the language switch, and each store's own page
+//! on its own host ([`stores`]).
 //!
 //! The app itself was made with `rnx new bikeshop`; this module is the home
 //! page it wrote, moved onto the bike shop's public layout. The catalogue
 //! (#233) gives the home page its products later.
 
 pub mod explain;
+pub mod stores;
 
 use renox::prelude::*;
 
@@ -24,6 +26,8 @@ impl Module for Home {
             .etag()
             .post("/locale/{locale}", locale)
             .name("locale.update")
+            // Each store's own page, on its own host (#351).
+            .merge(stores::routes())
     }
 }
 

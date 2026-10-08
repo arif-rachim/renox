@@ -1,0 +1,47 @@
+{% extends "layouts/store.html" %}
+{#- A store's own page, on its own host (`stores.site`, src/app/home/stores.rs):
+    the store's hero, what it has today, where it is and when it's open.
+    `site`: store, address, bikes_free, bikes_here, products_in_stock; the
+    shop's pages as absolute addresses (shop_url, rent_url, service_url,
+    catalog_url). Only the kit and the shop's hero macro. -#}
+{% from "renox/ui.html" import card, columns, infolist, entry, stats, stat, table, link_button %}
+{% from "layouts/_hero.html" import page_hero %}
+{% set store = site.store %}
+{% block seo %}{{ seo(title=t('home.stores.store', name=store.name), description=t('stores.site.lead', name=store.name)) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_hero(t('home.stores.store', name=store.name), lead=t('stores.site.lead', name=store.name),
+                    eyebrow=site.address, photo="/images/site/store-" ~ store.slug ~ ".webp", compact=true) %}
+    <p class="bs-hero__actions">
+      {{ link_button(rent_url, t('stores.site.rent'), variant="primary") }}
+      {{ link_button(service_url, t('stores.site.service')) }}
+    </p>
+  {% endcall %}
+
+  {% call stats(3) %}
+    {{ stat(t('stores.site.bikes_free'), site.bikes_free | number, hint=t('stores.site.bikes_here', count=site.bikes_here)) }}
+    {{ stat(t('stores.site.products'), site.products_in_stock | number, url=catalog_url, hint=t('stores.site.products_hint')) }}
+    {{ stat(t('stores.site.workshop'), t('stores.site.minutes', minutes=store.workshop_minutes_per_day), url=service_url, hint=t('stores.site.workshop_hint')) }}
+  {% endcall %}
+
+  {% call columns(2) %}
+    {% call card(t('stores.site.visit')) %}
+      {% call infolist() %}
+        {{ entry(t('stores.site.address'), site.address) }}
+        {{ entry(t('stores.site.phone'), store.phone, url="tel:" ~ store.phone) }}
+        {{ entry(t('stores.site.email'), store.email, url="mailto:" ~ store.email, copyable=true) }}
+      {% endcall %}
+    {% endcall %}
+    {% call card(t('stores.site.hours')) %}
+      {% call table([t('stores.site.day'), [t('stores.site.open'), "num"]], caption=t('stores.site.hours')) %}
+        {%- for day in store.opening_hours %}
+        <tr><td>{{ t('staff.stores.days.' ~ day.day) }}</td><td class="rx-num">{{ day.opens }}–{{ day.closes }}</td></tr>
+        {%- else %}
+        <tr><td colspan="2">{{ t('stores.site.closed') }}</td></tr>
+        {%- endfor %}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+</div>
+{% endblock %}

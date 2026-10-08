@@ -2859,5 +2859,28 @@
   },
   "auth_art": {
     "quote": "Ride further. We'll keep the bike ready."
+  },
+  "stores": {
+    "site": {
+      "lead": "The :name store: buy, rent and service bikes, with our own workshop on site.",
+      "rent": "Rent a bike here",
+      "service": "Book a service",
+      "bikes_free": "Bikes free to rent now",
+      "bikes_here": ":count rental bikes at this store",
+      "products": "Products on the shelves",
+      "products_hint": "Bikes, gear and parts in stock here",
+      "workshop": "Workshop time per day",
+      "workshop_hint": "Book a service online",
+      "minutes": ":minutes minutes",
+      "visit": "Visit us",
+      "address": "Address",
+      "phone": "Phone",
+      "email": "Email",
+      "hours": "Opening hours",
+      "day": "Day",
+      "open": "Open",
+      "closed": "Closed every day for now.",
+      "all": "All three stores"
+    }
   }
 }

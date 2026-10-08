@@ -2067,6 +2067,19 @@
         "4": "Los libros se guardan en el disco privado (`reports/monthly/2026-09/<store>.xlsx`) y se descargan por una ruta que comprueba `reports.view` en esa tienda (el archivo de otra tienda es un 404).",
         "5": "Un libro con cuatro hojas es más de lo que hace `Grid::export_as` (una hoja por archivo), así que los trabajos lo escriben con el crate que la feature `xlsx` de Renox ya compila: números de verdad con los decimales de la moneda, fechas en `APP_TIMEZONE`, encabezados fijos."
       }
+    },
+    "stores.site": {
+      "title": "La página de una tienda",
+      "purpose": "Cada tienda tiene su propia página en su propio host: `north.localhost:3000` en desarrollo, `north.example.com` en producción. Muestra la dirección, el teléfono y el horario de la tienda, cuántas bicis de alquiler están libres ahí ahora mismo, y enlaces a la tienda en línea. Las fichas de tiendas de la página de inicio enlazan aquí.",
+      "who": "Visitantes que buscan una tienda, y cualquiera a quien una tienda dé su propia dirección (un folleto, un mapa).",
+      "under_hood": "El host `north.localhost:3000` encaja con `{store}.localhost`, así que Renox enruta la petición solo con el router del dominio. El handler busca la tienda por su slug (una consulta), carga su dirección con su ciudad y su país (tres), cuenta las bicis de alquiler que están ahí y las libres (dos), y las variantes del catálogo que tiene en sus estanterías (una). El layout de la página, `layouts/store.html`, enlaza a la tienda en línea con direcciones absolutas hechas a partir de `APP_URL`, porque sus páginas no están en este host; los archivos del kit y `public/` se sirven en todos los hosts. `stores::site_url` hace la dirección a la que enlaza la página de inicio.",
+      "features": {
+        "0": "`Routes::domain(\"{store}.localhost\", …)` sirve la página solo en los hosts que encajan con el patrón, y esos hosts reciben solo estas rutas (más los archivos de Renox), así que `/` ahí es la página de la tienda mientras `/` en el host de la tienda en línea sigue siendo la de inicio. El dominio viene de `BIKESHOP_STORE_DOMAIN` (por defecto `localhost`): los navegadores envían cualquier nombre `*.localhost` a esta máquina, así que funciona en local sin DNS.",
+        "1": "El handler lee el slug de la tienda del host (`domain.get(\"store\")`) como `Path` lee un parámetro de la ruta, y responde 404 a un host cuya tienda no existe.",
+        "2": "Un `fallback` dentro del dominio lleva cualquier otra ruta del host de una tienda (un enlace viejo, una errata) a la página de la tienda en vez de a un 404, sin tocar el fallback de la tienda en línea.",
+        "3": "La ruta tiene un nombre, `stores.site`, como cualquier otra, así que `route:list` la muestra (con su DOMAIN) y es la clave de esta explicación. Renox nombra la ruta actual por host, así que el panel encuentra esta página y no la de inicio, aunque las dos sean `/`.",
+        "4": "La página son los `stat` del kit para las cifras, un `infolist` para los datos de contacto (un enlace `tel:` y un botón para copiar el correo) y una `table` para el horario, bajo el hero de la tienda, así que se ve como la tienda sin CSS propio más allá de la rejilla del layout."
+      }
     }
   },
   "blocks": {
@@ -5407,5 +5420,28 @@
   },
   "auth_art": {
     "quote": "Rueda más lejos. Nosotros dejamos la bici lista."
+  },
+  "stores": {
+    "site": {
+      "lead": "La tienda :name: compra, alquila y repara bicis, con nuestro propio taller.",
+      "rent": "Alquilar una bici aquí",
+      "service": "Reservar una revisión",
+      "bikes_free": "Bicis libres para alquilar ahora",
+      "bikes_here": ":count bicis de alquiler en esta tienda",
+      "products": "Productos en las estanterías",
+      "products_hint": "Bicis, equipo y recambios en stock aquí",
+      "workshop": "Horas de taller al día",
+      "workshop_hint": "Reserva una revisión en línea",
+      "minutes": ":minutes minutos",
+      "visit": "Visítanos",
+      "address": "Dirección",
+      "phone": "Teléfono",
+      "email": "Correo",
+      "hours": "Horario",
+      "day": "Día",
+      "open": "Abierto",
+      "closed": "Por ahora cerrada todos los días.",
+      "all": "Las tres tiendas"
+    }
   }
 }

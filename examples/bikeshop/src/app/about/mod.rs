@@ -57,6 +57,12 @@ async fn pages(
     let feature = filters.feature.filter(|f| features.contains(f.as_str()));
     let audience = filters.audience.as_deref().and_then(Audience::from_key);
 
+    // A store's page is on its own host: link to the first store's.
+    let first_store = crate::app::staff::model::Store::query()
+        .order_by("id")
+        .first(&state.db)
+        .await?
+        .map(|store| crate::app::home::stores::site_url(&state.config, &store.slug));
     let mut pages: Vec<about_this_page::Page> = all
         .iter()
         .filter(|e| {
@@ -68,7 +74,11 @@ async fn pages(
         .map(|e| {
             let mut page = e.localize(&translate);
             // A link when the page needs no parameters.
-            page.url = state.url(e.route, &[]).ok();
+            page.url = if e.route == crate::app::home::stores::ROUTE {
+                first_store.clone()
+            } else {
+                state.url(e.route, &[]).ok()
+            };
             page
         })
         .collect();
