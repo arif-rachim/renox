@@ -5,6 +5,7 @@
     htmx asks for it alone. -#}
 {% from "renox/ui.html" import page_header, card_grid, media_card, empty, button, link_button, checkbox_list, select, checkbox, input %}
 {% from "renox-blocks/blocks.html" import range_slider %}
+{% from "layouts/_category_icon.html" import category_icon %}
 {% block seo %}{{ seo(title=title ~ " · " ~ t('shop.name'), description=description, canonical=reset) }}{% endblock %}
 
 {% block content %}
@@ -27,11 +28,11 @@
         <ul class="bs-tree" role="list">
           {%- for root in category_menu %}
           <li>
-            <a class="rx-link" href="{{ root.href }}"{% if root.current %} aria-current="page"{% endif %}>{{ root.name }}</a>
+            <a class="rx-link bs-tree__root" href="{{ root.href }}"{% if root.current %} aria-current="page"{% endif %}><span class="bs-icon-circle bs-icon-circle--small">{{ category_icon(root.href) }}</span>{{ root.name }}</a>
             {%- if root.children %}
             <ul class="bs-tree" role="list">
               {%- for child in root.children %}
-              <li><a class="rx-link" href="{{ child.href }}"{% if child.current %} aria-current="page"{% endif %}>{{ child.name }}</a></li>
+              <li><a class="rx-link bs-tree__leaf" href="{{ child.href }}"{% if child.current %} aria-current="page"{% endif %}>{{ category_icon(child.href, size=16) }}{{ child.name }}</a></li>
               {%- endfor %}
             </ul>
             {%- endif %}

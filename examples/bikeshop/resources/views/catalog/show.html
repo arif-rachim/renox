@@ -2,7 +2,7 @@
 {#- A product (src/app/catalog/product.rs). Macros are imported at the top,
     so the `buybox` block sees them when htmx asks for it alone (a change of
     size or colour). -#}
-{% from "renox/ui.html" import page_header, card, card_grid, media_card, infolist, entry, button, link_button, badge, alert %}
+{% from "renox/ui.html" import page_header, card, card_grid, media_card, infolist, entry, button, link_button, badge, alert, icon %}
 {% from "renox-blocks/blocks.html" import gallery as photo_gallery, swatches, quantity %}
 {% block seo %}{{ seo(title=product.name ~ " · " ~ t('shop.name'), description=summary, image=og_image, type="product") }}{% endblock %}
 
@@ -54,7 +54,7 @@
       <ul class="bs-stock" role="list">
         {%- for s in chosen.stock %}
         <li class="bs-stock__row{% if s.available == 0 %} bs-stock__row--out{% endif %}">
-          <span class="bs-stock__dot" aria-hidden="true"></span>
+          <span class="bs-stock__dot" aria-hidden="true"></span>{{ icon("store", size=16) }}
           <span>{{ t('catalog.product.stock_at', count=s.available, store=s.store) }}</span>
         </li>
         {%- endfor %}
@@ -68,7 +68,7 @@
         {{ csrf_field() }}
         <input type="hidden" name="variant_id" value="{{ chosen.id }}">
         {{ quantity("quantity", 1, min=1, max=([chosen.available, 10] | min), label=t('catalog.product.quantity'), id="add-quantity") }}
-        {{ button(t('catalog.product.add_to_cart'), variant="primary", key="a") }}
+        {{ button(t('catalog.product.add_to_cart'), variant="primary", key="a", icon="shopping-cart") }}
       </form>
       {# [/explain:catalog.show.template] #}
       {%- else %}
@@ -76,7 +76,7 @@
       {%- endif %}
       {%- endif %}
       {%- if rent_url %}
-      <p class="bs-buybox__rent">{{ link_button(rent_url, t('catalog.product.rent'), variant="secondary") }}</p>
+      <p class="bs-buybox__rent">{{ link_button(rent_url, t('catalog.product.rent'), variant="secondary", icon="key-round") }}</p>
       {%- endif %}
     </section>
     {% endblock %}

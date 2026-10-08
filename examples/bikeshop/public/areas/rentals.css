@@ -28,6 +28,7 @@
 /* The counter's three columns sit closer than the kit's default, so each
    keeps room for a card; their headings: an icon, the name, the count. */
 .bs-counter .rx-columns { gap: var(--rx-space-4); }
+.bs-counter .rx-empty { padding-block: var(--rx-space-5); }
 .bs-counter-heading { display: flex; align-items: center; gap: var(--rx-space-2); }
 
 /* The counter's desk: the rental's facts beside the form. */

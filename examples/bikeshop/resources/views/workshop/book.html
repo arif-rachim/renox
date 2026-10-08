@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, select, radio, checkbox_list, textarea, button, form_errors, empty, link_button, date_picker %}
+{% from "renox/ui.html" import page_header, card, select, radio, checkbox_list, textarea, button, form_errors, empty, link_button, date_picker, icon %}
 {% from "workshop/_parts.html" import styles %}
 {% block seo %}{{ seo(title=t('workshop.book.title'), description=t('workshop.book.lead')) }}{% endblock %}
 
@@ -11,6 +11,18 @@
 {{ styles() }}
 <div class="rx-stack">
   {{ page_header(t('workshop.book.title'), subtitle=t('workshop.book.lead'), back=route('workshop.bikes'), back_label=t('workshop.bikes.title')) }}
+  {#- What the workshop does, each on a photo (decoration: the words say it). -#}
+  <ul class="bs-photo-cards" role="list" aria-label="{{ t('workshop.book.what.label') }}">
+    {%- for key, photo, sign in [["repair", "workshop-1", "wrench"], ["care", "wash", "droplets"], ["tune", "fitting", "gauge"]] %}
+    <li class="bs-photo-card">
+      <div class="bs-photo-card__photo"><img src="/images/site/{{ photo }}.webp" alt="" width="1200" height="900" loading="lazy"></div>
+      <div class="bs-photo-card__body">
+        <span class="bs-icon-circle">{{ icon(sign) }}</span>
+        <span><b>{{ t('workshop.book.what.' ~ key ~ '.title') }}</b><span>{{ t('workshop.book.what.' ~ key ~ '.text') }}</span></span>
+      </div>
+    </li>
+    {%- endfor %}
+  </ul>
   {%- if not bikes %}
   <div class="rx-card">{{ empty(t('workshop.book.no_bike'), t('workshop.book.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add'), icon="bike") }}</div>
   {%- else %}
@@ -42,7 +54,7 @@
           </dl>
           <p class="rx-hint">{{ t('workshop.book.estimate_hint') }}</p>
           {%- else %}<p class="rx-subtitle">{{ t('workshop.book.pick') }}</p>{% endif %}
-          {{ button(t('workshop.book.submit'), icon="check", block=true) }}
+          {{ button(t('workshop.book.submit'), icon="calendar-check", block=true) }}
         {% endcall %}
       </div>
     </div>

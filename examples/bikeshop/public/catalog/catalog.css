@@ -27,6 +27,14 @@
 .bs-tree { display: grid; gap: var(--rx-space-1); margin: 0; padding: 0; list-style: none; }
 .bs-tree .bs-tree { padding-left: var(--rx-space-3); margin-top: var(--rx-space-1); }
 .bs-tree [aria-current="page"] { font-weight: 600; color: var(--rx-label); }
+/* The categories with their icons: the top ones in a tinted circle, the
+   others small and muted, in line with the circles' centre. */
+.bs-tree__root, .bs-tree__leaf { display: inline-flex; align-items: center; gap: var(--rx-space-2); text-decoration: none; }
+.bs-tree__root { font-weight: 600; color: var(--rx-label); }
+.bs-tree .bs-tree { padding-left: var(--rx-space-6); }
+.bs-tree__leaf { min-height: 2rem; color: var(--rx-secondary-label); }
+.bs-tree__leaf .rx-icon { color: var(--rx-tertiary-label); }
+.bs-tree__leaf:hover, .bs-tree__leaf:hover .rx-icon, .bs-tree__leaf[aria-current="page"], .bs-tree__leaf[aria-current="page"] .rx-icon { color: var(--rx-accent-text); }
 
 /* Filters that are on, as chips that take one off. */
 .bs-chips { display: flex; flex-wrap: wrap; gap: var(--rx-space-2); margin: 0; padding: 0; list-style: none; }
@@ -60,7 +68,7 @@
 .bs-buybox__heading { font: var(--rx-type-label); color: var(--rx-secondary-label); }
 .bs-buybox__add { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr); gap: var(--rx-space-3); align-items: end; }
 .bs-stock { display: grid; gap: var(--rx-space-1); margin: 0; padding: 0; list-style: none; }
-.bs-stock__row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--rx-space-2); font: var(--rx-type-body); }
+.bs-stock__row { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: var(--rx-space-2); font: var(--rx-type-body); }
 .bs-stock__dot { width: 0.6em; height: 0.6em; border-radius: 50%; background: var(--rx-success); }
 .bs-stock__row--out { color: var(--rx-secondary-label); }
 .bs-stock__row--out .bs-stock__dot { background: var(--rx-tertiary-label); }
@@ -105,3 +113,4 @@
 @media (prefers-reduced-motion: reduce) {
   .bs-catalog__results { transition: none; }
 }
+.bs-stock__row > .rx-icon { color: var(--rx-secondary-label); }

@@ -5,8 +5,17 @@
 
 /* The public layout: the bar, the page, the footer, top to bottom. */
 .bs-public { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; min-height: 100vh; min-height: 100dvh; }
-.bs-footer { display: grid; grid-auto-flow: column; justify-content: space-between; align-items: center; gap: var(--rx-space-3); padding-block: var(--rx-space-6); border-top: 0.5px solid var(--rx-separator); }
-@media (max-width: 40rem) { .bs-footer { grid-auto-flow: row; justify-content: start; } }
+.bs-footer { display: grid; gap: var(--rx-space-6); padding-block: var(--rx-space-6); border-top: 0.5px solid var(--rx-separator); }
+.bs-footer__end { display: grid; grid-auto-flow: column; justify-content: space-between; align-items: center; gap: var(--rx-space-3); }
+@media (max-width: 40rem) { .bs-footer__end { grid-auto-flow: row; justify-content: start; } }
+/* The footer's row of services: an icon in a tinted circle, a name, a line. */
+.bs-footer__services { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); gap: var(--rx-space-4); margin: 0; padding: 0; list-style: none; }
+.bs-footer__service { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--rx-space-3); color: var(--rx-label); text-decoration: none; border-radius: var(--rx-radius-l); }
+.bs-footer__service b { display: block; font: var(--rx-type-label); }
+.bs-footer__service span span { display: block; font: var(--rx-type-note); color: var(--rx-secondary-label); }
+.bs-footer__service:hover b { color: var(--rx-accent-text); }
+.bs-footer__service:focus-visible { outline: 2px solid var(--rx-focus); outline-offset: 4px; }
+@media (max-width: 40rem) { .bs-footer__services { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bs-footer__service { grid-template-columns: minmax(0, 1fr); } }
 /* The bar's search box gives way first when the bar gets full (logged in, in
    Spanish), so the account menu stays on the first line; on phones it has a
    row of its own (catalog.css). */
@@ -32,11 +41,12 @@
 .bs-demo-logins__lead, .bs-demo-logins__note { margin: 0; font: var(--rx-type-note); color: var(--rx-secondary-label); }
 .bs-demo-logins__list { display: grid; gap: var(--rx-space-1); margin: 0; padding: 0; list-style: none; }
 .bs-demo-logins__account {
-  display: grid; width: 100%; min-height: var(--rx-target); padding: var(--rx-space-2) var(--rx-space-3); text-align: left;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--rx-space-3); align-items: center; width: 100%; min-height: var(--rx-target); padding: var(--rx-space-2) var(--rx-space-3); text-align: left;
   border: var(--rx-surface-border); border-radius: var(--rx-radius-s); background: var(--rx-surface); color: var(--rx-label); cursor: pointer;
 }
 .bs-demo-logins__account:hover { background: var(--rx-fill); }
 .bs-demo-logins__account:focus-visible { outline: 2px solid var(--rx-focus); outline-offset: 1px; }
+.bs-demo-logins__account > .bs-icon-circle { grid-row: 1 / span 2; }
 .bs-demo-logins__role { font: var(--rx-type-label); }
 .bs-demo-logins__email { font: var(--rx-type-note); color: var(--rx-secondary-label); overflow-wrap: anywhere; }
 
@@ -133,3 +143,17 @@
   .bs-way:hover { transform: none; }
 }
 .bs-icon-circle--small { width: 2rem; height: 2rem; }
+
+/* The account page's header: a band of photo, then the person's initials
+   overlapping its edge, the title and the notifications button. */
+.bs-profile { display: grid; overflow: hidden; border-radius: var(--rx-radius-l); background: var(--rx-surface); border: var(--rx-surface-border); box-shadow: var(--rx-shadow); }
+.bs-profile__band { height: 8rem; background: var(--rx-tint); }
+.bs-profile__band img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 60%; }
+.bs-profile__body { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: var(--rx-space-2) var(--rx-space-4); padding: 0 var(--rx-space-6) var(--rx-space-5); }
+.bs-profile__body > .bs-avatar { width: 4.5rem; height: 4.5rem; margin-top: -2.25rem; font-size: 1.375rem; box-shadow: 0 0 0 4px var(--rx-surface); }
+.bs-profile__text { display: grid; gap: 2px; min-width: 0; }
+.bs-profile__text .rx-title, .bs-profile__text .rx-subtitle { margin: 0; }
+@media (max-width: 40rem) {
+  .bs-profile__body { grid-template-columns: minmax(0, 1fr); padding: 0 var(--rx-space-4) var(--rx-space-4); }
+  .bs-profile__band { height: 6rem; }
+}

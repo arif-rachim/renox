@@ -91,8 +91,17 @@
     </div>
   </main>
   <footer class="rx-container rx-container--wide bs-footer">
-    <p class="rx-subtitle">{{ t('shop.footer') }}</p>
-    <a class="rx-link" href="{{ route('about.pages') }}">{{ t('about.index_link') }}</a>
+    {#- What the shop does, a row of icons and a line each. -#}
+    {%- from "renox/ui.html" import icon %}
+    <ul class="bs-footer__services" role="list" aria-label="{{ t('home.services.label') }}">
+      {%- for href, key, sign in [[route('catalog.index'), "buy", "shopping-bag"], [route('rentals.create'), "rent", "key-round"], [route('workshop.book'), "repair", "wrench"], [route('plans.index'), "plans", "calendar-check"]] %}
+      <li><a class="bs-footer__service" href="{{ href }}"><span class="bs-icon-circle">{{ icon(sign) }}</span><span><b>{{ t('shop.services.' ~ key ~ '.title') }}</b><span>{{ t('shop.services.' ~ key ~ '.text') }}</span></span></a></li>
+      {%- endfor %}
+    </ul>
+    <div class="bs-footer__end">
+      <p class="rx-subtitle">{{ t('shop.footer') }}</p>
+      <a class="rx-link" href="{{ route('about.pages') }}">{{ t('about.index_link') }}</a>
+    </div>
   </footer>
   {#- "About this page": docked beside the page on wide screens, a sheet on
       narrower ones (about/_dock.html, about/_panel.html). -#}

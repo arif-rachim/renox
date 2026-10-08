@@ -83,7 +83,7 @@ describe('bikeshop design', () => {
     }
   }
 
-  test('the sign-in page shows its photo beside the form on wide screens only', () =>
+  test('the sign-in page shows its photo beside the form on wide screens, as a band above it on phones', () =>
     browser.with(async (page) => {
       await page.send('Network.clearBrowserCookies');
       await page.send('Emulation.setDeviceMetricsOverride', DESKTOP);
@@ -93,7 +93,14 @@ describe('bikeshop design', () => {
       await shot(page, 'design-login-desktop');
       await page.send('Emulation.setDeviceMetricsOverride', PHONE);
       await page.goto(`${app.url}/login`);
-      assert.equal(await page.eval(() => getComputedStyle(document.querySelector('.bs-auth__art')).display), 'none', 'no photo on a phone');
+      // A phone: a short band above the form, without the quote.
+      const [artBottom, formTop, quote] = await page.eval(() => [
+        document.querySelector('.bs-auth__art').getBoundingClientRect().bottom,
+        document.querySelector('.rx-auth').getBoundingClientRect().top,
+        getComputedStyle(document.querySelector('.bs-auth__quote')).display,
+      ]);
+      assert.ok(artBottom <= formTop + 1 && artBottom < 200, `a band above the form (${artBottom}, ${formTop})`);
+      assert.equal(quote, 'none', 'no quote on a phone');
       page.assertClean();
     }));
 });
