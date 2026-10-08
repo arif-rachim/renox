@@ -463,3 +463,40 @@ test('a button disabled with a reason is reached by keyboard, says why and does 
   assert.equal(await page.eval(() => document.querySelector('#publish').dataset.pressed), undefined);
   assert.equal(await page.eval(() => document.querySelector('#publish').getAttribute('aria-disabled')), 'true');
 }));
+
+// #349: charts, the wizard, the repeater and tags are modules renox-ui.js
+// loads when it finds them, here in what htmx swaps in, twice: each module
+// once, its listeners bound once.
+test('parts swapped in by htmx load once and work', () => browser.with(async (page) => {
+  await page.goto(`${app.url}/parts`);
+  const modules = () => page.eval(() => [...document.querySelectorAll('script[type=module][src*="/_renox/ui-"]')]
+    .map((s) => s.getAttribute('src').replace(/^\/_renox\/ui-([a-z]+)-[0-9a-f]+\.js$/, '$1')).sort());
+  assert.deepEqual(await modules(), [], 'a page without them loads none');
+  for (let i = 0; i < 2; i++) {
+    await page.eval(() => { document.querySelector('#more-box').textContent = ''; });
+    await page.click('#more');
+    await page.waitFor(() => document.querySelector('#more-box [data-rx-wizard][data-rx-ready]'), { message: 'the wizard set up' });
+    await page.settle();
+  }
+  assert.deepEqual(await modules(), ['chart', 'repeater', 'tags', 'wizard']);
+
+  // Tags inside the wizard's first step: Enter makes a tag, it doesn't go on.
+  await page.type('#rx-labels', 'sale');
+  await page.press('Enter');
+  const state = () => page.eval(() => ({
+    tags: [...document.querySelectorAll('[data-rx-tags="labels"] .rx-tag input[type=hidden]')].map((el) => el.value),
+    step: document.querySelector('[data-rx-wizard]').getAttribute('data-rx-step-index'),
+    rows: document.querySelectorAll('[data-rx-repeater] [data-rx-row]').length,
+  }));
+  assert.deepEqual(await state(), { tags: ['sale'], step: '0', rows: 1 });
+  await page.click('[data-rx-wizard-next]');
+  await page.waitFor(() => document.querySelector('[data-rx-wizard]').getAttribute('data-rx-step-index') === '1', { message: 'the next step' });
+  // One click, one row (a listener bound twice would add two).
+  await page.click('[data-rx-row-add]');
+  assert.deepEqual(await state(), { tags: ['sale'], step: '1', rows: 2 });
+
+  // The chart answers the keyboard.
+  await page.eval(() => document.querySelector('#parts-chart .rx-chart__plot').focus());
+  assert.equal(await page.eval(() => document.querySelector('#parts-chart .rx-chart__tip').hidden), false);
+  page.assertClean();
+}));

@@ -323,7 +323,10 @@ async fn components_see_the_request_and_refill_forms() {
     res.assert_ok()
         .assert_header("cache-control", "public, max-age=31536000, immutable");
     let script = res.text();
-    assert!(!script.contains("renox:parts"), "the parts' URLs are filled in");
+    assert!(
+        !script.contains("renox:parts"),
+        "the parts' URLs are filled in"
+    );
     for part in ["chart", "wizard", "repeater", "tags"] {
         let start = script
             .find(&format!("/_renox/ui-{part}-"))
