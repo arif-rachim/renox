@@ -2131,8 +2131,8 @@ Subscriptions ready-made (Laravel's Cashier): the `renox-billing` crate,
 with `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `XENDIT_SECRET_KEY`,
 `XENDIT_CALLBACK_TOKEN`. It brings a plans page (`/billing`), a card on `/account`, the
 gateways' webhooks (`/billing/webhooks/{gateway}`), `Billing::of(&state, &user)` with
-`subscribed()`, `on_trial()`, `checkout(plan)`, `swap(plan)`, `cancel()`, `resume()`, and the
-guards `.require_subscription()` / `.require_plan(&["pro"])` (`use renox_billing::SubscriptionRoutes`)
+`subscribed()`, `on_trial()`, `checkout(plan)`, `swap(plan)`, `cancel()`, `resume()`, `pause(None)`, `unpause()`, and the
+guards `.require_subscription()` / `.require_plan(&["pro"])` (`_named("garage")` variants for `.named(..)` subscriptions) (`use renox_billing::SubscriptionRoutes`)
 ([docs/billing.md](docs/billing.md), [the bike shop's plans](examples/bikeshop/src/app/plans/billing.rs)).
 
 With `CSP=strict`, an inline script needs `<script nonce="{{ csp_nonce() }}">`, and Alpine
