@@ -1376,6 +1376,12 @@ picks the build, not the terminal.
   cause on a failed render) when a view value is named like a macro the template imports #312
   (`view.rs::hidden_by_imports`). Tests in `crates/renox/tests/it/app_gaps.rs` (#310 in
   scoped_roles.rs).
+- **1.1, wave 2** (grid; additive): `Column::computed(sql)` (an expression with `{T}` for the
+  table: sorts, filters, searches, summaries and groups work on it and on the related columns,
+  `summarize` reads each column's SQL through `sql_of`) and `Query::group_by_raw` #313; a
+  `select` column with whole-number options filters with `CAST(col AS TEXT) IN (…)` so integer
+  columns work on PostgreSQL #319 (multi-sheet exports and a heatmap chart stay open in #319).
+  Tests in grid.rs `computed_columns_are_summed_grouped_and_integers_filtered_by_select`.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

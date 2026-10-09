@@ -235,6 +235,19 @@ impl Column {
         c
     }
 
+    /// The column's value is `sql`, a scalar SQL expression over the row,
+    /// where `{T}` stands for the model's table: stock value as
+    /// `Column::money("value", "Value").computed("{T}.\"on_hand\" * (SELECT \"cost\" FROM \"variants\" WHERE \"id\" = {T}.\"variant_id\")")`.
+    /// It is shown, sorted, filtered, searched, summed ([`Column::summary`])
+    /// and grouped by ([`Grid::groups`]) like a related column, with no
+    /// database view. `sql` is written by the app, never taken from a
+    /// request: values go in the model's columns and subqueries, not in
+    /// the string.
+    pub fn computed(mut self, sql: &str) -> Self {
+        self.expr = Some(sql.to_owned());
+        self
+    }
+
     /// Shows a related value as a number (filtered with a range).
     pub fn numeric(mut self) -> Self {
         if self.expr.is_some() {
@@ -920,11 +933,28 @@ impl Grid {
         group: Option<&String>,
     ) -> Result<BTreeMap<String, Map<String, Value>>> {
         let mut out: BTreeMap<String, Map<String, Value>> = BTreeMap::new();
-        let group_sql = group.map(|g| format!("CAST(\"{g}\" AS TEXT)"));
-        if let Some(group_sql) = &group_sql {
+        // The SQL a column reads: its expression or the model's column.
+        let sql_of = |key: &str| -> Option<String> {
+            match self.find(key)?.target::<M>() {
+                Target::Expr(expr) => Some(expr),
+                Target::Column(key) if M::COLUMNS.contains(&key.as_str()) => {
+                    Some(format!("\"{key}\""))
+                }
+                Target::Column(_) => None,
+            }
+        };
+        let group_expr = match group {
+            Some(g) => match sql_of(g) {
+                Some(expr) => Some(expr),
+                None => return Ok(out),
+            },
+            None => None,
+        };
+        let group_sql = group_expr.as_ref().map(|e| format!("CAST({e} AS TEXT)"));
+        if let (Some(group_sql), Some(expr)) = (&group_sql, &group_expr) {
             let counts: Vec<(Option<String>, i64)> = query
                 .clone()
-                .group_by(group.map(String::as_str).unwrap_or_default())
+                .group_by_raw(expr)
                 .select_as(db, &format!("{group_sql}, COUNT(*)"))
                 .await?;
             for (value, count) in counts {
@@ -934,24 +964,24 @@ impl Grid {
             }
         }
         for column in self.columns.iter().filter(|c| !c.summaries.is_empty()) {
-            if !M::COLUMNS.contains(&column.key.as_str()) {
+            let Some(sql) = sql_of(&column.key) else {
                 continue;
-            }
+            };
             let key = &column.key;
             let numeric = matches!(column.kind, Kind::Number | Kind::Money);
             let figures = if numeric {
                 format!(
-                    "CAST(SUM(\"{key}\") AS DOUBLE PRECISION), CAST(AVG(\"{key}\") AS DOUBLE PRECISION), \
-                     CAST(MIN(\"{key}\") AS DOUBLE PRECISION), CAST(MAX(\"{key}\") AS DOUBLE PRECISION), COUNT(\"{key}\")"
+                    "CAST(SUM({sql}) AS DOUBLE PRECISION), CAST(AVG({sql}) AS DOUBLE PRECISION), \
+                     CAST(MIN({sql}) AS DOUBLE PRECISION), CAST(MAX({sql}) AS DOUBLE PRECISION), COUNT({sql})"
                 )
             } else {
-                format!("NULL, NULL, NULL, NULL, COUNT(\"{key}\")")
+                format!("NULL, NULL, NULL, NULL, COUNT({sql})")
             };
             type Figures = (Option<f64>, Option<f64>, Option<f64>, Option<f64>, i64);
-            let rows: Vec<(String, Figures)> = match (&group_sql, group) {
+            let rows: Vec<(String, Figures)> = match (&group_sql, &group_expr) {
                 (Some(group_sql), Some(group)) => query
                     .clone()
-                    .group_by(group)
+                    .group_by_raw(group)
                     .select_as::<(
                         Option<String>,
                         Option<f64>,
@@ -1428,7 +1458,23 @@ impl Filter {
                     .filter(|v| column.options.iter().any(|(o, _)| o == *v))
                     .collect();
                 if !picked.is_empty() {
-                    query = target.among(query, picked.into_iter().cloned().collect());
+                    let values: Vec<String> = picked.into_iter().cloned().collect();
+                    // Options that are numbers belong to an integer column,
+                    // which PostgreSQL won't compare with text: compare the
+                    // column's text instead.
+                    let numeric = column.options.iter().all(|(o, _)| o.parse::<i64>().is_ok());
+                    query = match (&target, numeric) {
+                        (Target::Column(key), true) if M::COLUMNS.contains(&key.as_str()) => {
+                            let marks = vec!["?"; values.len()].join(", ");
+                            query
+                                .where_raw(&format!("CAST(\"{key}\" AS TEXT) IN ({marks})"), values)
+                        }
+                        (Target::Expr(expr), true) => {
+                            let marks = vec!["?"; values.len()].join(", ");
+                            query.where_raw(&format!("CAST({expr} AS TEXT) IN ({marks})"), values)
+                        }
+                        _ => target.among(query, values),
+                    };
                 }
             }
             Kind::Tags => {

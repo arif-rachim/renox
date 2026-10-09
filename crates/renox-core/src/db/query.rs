@@ -671,6 +671,13 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Groups rows by a SQL expression (written by the app, never from a
+    /// request): `.group_by_raw("CAST(\"price\" / 100 AS INTEGER)")`.
+    pub fn group_by_raw(mut self, sql: &str) -> Self {
+        self.group.push(sql.to_owned());
+        self
+    }
+
     /// A condition on the groups, in SQL with `?` for each value:
     /// `.having_raw("COUNT(*) > ?", [2])`.
     pub fn having_raw<V: ToDbValue>(

@@ -1773,3 +1773,91 @@ async fn row_orders_refuse_more_than_a_thousand_rows() {
         "{err:?}"
     );
 }
+
+// ---------- #313, #319: computed columns, select filters on integers ----------
+
+fn computed_grid() -> Grid {
+    use renox::grid::Summary;
+    Grid::new("orders")
+        .column(Column::text("number", "Order"))
+        // An integer column with a select filter (#319).
+        .column(Column::select(
+            "total",
+            "Total",
+            [("10000", "$100"), ("30000", "$300"), ("50000", "$500")],
+        ))
+        .column(
+            Column::money("double", "Double")
+                .computed("\"grid_orders\".\"total\" * 2")
+                .summary(Summary::Sum),
+        )
+        .column(
+            Column::text("band", "Band")
+                .computed("CASE WHEN {T}.\"total\" >= 30000 THEN 'big' ELSE 'small' END"),
+        )
+        .sort_by("number")
+        .groups(&["band"])
+}
+
+struct Computing;
+
+impl Module for Computing {
+    fn name(&self) -> &'static str {
+        "computing"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/computed", |request: GridRequest| async move {
+            let page = computed_grid().page(GridOrder::query(), &request).await?;
+            Ok::<_, Error>(renox::axum::Json(serde_json::to_value(page)?))
+        })
+    }
+}
+
+#[renox::test]
+async fn computed_columns_are_summed_grouped_and_integers_filtered_by_select() {
+    let app = TestApp::new(App::new().migrations(&[SCHEMA]).module(Computing)).await;
+    for (number, total) in [("A", 10_000), ("B", 30_000), ("C", 50_000), ("D", 700)] {
+        GridOrder::create(
+            app.db(),
+            GridOrder {
+                number: number.into(),
+                status: "new".into(),
+                total,
+                ordered_on: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let page = app.get("/computed?per_page=10").await;
+    page.assert_ok();
+    // The expression's value is in each row, and its total in the footer data.
+    let rows = page.json_path("rows");
+    assert_eq!(rows[1]["double"], 60_000, "{rows}");
+    assert_eq!(page.json_path("summary")["double"]["sum"], 181_400.0);
+
+    // Grouped by the computed band: each group has its own sum.
+    let grouped = app.get("/computed?per_page=10&group=band").await;
+    let rows = grouped.json_path("rows");
+    let figures = |i: usize| rows[i]["_rx"]["group"]["figures"].clone();
+    assert_eq!(rows[0]["band"], "big", "{rows}");
+    assert_eq!(figures(0)["_rows"], 2);
+    assert_eq!(figures(0)["double"]["sum"], 160_000.0);
+    assert_eq!(rows[2]["band"], "small", "{rows}");
+    assert_eq!(figures(2)["double"]["sum"], 21_400.0);
+
+    // A select filter on an integer column (PostgreSQL won't compare it
+    // with text).
+    let picked = app.get("/computed?in.total=10000&in.total=50000").await;
+    picked.assert_ok();
+    let numbers: Vec<String> = picked
+        .json_path("rows")
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["number"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(numbers, ["A", "C"], "{numbers:?}");
+}
