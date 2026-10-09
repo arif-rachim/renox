@@ -297,6 +297,29 @@ impl Routes {
         )
     }
 
+    /// Only requests that authenticated as a device (`Authorization: Bearer`
+    /// with a `DeviceToken`) may use the routes added so far; others get 401
+    /// as JSON. Users and guests are not devices.
+    pub fn require_device(self) -> Self {
+        self.device_guard(None, "device")
+    }
+
+    /// Like `require_device`, and the device's token must have `ability`
+    /// (403 otherwise).
+    pub fn require_device_ability(self, ability: &str) -> Self {
+        self.device_guard(Some(ability), &format!("device:{ability}"))
+    }
+
+    fn device_guard(self, ability: Option<&str>, mark: &str) -> Self {
+        let ability = ability.map(|a| std::sync::Arc::new(a.to_owned()));
+        self.route_layer(from_fn(
+            move |req: Request, next: axum::middleware::Next| {
+                crate::auth::device_guard(ability.clone(), req, next)
+            },
+        ))
+        .mark(mark)
+    }
+
     fn requirement(self, requirement: crate::auth::Requirement, kind: &str, name: &str) -> Self {
         let requirement = std::sync::Arc::new(requirement);
         self.route_layer(from_fn(

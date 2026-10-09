@@ -93,7 +93,7 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   plans (named subscriptions per bike, Stripe/Xendit/a demo gateway), renox-admin (the
   catalogue by permission), renox-oauth, renox-2fa (required for staff), renox-editors;
   webhooks (Midtrans); signed single-use links; `Encrypted<String>` ID numbers; a JSON API
-  for kiosks and a mobile app (token abilities, `throttle_by`, CORS, `Ulid` codes); the
+  for kiosks and a mobile app (device tokens for kiosks, token abilities, `throttle_by`, CORS, `Ulid` codes); the
   kit's dashboard, charts, wizard, action sheets, repeater, infolists; renox-blocks for what the
   kit lacks (gallery, range slider, quantity, keypad, kanban, month calendar, availability,
   date-time range, swatches, history, plan comparison; the closed-days date picker is still
@@ -269,7 +269,7 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   [SECURITY.md](SECURITY.md): how to report a vulnerability;
   [RELEASING.md](RELEASING.md): how a release goes to crates.io.
 - `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, relations, migrations),
-  `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`),
+  `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`, `device.rs`: tokens for a kiosk or till without a user),
   `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,
   `grid/` (the data grid and its exports), `import.rs` (CSV imports), `testing.rs`.
 - `crates/renox-cli`: `rnx`; `stubs/` holds the files `rnx new` writes.

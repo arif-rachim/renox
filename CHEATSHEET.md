@@ -1427,6 +1427,10 @@ async fn setup(db: &Db, user: &User) -> Result {
     user.assign_role(db, "editor").await?; // also remove_role, sync_roles, roles, permissions
     let token = user.create_token_with(db, "reports", &["orders:read"], None).await?; // limited
     let _ = token.plain;
+    // A kiosk or till without a user row: a device token owned by your own key.
+    let kiosk = renox::auth::DeviceToken::create(db, "kiosk:3", "front", Some(&["sales:create"]), None).await?;
+    let _ = kiosk.plain; // `Authorization: Bearer d1|…`; extract `renox::auth::Device`,
+    // guard with Routes::require_device() / require_device_ability("sales:create")
     Ok(())
 }
 

@@ -77,9 +77,14 @@ fn key(req: &Request) -> String {
         .extensions()
         .get::<CurrentUser>()
         .and_then(|c| c.user.as_ref().map(|u| u.id));
-    match user {
-        Some(id) => format!("user:{id}"),
-        None => match crate::ClientIp::of(req) {
+    let device = req
+        .extensions()
+        .get::<CurrentUser>()
+        .and_then(|c| c.device.as_ref().map(|d| d.key().to_owned()));
+    match (user, device) {
+        (Some(id), _) => format!("user:{id}"),
+        (None, Some(device)) => format!("device:{device}"),
+        (None, None) => match crate::ClientIp::of(req) {
             Some(ip) => format!("ip:{ip}"),
             None => "ip:unknown".to_owned(),
         },
@@ -124,6 +129,8 @@ pub(crate) async fn check(limiter: &Limiter, req: Request, next: Next) -> Respon
 pub struct LimitRequest<'a> {
     /// The logged-in user, if any.
     pub user: Option<&'a crate::auth::User>,
+    /// The device a device token authenticated (`auth::DeviceToken`), if any.
+    pub device: Option<&'a crate::auth::Device>,
     /// The client's IP (`ClientIp`), if known.
     pub ip: Option<std::net::IpAddr>,
     /// The request method.
@@ -250,8 +257,13 @@ pub(crate) async fn check_named(name: &str, req: Request, next: Next) -> Respons
         .extensions()
         .get::<CurrentUser>()
         .and_then(|c| c.user.clone());
+    let device = req
+        .extensions()
+        .get::<CurrentUser>()
+        .and_then(|c| c.device.clone());
     let limit = (limiter.rule)(&LimitRequest {
         user: user.as_deref(),
+        device: device.as_deref(),
         ip: crate::ClientIp::of(&req),
         method: req.method(),
         path: req.uri().path(),

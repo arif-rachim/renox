@@ -19,6 +19,7 @@
 use renox::axum::Extension;
 use renox::axum::extract::Request;
 use renox::axum::middleware::Next;
+use renox::i18n::RequestLocale;
 use renox::prelude::*;
 
 use crate::app::home::LOCALES;
@@ -44,7 +45,7 @@ pub async fn middleware(
     user: Option<AuthUser>,
     session: Session,
     Extension(state): Extension<AppState>,
-    req: Request,
+    mut req: Request,
     next: Next,
 ) -> Response {
     if let Some(user) = user {
@@ -54,7 +55,8 @@ pub async fn middleware(
             None => {
                 if let Some(locale) = account {
                     let _ = renox::i18n::remember_locale(&session, &locale);
-                    renox::i18n::set_current_locale(&locale);
+                    // The whole request (`Lang`, validation, views) follows.
+                    RequestLocale::switch(&mut req, &locale);
                 }
             }
             Some(chosen) if supported(&chosen) && account.as_deref() != Some(chosen.as_str()) => {

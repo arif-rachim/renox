@@ -8,6 +8,7 @@
 //! the abilities ticked; revoking one deletes it, and the app or kiosk gets
 //! 401 from its next request.
 
+use renox::auth::DeviceToken;
 use renox::db::Json as DbJson;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -160,8 +161,8 @@ pub async fn kiosks(State(db): State<Db>, session: Session) -> Result<View> {
         .get(&db)
         .await?;
     let used: Vec<(i64, Option<DateTime>)> = renox::db::sql(
-        "SELECT id, last_used_at FROM personal_access_tokens WHERE user_id IN \
-         (SELECT user_id FROM kiosks WHERE store_id = ?)",
+        "SELECT id, last_used_at FROM device_tokens WHERE device IN \
+         (SELECT 'kiosk:' || CAST(id AS TEXT) FROM kiosks WHERE store_id = ?)",
     )
     .bind(store_id)
     .fetch_as::<(i64, Option<DateTime>)>(&db)
@@ -191,7 +192,7 @@ pub async fn kiosks(State(db): State<Db>, session: Session) -> Result<View> {
 
 // [explain:api.kiosks.store]
 /// `POST /staff/api-tokens` (`api.kiosks.store`): a kiosk for the active
-/// store: its own user (a random password nobody is told), a token with
+/// store and a device token owned by `kiosk:<id>` (no user account) with
 /// the abilities ticked (no expiry: the manager revokes it), shown once.
 pub async fn kiosk_store(
     State(db): State<Db>,
@@ -204,32 +205,22 @@ pub async fn kiosk_store(
     if !access::can_in(&user, catalogue::FLEET_MANAGE, store_id) {
         return Err(Error::Forbidden);
     }
-    // [/explain:api.kiosks.store]
-    let email = format!(
-        "kiosk-{}@kiosk.invalid",
-        renox::random_token()[..16].to_lowercase()
-    );
-    // [explain:api.kiosks.store]
-    let kiosk_user = User::register(&db, form.name.trim(), &email, &renox::random_token()).await?;
-    let abilities: Vec<&str> = form.abilities.iter().map(String::as_str).collect();
-    let token = kiosk_user
-        .create_token_with(&db, form.name.trim(), &abilities, None)
-        .await?;
-    // [/explain:api.kiosks.store]
-    Kiosk::create(
+    let mut kiosk = Kiosk::create(
         &db,
         Kiosk {
             store_id,
-            user_id: kiosk_user.id,
             name: form.name.trim().to_owned(),
-            token_id: Some(token.token.id),
             abilities: DbJson(form.abilities.clone()),
             created_by: Some(user.id),
             ..Default::default()
         },
     )
     .await?;
-    // [explain:api.kiosks.store]
+    let abilities: Vec<&str> = form.abilities.iter().map(String::as_str).collect();
+    let device = super::kiosk::device_key(kiosk.id);
+    let token = DeviceToken::create(&db, &device, &kiosk.name, Some(&abilities), None).await?;
+    kiosk.token_id = Some(token.token.id);
+    kiosk.save_only(&db, &["token_id"]).await?;
     session.flash(FLASH, token.plain)?;
     Ok((
         Toast::success(lang.t("api.tokens.made", &[])),
@@ -251,9 +242,7 @@ pub async fn kiosk_destroy(
     if !access::can_in(&user, catalogue::FLEET_MANAGE, kiosk.store_id) {
         return Err(Error::NotFound);
     }
-    if let Some(kiosk_user) = User::find(&db, kiosk.user_id).await? {
-        kiosk_user.revoke_tokens(&db).await?;
-    }
+    DeviceToken::revoke_all(&db, &super::kiosk::device_key(kiosk.id)).await?;
     kiosk.token_id = None;
     kiosk.revoked_at = Some(renox::db::now());
     kiosk.save_only(&db, &["token_id", "revoked_at"]).await?;

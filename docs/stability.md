@@ -161,7 +161,8 @@ field for you.
 - `Config`, `MailConfig`, `StorageConfig`, `AnalyticsConfig`
 - `Mail`, `User`, `Paginated`, `SimplePage`, `CursorPage`, `RouteInfo`, `MigrationStatus`,
   `FailedJob`, `audit::AuditLog`, the `auth::events` structs
-- `DatabaseNotification`, `AccessToken`, `NewToken`
+- `DatabaseNotification`, `AccessToken`, `NewToken`, `auth::DeviceToken`, `auth::NewDeviceToken`,
+  `auth::Device`, `i18n::RequestLocale`
 - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
 - `auth::Can<T>` (use `Can::new`), `schedule::UpcomingRun`, `maintenance::DownOptions` (use
   `DownOptions::new()` or `Default`)

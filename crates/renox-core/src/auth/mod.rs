@@ -33,6 +33,7 @@
 //! ```
 
 pub(crate) mod account;
+mod device;
 pub mod events;
 mod external;
 mod inbox;
@@ -59,6 +60,8 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
 
 pub(crate) use account::require_password_confirmed;
+pub(crate) use device::require as device_guard;
+pub use device::{Device, DeviceToken, NewDeviceToken};
 pub use external::{confirm_identity, register_verified, registration_open, sign_in};
 pub use module::{Auth, Registration};
 pub use notifications::{
@@ -70,7 +73,7 @@ pub use permissions::Permissions;
 pub use second_factor::{PendingLogin, complete_login, pending_login};
 pub(crate) use throttle::LoginThrottle;
 pub use tokens::{AccessToken, NewToken, prune_expired_tokens};
-pub use user::{User, hash_password, needs_rehash, verify_password};
+pub use user::{User, hash_password, needs_rehash, normalize_email, verify_password};
 pub use verification::send_verification;
 
 use crate::crypto::constant_time_eq;
@@ -271,6 +274,8 @@ pub(crate) struct CurrentUser {
     /// That token's abilities; `None` for every ability (sessions, and
     /// tokens made without a list).
     pub abilities: Option<Arc<Vec<String>>>,
+    /// The device a device token authenticated (no user then).
+    pub device: Option<Arc<Device>>,
     pub grants: Arc<Grants>,
 }
 
@@ -569,7 +574,15 @@ pub(crate) async fn middleware(
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(str::to_owned);
     let session = req.extensions().get::<Session>().cloned();
+    let mut device = None;
     let (user, token) = match (&bearer, &session) {
+        (Some(bearer), _) if bearer.trim().starts_with('d') => {
+            match device::authenticate(&state.db, bearer.trim()).await {
+                Ok(found) => device = found.map(Arc::new),
+                Err(err) => tracing::error!(error = ?err, "could not check the device token"),
+            }
+            (None, None)
+        }
         // Only a token that authenticates turns CSRF off: a wrong or unknown
         // one leaves the request a guest's, with CSRF checked as usual.
         (Some(bearer), _) => match tokens::authenticate(&state.db, bearer.trim()).await {
@@ -609,6 +622,7 @@ pub(crate) async fn middleware(
         gates: state.gates.clone(),
         token_id: token.as_ref().map(|t| t.0),
         abilities: token.and_then(|t| t.1).map(Arc::new),
+        device,
         grants,
     });
     req.extensions_mut().insert(state);
@@ -747,7 +761,7 @@ pub(crate) async fn require_verified(req: Request, next: Next) -> Response {
 pub(crate) fn user_via_token(extensions: &axum::http::Extensions) -> bool {
     extensions
         .get::<CurrentUser>()
-        .is_some_and(|c| c.token_id.is_some())
+        .is_some_and(|c| c.token_id.is_some() || c.device.is_some())
 }
 
 /// Route guard: only guests; logged-in users go to the `home` route.

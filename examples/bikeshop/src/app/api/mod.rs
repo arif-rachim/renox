@@ -11,8 +11,9 @@
 //! How a request goes: CORS for the app's origin ([`APP_ORIGIN`],
 //! `Routes::cors`); the per-token rate limit ([`limit`], registered in
 //! `src/lib.rs` as `bikeshop-api`, `Routes::throttle_by`: 429 over it);
-//! `require_auth` (no valid `Authorization: Bearer` token → 401, JSON);
-//! `require_ability` (a token without the endpoint's ability → 403); then
+//! `require_auth` for customers or `require_device` for kiosks (no valid
+//! `Authorization: Bearer` token → 401, JSON); `require_ability` /
+//! `require_device_ability` (a token without the endpoint's ability → 403); then
 //! the handler, which for a kiosk checks its store. Bearer requests need no
 //! CSRF token (Renox skips it for them). Validation errors are Renox's
 //! `422 {"message", "errors"}`; lists are paginated with `links`; rentals
@@ -60,6 +61,9 @@ pub const CUSTOMER_ABILITIES: [(&str, &str); 3] = [
 /// token's id, the part before `|`), else per user, else 30 a minute per
 /// IP address.
 pub fn limit(req: &LimitRequest) -> Limit {
+    if let Some(device) = req.device {
+        return Limit::per_minute(PER_MINUTE).by(format!("device:{}", device.key()));
+    }
     let token = req
         .headers
         .get("authorization")
@@ -98,19 +102,19 @@ impl Module for Api {
             .name("api.kiosk.bikes")
             .get("/api/v1/kiosk/rentals/{code}", kiosk::rental)
             .name("api.kiosk.rental")
-            .require_ability("rentals:read")
+            .require_device_ability("rentals:read")
             // [/explain:api.about.routes]
             .merge(
                 Routes::new()
                     .post("/api/v1/kiosk/rentals/{code}/checkout", kiosk::checkout)
                     .name("api.kiosk.checkout")
-                    .require_ability("rentals:checkout"),
+                    .require_device_ability("rentals:checkout"),
             )
             .merge(
                 Routes::new()
                     .post("/api/v1/kiosk/rentals/{code}/return", kiosk::give_back)
                     .name("api.kiosk.return")
-                    .require_ability("rentals:return"),
+                    .require_device_ability("rentals:return"),
             );
         let customers = Routes::new()
             .get("/api/v1/me", customer::me)
@@ -146,8 +150,7 @@ impl Module for Api {
         // Added last, so they run first: CORS answers preflights, the
         // limit counts every call, a missing or wrong token is a 401.
         let api = kiosk
-            .merge(customers)
-            .require_auth()
+            .merge(customers.require_auth())
             .throttle_by(LIMITER)
             .cors(&[APP_ORIGIN]);
         // [/explain:api.about.routes]

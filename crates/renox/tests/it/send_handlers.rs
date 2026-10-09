@@ -239,6 +239,11 @@ async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Resul
     permissions::delete_role(&db, "editor").await?;
     user.create_token_with(&db, "t", &["a"], None).await?;
     renox::auth::prune_expired_tokens(&db, Duration::from_secs(60)).await?;
+    let kiosk = renox::auth::DeviceToken::create(&db, "kiosk:1", "k", Some(&["a"]), None).await?;
+    renox::auth::DeviceToken::for_device(&db, "kiosk:1").await?;
+    renox::auth::DeviceToken::revoke(&db, "kiosk:1", kiosk.token.id).await?;
+    renox::auth::DeviceToken::revoke_all(&db, "kiosk:1").await?;
+    renox::auth::DeviceToken::prune_expired(&db, Duration::from_secs(60)).await?;
     renox::auth::prune_read_notifications(&db, Duration::from_secs(60)).await?;
     let scoped = Note::unscoped().none().count(&db).await?;
     let mut me = user.user().clone();
