@@ -102,6 +102,9 @@ test('the code editor keeps its textarea in step and lets Escape leave', () =>
     await page.waitFor(() => !!document.querySelector('[data-rx-code-editor] [contenteditable]'), { message: 'CodeJar ready' });
     assert.ok(loaded.some((p) => p.includes('/_renox/editors/codejar-')), 'CodeJar was loaded');
     await page.click('[data-rx-code-editor] [contenteditable]');
+    // Typing needs the editor focused (#321): a click that came before CodeJar
+    // was ready, or a focus taken by something else, left the keys nowhere.
+    await page.waitFor(() => document.activeElement?.matches('[data-rx-code-editor] [contenteditable]'), { message: 'the code editor has the focus' });
     await page.type('[data-rx-code-editor] [contenteditable]', '{"grind": "fine"}');
     await page.waitFor(() => document.querySelector('#rx-settings').value.includes('"grind"'));
     // Highlighted by Prism.
@@ -109,9 +112,8 @@ test('the code editor keeps its textarea in step and lets Escape leave', () =>
     // Escape, then Tab, leaves the editor (keyboard users aren't trapped).
     await page.press('Escape');
     await page.press('Tab');
-    const inEditor = await page.eval(() => !!document.activeElement.closest('[data-rx-code-editor]'));
-    assert.equal(inEditor, false);
-    await sleep(50);
+    // The focus moves on a moment after the key (#321): wait for it.
+    await page.waitFor(() => !document.activeElement?.closest('[data-rx-code-editor]'), { message: 'Tab left the code editor' });
   }));
 
 // ---------- #268: the rest ----------
