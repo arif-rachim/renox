@@ -563,9 +563,12 @@ async fn the_admin_panel_edits_the_catalogue_by_permission() {
 
     // Prices +10 %, audited.
     let ids = product.id.to_string();
-    app.post("/admin/products/actions/prices-up-10", &[("ids", &ids)])
-        .await
-        .assert_status(204);
+    app.post(
+        "/admin/products/actions/prices",
+        &[("ids", &ids), ("percent", "10")],
+    )
+    .await
+    .assert_status(204);
     let variant = ProductVariant::find(db, variant.id).await.unwrap().unwrap();
     assert_eq!(variant.price, 110_000);
     assert_eq!(audited(&app, "catalog.prices_changed").await.len(), 1);
@@ -577,9 +580,12 @@ async fn the_admin_panel_edits_the_catalogue_by_permission() {
         .unwrap();
     app.acting_as(&manager);
     app.get("/admin/service-plans").await.assert_ok();
-    app.post("/admin/products/actions/prices-up-10", &[("ids", &ids)])
-        .await
-        .assert_forbidden();
+    app.post(
+        "/admin/products/actions/prices",
+        &[("ids", &ids), ("percent", "10")],
+    )
+    .await
+    .assert_forbidden();
     app.acting_as(&owner);
 
     // Discontinue: to the trash, restorable.

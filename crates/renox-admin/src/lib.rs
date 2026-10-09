@@ -54,11 +54,16 @@ use renox::prelude::*;
 pub mod entry;
 pub mod field;
 mod panel;
+pub mod relation;
 pub mod resource;
+mod texts;
 
 pub use entry::Entry;
 pub use field::{Field, FieldKind};
-pub use resource::{ActionContext, AdminAction, AdminResource, BoxFuture, Filter};
+pub use relation::RelationManager;
+pub use resource::{
+    ActionContext, ActionInput, AdminAction, AdminResource, BoxFuture, Filter, SaveContext,
+};
 
 use panel::{Access, Holder, Listed, Panel};
 
@@ -78,12 +83,58 @@ const VIEWS: &[(&str, &str)] = &[
         include_str!("../views/index.html"),
     ),
     ("renox-admin/form.html", include_str!("../views/form.html")),
+    (
+        "renox-admin/relation.html",
+        include_str!("../views/relation.html"),
+    ),
     ("renox-admin/show.html", include_str!("../views/show.html")),
     (
         "renox-admin/fields.html",
         include_str!("../views/fields.html"),
     ),
 ];
+
+/// A place in the panel's layout where an app (or a module) adds content
+/// without replacing the layout: [`Admin::slot`], or a file of the slot's
+/// name under the app's views (`renox-admin/slots/after_content.html`).
+/// A slot's template sees the page's values (`admin`, `resource`, `record`,
+/// `title`, …) and the request's globals (`request.route`, `auth`, …).
+///
+/// ```
+/// use renox_admin::Slot;
+///
+/// assert_eq!(Slot::AfterContent.template(), "renox-admin/slots/after_content.html");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Slot {
+    /// In the page's `<head>`, after the app's `head` stack.
+    Head,
+    /// At the top of the sidebar, before the Dashboard link.
+    SidebarStart,
+    /// At the bottom of the sidebar, after the resources.
+    SidebarEnd,
+    /// In the top bar, before the account menu.
+    NavbarEnd,
+    /// Above the page's content.
+    BeforeContent,
+    /// Below the page's content ("About this page").
+    AfterContent,
+}
+
+impl Slot {
+    /// The template the layout includes for the slot, if there is one.
+    pub fn template(self) -> &'static str {
+        match self {
+            Self::Head => "renox-admin/slots/head.html",
+            Self::SidebarStart => "renox-admin/slots/sidebar_start.html",
+            Self::SidebarEnd => "renox-admin/slots/sidebar_end.html",
+            Self::NavbarEnd => "renox-admin/slots/navbar_end.html",
+            Self::BeforeContent => "renox-admin/slots/before_content.html",
+            Self::AfterContent => "renox-admin/slots/after_content.html",
+        }
+    }
+}
 
 /// The admin panel module: its address, its title, who may use it and its
 /// resources.
@@ -93,6 +144,7 @@ pub struct Admin {
     title: String,
     access: Option<Access>,
     resources: Vec<Arc<dyn Listed>>,
+    slots: Vec<(Slot, String)>,
 }
 
 impl Default for Admin {
@@ -123,6 +175,7 @@ impl Admin {
             title: "Admin".into(),
             access: None,
             resources: Vec::new(),
+            slots: Vec::new(),
         }
     }
 
@@ -161,6 +214,25 @@ impl Admin {
     pub fn gate(self, name: &str) -> Self {
         let name = name.to_owned();
         self.authorize(move |user| user.allows(&name))
+    }
+
+    /// Adds `template` (MiniJinja source) to a place in every page's
+    /// layout, without replacing the layout. Several for one slot are drawn
+    /// in the order added. A file of the slot's name under the app's views
+    /// ([`Slot::template`]) replaces them.
+    ///
+    /// ```
+    /// use renox_admin::{Admin, Slot};
+    ///
+    /// let admin = Admin::new().slot(
+    ///     Slot::AfterContent,
+    ///     r#"<aside class="about"><h2>About this page</h2><p>{{ request.route }}</p></aside>"#,
+    /// );
+    /// # let _ = admin;
+    /// ```
+    pub fn slot(mut self, slot: Slot, template: &str) -> Self {
+        self.slots.push((slot, template.to_owned()));
+        self
     }
 
     /// Adds a resource, after the ones before it in the navigation.
@@ -203,11 +275,27 @@ impl Module for Admin {
     }
 
     fn register(&self, app: &mut Registry) {
-        app.templates(|env| {
+        // One template per slot: what was added to it, in order.
+        let mut slots: Vec<(&'static str, String)> = Vec::new();
+        for (slot, source) in &self.slots {
+            match slots.iter_mut().find(|(name, _)| *name == slot.template()) {
+                Some((_, all)) => {
+                    all.push('\n');
+                    all.push_str(source);
+                }
+                None => slots.push((slot.template(), source.clone())),
+            }
+        }
+        app.templates(move |env| {
             for (name, source) in VIEWS {
                 // The app's own file of that name wins.
                 if env.get_template(name).is_err() {
                     let _ = env.add_template(name, source);
+                }
+            }
+            for (name, source) in &slots {
+                if env.get_template(name).is_err() {
+                    let _ = env.add_template_owned(*name, source.clone());
                 }
             }
         });

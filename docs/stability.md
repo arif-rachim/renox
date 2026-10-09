@@ -82,8 +82,9 @@ endpoints and scopes Google and GitHub use may change when the providers change 
 
 `renox-admin` is the optional admin panel plugin crate ([admin.md](admin.md)), at the same
 version as `renox`. Its public items (the `Admin` module, the `AdminResource` trait, `Field`,
-`FieldKind`, `Entry`, `Filter`, `AdminAction`, `ActionContext`) follow the same promise.
-`Field`, `FieldKind`, `Entry` and `ActionContext` are `#[non_exhaustive]`; `AdminResource` may
+`FieldKind`, `Entry`, `Filter`, `AdminAction`, `ActionContext`, `ActionInput`, `SaveContext`,
+`RelationManager`, `Slot`) follow the same promise. `Field`, `FieldKind`, `Entry`,
+`ActionContext`, `SaveContext` and `Slot` are `#[non_exhaustive]`; `AdminResource` may
 get new methods with default bodies in minor releases. The templates' markup and the values
 they receive may change in minor releases; an app that replaced one keeps its own. It
 depends publicly on `renox` (its grid's `Column` and `Grid`, `Query`, `Validator`).
@@ -171,7 +172,7 @@ field for you.
   `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
   `rate_limit::LimitRequest`, `SentNotification`, `SentBroadcast`, `db::InvalidUlid`, `grid::Grid`,
   `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`, `grid::Workbook`,
-  `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
+  `grid::Action` (`Action::sheet`), `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
   `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
   `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use
   `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`),

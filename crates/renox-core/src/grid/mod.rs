@@ -528,6 +528,12 @@ impl Column {
         &self.label
     }
 
+    /// The same column under another heading, e.g. a translation.
+    pub fn titled(mut self, label: &str) -> Self {
+        label.clone_into(&mut self.label);
+        self
+    }
+
     /// The `(value, label)` choices of a `select` or `tags` column (empty
     /// for the other kinds).
     pub fn options(&self) -> &[(String, String)] {
@@ -2370,6 +2376,7 @@ pub struct Action {
     confirm: Option<String>,
     danger: bool,
     link: bool,
+    sheet: Option<String>,
 }
 
 impl Action {
@@ -2383,6 +2390,7 @@ impl Action {
             confirm: None,
             danger: false,
             link: false,
+            sheet: None,
         }
     }
 
@@ -2413,8 +2421,19 @@ impl Action {
         self
     }
 
+    /// Opens the dialog `id` (a kit `action_sheet`, elsewhere on the page)
+    /// instead of sending the request at once: the grid points the sheet's
+    /// form at this action's `url`, adds the selection (`ids`, `all`) and
+    /// shows it, so the action can ask for input first. Use it with
+    /// `action_sheet(id, …, button=false)`.
+    pub fn sheet(mut self, id: &str) -> Self {
+        self.sheet = Some(id.to_owned());
+        self
+    }
+
     fn to_value(&self, id: Option<&str>) -> Value {
         json!({
+            "sheet": self.sheet,
             "label": self.label,
             "url": id.map_or_else(|| self.url.clone(), |id| self.url.replace("{id}", id)),
             "method": self.method,

@@ -340,6 +340,50 @@ impl Field {
     pub(crate) fn set_options(&mut self, options: Vec<(String, String)>) {
         self.options = options;
     }
+
+    pub(crate) fn label_text(&self) -> &str {
+        &self.label
+    }
+
+    pub(crate) fn has_placeholder(&self) -> bool {
+        self.placeholder.is_some()
+    }
+
+    pub(crate) fn is_required(&self) -> bool {
+        self.required
+    }
+
+    pub(crate) fn min_text(&self) -> Option<&str> {
+        self.min.as_deref()
+    }
+
+    pub(crate) fn max_text(&self) -> Option<&str> {
+        self.max.as_deref()
+    }
+
+    pub(crate) fn choices(&self) -> &[(String, String)] {
+        &self.options
+    }
+
+    /// Runs the field's words (label, hint, placeholder, affixes and the
+    /// choices' labels) through `translate`.
+    pub(crate) fn translate(&mut self, translate: &dyn Fn(&str) -> String) {
+        self.label = translate(&self.label);
+        for text in [
+            &mut self.hint,
+            &mut self.placeholder,
+            &mut self.prefix,
+            &mut self.suffix,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            *text = translate(text);
+        }
+        for (_, label) in &mut self.options {
+            *label = translate(label);
+        }
+    }
 }
 
 /// Whether `name` is a plain SQL name: letters, digits and `_`.

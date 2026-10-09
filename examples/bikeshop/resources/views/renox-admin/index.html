@@ -4,7 +4,8 @@
     by renox-admin/{slug}/cells.html. -#}
 {% extends "renox-admin/layout.html" %}
 {% from "renox/grid.html" import grid %}
-{% from "renox/ui.html" import page_header, link_button, link_tabs %}
+{% from "renox/ui.html" import page_header, link_button, link_tabs, action_sheet %}
+{% from "renox-admin/fields.html" import field %}
 {% from "layouts/_text.html" import tx as tr %}
 
 {% block title %}{{ tr(resource.plural_label) }} · {{ tr(admin.title) }}{% endblock %}
@@ -21,4 +22,12 @@
 {% call(row, column) grid(rows) %}
   {%- include "renox-admin/" ~ resource.slug ~ "/cells.html" ignore missing %}
 {% endcall %}
+{#- Actions that ask for input (AdminAction::form): the grid opens the sheet. -#}
+{%- for sheet in sheets %}
+{% call action_sheet(sheet.id, sheet.title, sheet.url, sheet.title, description=sheet.description, submit_label=sheet.submit_label, danger=sheet.danger, button=false) %}
+  {%- for f in sheet.fields %}
+  {{ field(f, currency=admin.currency) }}
+  {%- endfor %}
+{% endcall %}
+{%- endfor %}
 {% endblock %}

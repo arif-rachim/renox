@@ -583,6 +583,34 @@ describe('logged in', () => {
       await page.waitFor((t) => document.querySelector('.rx-toast')?.textContent.includes(`${t} orders marked shipped`), {}, total);
     }));
 
+  test('an action that asks for input opens its sheet with the selection', () =>
+    onGrid(async (page) => {
+      const ids = await page.eval(() => [...document.querySelectorAll('tbody tr[data-id]')].slice(0, 2).map((r) => r.dataset.id));
+      for (const id of ids) await page.click(`tbody tr[data-id="${id}"] [data-grid-select]`);
+      const requests = [];
+      page.on('Network.requestWillBeSent', (p) => {
+        if (p.request.url.includes('/grid/orders/bulk/note')) requests.push(p.request);
+      });
+      await page.eval(() => [...document.querySelectorAll('[data-grid-bulk-action]')].find((b) => b.textContent.trim() === 'Add note').click());
+      // The sheet, not the grid's dialog, and nothing sent yet.
+      await page.waitFor(() => document.getElementById('orders-note').open);
+      assert.equal(await page.eval(() => document.querySelector('dialog[data-grid-dialog]').open), false);
+      assert.deepEqual(requests, []);
+      assert.equal(await page.eval(() => document.querySelector('#orders-note input[name="ids"]').value), ids.join(','));
+      assert.match(await page.eval(() => document.querySelector('#orders-note form').getAttribute('hx-post')), /\/grid\/orders\/bulk\/note/);
+      // Blank: the server's error shows in the sheet, which stays open.
+      await page.click('#orders-note button[type="submit"]');
+      await page.waitFor(() => /required/i.test(document.querySelector('#orders-note').textContent));
+      assert.equal(await page.eval(() => document.getElementById('orders-note').open), true);
+      // Typed: it closes, the toast says what happened, the grid has the note.
+      await page.type('#orders-note input[name="note"]', 'Checked by Ana');
+      await page.click('#orders-note button[type="submit"]');
+      await page.waitFor(() => !document.getElementById('orders-note').open);
+      await page.waitFor(() => document.querySelector('.rx-toast')?.textContent.includes('2 orders noted: Checked by Ana'));
+      const bodies = requests.map((r) => r.postData ?? '');
+      assert.ok(bodies.some((b) => b.includes('note=Checked')), bodies.join('|'));
+    }));
+
   test("a row's menu deletes it after the grid asks", () =>
     onGrid(async (page) => {
       const id = await page.eval(() => document.querySelector('tbody tr[data-id]').dataset.id);

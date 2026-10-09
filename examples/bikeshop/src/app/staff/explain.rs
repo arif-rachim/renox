@@ -1209,8 +1209,9 @@ fn admin_pages() -> Vec<Explanation> {
                         if *slug == "products" {
                             features.push(Feature {
                                 api: "AdminAction",
-                                why: "Bulk actions: prices ±5 % or ±10 % on every variant \
-                                      (`prices.change` too, one transaction, audited), move \
+                                why: "Bulk actions: prices changed by a percentage typed in \
+                                      the action's sheet (`AdminAction::form`; \
+                                      `prices.change` too, one transaction, audited), move \
                                       to a category (a page to pick it), discontinue (to the \
                                       trash, also on each row). The tabs by kind are \
                                       `Filter`s; the Trash tab restores.",

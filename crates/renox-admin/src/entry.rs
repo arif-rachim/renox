@@ -117,4 +117,12 @@ impl Entry {
     pub fn key(&self) -> &str {
         &self.key
     }
+
+    /// Runs the entry's label and its value names through `translate`.
+    pub(crate) fn translate(&mut self, translate: &dyn Fn(&str) -> String) {
+        self.label = translate(&self.label);
+        for label in self.labels.values_mut() {
+            *label = translate(label);
+        }
+    }
 }

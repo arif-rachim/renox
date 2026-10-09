@@ -314,7 +314,7 @@
     <button type="button" class="rx-grid__link" data-grid-select-matching data-total="{{ page.page.total }}" hidden>{{ t('ui.grid.select_matching', total=page.page.total | number) }}</button>
     <span class="rx-grid__bulk-actions">
       {%- for action in page.bulk %}
-      <button type="button" class="{{ class_names('rx-button', 'rx-button--small', {'rx-button--danger': action.danger, 'rx-button--secondary': not action.danger}) }}" data-grid-bulk-action data-url="{{ action.url }}" data-method="{{ action.method }}"{% if action.confirm %} data-confirm="{{ action.confirm }}"{% endif %}{% if action.danger %} data-danger{% endif %}>{{ action.label }}</button>
+      <button type="button" class="{{ class_names('rx-button', 'rx-button--small', {'rx-button--danger': action.danger, 'rx-button--secondary': not action.danger}) }}" data-grid-bulk-action data-url="{{ action.url }}" data-method="{{ action.method }}"{% if action.sheet %} data-sheet="{{ action.sheet }}"{% endif %}{% if action.confirm %} data-confirm="{{ action.confirm }}"{% endif %}{% if action.danger %} data-danger{% endif %}>{{ action.label }}</button>
       {%- endfor %}
     </span>
     <button type="button" class="rx-grid__link" data-grid-select-none>{{ t('ui.grid.select_none') }}</button>
@@ -408,7 +408,7 @@
             <span class="rx-grid__pop rx-grid__menu" id="{{ id }}-a-{{ loop.index }}" popover>
               {%- for action in row._rx.actions %}
               {%- if action.link %}<a class="rx-grid__menu-item" href="{{ action.url }}">{{ action.label }}</a>
-              {%- else %}<button type="button" class="{{ class_names('rx-grid__menu-item', {'rx-grid__menu-item--danger': action.danger}) }}" data-grid-action data-url="{{ action.url }}" data-method="{{ action.method }}"{% if action.confirm %} data-confirm="{{ action.confirm }}"{% endif %}{% if action.danger %} data-danger{% endif %}>{{ action.label }}</button>{% endif %}
+              {%- else %}<button type="button" class="{{ class_names('rx-grid__menu-item', {'rx-grid__menu-item--danger': action.danger}) }}" data-grid-action data-url="{{ action.url }}" data-method="{{ action.method }}"{% if action.sheet %} data-sheet="{{ action.sheet }}"{% endif %}{% if action.confirm %} data-confirm="{{ action.confirm }}"{% endif %}{% if action.danger %} data-danger{% endif %}>{{ action.label }}</button>{% endif %}
               {%- endfor %}
             </span>
             {%- endif %}

@@ -6,7 +6,9 @@ use renox::chrono::NaiveDate;
 use renox::grid::Column;
 use renox::prelude::*;
 use renox::testing::TestApp;
-use renox_admin::{Admin, AdminAction, AdminResource, Entry, Field, Filter};
+use renox_admin::{
+    Admin, AdminAction, AdminResource, Entry, Field, Filter, RelationManager, SaveContext, Slot,
+};
 use serde::{Deserialize, Serialize};
 
 const PASSWORD: &str = "secret-password-1";
@@ -129,8 +131,72 @@ impl AdminResource for Products {
         })]
     }
 
+    fn relations(&self) -> Vec<RelationManager> {
+        vec![
+            RelationManager::has_many("variants", "Variants", Variants, "product_id"),
+            RelationManager::belongs_to_many(
+                "tags",
+                "Tags",
+                Tags,
+                "product_tag",
+                "product_id",
+                "tag_id",
+            ),
+        ]
+    }
+
+    async fn saved(&self, product: &Product, cx: &SaveContext) -> Result {
+        let was = cx
+            .previous
+            .as_ref()
+            .and_then(|old| old["price"].as_i64())
+            .map_or_else(|| "-".to_owned(), |price| price.to_string());
+        let note = format!(
+            "{} {} by {}: {was} -> {}",
+            if cx.created { "created" } else { "updated" },
+            product.name,
+            cx.user.name,
+            product.price
+        );
+        renox::db::sql("INSERT INTO audits (note) VALUES (?)")
+            .bind(note)
+            .execute(&cx.state.db)
+            .await?;
+        Ok(())
+    }
+
     fn actions(&self) -> Vec<AdminAction<Product>> {
         vec![
+            AdminAction::new(
+                "reprice",
+                "Change price by %",
+                |products: Vec<Product>, cx| async move {
+                    let percent: f64 = cx.input.parse("percent").unwrap_or(0.0);
+                    let note = cx.input.text("note").to_owned();
+                    for product in &products {
+                        let price = (product.price as f64 * (1.0 + percent / 100.0)).round() as i64;
+                        Product::query()
+                            .where_eq("id", product.id)
+                            .update(&cx.state.db, &[("price", &price)])
+                            .await?;
+                    }
+                    Ok(Toast::success(format!(
+                        "{} repriced by {percent} % {note}",
+                        products.len()
+                    )))
+                },
+            )
+            .form(vec![
+                Field::number("percent", "Percent")
+                    .required()
+                    .min(-90)
+                    .max(500),
+                Field::text("note", "Note"),
+                Field::select("mode", "Mode", [("all", "All"), ("some", "Some")]),
+            ])
+            .description("Every selected product changes by this much.")
+            .submit_label("Change prices")
+            .row(),
             AdminAction::new(
                 "publish",
                 "Publish",
@@ -1327,4 +1393,761 @@ async fn the_gate_guards_every_page_and_groups_share_a_heading() {
         rest.contains("/admin/products") && rest.contains("/admin/specs"),
         "{html}"
     );
+}
+
+// --- Relation managers, input actions, hooks, slots, edit-only, texts ---
+
+#[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
+#[model(table = "variants")]
+struct Variant {
+    id: i64,
+    product_id: i64,
+    name: String,
+    stock: i64,
+}
+
+impl Policy for Variant {
+    fn allows(&self, user: &User, ability: &str) -> bool {
+        // The viewer looks at variants; nobody changes a "locked" one.
+        (matches!(ability, "viewAny" | "view") || user.email != VIEWER)
+            && !(ability == "update" && self.name == "locked")
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+struct VariantForm {
+    #[validate(required)]
+    product_id: i64,
+    #[validate(required, max = 50)]
+    name: String,
+    #[validate(min = 0)]
+    stock: i64,
+}
+
+struct Variants;
+
+impl AdminResource for Variants {
+    type Model = Variant;
+    type Form = VariantForm;
+
+    fn label(&self) -> &str {
+        "Variant"
+    }
+
+    fn plural_label(&self) -> &str {
+        "Variants"
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        vec![
+            Column::text("name", "Name").searchable(),
+            Column::number("stock", "Stock"),
+        ]
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        vec![
+            // The manager leaves the foreign key out of the form.
+            Field::belongs_to("product_id", "Product", "products", "name"),
+            Field::text("name", "Name").required(),
+            Field::number("stock", "Stock"),
+        ]
+    }
+
+    fn entries(&self) -> Vec<Entry> {
+        Vec::new()
+    }
+
+    fn fill(&self, variant: &mut Variant, form: VariantForm) {
+        variant.product_id = form.product_id;
+        variant.name = form.name;
+        variant.stock = form.stock;
+    }
+}
+
+#[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
+#[model(table = "tags")]
+struct Tag {
+    id: i64,
+    name: String,
+}
+
+impl Policy for Tag {
+    fn allows(&self, _user: &User, _ability: &str) -> bool {
+        true
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+struct TagForm {
+    #[validate(required)]
+    name: String,
+}
+
+struct Tags;
+
+impl AdminResource for Tags {
+    type Model = Tag;
+    type Form = TagForm;
+
+    fn label(&self) -> &str {
+        "Tag"
+    }
+
+    fn plural_label(&self) -> &str {
+        "Tags"
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        vec![Column::text("name", "Name")]
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        vec![Field::text("name", "Name").required()]
+    }
+
+    fn fill(&self, tag: &mut Tag, form: TagForm) {
+        tag.name = form.name;
+    }
+}
+
+#[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
+#[model(table = "settings")]
+struct Setting {
+    id: i64,
+    name: String,
+    value: String,
+}
+
+impl Policy for Setting {
+    fn allows(&self, _user: &User, _ability: &str) -> bool {
+        true
+    }
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+struct SettingForm {
+    #[validate(required)]
+    value: String,
+}
+
+/// Edited, never created or deleted from the panel.
+struct Settings;
+
+impl AdminResource for Settings {
+    type Model = Setting;
+    type Form = SettingForm;
+
+    fn label(&self) -> &str {
+        "Setting"
+    }
+
+    fn plural_label(&self) -> &str {
+        "Settings"
+    }
+
+    fn creatable(&self) -> bool {
+        false
+    }
+
+    fn deletable(&self) -> bool {
+        false
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        vec![Column::text("name", "Name"), Column::text("value", "Value")]
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        vec![Field::text("value", "Value").required()]
+    }
+
+    fn fill(&self, setting: &mut Setting, form: SettingForm) {
+        setting.value = form.value;
+    }
+}
+
+async fn full_app() -> TestApp {
+    app_with(
+        Admin::new()
+            .title("Back office")
+            .authorize(|user| user.email.ends_with("@example.com"))
+            .resource(Products)
+            .resource(Categories)
+            .resource(Settings)
+            .slot(
+                Slot::AfterContent,
+                r#"<aside id="about">About {{ request.route }}</aside>"#,
+            )
+            .slot(Slot::BeforeContent, r#"<p id="before">Before</p>"#),
+    )
+    .await
+}
+
+async fn notes(app: &TestApp) -> Vec<String> {
+    renox::db::sql("SELECT note FROM audits ORDER BY id")
+        .scalars(app.db())
+        .await
+        .unwrap()
+}
+
+#[renox::test]
+async fn actions_can_ask_for_input_in_a_sheet() {
+    let app = full_app().await;
+    let a = product(&app, "Coffee", "C-1", "live").await;
+    let b = product(&app, "Tea", "T-1", "live").await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+
+    // The list has the action's sheet, and the grid opens it.
+    let page = app.get("/admin/products").await;
+    page.assert_ok()
+        .assert_see(r#"data-sheet="rx-admin-action-reprice""#)
+        .assert_see(r#"id="rx-admin-action-reprice""#)
+        .assert_see("Every selected product changes by this much.")
+        .assert_see("Change prices")
+        .assert_see(r#"name="percent""#)
+        .assert_see(r#"name="note""#);
+    // An action without input still asks with the grid's dialog.
+    page.assert_see(r#"data-confirm="Publish the selected products?""#);
+
+    let ids = format!("{},{}", a.id, b.id);
+    // Missing and out-of-range input stops the action.
+    app.htmx()
+        .post(
+            "/admin/products/actions/reprice",
+            &[("ids", &ids), ("percent", "")],
+        )
+        .await
+        .assert_status(422)
+        .assert_invalid("percent");
+    app.htmx()
+        .post(
+            "/admin/products/actions/reprice",
+            &[("ids", &ids), ("percent", "900")],
+        )
+        .await
+        .assert_status(422)
+        .assert_see("at most 500");
+    app.htmx()
+        .post(
+            "/admin/products/actions/reprice",
+            &[("ids", &ids), ("percent", "abc")],
+        )
+        .await
+        .assert_invalid("percent");
+    app.htmx()
+        .post(
+            "/admin/products/actions/reprice",
+            &[("ids", &ids), ("percent", "10"), ("mode", "none")],
+        )
+        .await
+        .assert_invalid("mode");
+    assert_eq!(
+        Product::find(app.db(), a.id).await.unwrap().unwrap().price,
+        75_000
+    );
+
+    // A valid answer runs it on the selection, and the page reloads.
+    app.htmx()
+        .post(
+            "/admin/products/actions/reprice",
+            &[("ids", &ids), ("percent", "10"), ("note", "spring")],
+        )
+        .await
+        .assert_ok()
+        .assert_header("hx-refresh", "true");
+    assert_eq!(
+        Product::find(app.db(), a.id).await.unwrap().unwrap().price,
+        82_500
+    );
+    assert_eq!(
+        Product::find(app.db(), b.id).await.unwrap().unwrap().price,
+        82_500
+    );
+
+    // From a row's menu.
+    app.htmx()
+        .post(
+            &format!("/admin/products/{}/actions/reprice", a.id),
+            &[("percent", "-50")],
+        )
+        .await
+        .assert_ok();
+    assert_eq!(
+        Product::find(app.db(), a.id).await.unwrap().unwrap().price,
+        41_250
+    );
+    assert_eq!(
+        Product::find(app.db(), b.id).await.unwrap().unwrap().price,
+        82_500
+    );
+    app.htmx()
+        .post(&format!("/admin/products/{}/actions/reprice", a.id), &[])
+        .await
+        .assert_invalid("percent");
+
+    // The viewer may not.
+    let viewer = user(&app, VIEWER).await;
+    app.acting_as(&viewer);
+    app.htmx()
+        .post(
+            "/admin/products/actions/reprice",
+            &[("ids", &ids), ("percent", "10")],
+        )
+        .await
+        .assert_forbidden();
+    app.get("/admin/products")
+        .await
+        .assert_dont_see("rx-admin-action-reprice");
+}
+
+#[renox::test]
+async fn the_saved_hook_gets_the_user_and_the_record_as_it_was() {
+    let app = full_app().await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    app.htmx()
+        .post(
+            "/admin/products",
+            &[
+                ("name", "Coffee"),
+                ("sku", "c-1"),
+                ("price", "7.50"),
+                ("status", "live"),
+            ],
+        )
+        .await
+        .assert_hx_redirect("/admin/products");
+    let coffee = Product::query().first(app.db()).await.unwrap().unwrap();
+    app.htmx()
+        .put(
+            &format!("/admin/products/{}", coffee.id),
+            &[
+                ("name", "Coffee"),
+                ("sku", "c-1"),
+                ("price", "9.00"),
+                ("status", "live"),
+            ],
+        )
+        .await
+        .assert_hx_redirect("/admin/products");
+    assert_eq!(
+        notes(&app).await,
+        vec![
+            "created Coffee by Ana: - -> 750".to_owned(),
+            "updated Coffee by Ana: 750 -> 900".to_owned()
+        ]
+    );
+    // A form that fails doesn't run it.
+    app.htmx()
+        .put(
+            &format!("/admin/products/{}", coffee.id),
+            &[
+                ("name", ""),
+                ("sku", "c-1"),
+                ("price", "1"),
+                ("status", "live"),
+            ],
+        )
+        .await
+        .assert_status(422);
+    assert_eq!(notes(&app).await.len(), 2);
+}
+
+#[renox::test]
+async fn relation_managers_are_tabs_with_their_own_lists_and_forms() {
+    let app = full_app().await;
+    let coffee = product(&app, "Coffee", "C-1", "live").await;
+    let tea = product(&app, "Tea", "T-1", "live").await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    let base = format!("/admin/products/{}", coffee.id);
+
+    // The tabs on the view and the edit pages.
+    for page in [&base, &format!("{base}/edit")] {
+        app.get(page)
+            .await
+            .assert_ok()
+            .assert_see(&format!(r#"href="{base}/relations/variants""#))
+            .assert_see(&format!(r#"href="{base}/relations/tags""#));
+    }
+
+    // A has-many: empty, then create (the foreign key is the record's even
+    // when the browser sends another).
+    app.get(&format!("{base}/relations/variants"))
+        .await
+        .assert_ok()
+        .assert_view("renox-admin/relation.html")
+        .assert_see("No variants yet")
+        .assert_see(&format!(r#"href="{base}/relations/variants/create""#));
+    let form = app.get(&format!("{base}/relations/variants/create")).await;
+    form.assert_ok().assert_see("New variant");
+    assert!(
+        !form.text().contains(r#"name="product_id""#),
+        "{}",
+        form.text()
+    );
+    app.htmx()
+        .post(
+            &format!("{base}/relations/variants"),
+            &[
+                ("name", "Large"),
+                ("stock", "4"),
+                ("product_id", &tea.id.to_string()),
+            ],
+        )
+        .await
+        .assert_hx_redirect(&format!("{base}/relations/variants"));
+    let large = Variant::query().first(app.db()).await.unwrap().unwrap();
+    assert_eq!(
+        (large.product_id, large.name.as_str(), large.stock),
+        (coffee.id, "Large", 4)
+    );
+    app.htmx()
+        .post(
+            &format!("{base}/relations/variants"),
+            &[("name", ""), ("stock", "1")],
+        )
+        .await
+        .assert_invalid("name");
+    app.get(&format!("{base}/relations/variants"))
+        .await
+        .assert_see("Large");
+    // Not another product's.
+    app.get(&format!("/admin/products/{}/relations/variants", tea.id))
+        .await
+        .assert_dont_see("Large");
+
+    // Edit, update (re-parenting is ignored), search in the list.
+    let edit = format!("{base}/relations/variants/{}", large.id);
+    app.get(&format!("{edit}/edit"))
+        .await
+        .assert_ok()
+        .assert_see("Edit Variant #")
+        .assert_see(r#"value="Large""#)
+        .assert_see(&format!(r#"hx-post="{edit}""#));
+    app.htmx()
+        .put(
+            &edit,
+            &[
+                ("name", "XL"),
+                ("stock", "9"),
+                ("product_id", &tea.id.to_string()),
+            ],
+        )
+        .await
+        .assert_hx_redirect(&format!("{base}/relations/variants"));
+    let xl = Variant::find(app.db(), large.id).await.unwrap().unwrap();
+    assert_eq!(
+        (xl.product_id, xl.name.as_str(), xl.stock),
+        (coffee.id, "XL", 9)
+    );
+    app.get(&format!(
+        "/admin/products/{}/relations/variants/{}/edit",
+        tea.id, large.id
+    ))
+    .await
+    .assert_not_found();
+    app.get(&format!("{base}/relations/variants?search=xl"))
+        .await
+        .assert_see("XL");
+
+    // The hook of the managed resource, a locked row, delete.
+    Variant::create(
+        app.db(),
+        Variant {
+            product_id: coffee.id,
+            name: "locked".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let locked = Variant::where_eq("name", "locked")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    app.get(&format!("{base}/relations/variants/{}/edit", locked.id))
+        .await
+        .assert_forbidden();
+    app.htmx().delete(&edit).await.assert_status(204);
+    assert!(Variant::find(app.db(), large.id).await.unwrap().is_none());
+    app.htmx()
+        .post(
+            &format!("{base}/relations/variants/actions/remove"),
+            &[("ids", &locked.id.to_string())],
+        )
+        .await
+        .assert_status(204);
+    assert_eq!(Variant::query().count(app.db()).await.unwrap(), 0);
+    app.get(&format!("{base}/relations/nothing"))
+        .await
+        .assert_not_found();
+}
+
+#[renox::test]
+async fn pivot_managers_attach_and_detach() {
+    let app = full_app().await;
+    let coffee = product(&app, "Coffee", "C-1", "live").await;
+    let mut tags = Vec::new();
+    for name in ["Hot", "Cold", "Sweet"] {
+        tags.push(
+            Tag::create(
+                app.db(),
+                Tag {
+                    name: name.into(),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap(),
+        );
+    }
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    let url = format!("/admin/products/{}/relations/tags", coffee.id);
+
+    let page = app.get(&url).await;
+    page.assert_ok()
+        .assert_see("Attach tag")
+        .assert_see("No tags yet");
+    // The sheet offers every tag, by name.
+    for name in ["Hot", "Cold", "Sweet"] {
+        page.assert_see(&format!(">{name}</option>"));
+    }
+    app.htmx()
+        .post(&url, &[("attach", &tags[0].id.to_string())])
+        .await
+        .assert_ok()
+        .assert_header("hx-refresh", "true");
+    app.htmx()
+        .post(&url, &[("attach", &tags[1].id.to_string())])
+        .await
+        .assert_ok();
+    // Twice is once.
+    app.htmx()
+        .post(&url, &[("attach", &tags[1].id.to_string())])
+        .await
+        .assert_ok();
+    app.assert_database_count("product_tag", 2).await;
+    let page = app.get(&url).await;
+    page.assert_see("Hot").assert_see("Cold");
+    // Only the rest is offered.
+    assert!(
+        !page
+            .text()
+            .contains(&format!(r#"<option value="{}""#, tags[0].id)),
+        "{}",
+        page.text()
+    );
+    app.htmx()
+        .post(&url, &[("attach", "9999")])
+        .await
+        .assert_status(422)
+        .assert_invalid("attach");
+    app.htmx().post(&url, &[]).await.assert_status(422);
+
+    app.htmx()
+        .delete(&format!("{url}/{}", tags[0].id))
+        .await
+        .assert_status(204);
+    app.assert_database_count("product_tag", 1).await;
+    assert!(Tag::find(app.db(), tags[0].id).await.unwrap().is_some());
+    app.htmx()
+        .post(
+            &format!("{url}/actions/remove"),
+            &[("ids", &tags[1].id.to_string())],
+        )
+        .await
+        .assert_status(204);
+    app.assert_database_count("product_tag", 0).await;
+    // Not attached: nothing there to detach.
+    app.htmx()
+        .delete(&format!("{url}/{}", tags[2].id))
+        .await
+        .assert_not_found();
+
+    // Changing what is attached takes the record's `update`.
+    let viewer = user(&app, VIEWER).await;
+    app.acting_as(&viewer);
+    app.get(&url)
+        .await
+        .assert_ok()
+        .assert_dont_see("Attach tag");
+    app.htmx()
+        .post(&url, &[("attach", &tags[2].id.to_string())])
+        .await
+        .assert_forbidden();
+    app.assert_database_count("product_tag", 0).await;
+    // The viewer sees variants but has no buttons for them.
+    app.get(&format!("/admin/products/{}/relations/variants", coffee.id))
+        .await
+        .assert_ok()
+        .assert_dont_see("/create");
+    app.get(&format!(
+        "/admin/products/{}/relations/variants/create",
+        coffee.id
+    ))
+    .await
+    .assert_forbidden();
+}
+
+#[renox::test]
+async fn the_layout_has_slots_for_the_apps_content() {
+    let app = full_app().await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    for page in ["/admin", "/admin/products", "/admin/products/create"] {
+        let html = app.get(page).await.assert_ok().text();
+        assert!(
+            html.contains(r#"<p id="before">Before</p>"#),
+            "{page}\n{html}"
+        );
+        assert!(
+            html.contains(r#"<aside id="about">About admin."#),
+            "{page}\n{html}"
+        );
+        // After the content, which is after "before".
+        let (before, content, about) = (
+            html.find(r#"id="before""#).unwrap(),
+            html.find(r#"id="main""#).unwrap(),
+            html.find(r#"id="about""#).unwrap(),
+        );
+        assert!(content < before && before < about, "{page}");
+    }
+    // Without any, nothing is drawn.
+    let plain = app_with(admin()).await;
+    let ana = user(&plain, "ana@example.com").await;
+    plain.acting_as(&ana);
+    plain
+        .get("/admin")
+        .await
+        .assert_ok()
+        .assert_dont_see("id=\"about\"");
+}
+
+#[renox::test]
+async fn an_edit_only_resource_has_no_create_and_no_delete() {
+    let app = full_app().await;
+    let theme = Setting::create(
+        app.db(),
+        Setting {
+            name: "theme".into(),
+            value: "light".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+
+    let list = app.get("/admin/settings").await;
+    list.assert_ok()
+        .assert_see("theme")
+        .assert_see(&format!("/admin/settings/{}/edit", theme.id))
+        .assert_dont_see("New setting")
+        .assert_dont_see("/actions/delete");
+    app.get(&format!("/admin/settings/{}/edit", theme.id))
+        .await
+        .assert_ok()
+        .assert_dont_see("rx-admin-delete");
+    app.get("/admin/settings/create").await.assert_not_found();
+    app.post("/admin/settings", &[("value", "x")])
+        .await
+        .assert_not_found();
+    app.delete(&format!("/admin/settings/{}", theme.id))
+        .await
+        .assert_not_found();
+    app.htmx()
+        .post(
+            "/admin/settings/actions/delete",
+            &[("ids", &theme.id.to_string())],
+        )
+        .await
+        .assert_not_found();
+    app.htmx()
+        .post(&format!("/admin/settings/{}/actions/delete", theme.id), &[])
+        .await
+        .assert_not_found();
+    app.htmx()
+        .put(
+            &format!("/admin/settings/{}", theme.id),
+            &[("value", "dark")],
+        )
+        .await
+        .assert_hx_redirect("/admin/settings");
+    assert_eq!(
+        Setting::find(app.db(), theme.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .value,
+        "dark"
+    );
+    app.assert_database_count("settings", 1).await;
+}
+
+#[renox::test]
+async fn the_panels_own_words_follow_the_apps_translations() {
+    let app = TestApp::with_config(
+        App::new()
+            .module(Auth::new())
+            .module(admin())
+            .migrations(renox::migrations!("tests/migrations")),
+        |c| {
+            c.locale = "es".into();
+            c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
+        },
+    )
+    .await;
+    let coffee = product(&app, "Coffee", "C-1", "live").await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+
+    app.get("/admin/products")
+        .await
+        .assert_ok()
+        // Heading, button, tab, column names, action names, row actions.
+        .assert_see("Productos")
+        .assert_see("Nuevo producto")
+        .assert_see("Todos")
+        .assert_see("Nombre")
+        .assert_see("Precio")
+        .assert_see("Publicar")
+        .assert_see("Eliminar")
+        .assert_see("Editar")
+        .assert_see("Ver")
+        .assert_dont_see(">Name<");
+    app.get("/admin").await.assert_see("Panel");
+    app.get(&format!("/admin/products/{}", coffee.id))
+        .await
+        .assert_see(&format!("Producto n.º {}", coffee.id));
+    app.get(&format!("/admin/products/{}/edit", coffee.id))
+        .await
+        .assert_see(&format!("Editar Producto n.º {}", coffee.id))
+        .assert_see("Guardar cambios");
+    app.get("/admin/products/create")
+        .await
+        .assert_see("Nuevo producto")
+        .assert_see("Crear producto");
+    // Without a translation, the English text stays.
+    app.get("/admin/products/create").await.assert_see("Cancel");
+    // Toasts too.
+    app.htmx()
+        .put(
+            &format!("/admin/products/{}", coffee.id),
+            &[
+                ("name", "Coffee"),
+                ("sku", "c-1"),
+                ("price", "1"),
+                ("status", "live"),
+            ],
+        )
+        .await
+        .assert_hx_redirect("/admin/products");
+    let toast = app.get("/admin/products").await.text();
+    assert!(toast.contains("Producto guardado."), "{toast}");
 }

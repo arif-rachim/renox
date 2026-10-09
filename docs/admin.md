@@ -15,8 +15,11 @@ panel authorized by permission, with a column of its own and the Markdown editor
 - adding the panel and saying who may open it;
 - declaring a resource: columns, fields, the form and how it fills the model;
 - the policy behind every page and button;
-- filters, actions, soft deletes and the trash, exports;
-- the view page, the routes, and replacing the panel's pages;
+- filters, actions (also ones that ask for input), soft deletes and the trash, exports;
+- what runs after a save, child rows managed from a record (relation managers), and resources
+  that are only edited;
+- the view page, the routes, words in another language, and adding to or replacing the panel's
+  pages;
 - how it maps to Laravel's Filament.
 
 ### Words you'll meet
@@ -397,6 +400,205 @@ fn publish() -> AdminAction<Product> {
 - `.danger()` shows it in red; `.row_only()` puts it only in the rows' menus.
 - At most 10,000 records are loaded for one action.
 
+### Actions that ask for input
+
+Give an action a `form` and its button opens a sheet with those fields (any `Field` but
+`belongs_to`). The action runs once they are valid, and `cx.input` holds what was typed:
+
+```rust
+# use renox::prelude::*;
+use renox_admin::{AdminAction, Field};
+# #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, price: i64 }
+/// "Change price by %": the percentage is typed in the sheet.
+fn reprice() -> AdminAction<Product> {
+    AdminAction::new("reprice", "Change price by %", |products: Vec<Product>, cx| async move {
+        let percent: f64 = cx.input.parse("percent").unwrap_or(0.0);
+        for product in &products {
+            let price = (product.price as f64 * (1.0 + percent / 100.0)).round() as i64;
+            Product::query()
+                .where_eq("id", product.id)
+                .update(&cx.state.db, &[("price", &price)])
+                .await?;
+        }
+        Ok(Toast::success(format!("{} prices changed by {percent} %.", products.len())))
+    })
+    .form(vec![Field::number("percent", "Percent").required().min(-90).max(500).suffix("%")])
+    .description("Every selected product's price changes by this much.")
+    .submit_label("Change prices")
+    .row()
+}
+# let _ = reprice();
+```
+
+- The input is checked as far as the fields say: `required`, numbers and dates that read as
+  such, `min` and `max`, a select's choices. A failure shows under the field in the sheet (a 422
+  answer) and nothing runs.
+- `cx.input` is an `ActionInput`: `get(name)`, `text(name)` (empty when missing), `parse::<T>(name)`,
+  `bool(name)` for checkboxes and toggles. Money fields arrive in the currency's smallest unit.
+- The sheet replaces the `.confirm(…)` question; when the action is done, the page reloads
+  with its toast.
+- The sheet is the kit's `action_sheet` after the grid, and the grid opens it
+  (`grid::Action::sheet(id)`), with the selection.
+
+## After a record is saved
+
+`saved` runs after the create or edit page saved a record (Filament's `afterSave`). It gets the
+record, who saved it and, on an edit, the record as it was before the form changed it (its
+fields as JSON): audit an exact price change, refresh search keywords.
+
+```rust
+# use renox::prelude::*;
+# use renox::grid::Column;
+# use renox_admin::{AdminResource, Field, SaveContext};
+# #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, name: String, price: i64 }
+# impl Policy for Product { fn allows(&self, _: &User, _: &str) -> bool { true } }
+# #[derive(serde::Deserialize, serde::Serialize, Validate)] struct ProductForm { #[validate(required)] name: String }
+# struct ProductResource;
+# impl AdminResource for ProductResource {
+#     type Model = Product;
+#     type Form = ProductForm;
+#     fn label(&self) -> &str { "Product" }
+#     fn plural_label(&self) -> &str { "Products" }
+#     fn columns(&self) -> Vec<Column> { vec![] }
+#     fn fields(&self) -> Vec<Field> { vec![] }
+#     fn fill(&self, p: &mut Product, f: ProductForm) { p.name = f.name; }
+/// Writes who changed a price, from what to what.
+async fn saved(&self, product: &Product, cx: &SaveContext) -> Result {
+    let before = cx.previous.as_ref().and_then(|old| old["price"].as_i64());
+    if before.is_some_and(|before| before != product.price) {
+        renox::db::sql("INSERT INTO audit_logs (note) VALUES (?)")
+            .bind(format!("{} set {} to {}", cx.user.name, product.name, product.price))
+            .execute(&cx.state.db)
+            .await?;
+    }
+    Ok(())
+}
+# }
+```
+
+`cx.created` says whether the record is new. The record is saved when the hook runs, so an
+error from it answers the request with that error: do work that must go in with the record in a
+transaction of your own. Only the create and edit forms (a relation manager's too) call it;
+bulk actions don't.
+
+## Child rows: relation managers
+
+A record often owns rows of other tables: a product's variants and photos, the bike models a
+part fits. `relations()` lists them, and each becomes a tab of the record's view and edit
+pages, with its own list:
+
+```rust
+# use renox::prelude::*;
+# use renox::grid::Column;
+# use renox_admin::{AdminResource, Field, RelationManager};
+# #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, name: String }
+# impl Policy for Product { fn allows(&self, _: &User, _: &str) -> bool { true } }
+# #[derive(Model, serde::Serialize, Default)] struct Variant { id: i64, product_id: i64, name: String }
+# impl Policy for Variant { fn allows(&self, _: &User, _: &str) -> bool { true } }
+# #[derive(Model, serde::Serialize, Default)] struct BikeModel { id: i64, name: String }
+# impl Policy for BikeModel { fn allows(&self, _: &User, _: &str) -> bool { true } }
+# #[derive(serde::Deserialize, serde::Serialize, Validate)] struct ProductForm { #[validate(required)] name: String }
+/// The variants' form has the foreign key: the panel fills it in.
+#[derive(serde::Deserialize, serde::Serialize, Validate)]
+struct VariantForm {
+    product_id: i64,
+    #[validate(required, max = 50)]
+    name: String,
+}
+# #[derive(serde::Deserialize, serde::Serialize, Validate)] struct BikeModelForm { #[validate(required)] name: String }
+
+struct Variants;
+
+impl AdminResource for Variants {
+    type Model = Variant;
+    type Form = VariantForm;
+    fn label(&self) -> &str { "Variant" }
+    fn plural_label(&self) -> &str { "Variants" }
+    fn columns(&self) -> Vec<Column> { vec![Column::text("name", "Name")] }
+    fn fields(&self) -> Vec<Field> { vec![Field::text("name", "Name").required()] }
+    fn fill(&self, v: &mut Variant, f: VariantForm) {
+        v.product_id = f.product_id;
+        v.name = f.name;
+    }
+}
+# struct BikeModels;
+# impl AdminResource for BikeModels {
+#     type Model = BikeModel;
+#     type Form = BikeModelForm;
+#     fn label(&self) -> &str { "Bike model" }
+#     fn plural_label(&self) -> &str { "Bike models" }
+#     fn columns(&self) -> Vec<Column> { vec![Column::text("name", "Name")] }
+#     fn fields(&self) -> Vec<Field> { vec![Field::text("name", "Name").required()] }
+#     fn fill(&self, m: &mut BikeModel, f: BikeModelForm) { m.name = f.name; }
+# }
+# struct ProductResource;
+# impl AdminResource for ProductResource {
+#     type Model = Product;
+#     type Form = ProductForm;
+#     fn label(&self) -> &str { "Product" }
+#     fn plural_label(&self) -> &str { "Products" }
+#     fn columns(&self) -> Vec<Column> { vec![] }
+#     fn fields(&self) -> Vec<Field> { vec![] }
+#     fn fill(&self, p: &mut Product, f: ProductForm) { p.name = f.name; }
+fn relations(&self) -> Vec<RelationManager> {
+    vec![
+        // Rows holding the product's id: created, edited and deleted under it.
+        RelationManager::has_many("variants", "Variants", Variants, "product_id"),
+        // Rows joined by a pivot table: attached and detached.
+        RelationManager::belongs_to_many(
+            "fits", "Fits", BikeModels, "product_fits", "product_id", "bike_model_id",
+        ),
+    ]
+}
+# }
+```
+
+- **`has_many(key, label, resource, foreign_key)`**: the tab lists the rows whose
+  `foreign_key` column holds the record's id. It has its own create, edit and delete pages
+  (under `/admin/products/{id}/relations/variants`) and a bulk delete. The child's form needs the
+  foreign key as a field (`product_id` above): the panel leaves it out of the form and fills
+  it with the record's id, whatever the browser sends, so a row can't be moved to another
+  record. The child's `fill`, `rules` and `saved` run as in its own resource.
+- **`belongs_to_many(key, label, resource, pivot_table, parent_key, related_key)`**: the tab
+  lists the rows joined to the record by the pivot table, with **Attach** (a select of the
+  rows not attached yet, named by their `name` column, or `.title_column("title")`) and
+  **Detach** per row and over the selection. The pivot rows hold the two ids only.
+- The managed resource decides who sees the tab and what the buttons are (its `allows`:
+  `viewAny`, `create`, `update`, `delete`, `deleteAny`, and its `creatable`/`deletable`).
+  Attaching and detaching also need the record's `update`.
+- A managed resource needn't be in the navigation: a resource only used as a relation isn't
+  registered with `Admin::resource`.
+- Routes are named `admin.products.variants.index`, `.create`, `.store`, `.edit`, `.update`,
+  `.destroy`, `.bulk`; a pivot has `.index`, `.attach`, `.detach` and `.bulk`. A custom column
+  of the child is drawn by `renox-admin/{child slug}/cells.html`.
+
+## Resources that are only edited
+
+Some records are changed but never made or removed from the panel: a settings row, a store, a
+record other code creates. Say so, and the panel has no "New" button, no delete buttons or
+bulk delete, no trash, and those addresses answer 404:
+
+```rust
+# use renox::prelude::*;
+# use renox::grid::Column;
+# use renox_admin::{AdminResource, Field};
+# #[derive(Model, serde::Serialize, Default)] struct Store { id: i64, name: String }
+# impl Policy for Store { fn allows(&self, _: &User, _: &str) -> bool { true } }
+# #[derive(serde::Deserialize, serde::Serialize, Validate)] struct StoreForm { #[validate(required)] name: String }
+# struct Stores;
+# impl AdminResource for Stores {
+#     type Model = Store;
+#     type Form = StoreForm;
+#     fn label(&self) -> &str { "Store" }
+#     fn plural_label(&self) -> &str { "Stores" }
+#     fn columns(&self) -> Vec<Column> { vec![] }
+#     fn fields(&self) -> Vec<Field> { vec![] }
+#     fn fill(&self, s: &mut Store, f: StoreForm) { s.name = f.name; }
+fn creatable(&self) -> bool { false }
+fn deletable(&self) -> bool { false }
+# }
+```
+
 ## Soft deletes and the trash
 
 When the model has soft deletes (`#[model(soft_deletes)]`, a `deleted_at` column), deleting
@@ -457,9 +659,74 @@ The panel's routes are named, so templates and redirects can reach them with `ro
 | `DELETE /admin/products/{id}` | `admin.products.destroy` |
 | `POST /admin/products/actions/{action}` | `admin.products.bulk` |
 | `POST /admin/products/{id}/actions/{action}` | `admin.products.action` |
+| `GET /admin/products/{id}/relations/{key}` (a relation manager's list, and its create, edit, attach… pages) | `admin.products.{key}.index`, `.create`, `.store`, `.edit`, `.update`, `.destroy`, `.attach`, `.detach`, `.bulk` |
 
 The built-in actions are `delete`, `restore` and `force-delete`. Every route needs a login,
 and `rnx route:list` (the app's `route:list`) shows them.
+
+## Words in another language
+
+The panel's own words (the buttons, the tabs, the toasts, "Save changes", "Product #7") are
+English by default. An app translates any of them with a key under `renox.admin.` in its lang
+files (`resources/lang/es.json`), as it does for Renox's auth pages:
+
+```json
+{
+  "renox": {
+    "admin": {
+      "new": "Nuevo :label",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "save_changes": "Guardar cambios",
+      "record_title": ":label n.º :id",
+      "Product": "Producto",
+      "Products": "Productos",
+      "products": { "Name": "Nombre", "Price": "Precio", "Publish": "Publicar" }
+    }
+  }
+}
+```
+
+- The built-in keys are `dashboard`, `new`, `create`, `edit_title`, `save_changes`, `cancel`,
+  `edit`, `view`, `details`, `delete`, `restore`, `delete_for_good`, `all`, `trash`, `empty`,
+  `record_title`, `created`, `saved`, `deleted`, `n_deleted`, `n_restored`, `attach`, `detach` and
+  more; `:label`, `:plural`, `:title`, `:id` and `:what` stand for the values the panel fills in.
+  The full list, with the English defaults, is `DEFAULTS` in the crate's `texts.rs`.
+- The words you give your resources are looked up by their English text, first under
+  `renox.admin.<slug>.` (a column or field name, an action or filter label, in one resource), then
+  under `renox.admin.` itself (a label shared by all): `label()`, `plural_label()`,
+  `navigation_group()`, column and field labels (and their hints, placeholders and select
+  options), filter, action and entry labels. A text with no translation stays as written.
+- The language is the request's (`APP_LOCALE`, `Accept-Language` with `App::detect_locale`, the
+  session).
+
+## Adding to the panel's layout
+
+To put something in every page (an "About this page" panel, a notice, a link in the sidebar)
+without replacing `layout.html`, use a **slot**: `Admin::slot(Slot::AfterContent, template)`,
+or a file of the slot's name under the app's views. The slot's template sees the page's values
+(`admin`, `resource`, `record`, `title`…) and the request's globals (`request.route`, `auth`…):
+
+```rust
+use renox_admin::{Admin, Slot};
+
+fn panel() -> Admin {
+    Admin::new().slot(
+        Slot::AfterContent,
+        r#"<aside class="about"><h2>About this page</h2><p>{{ request.route }}</p></aside>"#,
+    )
+}
+# let _ = panel();
+```
+
+| Slot | File under the app's views | Where |
+|---|---|---|
+| `Slot::Head` | `renox-admin/slots/head.html` | in `<head>` |
+| `Slot::SidebarStart` / `SidebarEnd` | `renox-admin/slots/sidebar_start.html` / `sidebar_end.html` | top and bottom of the sidebar |
+| `Slot::NavbarEnd` | `renox-admin/slots/navbar_end.html` | in the top bar, before the account menu |
+| `Slot::BeforeContent` / `AfterContent` | `renox-admin/slots/before_content.html` / `after_content.html` | above and below the page's content |
+
+Several `slot` calls for one place are drawn in order; a file of the app's replaces them.
 
 ## Replacing the panel's pages
 
@@ -474,8 +741,10 @@ under its views directory:
 | `renox-admin/form.html` | the create and edit page |
 | `renox-admin/fields.html` | the macro that draws one field |
 | `renox-admin/show.html` | the view page |
+| `renox-admin/relation.html` | a relation manager's list |
 
-Every page gets `admin` (the panel: `title`, `nav`, …) and `resource` (`slug`, `label`,
+Every page gets `admin` (the panel: `title`, `nav`, `text`: its words in the request's
+language, …) and `resource` (`slug`, `label`,
 `plural_label`, `index_url`, `create_url`).
 
 Grid columns of the `custom` kind are drawn by the page. The list includes
@@ -508,6 +777,12 @@ Grid columns of the `custom` kind are drawn by the page. The list includes
 | `infolist()` | `entries()` |
 | `getTabs()`, `filters()` | `filters()` (tabs); each column's own filter |
 | `BulkAction`, `Action` | `AdminAction` (`.row()` for the row menu) |
+| an action's `->form([...])` and `$data` | `AdminAction::form(fields)` and `cx.input` |
+| `afterSave()`, `afterCreate()` | `AdminResource::saved` (`cx.created` tells which) |
+| `RelationManager`, `HasManyRelationManager`, `AttachAction`, `DetachAction` | `RelationManager::has_many`, `belongs_to_many` |
+| `canCreate()`, `canDelete()` returning false | `creatable()`, `deletable()` |
+| render hooks (`PanelsRenderHook::CONTENT_END`) | `Admin::slot(Slot::AfterContent, …)` |
+| `__('filament-panels::...')` lang files | the `renox.admin.*` keys |
 | `DeleteBulkAction`, `RestoreAction`, `ForceDeleteAction`, `TrashedFilter` | built in, with soft deletes |
 | `ExportAction` | built in (CSV, print, Excel with `xlsx`) |
 | model policies (`viewAny`, `create`, `update`, `delete`, `deleteAny`, …) | the model's `Policy`, same ability names |

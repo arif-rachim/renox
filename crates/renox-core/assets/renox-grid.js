@@ -948,6 +948,31 @@
     });
   }
 
+  // An action that asks for input: its sheet (a kit `action_sheet` somewhere
+  // on the page) is pointed at the action's address and given the selection,
+  // then opened. The sheet's form is sent with htmx like any other.
+  function openActionSheet(id, opener, url, values) {
+    var dialog = document.getElementById(id);
+    var form = dialog && dialog.querySelector("form");
+    if (!dialog || !form || typeof dialog.showModal !== "function" || dialog.open) return;
+    form.setAttribute("action", url);
+    form.setAttribute("hx-post", url);
+    form.querySelectorAll("input[data-grid-sheet-value]").forEach(function (input) { input.remove(); });
+    Object.keys(values).forEach(function (name) {
+      var input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.setAttribute("value", values[name]);
+      input.setAttribute("data-grid-sheet-value", "");
+      form.appendChild(input);
+    });
+    dialog._opener = opener;
+    dialog.showModal();
+    var first = dialog.querySelector("[autofocus]") ||
+      dialog.querySelector(".rx-sheet__body :is(input:not([type=hidden]), select, textarea):not([disabled])");
+    if (first) first.focus();
+  }
+
   function send(grid, source, method, url, values) {
     if (!window.htmx) return;
     source.setAttribute("aria-busy", "true");
@@ -1000,12 +1025,20 @@
       var all = !!grid._rxAllMatching;
       // The grid's query string goes along, for "all matching".
       var url = t.getAttribute("data-url") + window.location.search;
+      if (t.hasAttribute("data-sheet")) {
+        openActionSheet(t.getAttribute("data-sheet"), t, url, { ids: ids.join(","), all: all ? "true" : "false" });
+        return;
+      }
       ask(grid, t.getAttribute("data-confirm"), t.hasAttribute("data-danger")).then(function (ok) {
         if (ok) send(grid, t, t.getAttribute("data-method") || "POST", url, { ids: ids.join(","), all: all ? "true" : "false" });
       });
     } else if (t.hasAttribute("data-grid-action")) {
       var pop = t.closest("[popover]");
       if (pop && pop.hidePopover) pop.hidePopover();
+      if (t.hasAttribute("data-sheet")) {
+        openActionSheet(t.getAttribute("data-sheet"), t, t.getAttribute("data-url"), {});
+        return;
+      }
       ask(grid, t.getAttribute("data-confirm"), t.hasAttribute("data-danger")).then(function (ok) {
         if (ok) send(grid, t, t.getAttribute("data-method") || "POST", t.getAttribute("data-url"));
       });
