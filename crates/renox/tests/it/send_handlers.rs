@@ -211,6 +211,16 @@ async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Resul
     user.sync_roles_in(&db, &["editor"], &store).await?;
     let assignments = user.assignments(&db).await?;
     let managers = permissions::users_with_role_in(&db, "editor", &store).await?;
+    let editors = permissions::users_with_permission_in(&db, "posts.edit", &store).await?;
+    let publishers = permissions::users_with_permission(&db, "posts.publish").await?;
+    // Several statements on one generic executor (#303).
+    {
+        let mut tx = db.begin().await?;
+        let mut conn = renox::db::Executor::into_conn(&mut tx);
+        Note::query().count(conn.reborrow()).await?;
+        renox::db::sql("SELECT 1").execute(conn.reborrow()).await?;
+        tx.commit().await?;
+    }
     permissions::prune_ended_assignments(&db, Duration::from_secs(60)).await?;
     let mine = permissions::scopes_with::<Note>("posts.publish");
     let scoped = Note::query().where_eq("stars", 1);
@@ -223,7 +233,7 @@ async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Resul
         user.has_permission_in("posts.publish", &store),
         user.has_role_in("editor", &store),
         mine.is_empty(),
-        assignments.len() + managers.len(),
+        assignments.len() + managers.len() + editors.len() + publishers.len(),
     );
     permissions::clear_scope();
     permissions::delete_role(&db, "editor").await?;

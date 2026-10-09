@@ -17,8 +17,8 @@
 //! a preference: it keeps its own channels (the bell, and mail when
 //! [`Notice::mail`] is set).
 
+use renox::auth::permissions;
 use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
-use renox::db::sql;
 use renox::mail::Mail;
 use renox::prelude::*;
 use serde::Serialize;
@@ -226,32 +226,12 @@ pub async fn customer(
 }
 
 /// The users who hold `permission` in store `store_id` now: a role given
-/// in that store and within its dates, or a global role (the owner).
-///
-/// Renox answers "who has this **role** here" (`users_with_role_in`), but
-/// the app checks permissions, never role names, so this asks the
-/// `Permissions` module's tables which roles grant the permission.
+/// in that store and within its dates, or a global role (the owner). The
+/// app checks permissions, never role names, so it asks
+/// `permissions::users_with_permission_in`, which reads which roles grant
+/// the permission.
 pub async fn staff_with_permission(db: &Db, permission: &str, store_id: i64) -> Result<Vec<User>> {
-    let scope = store_scope(store_id);
-    let at = renox::db::now();
-    let ids: Vec<i64> = sql(
-        "SELECT DISTINCT ru.user_id FROM role_user ru \
-         JOIN permission_role pr ON pr.role_id = ru.role_id \
-         JOIN permissions p ON p.id = pr.permission_id \
-         WHERE p.name = ? \
-         AND ((ru.scope_type = '' AND ru.scope_id = '') OR (ru.scope_type = ? AND ru.scope_id = ?)) \
-         AND (ru.starts_at IS NULL OR ru.starts_at <= ?) \
-         AND (ru.ends_at IS NULL OR ru.ends_at > ?) \
-         ORDER BY ru.user_id",
-    )
-    .bind(permission)
-    .bind(scope.kind())
-    .bind(scope.id())
-    .bind(at)
-    .bind(at)
-    .scalars(db)
-    .await?;
-    User::find_many(db, ids).await
+    permissions::users_with_permission_in(db, permission, &store_scope(store_id)).await
 }
 
 /// Sends `notice` (in the app only) to everyone holding `permission` in

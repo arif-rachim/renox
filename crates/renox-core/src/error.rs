@@ -161,6 +161,46 @@ impl std::fmt::Debug for Error {
     }
 }
 
+/// The message alone, for logs and tests (`{}`): the error's own text
+/// without its causes (`{:?}` adds them), the message given to
+/// `abort`/`Error::Status`/`Error::BadRequest`, each field's messages for a
+/// validation error, else the status's reason ("Not Found").
+///
+/// ```
+/// # use renox::prelude::*;
+/// let err = renox::abort(StatusCode::CONFLICT, "The bike is already rented.");
+/// assert_eq!(err.to_string(), "The bike is already rented.");
+/// assert_eq!(Error::NotFound.to_string(), "Not Found");
+/// ```
+///
+/// `Error` doesn't implement `std::error::Error`: any error converts into it
+/// with `?`, and that conversion would then apply to `Error` itself.
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Internal(err) => write!(f, "{err}"),
+            Self::BadRequest(msg) | Self::Status(_, msg) => f.write_str(msg),
+            Self::Validation(err) => {
+                let mut first = true;
+                for (field, messages) in err.errors.iter() {
+                    for message in messages {
+                        if !first {
+                            f.write_str("; ")?;
+                        }
+                        first = false;
+                        write!(f, "{field}: {message}")?;
+                    }
+                }
+                if first {
+                    f.write_str(reason(self.status()))?;
+                }
+                Ok(())
+            }
+            other => f.write_str(reason(other.status())),
+        }
+    }
+}
+
 impl<E: Into<anyhow::Error>> From<E> for Error {
     fn from(err: E) -> Self {
         Self::Internal(err.into())

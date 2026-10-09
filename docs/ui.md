@@ -101,6 +101,12 @@ What it does:
 
 The first line imports the macro. The second calls it, with the field's name and its label.
 
+> [!WARNING]
+> An imported macro takes its name in the template: a value the handler passes under the same
+> name (`history` next to `import history`) is hidden by the macro. While debugging Renox logs
+> a warning naming both, and a page that then fails says why. Rename the value, or import the
+> macro under another name (`import history as history_list`).
+
 ### Only once per page
 
 `{% if once('datepicker') %}<script …>{% endif %}` is true only the first time a key is asked

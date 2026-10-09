@@ -35,7 +35,13 @@ pub struct Registry {
     pub(crate) assets: Vec<StaticAsset>,
     /// Values modules provide (`provide`), under the app's own `App::provide`.
     pub(crate) provided: HashMap<TypeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>,
+    /// Seeders for `db:seed`: the app's (`App::seeder`), then the modules'.
+    pub(crate) seeders: Vec<Seeder>,
 }
+
+/// A seeder registered with `App::seeder` or `Registry::seeder`.
+pub(crate) type Seeder =
+    Box<dyn Fn(AppState) -> std::pin::Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
 
 /// A file a module serves as it is (`Registry::asset`).
 #[derive(Clone, Copy)]
@@ -88,6 +94,37 @@ impl Registry {
     {
         self.commands
             .push(crate::command::command(name, about, run));
+        self
+    }
+
+    /// Registers a seeder for `db:seed`, like `App::seeder`, so a module (an
+    /// area of a big app, or a plugin) seeds its own tables. The app's seeders
+    /// run first, then each module's in the order the modules were added.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64 }
+    /// # impl Factory for Product { fn definition() -> Self { Product::default() } }
+    /// struct Catalog;
+    ///
+    /// impl Module for Catalog {
+    ///     fn name(&self) -> &'static str { "catalog" }
+    ///
+    ///     fn register(&self, registry: &mut Registry) {
+    ///         registry.seeder(|state| async move {
+    ///             Product::factory().count(50).create(&state.db).await?;
+    ///             Ok(())
+    ///         });
+    ///     }
+    /// }
+    /// ```
+    pub fn seeder<F, Fut>(&mut self, seeder: F) -> &mut Self
+    where
+        F: Fn(AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        self.seeders
+            .push(Box::new(move |state| Box::pin(seeder(state))));
         self
     }
 
@@ -179,7 +216,9 @@ impl Registry {
     /// # ;
     /// ```
     ///
-    /// Values a handler passes in `context!` win over shared ones.
+    /// `ctx.session` is the request's session, for values kept there (a
+    /// guest's cart). Values a handler passes in `context!` win over shared
+    /// ones.
     pub fn share<F, Fut, T>(&mut self, key: &str, compute: F) -> &mut Self
     where
         F: Fn(crate::view::ViewContext) -> Fut + Send + Sync + 'static,

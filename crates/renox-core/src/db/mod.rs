@@ -25,8 +25,9 @@ use anyhow::Context;
 use axum::extract::FromRef;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 
+pub use conn::Conn;
 #[doc(hidden)]
-pub use conn::{Conn, bounds};
+pub use conn::bounds;
 pub use conn::{Db, Dialect, Executor, FromDb, Row, RowIndex, Sql, Transaction, sql};
 pub(crate) use conn::{RowInner, SchemaEpoch, script};
 pub use encrypted::{Encrypted, Unsealed};

@@ -7,6 +7,7 @@ mod accounts;
 mod action_kinds;
 mod actions;
 mod api_foundations;
+mod app_gaps;
 mod assertion_messages;
 mod auth;
 mod auth_edges;
