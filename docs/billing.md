@@ -295,7 +295,7 @@ async fn start(state: &AppState, user: &User) -> Result {
 # fn main() { let _ = start; }
 ```
 
-## Changing plan, canceling, resuming, pausing
+## Changing plan, canceling, resuming
 
 The account card and the plans page do these for the logged-in user; in code:
 
