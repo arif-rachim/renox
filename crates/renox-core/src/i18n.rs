@@ -552,9 +552,60 @@ fn choose_range(text: &str, count: i64) -> String {
     }
 }
 
-/// The language chosen for the current request.
-#[derive(Debug, Clone)]
-pub(crate) struct RequestLocale(pub String);
+/// The language chosen for the current request, kept in the request's
+/// extensions by Renox's language middleware (session choice, then
+/// `Accept-Language` with `App::detect_locale`, then `APP_LOCALE`).
+///
+/// A layer added with `App::layer` runs after it and may change the language
+/// of the rest of the request, e.g. to the signed-in user's own:
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::i18n::RequestLocale;
+/// use renox::axum::{extract::Request, middleware::Next};
+///
+/// async fn account_language(mut req: Request, next: Next) -> Response {
+///     if let Some(chosen) = req.extensions().get::<RequestLocale>() {
+///         println!("chosen so far: {}", chosen.as_str());
+///     }
+///     RequestLocale::switch(&mut req, "es");
+///     next.run(req).await
+/// }
+/// # let _ = App::new().layer(renox::axum::middleware::from_fn(account_language));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct RequestLocale(String);
+
+impl RequestLocale {
+    /// A locale value, e.g. `es`.
+    pub fn new(locale: impl Into<String>) -> Self {
+        Self(locale.into())
+    }
+
+    /// The locale, e.g. `en`.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Makes `locale` the language of the rest of this request: the `Lang`
+    /// extractor, validation messages, `t()` in views, mails and
+    /// [`current_locale`] all follow. Call it from a layer; it does not
+    /// check that the locale has a translation file (texts fall back to
+    /// `APP_FALLBACK_LOCALE`, then to the key).
+    pub fn switch(req: &mut Request, locale: &str) {
+        set_current_locale(locale);
+        req.extensions_mut().insert(RequestLocale::new(locale));
+    }
+}
+
+impl std::ops::Deref for RequestLocale {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
 
 /// The request's language in [`crate::context`], for code without the
 /// request (mail views, notifications).
@@ -631,7 +682,7 @@ pub(crate) async fn middleware(
         chosen.unwrap_or_else(|| state.config.locale.clone())
     };
     set_current_locale(&locale);
-    req.extensions_mut().insert(RequestLocale(locale));
+    req.extensions_mut().insert(RequestLocale::new(locale));
     let mut res = next.run(req).await;
     if state.detect_locale {
         res.headers_mut().append(

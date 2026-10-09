@@ -600,6 +600,7 @@ commands, so it calls the function.)
 |---|---|---|
 | `cache` (database store) | expired entries | itself, at most once an hour per process; `cache:prune` (`state.cache.prune()`) when you ask |
 | `personal_access_tokens` | expired API tokens | `tokens:prune` (Auth module): tokens that expired more than a day ago (`renox::auth::prune_expired_tokens(&state.db, grace)`) |
+| `device_tokens` | expired device tokens (kiosks, tills) | `tokens:prune` too (`renox::auth::DeviceToken::prune_expired(&state.db, grace)`) |
 | `audit_logs` | every audited action (Audit module) | `audit:prune --days 365` (`renox::audit::prune(&state.db, age)`) |
 | `role_user` | role assignments with an end date (`assign_role_in(…).until(…)`, Permissions module) | `permissions:prune --days 30` (`renox::auth::permissions::prune_ended_assignments(&state.db, age)`); ended ones already don't count |
 | `revoked_sessions` | logouts | itself, on each logout |

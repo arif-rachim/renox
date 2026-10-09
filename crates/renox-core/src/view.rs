@@ -826,7 +826,6 @@ pub(crate) async fn middleware(
 ) -> Response {
     let session = req.extensions().get::<Session>().cloned();
     let current_user = req.extensions().get::<CurrentUser>().cloned();
-    let locale = crate::i18n::request_locale(req.extensions(), &state);
     let htmx = Htmx::from_headers(req.headers());
     let method = req.method().clone();
     let path = req.uri().path().to_owned();
@@ -853,6 +852,8 @@ pub(crate) async fn middleware(
         format!("{method} {path}?{query}")
     };
     let mut res = next.run(req).await;
+    // A layer may have switched the language (`RequestLocale::switch`).
+    let locale = crate::i18n::current_locale(&state);
 
     if let Some(crate::toast::PendingToasts(toasts)) =
         res.extensions_mut().remove::<crate::toast::PendingToasts>()

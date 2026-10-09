@@ -286,7 +286,14 @@ pub(crate) async fn revoke_sessions(db: &Db, id: i64) -> Result<i64> {
 /// Emails are stored and looked up trimmed and lowercased, so they match
 /// regardless of case on every database (SQLite's `COLLATE NOCASE` alone
 /// wouldn't help on PostgreSQL).
-pub(crate) fn normalize_email(email: &str) -> String {
+///
+/// Use it where app code compares or stores an address, so it matches what
+/// Renox did at registration and login.
+///
+/// ```
+/// assert_eq!(renox::auth::normalize_email("  Ana@Example.COM "), "ana@example.com");
+/// ```
+pub fn normalize_email(email: &str) -> String {
     email.trim().to_lowercase()
 }
 

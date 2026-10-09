@@ -80,31 +80,28 @@ async fn world() -> World {
 /// the staff page makes one.
 async fn kiosk(w: &World, store: &Store, abilities: &[&str]) -> String {
     let db = w.app.db();
-    let user = User::register(
-        db,
-        "Kiosk",
-        &format!("kiosk-{}@kiosk.invalid", unique()),
-        &renox::random_token(),
-    )
-    .await
-    .unwrap();
-    let token = user
-        .create_token_with(db, "Kiosk", abilities, None)
-        .await
-        .unwrap();
-    Kiosk::create(
+    let mut kiosk = Kiosk::create(
         db,
         Kiosk {
             store_id: store.id,
-            user_id: user.id,
             name: "Kiosk".into(),
-            token_id: Some(token.token.id),
             abilities: DbJson(abilities.iter().map(|a| (*a).to_owned()).collect()),
             ..Default::default()
         },
     )
     .await
     .unwrap();
+    let token = renox::auth::DeviceToken::create(
+        db,
+        &bikeshop::app::api::kiosk::device_key(kiosk.id),
+        "Kiosk",
+        Some(abilities),
+        None,
+    )
+    .await
+    .unwrap();
+    kiosk.token_id = Some(token.token.id);
+    kiosk.save_only(db, &["token_id"]).await.unwrap();
     token.plain
 }
 
@@ -271,14 +268,16 @@ async fn each_endpoint_refuses_no_token_a_missing_ability_and_another_stores_dat
     )
     .await
     .assert_status(403);
+    get(&w, &mine, "/api/v1/me/orders").await.assert_status(403);
+    // The wrong kind of token is no login at all: a customer's token is no
+    // device, and a kiosk's device token is no user.
     get(&w, &mine, "/api/v1/kiosk/bikes")
         .await
-        .assert_status(403);
-    get(&w, &reader, "/api/v1/me").await.assert_status(403);
+        .assert_status(401);
+    get(&w, &reader, "/api/v1/me").await.assert_status(401);
     get(&w, &mine, "/api/v1/me/rentals")
         .await
         .assert_status(403);
-    get(&w, &mine, "/api/v1/me/orders").await.assert_status(403);
     // Another store's reservation doesn't exist for this kiosk.
     get(
         &w,

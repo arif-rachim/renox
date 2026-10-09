@@ -62,7 +62,7 @@ pub fn routes() -> Routes {
 
 /// An address as Renox stores it on `users`: trimmed, lowercase.
 pub fn normalize_email(email: &str) -> String {
-    email.trim().to_lowercase()
+    renox::auth::normalize_email(email)
 }
 
 /// A walk-in record that can still be invited: not claimed, not deleted.

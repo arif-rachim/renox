@@ -27,6 +27,7 @@ const MIGRATIONS: &[Migration] = &[
         "00010101000005_add_abilities_to_personal_access_tokens"
     ),
     crate::db::framework_migration!("auth", "00010101000006_create_revoked_sessions_table"),
+    crate::db::framework_migration!("auth", "00010101000007_create_device_tokens_table"),
 ];
 
 pub(crate) struct Settings {
@@ -280,7 +281,8 @@ impl Module for Auth {
             "Delete API tokens that expired more than a day ago",
             |_args, state| async move {
                 let day = std::time::Duration::from_secs(24 * 60 * 60);
-                let pruned = super::prune_expired_tokens(&state.db, day).await?;
+                let pruned = super::prune_expired_tokens(&state.db, day).await?
+                    + super::DeviceToken::prune_expired(&state.db, day).await?;
                 println!("Deleted {pruned} expired API tokens.");
                 Ok(())
             },

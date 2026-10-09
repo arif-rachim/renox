@@ -1,14 +1,14 @@
 //! The kiosk API (`/api/v1/kiosk/…`): a self-service kiosk next to a
 //! store's bike racks checks reserved bikes out and takes them back.
 //!
-//! A kiosk is a row of `kiosks` with its own user (nobody knows its
-//! password) and that user's API token, made by a manager on
+//! A kiosk is a row of `kiosks` and a Renox device token (`DeviceToken`,
+//! owner key `kiosk:<id>`: no placeholder user), made by a manager on
 //! `/staff/api-tokens` ([`super::tokens`]) with some of the abilities
 //! `rentals:read`, `rentals:checkout` and `rentals:return`. Every endpoint:
 //!
-//! 1. `require_auth`: no valid `Authorization: Bearer` token → 401;
-//! 2. `require_ability(…)`: a token without the endpoint's ability → 403;
-//! 3. [`of`]: the token must be a kiosk's, not revoked (403 otherwise),
+//! 1. `require_device`: no valid `Authorization: Bearer` device token → 401;
+//! 2. `require_device_ability(…)`: a token without the endpoint's ability → 403;
+//! 3. [`of`]: the device must be a kiosk, not revoked (403 otherwise),
 //!    and the kiosk only sees **its own store**: another store's
 //!    reservation answers 404, as on the staff side.
 //!
@@ -17,6 +17,7 @@
 //! fee, damage, deposit, the workshop told), with the counter's own forms
 //! (`PickupForm`, `ReturnForm`) read by `Valid<T>` from JSON or multipart.
 
+use renox::auth::Device;
 use renox::db::{Json as DbJson, Ulid};
 use renox::prelude::*;
 use renox::serde_json::Value;
@@ -33,10 +34,8 @@ use crate::app::rentals::reserve::variant_names;
 pub struct Kiosk {
     pub id: i64,
     pub store_id: i64,
-    /// The user it acts as (`kiosk-…@kiosk.invalid`), never a person.
-    pub user_id: i64,
     pub name: String,
-    /// Its API token (`personal_access_tokens`), `None` once revoked.
+    /// Its device token (`device_tokens`, owner `kiosk:<id>`), `None` once revoked.
     pub token_id: Option<i64>,
     pub abilities: DbJson<Vec<String>>,
     /// The manager who made it.
@@ -46,10 +45,19 @@ pub struct Kiosk {
     pub updated_at: Option<DateTime>,
 }
 
-/// The kiosk this request's token belongs to: a 403 for anyone else (a
-/// person's session or token, a revoked kiosk).
-pub async fn of(db: &Db, user: &User) -> Result<Kiosk> {
-    let kiosk = Kiosk::where_eq("user_id", user.id)
+/// The owner key of a kiosk's device tokens.
+pub fn device_key(kiosk_id: i64) -> String {
+    format!("kiosk:{kiosk_id}")
+}
+
+/// The kiosk this request's device token belongs to: a 403 for anyone else
+/// (another kind of device, a revoked kiosk).
+pub async fn of(db: &Db, device: &Device) -> Result<Kiosk> {
+    let id: i64 = device
+        .id_of("kiosk")
+        .and_then(|id| id.parse().ok())
+        .ok_or(Error::Forbidden)?;
+    let kiosk = Kiosk::where_eq("id", id)
         .where_null("revoked_at")
         .first(db)
         .await?;
@@ -81,9 +89,9 @@ pub struct BikeJson {
 /// `GET /api/v1/kiosk/bikes` (`api.kiosk.bikes`, `rentals:read`): the
 /// bikes free at the kiosk's store for the next hour, cheapest first (the
 /// rentals area's own `free_bikes`). Two queries plus the models' names.
-pub async fn bikes(State(state): State<AppState>, user: AuthUser) -> Result<Json<Value>> {
+pub async fn bikes(State(state): State<AppState>, device: Device) -> Result<Json<Value>> {
     let db = &state.db;
-    let kiosk = of(db, &user).await?;
+    let kiosk = of(db, &device).await?;
     let now = renox::db::now();
     let free = free_bikes(
         db,
@@ -141,10 +149,10 @@ pub fn rental_json(state: &AppState, rental: &Rental) -> Value {
 /// `rentals:read`): a reservation of the kiosk's store, by its code.
 pub async fn rental(
     State(state): State<AppState>,
-    user: AuthUser,
+    device: Device,
     Path(code): Path<String>,
 ) -> Result<Json<Value>> {
-    let kiosk = of(&state.db, &user).await?;
+    let kiosk = of(&state.db, &device).await?;
     let rental = own_rental(&state.db, &kiosk, &code).await?;
     Ok(Json(json!({ "data": rental_json(&state, &rental) })))
 }
@@ -156,12 +164,12 @@ pub async fn rental(
 /// otherwise); an unverified customer gets the counter's 422.
 pub async fn checkout(
     State(state): State<AppState>,
-    user: AuthUser,
+    device: Device,
     Path(code): Path<String>,
     Valid(form): Valid<PickupForm>,
 ) -> Result<Json<Value>> {
     let db = &state.db;
-    let kiosk = of(db, &user).await?;
+    let kiosk = of(db, &device).await?;
     let mut rental = own_rental(db, &kiosk, &code).await?;
     if !rental.is_reserved() {
         return Err(abort(
@@ -182,12 +190,12 @@ pub async fn checkout(
 /// another store's, but it must be out (409 otherwise).
 pub async fn give_back(
     State(state): State<AppState>,
-    user: AuthUser,
+    device: Device,
     Path(code): Path<String>,
     Valid(form): Valid<ReturnForm>,
 ) -> Result<Json<Value>> {
     let db = &state.db;
-    let kiosk = of(db, &user).await?;
+    let kiosk = of(db, &device).await?;
     let code: Ulid = code.parse().map_err(|_| Error::NotFound)?;
     let mut rental = Rental::where_eq("reservation_code", code)
         .first(db)

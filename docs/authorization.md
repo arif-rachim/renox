@@ -574,7 +574,49 @@ More to know:
 - A password reset deletes all of the user's API tokens, since whoever reset it may be taking
   back a stolen account. Programs then need new tokens.
 - `rnx tokens:prune` deletes tokens that expired more than a day ago. Schedule it daily
-  (`renox::auth::prune_expired_tokens` in a `daily_at` task).
+  (`renox::auth::prune_expired_tokens` in a `daily_at` task); it prunes device tokens too.
+
+### Tokens for a device, not a user
+
+A store's kiosk, a till or a sensor is not a person, and making a placeholder user for it
+(with a password nobody knows) clutters `users` and every list of them. A **device token** is
+owned by a key you choose, like `"kiosk:3"`, and authenticates a request as a `Device`, with
+no user at all:
+
+```rust
+use renox::auth::{Device, DeviceToken};
+use renox::prelude::*;
+
+async fn make(State(db): State<Db>) -> Result<String> {
+    // Shown once, like a user's token; it starts with `d` (`d12|…`).
+    let made = DeviceToken::create(&db, "kiosk:3", "front desk", Some(&["sales:create"]), None).await?;
+    Ok(made.plain)
+}
+
+async fn sale(device: Device) -> String {
+    format!("sale at {}", device.key()) // device.id_of("kiosk") == Some("3")
+}
+
+struct Kiosks;
+
+impl Module for Kiosks {
+    fn name(&self) -> &'static str { "kiosks" }
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .post("/kiosk/sales", sale)
+            .require_device_ability("sales:create") // 401 without a device token, 403 without the ability
+    }
+}
+```
+
+- `Routes::require_device()` and `require_device_ability(…)` guard routes; both answer JSON.
+  `Device` is an extractor (`Option<Device>` too); `device.can("sales:create")` answers inside
+  a handler. A device request has no user: `AuthUser` answers 401 on it, and `Routes::require_auth`
+  does not let it in. Like any bearer token, it needs no CSRF token.
+- `DeviceToken::for_device`, `revoke(db, device, id)` and `revoke_all(db, device)` list and
+  revoke, per device key: retire a kiosk and all its tokens go. `prune_expired` is the pruning.
+- Tokens live in `device_tokens` (a migration of the `Auth` module). Named rate limiters see
+  the device (`LimitRequest::device`), and the default limit key is `device:<key>`.
 
 ## Tenants: rows that belong to a team
 

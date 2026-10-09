@@ -23,6 +23,7 @@ mod data_layer;
 mod data_resilience;
 mod database;
 mod derive_validate;
+mod devices;
 mod direct;
 mod dx;
 mod embed;
