@@ -308,6 +308,8 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.chart.series", "Series"),
             ("ui.chart.size", "Size"),
             ("ui.chart.axes", ":y by :x"),
+            ("ui.chart.less", "Less"),
+            ("ui.chart.more", "More"),
             ("ui.stat.vs_previous", "vs previous period"),
             ("ui.period.label", "Period"),
             ("ui.period.7d", "7 days"),

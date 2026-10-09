@@ -120,16 +120,16 @@ impl Grid {
         self.file(&columns, query, format, request).await
     }
 
-    async fn file<M: Model + Serialize>(
+    /// Every row of `query` (up to [`MAX_EXPORT_ROWS`]) with the related
+    /// values the grid's columns show.
+    async fn export_rows<M: Model + Serialize>(
         &self,
-        columns: &[(&Column, Option<Pin>)],
         query: Query<M>,
-        format: ExportFormat,
         request: &GridRequest,
-    ) -> Result<Response> {
+    ) -> Result<Vec<Map<String, Value>>> {
         let items = query.limit(MAX_EXPORT_ROWS).get(&request.db).await?;
         let related = self.related_values(&request.db, &items).await?;
-        let rows: Vec<Map<String, Value>> = items
+        Ok(items
             .iter()
             .zip(related)
             .map(|(item, related)| {
@@ -140,7 +140,17 @@ impl Grid {
                 row.extend(related);
                 row
             })
-            .collect();
+            .collect())
+    }
+
+    async fn file<M: Model + Serialize>(
+        &self,
+        columns: &[(&Column, Option<Pin>)],
+        query: Query<M>,
+        format: ExportFormat,
+        request: &GridRequest,
+    ) -> Result<Response> {
+        let rows = self.export_rows(query, request).await?;
         let today = crate::db::now().format("%Y-%m-%d").to_string();
         let name = format!("{}-{today}", self.id);
         let table = Table {
@@ -208,6 +218,112 @@ impl ExportFormat {
     /// Whether this build can make it (`Xlsx` needs the `xlsx` feature).
     pub fn available(self) -> bool {
         self != Self::Xlsx || cfg!(feature = "xlsx")
+    }
+}
+
+/// An Excel workbook with several sheets, each one a grid's export of a
+/// query (needs renox's `xlsx` feature; without it [`Workbook::sheet`]
+/// answers 400, like the single-sheet export). Sheets appear in the order
+/// they are added; each uses the grid's columns that show by default on
+/// wide screens, with the same headings, number formats and frozen columns
+/// as [`Grid::export_as`].
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::grid::{Column, Grid, GridRequest, Workbook};
+/// # #[derive(Model, serde::Serialize, Default)] struct Sale { id: i64, total: i64 }
+/// # #[derive(Model, serde::Serialize, Default)] struct Refund { id: i64, amount: i64 }
+/// // GET /reports/summary.xlsx
+/// async fn summary(request: GridRequest) -> Result<Response> {
+///     let sales = Grid::new("sales").column(Column::money("total", "Total"));
+///     let refunds = Grid::new("refunds").column(Column::money("amount", "Amount"));
+///     Workbook::new("summary")
+///         .sheet("Sales", &sales, Sale::query().order_by("id"), &request).await?
+///         .sheet("Refunds", &refunds, Refund::query().order_by("id"), &request).await?
+///         .into_response()
+/// }
+/// ```
+#[non_exhaustive]
+pub struct Workbook {
+    name: String,
+    #[cfg(feature = "xlsx")]
+    book: rust_xlsxwriter::Workbook,
+}
+
+impl Workbook {
+    /// A workbook whose file is `{name}-{date}.xlsx`.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            #[cfg(feature = "xlsx")]
+            book: rust_xlsxwriter::Workbook::new(),
+        }
+    }
+
+    /// Adds a sheet called `title` (at most 31 characters, none of
+    /// `[]:*?/\`, unique in the workbook) with every row `query`
+    /// matches, up to [`MAX_EXPORT_ROWS`]. The request's filters and the
+    /// user's column choices don't apply (as in [`Grid::export_as`]).
+    pub async fn sheet<M: Model + Serialize>(
+        mut self,
+        title: &str,
+        grid: &Grid,
+        query: Query<M>,
+        request: &GridRequest,
+    ) -> Result<Self> {
+        let shown = grid.default_visible(false);
+        let columns: Vec<(&Column, Option<Pin>)> = grid
+            .ordered(&GridPrefs::default())
+            .into_iter()
+            .filter(|(c, _)| c.kind != Kind::Custom && shown.contains(&c.key))
+            .collect();
+        let rows = grid.export_rows(query, request).await?;
+        let table = Table {
+            columns: &columns,
+            rows: &rows,
+            request,
+        };
+        self.add(title, &table)?;
+        Ok(self)
+    }
+
+    #[cfg(feature = "xlsx")]
+    fn add(&mut self, title: &str, table: &Table<'_>) -> Result<()> {
+        let sheet = self.book.add_worksheet();
+        sheet
+            .set_name(title)
+            .map_err(|e| Error::BadRequest(format!("`{title}` can't name a sheet: {e}")))?;
+        write_sheet(sheet, table)
+    }
+
+    #[cfg(not(feature = "xlsx"))]
+    fn add(&mut self, _: &str, _: &Table<'_>) -> Result<()> {
+        Err(Error::BadRequest(
+            "Excel exports need renox's `xlsx` feature".into(),
+        ))
+    }
+
+    /// The `.xlsx` download of the sheets added so far.
+    pub fn into_response(self) -> Result<Response> {
+        let today = crate::db::now().format("%Y-%m-%d").to_string();
+        let name = format!("{}-{today}", self.name);
+        self.finish(&name)
+    }
+
+    #[cfg(feature = "xlsx")]
+    fn finish(mut self, name: &str) -> Result<Response> {
+        let bytes = self
+            .book
+            .save_to_buffer()
+            .map_err(|e| Error::Internal(anyhow::anyhow!(e)))?;
+        Ok(xlsx_download(name, bytes))
+    }
+
+    #[cfg(not(feature = "xlsx"))]
+    fn finish(self, _: &str) -> Result<Response> {
+        Err(Error::BadRequest(
+            "Excel exports need renox's `xlsx` feature".into(),
+        ))
     }
 }
 
@@ -350,10 +466,29 @@ impl Table<'_> {
 
 #[cfg(feature = "xlsx")]
 fn xlsx(table: &Table<'_>, name: &str) -> Result<Response> {
-    use rust_xlsxwriter::{Format, FormatAlign, FormatBorder, Workbook};
+    let mut book = rust_xlsxwriter::Workbook::new();
+    write_sheet(book.add_worksheet(), table)?;
+    let bytes = book
+        .save_to_buffer()
+        .map_err(|e| Error::Internal(anyhow::anyhow!(e)))?;
+    Ok(xlsx_download(name, bytes))
+}
 
-    let mut book = Workbook::new();
-    let sheet = book.add_worksheet();
+#[cfg(feature = "xlsx")]
+fn xlsx_download(name: &str, bytes: Vec<u8>) -> Response {
+    crate::Download::bytes(
+        format!("{name}.xlsx"),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        bytes,
+    )
+    .into_response()
+}
+
+/// Writes a table into a worksheet: headings, rows, frozen panes.
+#[cfg(feature = "xlsx")]
+fn write_sheet(sheet: &mut rust_xlsxwriter::Worksheet, table: &Table<'_>) -> Result<()> {
+    use rust_xlsxwriter::{Format, FormatAlign, FormatBorder};
+
     let fail = |e: rust_xlsxwriter::XlsxError| Error::Internal(anyhow::anyhow!(e));
     let head = Format::new()
         .set_bold()
@@ -468,13 +603,7 @@ fn xlsx(table: &Table<'_>, name: &str) -> Result<Response> {
         .count() as u16;
     sheet.set_freeze_panes(depth, frozen).map_err(fail)?;
     sheet.autofit();
-    let bytes = book.save_to_buffer().map_err(fail)?;
-    Ok(crate::Download::bytes(
-        format!("{name}.xlsx"),
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        bytes,
-    )
-    .into_response())
+    Ok(())
 }
 
 #[cfg(not(feature = "xlsx"))]

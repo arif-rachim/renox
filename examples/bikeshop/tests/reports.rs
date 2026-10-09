@@ -249,7 +249,7 @@ async fn the_numbers_match_the_data_by_work_and_by_books() {
     assert_eq!(company.top_customers[0].name, "Rider Report");
     assert_eq!(company.top_customers[0].amount, 265_000);
     assert_eq!(company.top_products[0].amount, 80_000);
-    assert!(company.rental_hours.iter().map(|p| p.size).sum::<i64>() <= 1);
+    assert!(company.rental_hours.iter().map(|p| p.value).sum::<i64>() <= 1);
 
     // Forty days on, the last 30 days are empty and the last 90 still hold it all.
     w.app.travel(DAY * 40);

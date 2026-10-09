@@ -587,6 +587,16 @@ async fn imports(
         .column(Column::text("body", "Body"))
         .export_as(Note::query(), ExportFormat::Csv, &request)
         .await?;
+    // A workbook of two sheets (answers 400 without the `xlsx` feature).
+    let book = renox::grid::Workbook::new("notes")
+        .sheet(
+            "Notes",
+            &Grid::new("notes").column(Column::text("body", "Body")),
+            Note::query(),
+            &request,
+        )
+        .await;
+    let _ = book.map(|b| b.into_response());
     Ok(format!(
         "{} {} {} {}",
         report.imported,

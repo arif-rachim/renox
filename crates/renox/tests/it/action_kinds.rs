@@ -106,6 +106,27 @@ async fn export(Path(format): Path<ExportFormat>, request: GridRequest) -> Resul
         .await
 }
 
+async fn workbook(request: GridRequest) -> Result<Response> {
+    renox::grid::Workbook::new("items")
+        .sheet(
+            "By stock",
+            &grid(),
+            Item::query().order_by_desc("stock"),
+            &request,
+        )
+        .await?
+        .sheet("By name", &grid(), Item::query().order_by("name"), &request)
+        .await?
+        .into_response()
+}
+
+async fn bad_sheet(request: GridRequest) -> Result<Response> {
+    renox::grid::Workbook::new("items")
+        .sheet("Bad/name", &grid(), Item::query(), &request)
+        .await?
+        .into_response()
+}
+
 async fn copy(State(db): State<Db>, Path(id): Path<i64>) -> Result<Json<Item>> {
     let item = Item::find_or_404(&db, id).await?;
     Ok(Json(item.replicate()))
@@ -128,6 +149,8 @@ impl Module for Pages {
                 renox::import::template("items.csv", &["name", "stock"])
             })
             .get("/items/export/{format}", export)
+            .get("/items.xlsx", workbook)
+            .get("/items-bad.xlsx", bad_sheet)
             .get("/items/{id}/copy", copy)
     }
 }
@@ -457,4 +480,51 @@ async fn export_as_makes_a_file_of_a_query_outside_the_grid() {
     assert_eq!(ExportFormat::parse("xlsx"), Some(ExportFormat::Xlsx));
     assert_eq!(ExportFormat::Xlsx.available(), cfg!(feature = "xlsx"));
     assert!(ExportFormat::Csv.available());
+}
+
+#[cfg(feature = "xlsx")]
+#[renox::test]
+async fn a_workbook_holds_one_sheet_per_query() {
+    use std::io::Read;
+    let (app, _dir) = app().await;
+    for (name, stock) in [("Coffee", 4), ("Tea", 9)] {
+        Item::create(
+            app.db(),
+            Item {
+                name: name.into(),
+                stock,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let res = app.get("/items.xlsx").await;
+    res.assert_ok().assert_header(
+        "content-type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(res.body.to_vec())).unwrap();
+    let mut read = |name: &str| {
+        let mut text = String::new();
+        zip.by_name(name)
+            .unwrap()
+            .read_to_string(&mut text)
+            .unwrap();
+        text
+    };
+    let book = read("xl/workbook.xml");
+    assert!(book.contains(r#"name="By stock""#) && book.contains(r#"name="By name""#));
+    let strings = read("xl/sharedStrings.xml");
+    assert!(strings.contains("Coffee") && strings.contains("Tea"));
+    assert!(read("xl/worksheets/sheet2.xml").contains("<row"));
+    // A title Excel refuses is a 400, not a corrupt file.
+    app.get("/items-bad.xlsx").await.assert_status(400);
+}
+
+#[cfg(not(feature = "xlsx"))]
+#[renox::test]
+async fn a_workbook_needs_the_xlsx_feature() {
+    let (app, _dir) = app().await;
+    app.get("/items.xlsx").await.assert_status(400);
 }

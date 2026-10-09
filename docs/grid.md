@@ -797,6 +797,26 @@ async fn export_ledger(Path(id): Path<i64>, request: GridRequest) -> Result<Resp
   parameter too, so `GET /orders/export/{format}` with `Path(format): Path<ExportFormat>` takes
   `csv`, `xlsx` or `print` (anything else is a 404). `ExportFormat::Xlsx.available()` says
   whether this build can make Excel files.
+- `grid::Workbook` puts several queries in one Excel file, a sheet each (the `xlsx` feature;
+  without it `sheet` answers 400). Each sheet takes a grid's default wide columns like
+  `export_as`; the title must be a valid sheet name (31 characters at most, none of
+  `[ ] : * ? / \`, unique), else 400.
+
+  ```rust
+  # use renox::prelude::*;
+  use renox::grid::{Column, Grid, GridRequest, Workbook};
+  # #[derive(Model, serde::Serialize, Default)] struct Sale { id: i64, total: i64 }
+  # #[derive(Model, serde::Serialize, Default)] struct Refund { id: i64, amount: i64 }
+  /// GET /reports/summary.xlsx
+  async fn summary(request: GridRequest) -> Result<Response> {
+      let sales = Grid::new("sales").column(Column::money("total", "Total"));
+      let refunds = Grid::new("refunds").column(Column::money("amount", "Amount"));
+      Workbook::new("summary")
+          .sheet("Sales", &sales, Sale::query().order_by("id"), &request).await?
+          .sheet("Refunds", &refunds, Refund::query().order_by("id"), &request).await?
+          .into_response()
+  }
+  ```
 - A large export can run in a job instead: build a `GridRequest::new(…)` there from the
   filters the page had, export into storage, and tell the user when the file is ready.
 
