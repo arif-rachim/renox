@@ -91,10 +91,10 @@ depends publicly on `renox` (its grid's `Column` and `Grid`, `Query`, `Validator
 `renox-billing` is the optional subscriptions plugin crate ([billing.md](billing.md)), at the
 same version as `renox`. Its public items (the `Billing` module, `Plan`, `Interval`,
 `Customer`, `Billable`, `Owner`, the `Gateway` trait, `Remote`, `Notice`, `Payment`,
-`Checkout`, `CheckoutRequest`, `Stripe`, `Xendit`, `SubscriptionRoutes`, the `Subscription`
+`Checkout`, `CheckoutRequest`, `Stripe`, `Xendit`, `SubscriptionRoutes` (with its `_named` guards), the `Subscription`
 and `BillingCustomer` models, `SubscriptionStatus` and its events) follow the same promise.
 `Plan`, `Interval`, `Owner`, `Notice`, `Payment`, `Checkout`, `CheckoutRequest`,
-`SubscriptionStatus` and the events are `#[non_exhaustive]`; `Gateway` may get new methods
+`SubscriptionStatus` (which gained `Paused`) and the events (`SubscriptionPaused`, `SubscriptionUnpaused` among them) are `#[non_exhaustive]`; `Gateway` may get new methods
 with default bodies in minor releases. The Stripe and Xendit API calls (and the API versions
 they read) may change when the providers change them; the templates' markup and the values
 they receive may change in minor releases. It depends publicly on `renox` (`AppState`,

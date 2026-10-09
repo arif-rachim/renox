@@ -12,8 +12,8 @@ use renox::serde_json::Value;
 use renox::testing::{TestApp, TestResponse};
 use renox_billing::{
     Billing, Interval, PaymentFailed, PaymentSucceeded, Plan, Stripe, Subscription,
-    SubscriptionCanceled, SubscriptionCreated, SubscriptionRoutes, SubscriptionStatus,
-    SubscriptionUpdated,
+    SubscriptionCanceled, SubscriptionCreated, SubscriptionPaused, SubscriptionRoutes,
+    SubscriptionStatus, SubscriptionUnpaused, SubscriptionUpdated,
 };
 
 const PASSWORD: &str = "a long password 12";
@@ -37,6 +37,16 @@ impl Module for Area {
                 Routes::new()
                     .get("/exports", || async { "exports" })
                     .require_plan(&["pro"]),
+            )
+            .merge(
+                Routes::new()
+                    .get("/garage", || async { "garage" })
+                    .require_subscription_named("garage"),
+            )
+            .merge(
+                Routes::new()
+                    .get("/garage/pro", || async { "garage pro" })
+                    .require_plan_named("garage", &["pro"]),
             )
             .require_auth()
     }
@@ -2114,4 +2124,282 @@ async fn plans_show_their_description() {
         .await
         .assert_see("For one busy day.")
         .assert_see("$5.00 / day");
+}
+
+// ---------- #315: named guards, pause, the webhook context ----------
+
+#[renox::test]
+async fn the_named_guards_check_that_subscription_and_not_the_default() {
+    let app = app().await;
+    let (ana, _) = subscribed(&app).await;
+    // Ana's `default` subscription doesn't open the garage.
+    app.get("/garage").await.assert_redirect("/billing");
+    app.request()
+        .header("accept", "application/json")
+        .get("/garage")
+        .await
+        .assert_status(402);
+    // A `garage` subscription to Basic opens the first page, not the Pro one.
+    let mut garage = row(&app, &ana, "stripe", Some("sub_garage")).await;
+    garage.name = "garage".into();
+    garage.plan = "basic".into();
+    garage.save(app.db()).await.unwrap();
+    app.get("/garage").await.assert_ok().assert_see("garage");
+    app.get("/garage/pro").await.assert_redirect("/billing");
+    garage.plan = "pro".into();
+    garage.save(app.db()).await.unwrap();
+    app.get("/garage/pro").await.assert_ok();
+    // The default guards still look at `default` only.
+    app.get("/reports").await.assert_ok();
+}
+
+#[renox::test]
+async fn pausing_stops_billing_and_taking_it_up_again_restores_it() {
+    let app = app().await;
+    let (ana, period_end) = subscribed(&app).await;
+    app.fake_events();
+    let http = app.fake_http();
+    let mut paused = stripe_sub(&ana, "active", "price_pro", "pro", period_end);
+    paused["pause_collection"] = json!({ "behavior": "void", "resumes_at": null });
+    // Queue every answer first: the pause, then the unpause.
+    http.on(
+        &format!("POST {STRIPE}/subscriptions/sub_1"),
+        FakeResponse::json(200, paused.clone()),
+    )
+    .on(
+        &format!("POST {STRIPE}/subscriptions/sub_1"),
+        FakeResponse::json(
+            200,
+            stripe_sub(&ana, "active", "price_pro", "pro", period_end),
+        ),
+    );
+    app.get("/account")
+        .await
+        .assert_ok()
+        .assert_see("Pause billing");
+    app.post("/billing/pause", &[])
+        .await
+        .assert_redirect("/account");
+    http.assert_sent(|r| r.body.contains("pause_collection%5Bbehavior%5D=void"));
+    let subscription = latest(&app, &ana).await;
+    assert!(subscription.paused());
+    assert!(!subscription.valid());
+    app.assert_emitted::<SubscriptionPaused>(|e| e.subscription.id == subscription.id);
+    // The guards turn a paused subscriber away; the account page offers to go on.
+    app.get("/reports").await.assert_redirect("/billing");
+    app.get("/account")
+        .await
+        .assert_ok()
+        .assert_see("Billing is paused")
+        .assert_see("Take it up again");
+
+    app.post("/billing/unpause", &[])
+        .await
+        .assert_redirect("/account");
+    http.assert_sent(|r| r.body.contains("pause_collection="));
+    let subscription = latest(&app, &ana).await;
+    assert!(!subscription.paused() && subscription.valid());
+    app.assert_emitted::<SubscriptionUnpaused>(|e| e.subscription.id == subscription.id);
+    app.get("/reports").await.assert_ok();
+}
+
+#[renox::test]
+async fn a_pause_until_a_date_is_sent_and_stripes_webhooks_keep_it_paused() {
+    let app = app().await;
+    let (ana, period_end) = subscribed(&app).await;
+    let http = app.fake_http();
+    let until = now(&app).await + 7 * DAY as i64;
+    let mut paused = stripe_sub(&ana, "active", "price_pro", "pro", period_end);
+    paused["pause_collection"] = json!({ "behavior": "void", "resumes_at": until });
+    http.on(
+        &format!("POST {STRIPE}/subscriptions/sub_1"),
+        FakeResponse::json(200, paused.clone()),
+    );
+    let resumes_at = renox::chrono::DateTime::from_timestamp(until, 0);
+    Billing::of(app.state(), &ana)
+        .pause(resumes_at)
+        .await
+        .unwrap();
+    http.assert_sent(|r| r.body.contains(&format!("resumes_at%5D={until}")));
+    // Pausing twice is a no-op; a webhook about the paused subscription
+    // keeps it paused (Stripe says `active` with `pause_collection`).
+    assert!(
+        Billing::of(app.state(), &ana)
+            .pause(None)
+            .await
+            .unwrap()
+            .paused()
+    );
+    stripe_webhook(
+        &app,
+        "evt_renewed",
+        "customer.subscription.updated",
+        now(&app).await + 5,
+        paused,
+    )
+    .await
+    .assert_ok();
+    app.run_jobs().await;
+    assert!(latest(&app, &ana).await.paused());
+    // A webhook without `pause_collection` is the gateway resuming it.
+    stripe_webhook(
+        &app,
+        "evt_auto_resumed",
+        "customer.subscription.updated",
+        now(&app).await + 10,
+        stripe_sub(&ana, "active", "price_pro", "pro", period_end),
+    )
+    .await
+    .assert_ok();
+    app.run_jobs().await;
+    assert!(latest(&app, &ana).await.valid());
+}
+
+#[renox::test]
+async fn a_gateway_that_cannot_pause_says_so_and_changes_nothing() {
+    let app = app().await;
+    let ana = on_xendit(&app).await;
+    assert!(!Billing::of(app.state(), &ana).can_pause().await.unwrap());
+    let err = Billing::of(app.state(), &ana)
+        .pause(None)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, Error::BadRequest(ref m) if m.contains("can't pause a subscription")),
+        "{err:?}"
+    );
+    assert!(latest(&app, &ana).await.valid());
+    // Nothing to take up again, and the page toasts the refusal.
+    let err = Billing::of(app.state(), &ana)
+        .unpause()
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::BadRequest(_)), "{err:?}");
+    app.post("/billing/pause", &[])
+        .await
+        .assert_redirect("/account");
+    assert!(latest(&app, &ana).await.valid());
+}
+
+/// A gateway whose signing key is an app-provided value, not configuration.
+struct Keyed;
+
+/// The app's own settings, given with `App::provide`.
+struct KeyedSettings {
+    token: &'static str,
+}
+
+impl renox_billing::Gateway for Keyed {
+    fn name(&self) -> &str {
+        "keyed"
+    }
+    fn label(&self) -> &str {
+        "Keyed"
+    }
+    fn configured(&self, _config: &Config) -> bool {
+        true
+    }
+    fn create_customer<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _owner: &'a renox_billing::Owner,
+    ) -> renox_billing::BoxFuture<'a, Result<String>> {
+        Box::pin(async { Ok("keyed-1".into()) })
+    }
+    fn checkout<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _request: &'a renox_billing::CheckoutRequest,
+    ) -> renox_billing::BoxFuture<'a, Result<renox_billing::Checkout>> {
+        Box::pin(async { Ok(renox_billing::Checkout::redirect("/pay")) })
+    }
+    fn swap<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subscription: &'a Subscription,
+        _plan: &'a Plan,
+        _prorate: bool,
+    ) -> renox_billing::BoxFuture<'a, Result<renox_billing::Remote>> {
+        Box::pin(async { Err(Error::BadRequest("no".into())) })
+    }
+    fn cancel<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subscription: &'a Subscription,
+        _at_period_end: bool,
+    ) -> renox_billing::BoxFuture<'a, Result<renox_billing::Remote>> {
+        Box::pin(async { Err(Error::BadRequest("no".into())) })
+    }
+    fn verify_webhook(
+        &self,
+        _config: &Config,
+        _headers: &renox::axum::http::HeaderMap,
+        _body: &[u8],
+    ) -> Result {
+        Err(Error::Unauthorized)
+    }
+    fn verify_webhook_with(
+        &self,
+        state: &AppState,
+        headers: &renox::axum::http::HeaderMap,
+        _body: &[u8],
+    ) -> Result {
+        let settings = state.provided::<KeyedSettings>().ok_or(Error::Unauthorized)?;
+        let sent = headers
+            .get("x-keyed-token")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default();
+        renox::webhook::ensure(renox::webhook::same(sent, settings.token))
+    }
+    fn parse_webhook(&self, _body: &[u8]) -> Result<Vec<renox_billing::Notice>> {
+        Ok(Vec::new())
+    }
+    fn parse_webhook_with(
+        &self,
+        state: &AppState,
+        _body: &[u8],
+    ) -> Result<Vec<renox_billing::Notice>> {
+        let settings = state.provided::<KeyedSettings>().ok_or(Error::Unauthorized)?;
+        Ok(vec![renox_billing::Notice::Payment(
+            renox_billing::Payment::new(settings.token, 500, "usd", true),
+        )])
+    }
+}
+
+#[renox::test]
+async fn a_custom_gateway_verifies_webhooks_with_the_app_state() {
+    let app = TestApp::new(
+        App::new()
+            .provide(KeyedSettings { token: "s3cret" })
+            .module(Auth::new().account())
+            .module(Billing::new().gateway(Keyed).plan(Plan::new("basic", "Basic").price(
+                900,
+                "USD",
+                Interval::Month,
+            )))
+            .module(Area),
+    )
+    .await;
+    app.fake_events();
+    let wrong = app
+        .request()
+        .header("x-keyed-token", "nope")
+        .post_body("/billing/webhooks/keyed", "application/json", r#"{"id":"e1"}"#)
+        .await;
+    wrong.assert_status(401);
+    app.request()
+        .header("x-keyed-token", "s3cret")
+        .post_body("/billing/webhooks/keyed", "application/json", r#"{"id":"e2"}"#)
+        .await
+        .assert_ok();
+    app.run_jobs().await;
+    // The worker read the event with the state too.
+    app.assert_emitted::<PaymentSucceeded>(|e| e.payment_id == "s3cret");
+    // The old method alone (the default of the new one) still works.
+    use renox_billing::Gateway;
+    assert!(
+        Manual
+            .verify_webhook_with(app.state(), &Default::default(), b"")
+            .is_ok()
+    );
 }

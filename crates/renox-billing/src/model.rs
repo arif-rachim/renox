@@ -17,6 +17,9 @@ pub enum SubscriptionStatus {
     PastDue,
     /// Canceled: see [`Subscription::ends_at`] for when access ends.
     Canceled,
+    /// Billing is paused ([`crate::Customer::pause`]): nothing is charged
+    /// and access is not valid until it is taken up again.
+    Paused,
     /// Started, not paid for yet (the customer left the payment page).
     #[default]
     Incomplete,
@@ -63,11 +66,12 @@ pub struct Subscription {
 impl Subscription {
     /// Whether the owner has what they pay for: on a trial, paid for and
     /// not canceled, or canceled with time left (the grace period). Past
-    /// due and incomplete subscriptions aren't valid.
+    /// due, paused and incomplete subscriptions aren't valid.
     pub fn valid(&self) -> bool {
-        self.on_trial()
+        !self.paused()
+            && (self.on_trial()
             || self.on_grace_period()
-            || (self.status == SubscriptionStatus::Active && self.ends_at.is_none())
+            || (self.status == SubscriptionStatus::Active && self.ends_at.is_none()))
     }
 
     /// Whether it's in its free trial (with a gateway or without).
@@ -91,6 +95,11 @@ impl Subscription {
     /// Whether it was canceled and has run out.
     pub fn ended(&self) -> bool {
         self.ends_at.is_some_and(|at| at <= renox::db::now())
+    }
+
+    /// Whether billing is paused ([`crate::Customer::pause`]).
+    pub fn paused(&self) -> bool {
+        self.status == SubscriptionStatus::Paused
     }
 
     /// Whether a payment failed and the gateway is retrying it.

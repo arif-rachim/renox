@@ -250,7 +250,7 @@ impl Customer<'_> {
         let gateway = setup.gateway_for(self.state, &plan)?;
         let current = self.subscription().await?;
         if let Some(current) = &current
-            && current.valid()
+            && (current.valid() || current.paused())
             && !current.is_generic_trial()
             && !current.canceled()
         {
@@ -326,7 +326,7 @@ impl Customer<'_> {
     async fn current(&self) -> Result<Subscription> {
         self.subscription()
             .await?
-            .filter(|s| s.valid())
+            .filter(|s| s.valid() || (s.paused() && !s.ended()))
             .ok_or_else(|| Error::BadRequest("You're not subscribed.".into()))
     }
 
@@ -445,6 +445,78 @@ impl Customer<'_> {
             renox::anyhow::anyhow!("the payment gateway `{}` isn't set up", current.gateway)
         })?;
         let remote = gateway.resume(self.state, &current).await?;
+        self.applied(&setup, &current, remote).await
+    }
+
+    /// Whether billing can be [paused](Customer::pause): an active
+    /// subscription with a payment method, not canceled, at a gateway that
+    /// pauses.
+    pub async fn can_pause(&self) -> Result<bool> {
+        let Some(current) = self.subscription().await? else {
+            return Ok(false);
+        };
+        if current.is_generic_trial()
+            || current.canceled()
+            || current.status != SubscriptionStatus::Active
+        {
+            return Ok(false);
+        }
+        let setup = self.setup()?;
+        Ok(setup
+            .gateway(self.state, &current.gateway)
+            .is_some_and(|g| g.pauses()))
+    }
+
+    /// Stops billing for a while: nothing is charged and the subscription
+    /// is not [valid](Subscription::valid) (the guards turn the owner
+    /// away) until [`Customer::unpause`], or, with `resumes_at`, until the
+    /// gateway takes it up again then. A gateway that can't pause
+    /// answers a refusal ([`Error::BadRequest`]); so does a subscription
+    /// that isn't active.
+    pub async fn pause(&self, resumes_at: Option<DateTime>) -> Result<Subscription> {
+        let setup = self.setup()?;
+        let current = self.current().await?;
+        if current.paused() {
+            return Ok(current);
+        }
+        if current.is_generic_trial() || current.status != SubscriptionStatus::Active {
+            return Err(Error::BadRequest(
+                "Only a subscription that is paid for can be paused.".into(),
+            ));
+        }
+        if current.canceled() {
+            return Err(Error::BadRequest(
+                "A canceled subscription can't be paused: resume it first.".into(),
+            ));
+        }
+        let gateway = setup.gateway(self.state, &current.gateway).ok_or_else(|| {
+            renox::anyhow::anyhow!("the payment gateway `{}` isn't set up", current.gateway)
+        })?;
+        let remote = gateway.pause(self.state, &current, resumes_at).await?;
+        let remote = Remote {
+            status: Some(SubscriptionStatus::Paused),
+            ..remote
+        };
+        self.applied(&setup, &current, remote).await
+    }
+
+    /// Takes billing up again after [`Customer::pause`].
+    pub async fn unpause(&self) -> Result<Subscription> {
+        let setup = self.setup()?;
+        let current = self.current().await?;
+        if !current.paused() {
+            return Err(Error::BadRequest(
+                "Only a paused subscription can be taken up again.".into(),
+            ));
+        }
+        let gateway = setup.gateway(self.state, &current.gateway).ok_or_else(|| {
+            renox::anyhow::anyhow!("the payment gateway `{}` isn't set up", current.gateway)
+        })?;
+        let remote = gateway.unpause(self.state, &current).await?;
+        let remote = Remote {
+            status: remote.status.filter(|s| *s != SubscriptionStatus::Paused).or(Some(SubscriptionStatus::Active)),
+            ..remote
+        };
         self.applied(&setup, &current, remote).await
     }
 

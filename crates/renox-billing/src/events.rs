@@ -59,6 +59,25 @@ pub struct SubscriptionCanceled {
     pub subscription: Subscription,
 }
 
+/// Billing was paused ([`crate::Customer::pause`], or the gateway said so):
+/// nothing is charged until it is taken up again. Follows its
+/// `SubscriptionUpdated`.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct SubscriptionPaused {
+    /// As stored now.
+    pub subscription: Subscription,
+}
+
+/// A paused subscription is billed again ([`crate::Customer::unpause`], or
+/// the gateway said so). Follows its `SubscriptionUpdated`.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct SubscriptionUnpaused {
+    /// As stored now.
+    pub subscription: Subscription,
+}
+
 /// A gateway took a payment.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -99,5 +118,7 @@ pub struct PaymentFailed {
 impl Event for SubscriptionCreated {}
 impl Event for SubscriptionUpdated {}
 impl Event for SubscriptionCanceled {}
+impl Event for SubscriptionPaused {}
+impl Event for SubscriptionUnpaused {}
 impl Event for PaymentSucceeded {}
 impl Event for PaymentFailed {}

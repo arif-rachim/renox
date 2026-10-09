@@ -244,7 +244,34 @@ fn routes() -> Routes {
 ```
 
 Others go to the plans page with "Choose a plan to continue."; a JSON request gets
-`402 Payment Required`.
+`402 Payment Required`. A paused subscription is not valid, so the guards turn it away too.
+
+An app that sells a subscription per item (`Billing::of(..).named("garage")`) names it in the
+guard: `require_subscription_named` and `require_plan_named` check that subscription instead
+of `default`:
+
+```rust
+use renox::prelude::*;
+use renox_billing::SubscriptionRoutes;
+
+# async fn garage() -> &'static str { "" }
+# async fn tuning() -> &'static str { "" }
+fn routes() -> Routes {
+    Routes::new()
+        .get("/garage", garage)
+        .require_subscription_named("garage")
+        .merge(
+            Routes::new()
+                .get("/garage/tuning", tuning)
+                .require_plan_named("garage", &["pro"]),
+        )
+        .require_auth()
+}
+# fn main() { let _ = routes; }
+```
+
+The name is fixed per guard. When it depends on the URL (one subscription per bike id), check
+in the handler with `Billing::of(..).named(..).subscribed()`.
 
 ## Trials
 
@@ -268,7 +295,7 @@ async fn start(state: &AppState, user: &User) -> Result {
 # fn main() { let _ = start; }
 ```
 
-## Changing plan, canceling, resuming
+## Changing plan, canceling, resuming, pausing
 
 The account card and the plans page do these for the logged-in user; in code:
 
@@ -283,6 +310,8 @@ async fn manage(state: &AppState, user: &User) -> Result {
     billing.cancel().await?;                   // at the period's end: the grace period
     billing.resume().await?;                   // before it ends (Stripe)
     billing.cancel_now().await?;               // access ends at once
+    billing.pause(None).await?;                // stop billing for a while (Stripe)
+    billing.unpause().await?;                  // take billing up again
     # let _ = url;
     Ok(())
 }
@@ -293,6 +322,15 @@ async fn manage(state: &AppState, user: &User) -> Result {
 the rest of the period. A plan sold through another gateway can't be swapped to (cancel, then
 subscribe). A refusal (already subscribed, an unknown plan, nothing to resume) is an
 `Error::BadRequest` whose message the pages show as a toast.
+
+**Pausing** stops the charges without canceling: `pause(Some(date))` also tells the gateway when
+to go on by itself (Stripe's `pause_collection`, charges are voided meanwhile). A paused
+subscription has the status `Paused`, is not valid (the guards turn the owner away; `cancel`
+still works), and `SubscriptionPaused` / `SubscriptionUnpaused` are emitted when it starts and
+ends, also when the change arrives by webhook. The account card shows "Pause billing" when
+`can_pause()` (an active, paid subscription at a gateway that pauses) and "Take it up again"
+while paused. Xendit can't pause: `pause` answers an `Error::BadRequest` and changes nothing.
+A gateway of your own implements `pauses`, `pause` and `unpause`.
 
 ## Webhooks
 
@@ -320,6 +358,8 @@ older event that arrives late is ignored. A subscription made outside the app (n
 | `SubscriptionCreated` | a subscription was made (a webhook, or a trial without a payment method) |
 | `SubscriptionUpdated` | its plan, status, trial, period or end changed (`previous_plan`, `previous_status`) |
 | `SubscriptionCanceled` | it was canceled, now or at the period's end (`subscription.ends_at`) |
+| `SubscriptionPaused` | billing was paused (`Customer::pause`, or the gateway said so) |
+| `SubscriptionUnpaused` | a paused subscription is billed again |
 | `PaymentSucceeded` | the gateway took a payment (`amount`, `currency`, `owner`, `subscription`) |
 | `PaymentFailed` | a payment failed; the subscription is past due while the gateway retries |
 
@@ -490,6 +530,12 @@ renox_billing::Billing::new().gateway(Acme)
 # ;
 ```
 
+`verify_webhook` gets only the configuration. A gateway whose signing key lives in the app's own
+settings (given with `App::provide`, say) overrides `verify_webhook_with(state, headers, body)`
+instead: it is what the webhook route calls, and by default it calls `verify_webhook` with
+`state.config`. In the same way `parse_webhook_with(state, body)` defaults to `parse_webhook`.
+Pausing is `pauses`, `pause` and `unpause` (the defaults refuse).
+
 Its webhooks come to `/billing/webhooks/acme`. Event ids for "process once" are the
 `webhook-id` header, else the JSON body's `id`, else a hash of the body; override
 `Gateway::webhook_event_id` for another rule. Use the app's HTTP client (`state.http`) for
@@ -503,12 +549,13 @@ your app's `resources/views/`: yours is used instead.
 | File | What it is |
 |---|---|
 | `billing/plans.html` | the plans page (gets `plans`: `key`, `label`, `description`, `price`, `trial_days`, `features`, `current`; `current`: the subscription as below, or none; `subscribed`, `trial_available`, `generic_trials`, `account`) |
-| `billing/section.html` | the card on `/account` (gets `section.data`: `current` with `plan`, `plan_label`, `price`, `status`, `status_label`, `valid`, `on_trial`, `generic_trial`, `trial_ends_at`, `canceled`, `on_grace_period`, `ends_at`, `current_period_end`, `past_due`, `can_resume`, `gateway`; and `plans_url`) |
+| `billing/section.html` | the card on `/account` (gets `section.data`: `current` with `plan`, `plan_label`, `price`, `status`, `status_label`, `valid`, `on_trial`, `generic_trial`, `trial_ends_at`, `canceled`, `on_grace_period`, `ends_at`, `current_period_end`, `past_due`, `can_resume`, `paused`, `can_pause`, `gateway`; and `plans_url`) |
 
 The routes are `billing.plans` (`GET /billing`), `billing.checkout` and `billing.trial`
 (`POST /billing/checkout/{plan}`, `/billing/trial/{plan}`), `billing.return`
 (`GET /billing/return`), `billing.swap` (`POST /billing/swap/{plan}`), `billing.cancel` and
-`billing.resume` (`POST /billing/cancel`, `/billing/resume`), all for logged-in users, and
+`billing.resume`, `billing.pause` and `billing.unpause` (`POST /billing/cancel`, `/billing/resume`,
+`/billing/pause`, `/billing/unpause`), all for logged-in users, and
 `webhooks.billing` (`POST /billing/webhooks/{gateway}`).
 
 ## Testing

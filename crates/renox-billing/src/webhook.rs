@@ -30,7 +30,7 @@ impl Webhook for BillingWebhook {
             .header(GATEWAY)
             .and_then(|name| setup.gateway(state, name))
             .ok_or(Error::Unauthorized)?;
-        gateway.verify_webhook(&state.config, &request.headers, &request.body)
+        gateway.verify_webhook_with(state, &request.headers, &request.body)
     }
 
     fn event_id(request: &WebhookRequest) -> Result<String> {
@@ -50,7 +50,7 @@ impl Webhook for BillingWebhook {
         let gateway = setup.gateway(&state, name).ok_or_else(|| {
             renox::anyhow::anyhow!("the payment gateway `{name}` isn't set up any more")
         })?;
-        for notice in gateway.parse_webhook(&call.payload)? {
+        for notice in gateway.parse_webhook_with(&state, &call.payload)? {
             match notice {
                 Notice::Subscription(remote) => {
                     apply(&state, &setup, gateway.name(), remote).await?;
