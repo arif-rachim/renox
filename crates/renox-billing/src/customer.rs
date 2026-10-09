@@ -514,7 +514,10 @@ impl Customer<'_> {
         })?;
         let remote = gateway.unpause(self.state, &current).await?;
         let remote = Remote {
-            status: remote.status.filter(|s| *s != SubscriptionStatus::Paused).or(Some(SubscriptionStatus::Active)),
+            status: remote
+                .status
+                .filter(|s| *s != SubscriptionStatus::Paused)
+                .or(Some(SubscriptionStatus::Active)),
             ..remote
         };
         self.applied(&setup, &current, remote).await

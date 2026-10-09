@@ -2270,10 +2270,7 @@ async fn a_gateway_that_cannot_pause_says_so_and_changes_nothing() {
     );
     assert!(latest(&app, &ana).await.valid());
     // Nothing to take up again, and the page toasts the refusal.
-    let err = Billing::of(app.state(), &ana)
-        .unpause()
-        .await
-        .unwrap_err();
+    let err = Billing::of(app.state(), &ana).unpause().await.unwrap_err();
     assert!(matches!(err, Error::BadRequest(_)), "{err:?}");
     app.post("/billing/pause", &[])
         .await
@@ -2344,7 +2341,9 @@ impl renox_billing::Gateway for Keyed {
         headers: &renox::axum::http::HeaderMap,
         _body: &[u8],
     ) -> Result {
-        let settings = state.provided::<KeyedSettings>().ok_or(Error::Unauthorized)?;
+        let settings = state
+            .provided::<KeyedSettings>()
+            .ok_or(Error::Unauthorized)?;
         let sent = headers
             .get("x-keyed-token")
             .and_then(|v| v.to_str().ok())
@@ -2359,7 +2358,9 @@ impl renox_billing::Gateway for Keyed {
         state: &AppState,
         _body: &[u8],
     ) -> Result<Vec<renox_billing::Notice>> {
-        let settings = state.provided::<KeyedSettings>().ok_or(Error::Unauthorized)?;
+        let settings = state
+            .provided::<KeyedSettings>()
+            .ok_or(Error::Unauthorized)?;
         Ok(vec![renox_billing::Notice::Payment(
             renox_billing::Payment::new(settings.token, 500, "usd", true),
         )])
@@ -2372,11 +2373,11 @@ async fn a_custom_gateway_verifies_webhooks_with_the_app_state() {
         App::new()
             .provide(KeyedSettings { token: "s3cret" })
             .module(Auth::new().account())
-            .module(Billing::new().gateway(Keyed).plan(Plan::new("basic", "Basic").price(
-                900,
-                "USD",
-                Interval::Month,
-            )))
+            .module(
+                Billing::new()
+                    .gateway(Keyed)
+                    .plan(Plan::new("basic", "Basic").price(900, "USD", Interval::Month)),
+            )
             .module(Area),
     )
     .await;
@@ -2384,12 +2385,20 @@ async fn a_custom_gateway_verifies_webhooks_with_the_app_state() {
     let wrong = app
         .request()
         .header("x-keyed-token", "nope")
-        .post_body("/billing/webhooks/keyed", "application/json", r#"{"id":"e1"}"#)
+        .post_body(
+            "/billing/webhooks/keyed",
+            "application/json",
+            r#"{"id":"e1"}"#,
+        )
         .await;
     wrong.assert_status(401);
     app.request()
         .header("x-keyed-token", "s3cret")
-        .post_body("/billing/webhooks/keyed", "application/json", r#"{"id":"e2"}"#)
+        .post_body(
+            "/billing/webhooks/keyed",
+            "application/json",
+            r#"{"id":"e2"}"#,
+        )
         .await
         .assert_ok();
     app.run_jobs().await;

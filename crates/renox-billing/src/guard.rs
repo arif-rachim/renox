@@ -110,7 +110,9 @@ async fn check(
     };
     let subscription = match Billing::of(&state, &user)
         .named(&*name)
-        .subscription().await {
+        .subscription()
+        .await
+    {
         Ok(subscription) => subscription,
         Err(err) => return err.into_response(),
     };

@@ -70,8 +70,8 @@ impl Subscription {
     pub fn valid(&self) -> bool {
         !self.paused()
             && (self.on_trial()
-            || self.on_grace_period()
-            || (self.status == SubscriptionStatus::Active && self.ends_at.is_none()))
+                || self.on_grace_period()
+                || (self.status == SubscriptionStatus::Active && self.ends_at.is_none()))
     }
 
     /// Whether it's in its free trial (with a gateway or without).
