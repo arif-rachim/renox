@@ -58,7 +58,7 @@ use serde_json::{Map, Value, json};
 
 mod export;
 
-pub use export::{ExportFormat, MAX_EXPORT_ROWS};
+pub use export::{ExportFormat, MAX_EXPORT_ROWS, Workbook};
 
 use crate::auth::AuthUser;
 use crate::db::{Db, DbValue, Model, Paginated, Query, ToDbValue};

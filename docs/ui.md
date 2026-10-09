@@ -1630,7 +1630,7 @@ The parts, one by one:
     `values`, `total()` and `named(…)`. Build one by hand with `Series::new(labels, values)`.
 - **`chart(kind, data, …)`** draws a chart.
   - Kinds: `line`, `area`, `bar` (`stacked=true` piles bars on top of each other),
-    `pie`/`doughnut`, or `scatter`/`bubble` (below).
+    `pie`/`doughnut`, `scatter`/`bubble` or `heatmap` (below).
   - `data` is a `Series`, a list of numbers, or a list of series (`{name, values}` maps).
     Or pass `labels=…` with `series=[…]` or `values=[…]`.
   - Options: `format` (`number`, `money` in `APP_CURRENCY` or `currency=…`, `percent`;
@@ -1660,6 +1660,23 @@ The parts, one by one:
   - The tooltip names the point (`label`), its series, and each value with its axis title;
     the arrow keys move from point to point, left to right. The "Show the data" table lists
     every point.
+- **Heatmaps** shade a grid of cells by value, such as rentals by weekday and hour:
+  ```html
+  {{ chart("heatmap", columns=hours, rows=["Mon", "Tue", "Wed"], cells=picked_up,
+           x_title="Hour", y_title="Weekday", title="Rentals by weekday and hour") }}
+  {{ chart("heatmap", columns=["Q1", "Q2"], rows=["Coffee", "Tea"], values=[[4, 7], [0, 3]]) }}
+  ```
+  - `columns` and `rows` are labels. The values are `values` (one list per row, one number per
+    column, `null` for none) or `cells`: `[column, row, value]` or `{x, y, value, label}`
+    maps, with `x` and `y` as indexes counting from 0 (so a Monday is row 0). Cells without a
+    value stay empty; at most 100 rows and 100 columns.
+  - Five shades by a cell's share of the largest value (zero and negative values stay
+    empty); the legend runs "Less" to "More". `format` and `decimals` work as on other
+    charts.
+  - Accessibility: the grid has the `title` as its name, each cell's `title` says
+    `Mon 09:00: 5` (a cell's `label` replaces the `Mon 09:00` part), and "Show the data"
+    lists every number, so no value is only a shade. There is no script: it works in mails
+    and print too.
 - **How the charts look.**
   - One axis that starts at 0, with clean tick labels (`12.5K`, or `2,5M` where the language
     writes a decimal comma).
@@ -1712,7 +1729,7 @@ The parts, one by one:
 The bike shop's reports dashboard ([reports/dashboard.html](../examples/bikeshop/resources/views/reports/dashboard.html))
 uses most of it: the period (with a custom range), figures against the period before with
 their trend, revenue as stacked bars, the mix of income as a doughnut and rental hours as
-bubbles.
+a heatmap.
 
 ## Data grids
 

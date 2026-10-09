@@ -197,7 +197,7 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   themes and the type scale: the warm default, `data-rx-theme="classic"`, `--rx-type-*`),
   the filters `number`, `money` (`APP_CURRENCY`), `date`, `since`, `words`, `markdown`,
   dashboards (`renox::chart`: `Period` with presets, weeks and custom ranges, `Trend` per
-  day/week/month, `Series`; `chart(…)` line/area/bar/pie/doughnut/scatter/bubble, `stat`,
+  day/week/month, `Series`; `chart(…)` line/area/bar/pie/doughnut/scatter/bubble/heatmap, `stat`,
   `stats`, `dashboard`, `widget`, `period_filter` with its custom range, `query_fields`), and its
   design rules, toasts (a body, links, a duration, an id, a position, `Renox.toast`), out-of-band
   fragments, htmx headers, live validation.

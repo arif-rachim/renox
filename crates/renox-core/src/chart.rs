@@ -904,6 +904,18 @@ pub(crate) fn chart(
                 };
                 render_points(&clouds, &options, &formats)
             }
+            "heatmap" => {
+                let heat = read_heat(data, &kwargs)?;
+                kwargs.assert_all_used()?;
+                let auto = match format.as_deref() {
+                    None | Some("number") => auto_decimals(heat.cells.iter().map(|c| c.value)),
+                    _ => None,
+                };
+                let formatter = formatter(format, decimals, auto);
+                let less = text(state, "ui.chart.less", &locale);
+                let more = text(state, "ui.chart.more", &locale);
+                render_heat(&heat, &options, &formatter, &less, &more)
+            }
             "line" | "area" | "bar" | "pie" | "doughnut" => {
                 let data = read_data(data, &kwargs, &title)?;
                 kwargs.assert_all_used()?;
@@ -933,7 +945,7 @@ pub(crate) fn chart(
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
                     format!(
-                        "chart: unknown kind `{other}` (line, area, bar, pie, doughnut, scatter or bubble)"
+                        "chart: unknown kind `{other}` (line, area, bar, pie, doughnut, scatter, bubble or heatmap)"
                     ),
                 ));
             }
@@ -1457,6 +1469,241 @@ fn render_pie(data: &Data, options: &Options, formatter: &Formatter) -> String {
         .map(|(name, v)| (name.clone(), vec![formatter.full(*v), percent(*v)]))
         .collect();
     table(&mut out, options, &heads, &rows);
+    out.push_str("</figure>");
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Heatmaps.
+
+/// One filled cell of a heatmap.
+struct Cell {
+    column: usize,
+    row: usize,
+    value: f64,
+    label: Option<String>,
+}
+
+/// What `chart("heatmap", …)` draws: labelled rows and columns and the
+/// cells that have a value.
+struct Heat {
+    columns: Vec<String>,
+    rows: Vec<String>,
+    cells: Vec<Cell>,
+}
+
+/// The most rows or columns a heatmap draws.
+const HEAT_MAX: usize = 100;
+
+/// Reads `chart("heatmap", …)`'s data: `columns` and `rows` (labels) with
+/// either `values` (one list per row, one number per column) or `cells`
+/// (`[column, row, value]` or `{x, y, value, label}`, indexes counting from
+/// 0). `data` may be a map holding any of these.
+fn read_heat(data: Option<Value>, kwargs: &Kwargs) -> std::result::Result<Heat, Error> {
+    let mut columns: Option<Value> = kwargs.get("columns")?;
+    let mut rows: Option<Value> = kwargs.get("rows")?;
+    let mut values: Option<Value> = kwargs.get("values")?;
+    let mut cells: Option<Value> = kwargs.get("cells")?;
+    if let Some(data) = data.filter(|d| d.kind() == ValueKind::Map) {
+        columns = columns.or_else(|| attr(&data, "columns"));
+        rows = rows.or_else(|| attr(&data, "rows"));
+        values = values.or_else(|| attr(&data, "values"));
+        cells = cells.or_else(|| attr(&data, "cells"));
+    }
+    let mut heat = Heat {
+        columns: columns.as_ref().map(strings).unwrap_or_default(),
+        rows: rows.as_ref().map(strings).unwrap_or_default(),
+        cells: Vec::new(),
+    };
+    if let Some(values) = values
+        && let Ok(lines) = values.try_iter()
+    {
+        for (row, line) in lines.enumerate() {
+            for (column, value) in numbers(&line).into_iter().enumerate() {
+                if let Some(value) = value {
+                    heat.cells.push(Cell {
+                        column,
+                        row,
+                        value,
+                        label: None,
+                    });
+                }
+            }
+        }
+    }
+    if let Some(cells) = cells
+        && let Ok(items) = cells.try_iter()
+    {
+        for item in items {
+            let index = |v: Option<Value>| {
+                v.as_ref()
+                    .and_then(number_of)
+                    .filter(|n| *n >= 0.0 && n.fract() == 0.0)
+                    .map(|n| n as usize)
+            };
+            let cell = if item.kind() == ValueKind::Map {
+                let value = attr(&item, "value").or_else(|| attr(&item, "size"));
+                (
+                    index(attr(&item, "x")),
+                    index(attr(&item, "y")),
+                    value.as_ref().and_then(number_of),
+                    attr(&item, "label").map(|l| {
+                        l.as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| l.to_string())
+                    }),
+                )
+            } else {
+                let parts: Vec<Value> = item.try_iter().map(|i| i.collect()).unwrap_or_default();
+                (
+                    index(parts.first().cloned()),
+                    index(parts.get(1).cloned()),
+                    parts.get(2).and_then(number_of),
+                    None,
+                )
+            };
+            if let (Some(column), Some(row), Some(value), label) = cell {
+                heat.cells.push(Cell {
+                    column,
+                    row,
+                    value,
+                    label,
+                });
+            }
+        }
+    }
+    let width = heat.cells.iter().map(|c| c.column + 1).max().unwrap_or(0);
+    let height = heat.cells.iter().map(|c| c.row + 1).max().unwrap_or(0);
+    for (labels, n) in [(&mut heat.columns, width), (&mut heat.rows, height)] {
+        for i in labels.len()..n {
+            labels.push((i + 1).to_string());
+        }
+        labels.truncate(HEAT_MAX);
+    }
+    let (w, h) = (heat.columns.len(), heat.rows.len());
+    heat.cells.retain(|c| c.column < w && c.row < h);
+    Ok(heat)
+}
+
+/// How many shades a heatmap has besides "nothing".
+const HEAT_LEVELS: usize = 5;
+
+/// A heatmap as an HTML grid of cells (no script): each cell has its value
+/// in a `title` and a shade by its share of the largest one; the legend
+/// and the data table repeat the numbers in text.
+fn render_heat(
+    heat: &Heat,
+    options: &Options,
+    formatter: &Formatter,
+    less: &str,
+    more: &str,
+) -> String {
+    let (w, h) = (heat.columns.len(), heat.rows.len());
+    let mut grid: Vec<Option<(f64, Option<&str>)>> = vec![None; w * h];
+    for cell in &heat.cells {
+        grid[cell.row * w + cell.column] = Some((cell.value, cell.label.as_deref()));
+    }
+    let max = grid
+        .iter()
+        .flatten()
+        .map(|(v, _)| *v)
+        .fold(0.0_f64, f64::max);
+    let level = |v: f64| {
+        if v <= 0.0 || max <= 0.0 {
+            0
+        } else {
+            ((v / max * HEAT_LEVELS as f64).ceil() as usize).clamp(1, HEAT_LEVELS)
+        }
+    };
+    let mut out = String::new();
+    let _ = write!(
+        out,
+        r#"<figure class="rx-chart rx-chart--heatmap"{id}>"#,
+        id = options
+            .id
+            .as_deref()
+            .map(|id| format!(r#" id="{}""#, escape(id)))
+            .unwrap_or_default(),
+    );
+    if !options.title.is_empty() {
+        let _ = write!(
+            out,
+            r#"<figcaption class="rx-visually-hidden">{}</figcaption>"#,
+            escape(&options.title)
+        );
+    }
+    y_title(&mut out, options);
+    let label = if options.title.is_empty() {
+        format!("{} × {}", heat.rows.len(), heat.columns.len())
+    } else {
+        options.title.clone()
+    };
+    let _ = write!(
+        out,
+        r#"<div class="rx-chart__heat" role="img" aria-label="{}" style="--rx-heat-cols:{w}"><span class="rx-chart__heat-corner"></span>"#,
+        escape(&label)
+    );
+    // About twelve column labels fit; the rest are left blank.
+    let step = w.div_ceil(12).max(1);
+    for (i, name) in heat.columns.iter().enumerate() {
+        let shown = if i % step == 0 {
+            escape(name)
+        } else {
+            String::new()
+        };
+        let _ = write!(out, r#"<span class="rx-chart__heat-col">{shown}</span>"#);
+    }
+    for (r, row) in heat.rows.iter().enumerate() {
+        let _ = write!(
+            out,
+            r#"<span class="rx-chart__heat-row">{}</span>"#,
+            escape(row)
+        );
+        for (c, column) in heat.columns.iter().enumerate() {
+            match grid[r * w + c] {
+                Some((value, custom)) => {
+                    let name = custom
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| format!("{row} {column}"));
+                    let _ = write!(
+                        out,
+                        r#"<span class="rx-chart__cell" data-level="{}" title="{}"></span>"#,
+                        level(value),
+                        escape(&format!("{name}: {}", formatter.full(value))),
+                    );
+                }
+                None => out.push_str(r#"<span class="rx-chart__cell" data-level="0"></span>"#),
+            }
+        }
+    }
+    out.push_str("</div>");
+    x_title(&mut out, options);
+    let _ = write!(
+        out,
+        r#"<div class="rx-chart__legend rx-chart__legend--heat" aria-hidden="true"><span>{}</span>"#,
+        escape(less)
+    );
+    for l in 0..=HEAT_LEVELS {
+        let _ = write!(
+            out,
+            r#"<span class="rx-chart__cell" data-level="{l}"></span>"#
+        );
+    }
+    let _ = write!(out, "<span>{}</span></div>", escape(more));
+    let rows: Vec<(String, Vec<String>)> = heat
+        .rows
+        .iter()
+        .enumerate()
+        .map(|(r, row)| {
+            (
+                row.clone(),
+                (0..w)
+                    .map(|c| grid[r * w + c].map_or_else(String::new, |(v, _)| formatter.full(v)))
+                    .collect(),
+            )
+        })
+        .collect();
+    table(&mut out, options, &heat.columns, &rows);
     out.push_str("</figure>");
     out
 }
@@ -2067,6 +2314,37 @@ mod tests {
             serde_json::to_value(now.named("Sales")).unwrap()["name"],
             "Sales"
         );
+    }
+
+    #[test]
+    fn heatmaps_shade_cells_and_say_their_values() {
+        let html = render(
+            r#"{{ chart("heatmap", columns=["Mon", "Tue"], rows=["09:00", "10:00"], cells=[[0, 0, 1], [1, 0, 5], {"x": 1, "y": 1, "value": 3, "label": "Tue late"}], title="Rentals") }}"#,
+        );
+        assert!(
+            html.contains(r#"class="rx-chart rx-chart--heatmap""#),
+            "{html}"
+        );
+        assert!(html.contains(r#"aria-label="Rentals""#));
+        assert!(
+            html.contains(r#"data-level="1" title="09:00 Mon: 1""#),
+            "{html}"
+        );
+        assert!(html.contains(r#"data-level="5" title="09:00 Tue: 5""#));
+        assert!(html.contains(r#"data-level="3" title="Tue late: 3""#));
+        // The cell nobody filled is empty, and the numbers are in the table.
+        assert!(html.contains(r#"<span class="rx-chart__cell" data-level="0"></span>"#));
+        assert!(html.contains("Show the data") && html.contains("<td"));
+        let dense = render(
+            r#"{{ chart("heatmap", columns=["a"], rows=["x", "y"], values=[[2], [null]]) }}"#,
+        );
+        assert!(
+            dense.contains(r#"data-level="5" title="x a: 2""#),
+            "{dense}"
+        );
+        assert!(!dense.contains("y a:"));
+        // No data: still a figure, not an error.
+        assert!(render(r#"{{ chart("heatmap") }}"#).contains("rx-chart--heatmap"));
     }
 
     #[test]

@@ -229,7 +229,7 @@ URL with `?v=hash`), `storage_url(key)` (a stored file's URL on the default disk
 with `page=n`),
 `query_with(key=value)` (this page's query with those keys set, or removed with `none`; `page` dropped),
 `query_fields("key", …)` (this page's query as hidden inputs, without `page` and those keys, for GET forms),
-`chart(kind, data, …)` (an SVG chart: line, area, bar, pie, doughnut, scatter, bubble),
+`chart(kind, data, …)` (an SVG chart: line, area, bar, pie, doughnut, scatter, bubble, heatmap),
 `renox_head()`, `csp_nonce()` (this request's nonce for `<script nonce=…>` under `CSP=strict`),
 `seo(title=…, description=…, image=…, type=…, canonical=…)` (see "SEO and analytics" below),
 `renox_ui()` (the UI kit), `renox_grid()` (the data grid's assets), `renox_calendar()` (the
@@ -1044,6 +1044,8 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
 {{ chart("scatter", points=orders, x_title="Items", y_title="Total", format="money") }}
 {{ chart("bubble", points=products, x_title="Price", y_title="Units", size_title="Revenue",
          x_format="money", size_format="money") }} {# format is y's; x_format / size_format: number, money, percent #}
+{# heatmap: columns/rows are labels; values is one list per row, or cells=[[col, row, value]] (0-based) #}
+{{ chart("heatmap", columns=["Mon", "Tue"], rows=["09:00", "10:00"], values=[[1, 4], [0, 9]]) }}
 ```
 
 ## Data grid (details in [docs/grid.md](docs/grid.md), example in [the bike shop's reports](examples/bikeshop/src/app/reports/grids.rs))
