@@ -101,15 +101,15 @@ pub struct BalanceLine {
     pub amount: i64,
 }
 
-/// A point of the weekday × hour chart.
+/// A cell of the weekday × hour heatmap.
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct HourPoint {
-    /// Hour of the day, 0–23 (in `APP_TIMEZONE`).
+    /// Hour of the day, 0–23 (in `APP_TIMEZONE`): the heatmap's column.
     pub x: u32,
-    /// Weekday, 1 = Monday … 7 = Sunday.
+    /// Weekday, 0 = Monday … 6 = Sunday: the heatmap's row.
     pub y: u32,
-    /// Rentals picked up then.
-    pub size: i64,
+    /// Rentals picked up then (the cell's value).
+    pub value: i64,
     /// `Mon 10:00`.
     pub label: String,
 }
@@ -310,8 +310,8 @@ impl Numbers {
             .into_iter()
             .map(|((day, hour), count)| HourPoint {
                 x: hour,
-                y: day,
-                size: count,
+                y: day - 1,
+                value: count,
                 label: format!("{} {hour:02}:00", DAYS[(day - 1) as usize]),
             })
             .collect();

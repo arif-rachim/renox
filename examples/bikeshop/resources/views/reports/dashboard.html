@@ -66,7 +66,7 @@
 
     {% call widget(t('reports.widget.hours'), description=t('reports.widget.hours_hint'), span=2) %}
       {%- if n.rental_hours %}
-      {{ chart("bubble", points=n.rental_hours, x_title=t('reports.widget.hour'), y_title=t('reports.widget.weekday'), size_title=t('reports.widget.rentals'), title=t('reports.widget.hours'), id="chart-hours") }}
+      {{ chart("heatmap", cells=n.rental_hours, columns=range(24) | map("string") | list, rows=[t('blocks.calendar.day_1'), t('blocks.calendar.day_2'), t('blocks.calendar.day_3'), t('blocks.calendar.day_4'), t('blocks.calendar.day_5'), t('blocks.calendar.day_6'), t('blocks.calendar.day_0')], x_title=t('reports.widget.hour'), y_title=t('reports.widget.weekday'), title=t('reports.widget.hours'), id="chart-hours") }}
       {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
     {% endcall %}
     {% call widget(t('reports.widget.between'), description=t('reports.widget.between_hint')) %}

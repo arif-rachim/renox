@@ -117,9 +117,8 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "chart(…) template function",
                     why: "Server-drawn SVG, no chart library: a stacked bar chart of revenue by \
-                          stream, a doughnut of the mix, a **bubble** chart of rentals by weekday \
-                          and hour (x = hour, y = weekday, size = rentals; the kit has no \
-                          heatmap, and a bubble grid reads the same way), and a stacked bar per \
+                          stream, a doughnut of the mix, a **heatmap** of rentals by weekday \
+                          and hour (`cells` of column = hour, row = weekday, value = rentals), and a stacked bar per \
                           store. Every chart has a \"Show the data\" table and keyboard focus.",
                 },
                 Feature {

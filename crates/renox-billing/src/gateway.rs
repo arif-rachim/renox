@@ -51,6 +51,11 @@ pub trait Gateway: Send + Sync + 'static {
         false
     }
 
+    /// Whether the gateway can [pause](Gateway::pause) billing for a while.
+    fn pauses(&self) -> bool {
+        false
+    }
+
     /// Makes a customer for `owner` and answers its id.
     fn create_customer<'a>(
         &'a self,
@@ -100,9 +105,54 @@ pub trait Gateway: Send + Sync + 'static {
         })
     }
 
+    /// Stops charging `subscription` until [`Gateway::unpause`] (or, when
+    /// `resumes_at` is given, until then). Answer the subscription with
+    /// [`SubscriptionStatus::Paused`]. The default refuses; override it
+    /// together with [`Gateway::pauses`].
+    fn pause<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subscription: &'a Subscription,
+        _resumes_at: Option<DateTime>,
+    ) -> BoxFuture<'a, Result<Remote>> {
+        let label = self.label().to_owned();
+        Box::pin(async move {
+            Err(Error::BadRequest(format!(
+                "{label} can't pause a subscription: cancel it instead"
+            )))
+        })
+    }
+
+    /// Takes billing up again after [`Gateway::pause`]. Answer the
+    /// subscription with its status from before the pause (usually
+    /// [`SubscriptionStatus::Active`]). The default refuses.
+    fn unpause<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subscription: &'a Subscription,
+    ) -> BoxFuture<'a, Result<Remote>> {
+        let label = self.label().to_owned();
+        Box::pin(async move {
+            Err(Error::BadRequest(format!(
+                "{label} can't pause a subscription, so there is nothing to take up again"
+            )))
+        })
+    }
+
     /// Accepts a webhook only if it comes from the provider (a signature
     /// over `body`, a token in a header); an error answers 401.
+    ///
+    /// A gateway whose key lives in the app's settings rather than in
+    /// [`Config`] overrides [`Gateway::verify_webhook_with`] instead.
     fn verify_webhook(&self, config: &Config, headers: &HeaderMap, body: &[u8]) -> Result;
+
+    /// [`Gateway::verify_webhook`] with the whole app state: its database,
+    /// its [provided](Registry::provide) settings, its HTTP client. This is
+    /// what the webhook route calls; the default calls `verify_webhook`
+    /// with `state.config`, so existing gateways keep working.
+    fn verify_webhook_with(&self, state: &AppState, headers: &HeaderMap, body: &[u8]) -> Result {
+        self.verify_webhook(&state.config, headers, body)
+    }
 
     /// The webhook's event id, so a provider's retry is processed once. The
     /// default: the `webhook-id` header, else the JSON body's top-level
@@ -126,6 +176,13 @@ pub trait Gateway: Send + Sync + 'static {
     /// What a verified webhook says, in the module's terms (often nothing:
     /// providers send many events a subscription doesn't need).
     fn parse_webhook(&self, body: &[u8]) -> Result<Vec<Notice>>;
+
+    /// [`Gateway::parse_webhook`] with the app state, for a gateway that
+    /// needs its settings to read an event. This is what the queue worker
+    /// calls; the default calls `parse_webhook`.
+    fn parse_webhook_with(&self, _state: &AppState, body: &[u8]) -> Result<Vec<Notice>> {
+        self.parse_webhook(body)
+    }
 }
 
 /// What [`Gateway::checkout`] gets: who subscribes, to what, and where the

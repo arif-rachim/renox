@@ -114,11 +114,17 @@ pub(crate) fn remote(sub: &Value) -> Remote {
     let status = match sub["status"].as_str().unwrap_or_default() {
         "trialing" => SubscriptionStatus::Trialing,
         "active" => SubscriptionStatus::Active,
-        "past_due" | "unpaid" | "paused" => SubscriptionStatus::PastDue,
+        "past_due" | "unpaid" => SubscriptionStatus::PastDue,
+        "paused" => SubscriptionStatus::Paused,
         "canceled" | "incomplete_expired" => SubscriptionStatus::Canceled,
         _ => SubscriptionStatus::Incomplete,
     };
-    remote = remote.status(status);
+    // A subscription whose collection is paused stays `active` at Stripe.
+    let paused = sub["pause_collection"].is_object();
+    remote = remote.status(match status {
+        SubscriptionStatus::Active if paused => SubscriptionStatus::Paused,
+        other => other,
+    });
     let metadata = &sub["metadata"];
     if let Some(owner) = text(&metadata["renox_billable"]) {
         remote = remote.owner(owner);
@@ -172,6 +178,10 @@ impl Gateway for Stripe {
     }
 
     fn resumes(&self) -> bool {
+        true
+    }
+
+    fn pauses(&self) -> bool {
         true
     }
 
@@ -305,6 +315,45 @@ impl Gateway for Stripe {
         })
     }
 
+    fn pause<'a>(
+        &'a self,
+        state: &'a AppState,
+        subscription: &'a Subscription,
+        resumes_at: Option<DateTime>,
+    ) -> BoxFuture<'a, Result<Remote>> {
+        Box::pin(async move {
+            let id = gateway_id(subscription)?;
+            let mut form = vec![("pause_collection[behavior]", "void".to_owned())];
+            if let Some(at) = resumes_at {
+                form.push(("pause_collection[resumes_at]", at.timestamp().to_string()));
+            }
+            let updated = send(
+                self.call(state, "POST", &format!("/subscriptions/{id}"))?
+                    .form(&form),
+            )
+            .await?;
+            Ok(remote(&updated))
+        })
+    }
+
+    fn unpause<'a>(
+        &'a self,
+        state: &'a AppState,
+        subscription: &'a Subscription,
+    ) -> BoxFuture<'a, Result<Remote>> {
+        Box::pin(async move {
+            let id = gateway_id(subscription)?;
+            // An empty value clears the field at Stripe.
+            let form = [("pause_collection", "")];
+            let updated = send(
+                self.call(state, "POST", &format!("/subscriptions/{id}"))?
+                    .form(&form),
+            )
+            .await?;
+            Ok(remote(&updated))
+        })
+    }
+
     fn verify_webhook(&self, config: &Config, headers: &HeaderMap, body: &[u8]) -> Result {
         let secret = self
             .webhook_secret
@@ -412,7 +461,7 @@ mod tests {
         for (status, expected) in [
             ("trialing", SubscriptionStatus::Trialing),
             ("unpaid", SubscriptionStatus::PastDue),
-            ("paused", SubscriptionStatus::PastDue),
+            ("paused", SubscriptionStatus::Paused),
             ("incomplete_expired", SubscriptionStatus::Canceled),
             ("something_new", SubscriptionStatus::Incomplete),
         ] {

@@ -24,7 +24,7 @@
 //! `subscriptions` table, and the account page shows it with "Change
 //! plan", "Cancel" and "Resume". In code, [`Billing::of`] answers
 //! `subscribed()`, `on_trial()`, `on_grace_period()` and does `checkout`,
-//! `swap`, `cancel`, `cancel_now` and `resume`;
+//! `swap`, `cancel`, `cancel_now`, `resume`, `pause` and `unpause`;
 //! [`SubscriptionRoutes::require_subscription`] guards routes. The guide is
 //! docs/billing.md in the Renox repository.
 
@@ -52,7 +52,8 @@ pub mod xendit;
 
 pub use customer::{Billable, Customer, Owner};
 pub use events::{
-    PaymentFailed, PaymentSucceeded, SubscriptionCanceled, SubscriptionCreated, SubscriptionUpdated,
+    PaymentFailed, PaymentSucceeded, SubscriptionCanceled, SubscriptionCreated, SubscriptionPaused,
+    SubscriptionUnpaused, SubscriptionUpdated,
 };
 pub use gateway::{BoxFuture, Checkout, CheckoutRequest, Gateway, Notice, Payment, Remote};
 pub use guard::SubscriptionRoutes;

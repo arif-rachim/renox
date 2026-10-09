@@ -4,7 +4,8 @@
 use renox::prelude::*;
 
 use crate::events::{
-    PaymentFailed, PaymentSucceeded, SubscriptionCanceled, SubscriptionCreated, SubscriptionUpdated,
+    PaymentFailed, PaymentSucceeded, SubscriptionCanceled, SubscriptionCreated, SubscriptionPaused,
+    SubscriptionUnpaused, SubscriptionUpdated,
 };
 use crate::model::{BillingCustomer, Subscription, SubscriptionStatus};
 use crate::{Owner, Payment, Remote, Setup};
@@ -135,8 +136,10 @@ fn differs(a: &Subscription, b: &Subscription) -> bool {
         || a.synced_at != b.synced_at
 }
 
-/// `SubscriptionUpdated` when the plan, status or end changed, and
-/// `SubscriptionCanceled` when it was just canceled.
+/// `SubscriptionUpdated` when the plan, status or end changed,
+/// `SubscriptionCanceled` when it was just canceled, and
+/// `SubscriptionPaused` / `SubscriptionUnpaused` when billing stopped or
+/// went on.
 pub(crate) async fn emit_changes(
     state: &AppState,
     before: &Subscription,
@@ -161,6 +164,19 @@ pub(crate) async fn emit_changes(
     if before.ends_at.is_none() && after.ends_at.is_some() {
         state
             .emit(SubscriptionCanceled {
+                subscription: after.clone(),
+            })
+            .await?;
+    }
+    if !before.paused() && after.paused() {
+        state
+            .emit(SubscriptionPaused {
+                subscription: after.clone(),
+            })
+            .await?;
+    } else if before.paused() && !after.paused() {
+        state
+            .emit(SubscriptionUnpaused {
                 subscription: after.clone(),
             })
             .await?;

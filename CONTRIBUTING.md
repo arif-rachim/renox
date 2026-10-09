@@ -126,7 +126,7 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p bikeshop --features
   bugs only showed there (see CLAUDE.md §6.4). A change to renox.js, the UI kit, the data grid
   or the editors gets a test in `tests/browser/` (headless Chrome over the DevTools protocol,
   Node 24, no npm packages): `tests/browser/run.sh`, or one file with
-  `tests/browser/run.sh grid`. CI's `browser` job runs them all.
+  `tests/browser/run.sh grid`. CI's `browser` job runs them all, in two halves side by side (`BROWSER_SHARD=rest` and `bikeshop`).
 - **Processes.** `tests/process/run.sh` runs the app binary and `rnx` as real processes:
   stopping on signals with a request in flight, `queue:work`, `schedule:work` twice on one
   database, systemd's socket, `LOG_FORMAT`/`LOG_FILE`, `db:shell` and prompts from a pipe and

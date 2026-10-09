@@ -1,5 +1,5 @@
 //! The pages: the plans, starting a checkout or a trial, coming back from
-//! the gateway, changing plan, canceling and resuming. All for the
+//! the gateway, changing plan, canceling, resuming and pausing. All for the
 //! logged-in user's `default` subscription.
 
 use renox::axum::middleware::from_fn;
@@ -27,6 +27,10 @@ pub(crate) fn routes() -> Routes {
         .name("billing.cancel")
         .post("/billing/resume", resume)
         .name("billing.resume")
+        .post("/billing/pause", pause)
+        .name("billing.pause")
+        .post("/billing/unpause", unpause)
+        .name("billing.unpause")
         .require_auth();
     let webhooks = Routes::new()
         .webhook::<BillingWebhook>("/billing/webhooks/{gateway}")
@@ -64,6 +68,8 @@ pub(crate) struct Current {
     current_period_end: Option<DateTime>,
     past_due: bool,
     can_resume: bool,
+    paused: bool,
+    can_pause: bool,
     gateway: String,
 }
 
@@ -75,7 +81,9 @@ impl Current {
         subscription: Subscription,
     ) -> Result<Self> {
         let plan = setup.plan(&subscription.plan).ok();
-        let status_label = if subscription.on_grace_period() {
+        let status_label = if subscription.paused() {
+            "Paused"
+        } else if subscription.on_grace_period() {
             "Canceled"
         } else if subscription.on_trial() {
             "Trial"
@@ -85,6 +93,7 @@ impl Current {
             match subscription.status.as_str() {
                 "active" => "Active",
                 "past_due" => "Past due",
+                "paused" => "Paused",
                 "canceled" => "Canceled",
                 "trialing" => "Trial over",
                 _ => "Not paid yet",
@@ -110,6 +119,8 @@ impl Current {
             current_period_end: subscription.current_period_end,
             past_due: subscription.past_due(),
             can_resume: billing.can_resume().await?,
+            paused: subscription.paused(),
+            can_pause: billing.can_pause().await?,
             gateway,
         })
     }
@@ -278,6 +289,26 @@ async fn cancel(State(state): State<AppState>, user: AuthUser, htmx: Htmx) -> Re
 /// Takes the cancellation back.
 async fn resume(State(state): State<AppState>, user: AuthUser, htmx: Htmx) -> Response {
     let result = Billing::of(&state, &user).resume().await;
+    let to = after(&state);
+    outcome(&htmx, result, "Your subscription goes on.", &to, &to)
+}
+
+/// Stops billing for a while.
+async fn pause(State(state): State<AppState>, user: AuthUser, htmx: Htmx) -> Response {
+    let result = Billing::of(&state, &user).pause(None).await;
+    let to = after(&state);
+    outcome(
+        &htmx,
+        result,
+        "Your subscription is paused. Nothing is charged until you take it up again.",
+        &to,
+        &to,
+    )
+}
+
+/// Takes billing up again.
+async fn unpause(State(state): State<AppState>, user: AuthUser, htmx: Htmx) -> Response {
+    let result = Billing::of(&state, &user).unpause().await;
     let to = after(&state);
     outcome(&htmx, result, "Your subscription goes on.", &to, &to)
 }
