@@ -160,6 +160,10 @@ export class Page {
     });
     await this.send('Page.enable');
     await this.send('Runtime.enable');
+    // A headless tab that has just navigated can count as unfocused, and an
+    // unfocused page gets no key events (#354, the family of #327): the page
+    // is always focused for the browser, as with a person at the keyboard.
+    await this.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await this.send('Log.enable');
     await this.send('Network.enable');
   }
