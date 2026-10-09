@@ -3,7 +3,7 @@
 //! - **Move to a category** (`staff.catalog.move`): the products panel's
 //!   bulk action "Move to a category…" keeps the selection in the cache for
 //!   half an hour and answers with a toast linking here, where the category
-//!   is picked. (`renox-admin` actions take no input yet.)
+//!   is picked. (Written before `renox-admin` actions could take input.)
 //! - **What fits** (`staff.catalog.fits`): which bike models a part fits
 //!   (or, from a bike, which parts fit it), with a note: the `part_fits`
 //!   many-to-many (`Pivot` and its `inverse()`, Pagila's `film_actor`),

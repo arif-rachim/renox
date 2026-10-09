@@ -154,6 +154,8 @@ fn writes() -> Routes {
         .name("orders.destroy")
         .post("/grid/orders/bulk/status/{status}", bulk_status)
         .name("orders.bulk_status")
+        .post("/grid/orders/bulk/note", bulk_note)
+        .name("orders.bulk_note")
         .post("/grid/orders/bulk/delete", bulk_delete)
         .name("orders.bulk_delete")
         .require_auth()
@@ -288,6 +290,8 @@ pub fn orders_grid(can_edit: bool) -> Grid {
         .reorder("position", "/grid/orders/reorder")
         // Checkboxes, and these over the selected rows (or all matching).
         .bulk_action(Action::new("Mark paid", "/grid/orders/bulk/status/paid"))
+        // Asks for input first: the grid opens the kit's sheet `orders-note`.
+        .bulk_action(Action::new("Add note", "/grid/orders/bulk/note").sheet("orders-note"))
         .bulk_action(Action::new(
             "Mark shipped",
             "/grid/orders/bulk/status/shipped",
@@ -558,6 +562,35 @@ async fn bulk_status(
         }
     };
     Ok(Toast::success(format!("{changed} orders marked {status}.")))
+}
+
+/// A bulk action with a sheet: the selection and the typed `note` come in
+/// one form.
+async fn bulk_note(
+    State(state): State<AppState>,
+    request: GridRequest,
+    Form(posted): Form<Vec<(String, String)>>,
+) -> Result<Toast> {
+    let mut selection = Selection::default();
+    let mut note = String::new();
+    for (name, value) in posted {
+        match name.as_str() {
+            "ids" => selection.ids = value.split(',').map(str::to_owned).collect(),
+            "all" => selection.all = value == "true",
+            "note" => note = value.trim().to_owned(),
+            _ => {}
+        }
+    }
+    if note.is_empty() {
+        let mut errors = renox::validation::Errors::new();
+        errors.add("note", "The note field is required.");
+        return Err(ValidationError::new(errors).into());
+    }
+    let changed = orders_grid(true)
+        .selected(Order::query(), &request, &selection)?
+        .update(&state.db, &[("updated_by", &note)])
+        .await?;
+    Ok(Toast::success(format!("{changed} orders noted: {note}")))
 }
 
 async fn bulk_delete(

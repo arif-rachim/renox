@@ -27,10 +27,11 @@
 //!   `description` textareas.
 //! - **Discontinued products** go to the trash (products are soft deleted),
 //!   restorable from the "Trash" tab.
-//! - **Bulk actions** on products: change prices by ±5 % or ±10 % (every
-//!   variant, audited), move to another category (a page to pick it), and
-//!   discontinue. `renox-admin` actions take no input yet, hence the fixed
-//!   steps and the extra page (see the area's notes in `explain.rs`).
+//! - **Bulk actions** on products: change prices by a percentage typed in
+//!   the action's sheet (`AdminAction::form`; every variant, audited), move
+//!   to another category (a page to pick it), and
+//!   discontinue. (The move keeps its extra page: it was written before
+//!   actions could take input; see the area's notes in `explain.rs`.)
 
 use renox::auth::Policy;
 use renox::grid::Column;
@@ -348,14 +349,27 @@ async fn change_prices(products: Vec<Product>, cx: ActionContext, percent: i64) 
     )))
 }
 
-fn price_action(key: &str, label: &str, percent: i64) -> AdminAction<Product> {
-    AdminAction::new(key, label, move |products, cx| {
-        change_prices(products, cx, percent)
+/// "Change prices by %": the percentage is typed in the action's sheet.
+fn price_action() -> AdminAction<Product> {
+    AdminAction::new("prices", "Change prices by %", |products, cx| async move {
+        let percent = cx
+            .input
+            .parse::<f64>("percent")
+            .map_or(0, |p| p.round() as i64);
+        change_prices(products, cx, percent).await
     })
     .ability("changePrices")
-    .confirm(&format!(
-        "Change every variant's price of the selected products by {percent:+} %?"
-    ))
+    .form(vec![
+        Field::number("percent", "Percent")
+            .required()
+            .step("1")
+            .min(-90)
+            .max(500)
+            .suffix("%")
+            .hint("Negative lowers the prices."),
+    ])
+    .description("Every variant's price of the selected products changes by this much.")
+    .submit_label("Change prices")
 }
 
 // [explain:admin.products.show]
@@ -449,10 +463,7 @@ impl AdminResource for Products {
     // [explain:admin.products.actions]
     fn actions(&self) -> Vec<AdminAction<Product>> {
         vec![
-            price_action("prices-up-5", "Prices +5 %", 5),
-            price_action("prices-up-10", "Prices +10 %", 10),
-            price_action("prices-down-5", "Prices −5 %", -5),
-            price_action("prices-down-10", "Prices −10 %", -10),
+            price_action(),
             AdminAction::new(
                 "move-category",
                 "Move to a category…",
@@ -948,6 +959,12 @@ impl AdminResource for Stores {
         store.workshop_minutes_per_day = form.workshop_minutes_per_day;
     }
     // [/explain:admin.stores.form]
+    fn creatable(&self) -> bool {
+        false
+    }
+    fn deletable(&self) -> bool {
+        false
+    }
     // [explain:admin.stores.allows]
     /// A store is made with its address and opening hours, not here;
     /// deleting one would orphan its stock and books.

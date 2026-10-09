@@ -10,11 +10,13 @@ use renox::db::{Model, Query};
 use renox::grid::{Action, Grid, GridRequest, Selection};
 use renox::prelude::*;
 use renox::serde_json::{Map, Value};
+use renox::validation::Errors;
 use serde::Serialize;
 
 use crate::field::{FieldKind, plain_name};
-use crate::resource::BoxFuture;
-use crate::{AdminResource, Field};
+use crate::resource::{ActionInput, BoxFuture, SaveContext};
+use crate::texts::{Texts, lower};
+use crate::{AdminAction, AdminResource, Field};
 
 /// The most records a bulk action loads.
 const MAX_SELECTED: u64 = 10_000;
@@ -39,7 +41,7 @@ pub(crate) struct Panel {
 impl Panel {
     /// Lets `user` in, or answers 403. Nobody gets in until the app says
     /// who may (`Admin::authorize`).
-    fn check(&self, user: &AuthUser) -> Result {
+    pub(crate) fn check(&self, user: &AuthUser) -> Result {
         match &self.access {
             Some(allows) if allows(user) => Ok(()),
             _ => Err(Error::Forbidden),
@@ -48,15 +50,21 @@ impl Panel {
 
     /// What the layout needs: the title, the navigation and the account
     /// links.
-    fn frame(&self, state: &AppState, user: &AuthUser, current: Option<&str>) -> Frame {
+    pub(crate) fn frame(
+        &self,
+        state: &AppState,
+        user: &AuthUser,
+        current: Option<&str>,
+        texts: &Texts,
+    ) -> Frame {
         let mut nav: Vec<NavGroup> = Vec::new();
         for resource in self.resources.iter().filter(|r| r.visible(user)) {
             let item = NavItem {
-                label: resource.plural().to_owned(),
+                label: texts.label(resource.slug(), resource.plural()),
                 url: format!("{}/{}", self.path, resource.slug()),
                 active: current == Some(resource.slug()),
             };
-            let title = resource.group().map(str::to_owned);
+            let title = resource.group().map(|group| texts.label("nav", group));
             match nav.iter_mut().find(|group| group.title == title) {
                 Some(group) => group.items.push(item),
                 None => nav.push(NavGroup {
@@ -76,13 +84,14 @@ impl Panel {
             account_url: state.url("account.show", &[]).ok(),
             logout_url: state.url("logout", &[]).ok(),
             currency,
+            text: texts.all(),
         }
     }
 }
 
 /// The layout's `admin` value.
 #[derive(Serialize)]
-struct Frame {
+pub(crate) struct Frame {
     title: String,
     home: String,
     /// The dashboard is the page shown.
@@ -92,16 +101,18 @@ struct Frame {
     logout_url: Option<String>,
     /// `APP_CURRENCY`, before money fields.
     currency: String,
+    /// The panel's own words in the request's language (`admin.text`).
+    text: Value,
 }
 
 #[derive(Serialize)]
-struct NavGroup {
+pub(crate) struct NavGroup {
     title: Option<String>,
     items: Vec<NavItem>,
 }
 
 #[derive(Serialize)]
-struct NavItem {
+pub(crate) struct NavItem {
     label: String,
     url: String,
     active: bool,
@@ -166,7 +177,7 @@ pub(crate) fn routes(panel: Arc<Panel>) -> Routes {
 }
 
 /// What a resource's handlers share.
-struct Ctx<R> {
+pub(crate) struct Ctx<R> {
     panel: Arc<Panel>,
     resource: Arc<R>,
 }
@@ -183,7 +194,7 @@ impl<R> Clone for Ctx<R> {
 fn resource_routes<R: AdminResource>(cx: Ctx<R>) -> Routes {
     let slug = cx.resource.slug().to_owned();
     let one = format!("/{slug}/{{id}}");
-    Routes::new()
+    let mut routes = Routes::new()
         .get(&format!("/{slug}"), index::<R>)
         .name(&format!("{slug}.index"))
         .post(&format!("/{slug}"), store::<R>)
@@ -202,8 +213,12 @@ fn resource_routes<R: AdminResource>(cx: Ctx<R>) -> Routes {
         .name(&format!("{slug}.edit"))
         .post(&format!("{one}/actions/{{action}}"), row_action::<R>)
         .name(&format!("{slug}.action"))
-        .route_layer(Extension(cx))
-        .require_auth()
+        .route_layer(Extension(cx.clone()))
+        .require_auth();
+    for manager in cx.resource.relations() {
+        routes = routes.merge(manager.routes(Arc::new(cx.clone())));
+    }
+    routes
 }
 
 /// The resource as its pages show it (`resource`).
@@ -232,21 +247,52 @@ impl<R: AdminResource> Ctx<R> {
         format!("{}/{}", self.panel.path, self.resource.slug())
     }
 
-    fn info(&self) -> Info {
+    fn info(&self, texts: &Texts) -> Info {
         let base = self.base();
         Info {
             slug: self.resource.slug().to_owned(),
-            label: self.resource.label().to_owned(),
-            plural_label: self.resource.plural_label().to_owned(),
+            label: self.label(texts),
+            plural_label: self.plural(texts),
             create_url: format!("{base}/create"),
             has_view: !self.resource.entries().is_empty(),
             index_url: base,
         }
     }
 
-    /// The panel lets `user` in and `ability` is allowed, or 403.
+    /// The resource's name for one record, in the request's language.
+    fn label(&self, texts: &Texts) -> String {
+        texts.label(self.resource.slug(), self.resource.label())
+    }
+
+    /// The resource's name for several records, in the request's language.
+    fn plural(&self, texts: &Texts) -> String {
+        texts.label(self.resource.slug(), self.resource.plural_label())
+    }
+
+    /// A record's title: the resource's own, or "Product #7" in the
+    /// request's language.
+    fn title_of(&self, record: &R::Model, texts: &Texts) -> String {
+        record_title(&*self.resource, record, texts)
+    }
+
+    /// Whether the resource offers `ability` at all: an edit-only resource
+    /// has no create and no delete.
+    fn offers(&self, ability: &str) -> bool {
+        offers(&*self.resource, ability)
+    }
+
+    /// `ability` is offered and the user may (the policy's answer).
+    fn allows(&self, user: &AuthUser, ability: &str, record: Option<&R::Model>) -> bool {
+        self.offers(ability) && self.resource.allows(user, ability, record)
+    }
+
+    /// The panel lets `user` in and `ability` is allowed, or 403 (404 for
+    /// what the resource doesn't offer).
     fn authorize(&self, user: &AuthUser, ability: &str, record: Option<&R::Model>) -> Result {
         self.panel.check(user)?;
+        if !self.offers(ability) {
+            return Err(Error::NotFound);
+        }
         if self.resource.allows(user, ability, record) {
             Ok(())
         } else {
@@ -259,7 +305,9 @@ impl<R: AdminResource> Ctx<R> {
     fn scoped(&self, filter: Option<&str>) -> Query<R::Model> {
         let query = self.resource.query();
         match filter {
-            Some(TRASHED) if R::Model::SOFT_DELETES => query.only_trashed(),
+            Some(TRASHED) if R::Model::SOFT_DELETES && self.offers("restoreAny") => {
+                query.only_trashed()
+            }
             Some(key) => match self.resource.filters().iter().find(|f| f.key() == key) {
                 Some(found) => found.apply(query),
                 None => query,
@@ -281,55 +329,54 @@ impl<R: AdminResource> Ctx<R> {
             .ok_or(Error::NotFound)
     }
 
+    /// The id of the sheet that asks for `action`'s input.
+    fn sheet_id(action: &AdminAction<R::Model>) -> String {
+        format!("rx-admin-action-{}", action.key())
+    }
+
     /// The list's grid, with the actions `user` may take.
-    fn grid(&self, user: &AuthUser, trashed: bool) -> Grid {
+    fn grid(&self, user: &AuthUser, trashed: bool, texts: &Texts) -> Grid {
         let base = self.base();
         let resource = &self.resource;
-        let mut grid = Grid::new(resource.slug())
-            .title(resource.plural_label())
+        let slug = resource.slug();
+        let label = lower(&self.label(texts));
+        let plural = lower(&self.plural(texts));
+        let mut grid = Grid::new(slug)
+            .title(&self.plural(texts))
             .sort_by("-id")
             .exports()
             .advanced_filter()
-            .empty_state(
-                &format!("No {} yet", resource.plural_label().to_lowercase()),
-                None,
-            );
+            .empty_state(&texts.get("empty", &[("plural", &plural)]), None);
         for column in resource.columns() {
-            grid = grid.column(column);
+            let heading = texts.label(slug, column.label());
+            grid = grid.column(column.titled(&heading));
         }
         let has_view = !resource.entries().is_empty();
-        let may = |ability: &str| resource.allows(user, ability, None);
-        let label = resource.label().to_lowercase();
-        let plural = resource.plural_label().to_lowercase();
+        let may = |ability: &str| self.allows(user, ability, None);
         if trashed {
+            let restore = texts.get("restore", &[]);
+            let for_good = texts.get("delete_for_good", &[]);
             if may("restoreAny") {
-                grid = grid.bulk_action(Action::new("Restore", &format!("{base}/actions/restore")));
+                grid = grid.bulk_action(Action::new(&restore, &format!("{base}/actions/restore")));
             }
             if may("forceDeleteAny") {
                 grid = grid.bulk_action(
-                    Action::new("Delete for good", &format!("{base}/actions/force-delete"))
-                        .confirm(&format!(
-                            "Delete the selected {plural} for good? This can't be undone."
-                        ))
+                    Action::new(&for_good, &format!("{base}/actions/force-delete"))
+                        .confirm(&texts.get("bulk_delete_for_good", &[("plural", &plural)]))
                         .danger(),
                 );
             }
             if may("restore") {
                 grid = grid.row_action(Action::new(
-                    "Restore",
+                    &restore,
                     &format!("{base}/{{id}}/actions/restore"),
                 ));
             }
             if may("forceDelete") {
                 grid = grid.row_action(
-                    Action::new(
-                        "Delete for good",
-                        &format!("{base}/{{id}}/actions/force-delete"),
-                    )
-                    .confirm(&format!(
-                        "Delete this {label} for good? This can't be undone."
-                    ))
-                    .danger(),
+                    Action::new(&for_good, &format!("{base}/{{id}}/actions/force-delete"))
+                        .confirm(&texts.get("row_delete_for_good", &[("label", &label)]))
+                        .danger(),
                 );
             }
             if has_view {
@@ -346,14 +393,17 @@ impl<R: AdminResource> Ctx<R> {
             if !may(action.ability_name()) {
                 continue;
             }
-            let mut bulk = Action::new(action.label(), &format!("{base}/actions/{}", action.key()));
-            let mut row = Action::new(
-                action.label(),
-                &format!("{base}/{{id}}/actions/{}", action.key()),
-            );
-            if let Some(question) = action.question() {
-                bulk = bulk.confirm(question);
-                row = row.confirm(question);
+            let name = texts.label(slug, action.label());
+            let mut bulk = Action::new(&name, &format!("{base}/actions/{}", action.key()));
+            let mut row = Action::new(&name, &format!("{base}/{{id}}/actions/{}", action.key()));
+            if !action.fields().is_empty() {
+                let sheet = Self::sheet_id(&action);
+                bulk = bulk.sheet(&sheet);
+                row = row.sheet(&sheet);
+            } else if let Some(question) = action.question() {
+                let question = texts.label(slug, question);
+                bulk = bulk.confirm(&question);
+                row = row.confirm(&question);
             }
             if action.is_danger() {
                 bulk = bulk.danger();
@@ -367,77 +417,292 @@ impl<R: AdminResource> Ctx<R> {
             }
         }
         if may("deleteAny") {
-            let question = if R::Model::SOFT_DELETES {
-                format!("Delete the selected {plural}? They go to the trash.")
+            let key = if R::Model::SOFT_DELETES {
+                "bulk_delete_soft"
             } else {
-                format!("Delete the selected {plural}? This can't be undone.")
+                "bulk_delete_hard"
             };
             grid = grid.bulk_action(
-                Action::new("Delete", &format!("{base}/actions/delete"))
-                    .confirm(&question)
+                Action::new(&texts.get("delete", &[]), &format!("{base}/actions/delete"))
+                    .confirm(&texts.get(key, &[("plural", &plural)]))
                     .danger(),
             );
         }
         if has_view {
-            grid = grid.row_action(Action::link("View", &format!("{base}/{{id}}")));
+            grid = grid.row_action(Action::link(
+                &texts.get("view", &[]),
+                &format!("{base}/{{id}}"),
+            ));
         }
         if may("update") {
-            grid = grid.row_action(Action::link("Edit", &format!("{base}/{{id}}/edit")));
+            grid = grid.row_action(Action::link(
+                &texts.get("edit", &[]),
+                &format!("{base}/{{id}}/edit"),
+            ));
         }
         if may("delete") {
             grid = grid.row_action(
-                Action::new("Delete", &format!("{base}/{{id}}"))
+                Action::new(&texts.get("delete", &[]), &format!("{base}/{{id}}"))
                     .method("DELETE")
-                    .confirm(&format!("Delete this {label}?"))
+                    .confirm(&texts.get("delete_question", &[("label", &label)]))
                     .danger(),
             );
         }
         resource.grid(grid)
     }
 
-    /// The form's fields for the create page (`record` is `None`) or the
-    /// edit page, each with its value and a `belongs_to`'s choices.
-    async fn fields(&self, state: &AppState, record: Option<&Value>) -> Result<Vec<FieldView>> {
-        let (db, decimals) = (&state.db, money_decimals(state));
-        let creating = record.is_none();
-        let mut views = Vec::new();
-        for mut field in self.resource.fields() {
-            if !field.shown(creating) {
+    /// The sheets that ask for input before an action (the list draws
+    /// them with the kit's `action_sheet`, opened from the grid).
+    fn sheets(&self, user: &AuthUser, texts: &Texts, decimals: u32) -> Vec<Value> {
+        let slug = self.resource.slug();
+        let base = self.base();
+        let mut sheets = Vec::new();
+        for action in self.resource.actions() {
+            if action.fields().is_empty() || !self.allows(user, action.ability_name(), None) {
                 continue;
             }
-            if let Some((table, title)) = field.relation() {
-                let options = relation_options(db, table, title).await?;
-                field.set_options(options);
-            }
-            views.push(FieldView::new(field, record, creating, decimals));
+            let fields: Vec<FieldView> = action
+                .fields()
+                .iter()
+                .cloned()
+                .map(|mut field| {
+                    field.translate(&|text| texts.label(slug, text));
+                    FieldView::new(field, None, true, decimals)
+                })
+                .collect();
+            let name = texts.label(slug, action.label());
+            sheets.push(json!({
+                "id": Self::sheet_id(&action),
+                "title": name,
+                "submit_label": action.submit().map(|text| texts.label(slug, text)),
+                "description": action.describe().map(|text| texts.label(slug, text)),
+                "danger": action.is_danger(),
+                "url": format!("{base}/actions/{}", action.key()),
+                "fields": fields,
+            }));
         }
-        Ok(views)
+        sheets
+    }
+
+    /// The form's fields for the create page (`record` is `None`) or the
+    /// edit page, each with its value and a `belongs_to`'s choices.
+    async fn fields(
+        &self,
+        state: &AppState,
+        record: Option<&Value>,
+        texts: &Texts,
+    ) -> Result<Vec<FieldView>> {
+        form_fields(&*self.resource, state, record, texts, &[]).await
+    }
+
+    /// The record's tabs: "Details", then each relation manager the user
+    /// may see. Empty when the resource has none.
+    fn relation_tabs(&self, user: &AuthUser, texts: &Texts, id: &str) -> Vec<(String, String)> {
+        let managers: Vec<_> = self
+            .resource
+            .relations()
+            .into_iter()
+            .filter(|manager| manager.visible(user))
+            .collect();
+        if managers.is_empty() {
+            return Vec::new();
+        }
+        let base = self.base();
+        let has_view = !self.resource.entries().is_empty();
+        let details = if has_view {
+            format!("{base}/{id}")
+        } else {
+            format!("{base}/{id}/edit")
+        };
+        let mut tabs = vec![(details, texts.get("details", &[]))];
+        for manager in managers {
+            tabs.push((
+                format!("{base}/{id}/relations/{}", manager.key()),
+                texts.label(self.resource.slug(), manager.label()),
+            ));
+        }
+        tabs
     }
 
     /// The names of the form's money fields.
     fn money_fields(&self) -> Vec<String> {
-        self.resource
-            .fields()
-            .iter()
-            .filter(|field| field.kind() == FieldKind::Money)
-            .map(|field| field.name().to_owned())
-            .collect()
+        money_fields(&*self.resource)
     }
 
     /// The resource's record-aware rules for `form`, with what refills the
     /// form if they fail. Synchronous, so the form isn't held across an
     /// `.await` (it needn't be `Sync`).
     fn rules(&self, form: &R::Form, record: Option<&R::Model>) -> (Validator, Value) {
-        let mut validator = Validator::new();
-        self.resource.rules(form, record, &mut validator);
-        let input = renox::serde_json::to_value(form).unwrap_or(Value::Null);
-        (validator, input)
+        rules_of(&*self.resource, form, record)
     }
+}
+
+/// A record whose relation manager is open, as the manager sees it.
+pub(crate) struct ParentRecord {
+    pub(crate) id: String,
+    pub(crate) key: renox::db::DbValue,
+    pub(crate) title: String,
+    pub(crate) can_update: bool,
+}
+
+/// The resource that owns a relation manager, whatever its model.
+pub(crate) trait Parent: Send + Sync {
+    fn panel(&self) -> &Arc<Panel>;
+    fn slug(&self) -> &str;
+    /// The resource's list address.
+    fn base(&self) -> String;
+    fn names(&self, texts: &Texts) -> (String, String);
+    /// The record `id`, once the user may open it (to view or to edit).
+    fn open(
+        &self,
+        state: &AppState,
+        user: &AuthUser,
+        id: &str,
+        texts: &Texts,
+    ) -> BoxFuture<'static, Result<ParentRecord>>;
+    fn tabs(&self, user: &AuthUser, texts: &Texts, id: &str) -> Vec<(String, String)>;
+}
+
+impl<R: AdminResource> Parent for Ctx<R> {
+    fn panel(&self) -> &Arc<Panel> {
+        &self.panel
+    }
+
+    fn slug(&self) -> &str {
+        self.resource.slug()
+    }
+
+    fn base(&self) -> String {
+        Ctx::base(self)
+    }
+
+    fn names(&self, texts: &Texts) -> (String, String) {
+        (self.label(texts), self.plural(texts))
+    }
+
+    fn open(
+        &self,
+        state: &AppState,
+        user: &AuthUser,
+        id: &str,
+        texts: &Texts,
+    ) -> BoxFuture<'static, Result<ParentRecord>> {
+        let (cx, state, user, id, texts) = (
+            self.clone(),
+            state.clone(),
+            user.clone(),
+            id.to_owned(),
+            texts.clone(),
+        );
+        Box::pin(async move {
+            cx.panel.check(&user)?;
+            let record = cx.find(&state.db, &id, false).await?;
+            let can_update = cx.allows(&user, "update", Some(&record));
+            if !can_update && !cx.allows(&user, "view", Some(&record)) {
+                return Err(Error::Forbidden);
+            }
+            Ok(ParentRecord {
+                id: record.id().to_string(),
+                key: renox::db::ToDbValue::to_db_value(&record.id()),
+                title: cx.title_of(&record, &texts),
+                can_update,
+            })
+        })
+    }
+
+    fn tabs(&self, user: &AuthUser, texts: &Texts, id: &str) -> Vec<(String, String)> {
+        self.relation_tabs(user, texts, id)
+    }
+}
+
+/// Whether `resource` offers `ability` at all (an edit-only resource has
+/// no create and no delete).
+pub(crate) fn offers<R: AdminResource>(resource: &R, ability: &str) -> bool {
+    match ability {
+        "create" => resource.creatable(),
+        "delete" | "deleteAny" | "restore" | "restoreAny" | "forceDelete" | "forceDeleteAny" => {
+            resource.deletable()
+        }
+        _ => true,
+    }
+}
+
+/// A record's title: the resource's own, or "Product #7" (in the
+/// request's language) when it keeps the default.
+pub(crate) fn record_title<R: AdminResource>(
+    resource: &R,
+    record: &R::Model,
+    texts: &Texts,
+) -> String {
+    let title = resource.record_title(record);
+    let id = record.id().to_string();
+    if title == format!("{} #{}", resource.label(), id) {
+        let label = texts.label(resource.slug(), resource.label());
+        texts.get("record_title", &[("label", &label), ("id", &id)])
+    } else {
+        title
+    }
+}
+
+/// The names of `resource`'s money fields.
+pub(crate) fn money_fields<R: AdminResource>(resource: &R) -> Vec<String> {
+    resource
+        .fields()
+        .iter()
+        .filter(|field| field.kind() == FieldKind::Money)
+        .map(|field| field.name().to_owned())
+        .collect()
+}
+
+/// `resource`'s form fields for a create page (`record` is `None`) or an
+/// edit page, translated, each with its value and a `belongs_to`'s
+/// choices. `hidden` names fields left out (a relation's foreign key).
+pub(crate) async fn form_fields<R: AdminResource>(
+    resource: &R,
+    state: &AppState,
+    record: Option<&Value>,
+    texts: &Texts,
+    hidden: &[&str],
+) -> Result<Vec<FieldView>> {
+    let (db, decimals) = (&state.db, money_decimals(state));
+    let creating = record.is_none();
+    let slug = resource.slug();
+    let mut views = Vec::new();
+    for mut field in resource.fields() {
+        if !field.shown(creating) || hidden.contains(&field.name()) {
+            continue;
+        }
+        if let Some((table, title)) = field.relation() {
+            let options = relation_options(db, table, title).await?;
+            field.set_options(options);
+        }
+        if matches!(field.kind(), FieldKind::Select | FieldKind::BelongsTo)
+            && !field.has_placeholder()
+        {
+            field = field.placeholder(&texts.get("select_placeholder", &[]));
+        }
+        field.translate(&|text| texts.label(slug, text));
+        views.push(FieldView::new(field, record, creating, decimals));
+    }
+    Ok(views)
+}
+
+/// `resource`'s record-aware rules for `form`, with what refills the form
+/// if they fail.
+pub(crate) fn rules_of<R: AdminResource>(
+    resource: &R,
+    form: &R::Form,
+    record: Option<&R::Model>,
+) -> (Validator, Value) {
+    let mut validator = Validator::new();
+    resource.rules(form, record, &mut validator);
+    let input = renox::serde_json::to_value(form).unwrap_or(Value::Null);
+    (validator, input)
 }
 
 /// Runs the rules' database checks: a failure answers like `Valid<T>`
 /// does (422 for htmx, back to the form otherwise).
-async fn check(db: &Db, (validator, input): (Validator, Value)) -> Result {
+pub(crate) async fn check(db: &Db, (validator, input): (Validator, Value)) -> Result {
     let errors = validator.finish(db).await?;
     if errors.is_empty() {
         Ok(())
@@ -448,7 +713,7 @@ async fn check(db: &Db, (validator, input): (Validator, Value)) -> Result {
 
 /// A field as `renox-admin/fields.html` draws it.
 #[derive(Serialize)]
-struct FieldView {
+pub(crate) struct FieldView {
     #[serde(flatten)]
     field: Field,
     value: Value,
@@ -461,7 +726,7 @@ struct FieldView {
 impl FieldView {
     /// `decimals`: `APP_CURRENCY`'s, for money fields, which show whole
     /// units (`12.99`) of an amount kept in the smallest unit (`1299`).
-    fn new(field: Field, record: Option<&Value>, creating: bool, decimals: u32) -> Self {
+    pub(crate) fn new(field: Field, record: Option<&Value>, creating: bool, decimals: u32) -> Self {
         let json = renox::serde_json::to_value(&field).unwrap_or(Value::Null);
         let read = |key: &str| json.get(key).cloned().unwrap_or(Value::Null);
         let mut value = match record {
@@ -535,7 +800,7 @@ async fn relation_options(db: &Db, table: &str, title: &str) -> Result<Vec<(Stri
 }
 
 /// The record as the pages read it: its fields as JSON.
-fn to_json(record: &impl Serialize) -> Result<Value> {
+pub(crate) fn to_json(record: &impl Serialize) -> Result<Value> {
     Ok(renox::serde_json::to_value(record)?)
 }
 
@@ -546,33 +811,117 @@ fn page<R: AdminResource>(
     user: &AuthUser,
     name: &str,
     mut values: Map<String, Value>,
+    texts: &Texts,
 ) -> Result<View> {
     values.insert(
         "admin".into(),
-        to_json(&cx.panel.frame(state, user, Some(cx.resource.slug())))?,
+        to_json(&cx.panel.frame(state, user, Some(cx.resource.slug()), texts))?,
     );
-    values.insert("resource".into(), to_json(&cx.info())?);
+    values.insert("resource".into(), to_json(&cx.info(texts))?);
     Ok(view(name, Value::Object(values)))
 }
 
 /// After a save: the list, with a toast (`HX-Redirect` for htmx forms).
-fn done(htmx: &Htmx, toast: Toast, to: &str) -> Response {
+pub(crate) fn done(htmx: &Htmx, toast: Toast, to: &str) -> Response {
     (toast, htmx.redirect(to)).into_response()
+}
+
+/// What an input sheet's form is checked against: each field's own
+/// declaration (`required`, numbers, dates, `min`/`max`, the choices).
+/// The values come back as the action reads them: money in the smallest
+/// unit, toggles as `true`/`false`.
+pub(crate) fn check_input(
+    fields: &[Field],
+    posted: &[(String, String)],
+    decimals: u32,
+    texts: &Texts,
+    scope: &str,
+) -> std::result::Result<ActionInput, Errors> {
+    let mut errors = Errors::new();
+    let mut values = Vec::new();
+    for field in fields {
+        let name = field.name();
+        let label = texts.label(scope, field.label_text());
+        let mut value = posted
+            .iter()
+            .rev()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.trim().to_owned())
+            .unwrap_or_default();
+        let mut fail = |key: &str, extra: &[(&str, &str)]| {
+            let mut all = vec![("field", label.as_str())];
+            all.extend_from_slice(extra);
+            errors.add(name, texts.get(key, &all));
+        };
+        match field.kind() {
+            FieldKind::Checkbox | FieldKind::Toggle => {
+                let on = matches!(value.as_str(), "on" | "true" | "1");
+                values.push((name.to_owned(), on.to_string()));
+                continue;
+            }
+            _ if value.is_empty() => {
+                if field.is_required() {
+                    fail("required", &[]);
+                }
+                values.push((name.to_owned(), value));
+                continue;
+            }
+            FieldKind::Number | FieldKind::Money => match value.parse::<f64>() {
+                Ok(n) if n.is_finite() => {
+                    for (limit, key, below) in [
+                        (field.min_text(), "min", true),
+                        (field.max_text(), "max", false),
+                    ] {
+                        if let Some(limit) = limit
+                            && let Ok(bound) = limit.parse::<f64>()
+                            && (if below { n < bound } else { n > bound })
+                        {
+                            fail(key, &[(key, limit)]);
+                        }
+                    }
+                    if field.kind() == FieldKind::Money
+                        && decimals > 0
+                        && let Some(amount) = smallest_unit(&value, decimals)
+                    {
+                        value = amount;
+                    }
+                }
+                _ => fail("number", &[]),
+            },
+            FieldKind::Date
+                if renox::chrono::NaiveDate::parse_from_str(&value, "%Y-%m-%d").is_err() =>
+            {
+                fail("date", &[]);
+            }
+            FieldKind::Email if !value.contains('@') => fail("email", &[]),
+            FieldKind::Select if !field.choices().iter().any(|(v, _)| *v == value) => {
+                fail("choice", &[]);
+            }
+            _ => {}
+        }
+        values.push((name.to_owned(), value));
+    }
+    if errors.is_empty() {
+        Ok(ActionInput::new(values))
+    } else {
+        Err(errors)
+    }
 }
 
 /// Reads and checks the form, after the user was let in: `Valid<T>`'s
 /// answer (errors, or a live-validation reply) when it isn't valid. The
 /// `money` fields' whole units (`12.99`) become the smallest unit
 /// (`1299`) first, as the model keeps them.
-async fn read_form<F>(
+pub(crate) async fn read_form<F>(
     state: &AppState,
     req: Request,
     money: &[String],
+    fixed: &[(String, String)],
 ) -> std::result::Result<F, Box<Response>>
 where
     F: serde::de::DeserializeOwned + Validate + Send,
 {
-    let req = money_to_smallest_unit(state, req, money).await?;
+    let req = rewrite_body(state, req, money, fixed).await?;
     Valid::<F>::from_request(req, state)
         .await
         .map(|Valid(form)| form)
@@ -580,7 +929,7 @@ where
 }
 
 /// `APP_CURRENCY`'s usual decimals (2 for `USD`, 0 for `IDR`).
-fn money_decimals(state: &AppState) -> u32 {
+pub(crate) fn money_decimals(state: &AppState) -> u32 {
     renox::currency_decimals(&state.config.currency).min(6)
 }
 
@@ -598,7 +947,7 @@ fn whole_units(amount: i64, decimals: u32) -> String {
 /// `12.99` with 2 decimals → `1299` (rounded to the smallest unit). Text
 /// that isn't an amount is left for the form's rules to report.
 /// Worked out on the digits, so `0.305` is `31`, not a float's `30`.
-fn smallest_unit(text: &str, decimals: u32) -> Option<String> {
+pub(crate) fn smallest_unit(text: &str, decimals: u32) -> Option<String> {
     let text = text.trim();
     let (negative, text) = match text.strip_prefix('-') {
         Some(rest) => (true, rest),
@@ -631,19 +980,22 @@ fn smallest_unit(text: &str, decimals: u32) -> Option<String> {
     ))
 }
 
-/// The request with its money fields in the smallest unit: a form
-/// (`application/x-www-form-urlencoded`) or a JSON object. Other bodies,
-/// and currencies without decimals, pass as they are.
-async fn money_to_smallest_unit(
+/// The request with its money fields in the smallest unit, and the
+/// `fixed` values set whatever the browser sent (a relation's foreign
+/// key): a form (`application/x-www-form-urlencoded`) or a JSON object.
+/// Other bodies, and currencies without decimals, pass as they are.
+async fn rewrite_body(
     state: &AppState,
     req: Request,
     money: &[String],
+    fixed: &[(String, String)],
 ) -> std::result::Result<Request, Box<Response>> {
     use renox::axum::body::{Body, Bytes};
     use renox::axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 
     let decimals = money_decimals(state);
-    if decimals == 0 || money.is_empty() {
+    let money: &[String] = if decimals == 0 { &[] } else { money };
+    if money.is_empty() && fixed.is_empty() {
         return Ok(req);
     }
     let kind = req
@@ -663,8 +1015,12 @@ async fn money_to_smallest_unit(
         .map_err(|rejection| Box::new(rejection.into_response()))?;
     let changed = if form {
         let text = String::from_utf8_lossy(&bytes);
-        let pairs: Vec<String> = text
+        let mut pairs: Vec<String> = text
             .split('&')
+            .filter(|pair| {
+                let key = pair.split_once('=').map_or(*pair, |(key, _)| key);
+                !fixed.iter().any(|(name, _)| *name == url_decode(key))
+            })
             .map(|pair| {
                 let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
                 if money.iter().any(|name| *name == url_decode(key))
@@ -676,6 +1032,9 @@ async fn money_to_smallest_unit(
                 }
             })
             .collect();
+        for (name, value) in fixed {
+            pairs.push(format!("{}={}", url_encode(name), url_encode(value)));
+        }
         Bytes::from(pairs.join("&"))
     } else {
         match renox::serde_json::from_slice::<Value>(&bytes) {
@@ -690,6 +1049,12 @@ async fn money_to_smallest_unit(
                         object.insert(name.clone(), Value::from(amount));
                     }
                 }
+                for (name, value) in fixed {
+                    let value = value
+                        .parse::<i64>()
+                        .map_or_else(|_| Value::String(value.clone()), Value::from);
+                    object.insert(name.clone(), value);
+                }
                 Bytes::from(renox::serde_json::to_vec(&object).unwrap_or_default())
             }
             _ => bytes,
@@ -697,6 +1062,31 @@ async fn money_to_smallest_unit(
     };
     parts.headers.remove(CONTENT_LENGTH);
     Ok(Request::from_parts(parts, Body::from(changed)))
+}
+
+/// `a b` → `a%20b` (a form's key or value).
+fn url_encode(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for byte in text.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            out.push(byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
+/// `a=1&b=x%20y` → `[("a", "1"), ("b", "x y")]`.
+pub(crate) fn parse_pairs(body: &[u8]) -> Vec<(String, String)> {
+    String::from_utf8_lossy(body)
+        .split('&')
+        .filter(|pair| !pair.is_empty())
+        .map(|pair| {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            (url_decode(key), url_decode(value))
+        })
+        .collect()
 }
 
 /// `a%20b+c` → `a b c` (a form's key or value).
@@ -728,6 +1118,7 @@ async fn dashboard(
     user: AuthUser,
 ) -> Result<View> {
     panel.check(&user)?;
+    let texts = Texts::new(&state);
     let mut cards = Vec::new();
     for resource in &panel.resources {
         if !resource.visible(&user) {
@@ -735,14 +1126,14 @@ async fn dashboard(
         }
         let count = resource.count(state.db.clone()).await?;
         cards.push(json!({
-            "label": resource.plural(),
+            "label": texts.label(resource.slug(), resource.plural()),
             "count": count,
             "url": format!("{}/{}", panel.path, resource.slug()),
         }));
     }
     Ok(view(
         "renox-admin/dashboard.html",
-        context! { admin => panel.frame(&state, &user, None), cards },
+        context! { admin => panel.frame(&state, &user, None, &texts), cards },
     ))
 }
 
@@ -753,9 +1144,11 @@ async fn index<R: AdminResource>(
     request: GridRequest,
 ) -> Result<Response> {
     cx.authorize(&user, "viewAny", None)?;
+    let texts = Texts::new(&state);
+    let slug = cx.resource.slug();
     let filter = request.param("filter").filter(|f| !f.is_empty());
-    let trashed = filter == Some(TRASHED) && R::Model::SOFT_DELETES;
-    let grid = cx.grid(&user, trashed);
+    let trashed = filter == Some(TRASHED) && R::Model::SOFT_DELETES && cx.offers("restoreAny");
+    let grid = cx.grid(&user, trashed, &texts);
     let query = cx.scoped(filter);
     if let Some(file) = grid.export(query.clone(), &request).await? {
         return Ok(file);
@@ -765,16 +1158,17 @@ async fn index<R: AdminResource>(
     let base = cx.base();
     let mut tabs = Vec::new();
     let filters = cx.resource.filters();
-    if !filters.is_empty() || R::Model::SOFT_DELETES {
-        tabs.push((base.clone(), "All".to_owned()));
+    let has_trash = R::Model::SOFT_DELETES && cx.offers("restoreAny");
+    if !filters.is_empty() || has_trash {
+        tabs.push((base.clone(), texts.get("all", &[])));
         for found in &filters {
             tabs.push((
                 format!("{base}?filter={}", found.key()),
-                found.label().to_owned(),
+                texts.label(slug, found.label()),
             ));
         }
-        if R::Model::SOFT_DELETES && cx.resource.allows(&user, "restoreAny", None) {
-            tabs.push((format!("{base}?filter={TRASHED}"), "Trash".to_owned()));
+        if has_trash && cx.resource.allows(&user, "restoreAny", None) {
+            tabs.push((format!("{base}?filter={TRASHED}"), texts.get("trash", &[])));
         }
     }
     let current = match filter {
@@ -788,15 +1182,30 @@ async fn index<R: AdminResource>(
         _ => base.clone(),
     };
     let can = Abilities {
-        create: !trashed && cx.resource.allows(&user, "create", None),
+        create: !trashed && cx.allows(&user, "create", None),
         ..Abilities::default()
     };
+    let plural = cx.plural(&texts);
     let mut values = Map::new();
     values.insert("rows".into(), to_json(&rows)?);
     values.insert("tabs".into(), to_json(&tabs)?);
     values.insert("current_tab".into(), Value::String(current));
     values.insert("allowed".into(), to_json(&can)?);
-    Ok(page(&cx, &state, &user, "renox-admin/index.html", values)?.into_response())
+    values.insert(
+        "tabs_label".into(),
+        Value::String(texts.get("filters_label", &[("plural", &plural)])),
+    );
+    values.insert(
+        "new_label".into(),
+        Value::String(texts.get("new", &[("label", &lower(&cx.label(&texts)))])),
+    );
+    let sheets = if trashed {
+        Vec::new()
+    } else {
+        cx.sheets(&user, &texts, money_decimals(&state))
+    };
+    values.insert("sheets".into(), to_json(&sheets)?);
+    Ok(page(&cx, &state, &user, "renox-admin/index.html", values, &texts)?.into_response())
 }
 
 async fn create<R: AdminResource>(
@@ -805,22 +1214,24 @@ async fn create<R: AdminResource>(
     user: AuthUser,
 ) -> Result<View> {
     cx.authorize(&user, "create", None)?;
-    let fields = cx.fields(&state, None).await?;
-    let info = cx.info();
+    let texts = Texts::new(&state);
+    let fields = cx.fields(&state, None, &texts).await?;
+    let info = cx.info(&texts);
+    let label = lower(&info.label);
     let mut values = Map::new();
     values.insert(
         "title".into(),
-        Value::String(format!("New {}", info.label.to_lowercase())),
+        Value::String(texts.get("new", &[("label", &label)])),
     );
     values.insert("fields".into(), to_json(&fields)?);
     values.insert("action".into(), Value::String(info.index_url.clone()));
     values.insert("method".into(), Value::String("POST".into()));
     values.insert(
         "submit_label".into(),
-        Value::String(format!("Create {}", info.label.to_lowercase())),
+        Value::String(texts.get("create", &[("label", &label)])),
     );
     values.insert("record".into(), Value::Null);
-    page(&cx, &state, &user, "renox-admin/form.html", values)
+    page(&cx, &state, &user, "renox-admin/form.html", values, &texts)
 }
 
 async fn store<R: AdminResource>(
@@ -831,7 +1242,8 @@ async fn store<R: AdminResource>(
     req: Request,
 ) -> Result<Response> {
     cx.authorize(&user, "create", None)?;
-    let form: R::Form = match read_form(&state, req, &cx.money_fields()).await {
+    let texts = Texts::new(&state);
+    let form: R::Form = match read_form(&state, req, &cx.money_fields(), &[]).await {
         Ok(form) => form,
         Err(answer) => return Ok(*answer),
     };
@@ -840,7 +1252,14 @@ async fn store<R: AdminResource>(
     let mut record = R::Model::default();
     cx.resource.fill(&mut record, form);
     record.save(&state.db).await?;
-    let toast = Toast::success(format!("{} created.", cx.resource.label()));
+    let saved = SaveContext {
+        state: state.clone(),
+        user: user.clone(),
+        created: true,
+        previous: None,
+    };
+    cx.resource.saved(&record, &saved).await?;
+    let toast = Toast::success(texts.get("created", &[("label", &cx.label(&texts))]));
     Ok(done(&htmx, toast, &cx.base()))
 }
 
@@ -851,9 +1270,14 @@ async fn show<R: AdminResource>(
     Path(id): Path<String>,
 ) -> Result<View> {
     cx.panel.check(&user)?;
-    let entries = cx.resource.entries();
+    let texts = Texts::new(&state);
+    let mut entries = cx.resource.entries();
     if entries.is_empty() {
         return Err(Error::NotFound);
+    }
+    let slug = cx.resource.slug();
+    for entry in &mut entries {
+        entry.translate(&|text| texts.label(slug, text));
     }
     let record = cx.find(&state.db, &id, true).await?;
     cx.authorize(&user, "view", Some(&record))?;
@@ -861,7 +1285,7 @@ async fn show<R: AdminResource>(
         && to_json(&record)?
             .get("deleted_at")
             .is_some_and(|at| !at.is_null());
-    let may = |ability: &str| cx.resource.allows(&user, ability, Some(&record));
+    let may = |ability: &str| cx.allows(&user, ability, Some(&record));
     let can = Abilities {
         create: false,
         update: !deleted && may("update"),
@@ -871,6 +1295,7 @@ async fn show<R: AdminResource>(
     };
     let base = cx.base();
     let id = record.id().to_string();
+    let label = cx.label(&texts);
     let mut values = Map::new();
     values.insert("record".into(), to_json(&record)?);
     values.insert("entries".into(), to_json(&entries)?);
@@ -890,11 +1315,12 @@ async fn show<R: AdminResource>(
         "force_delete_url".into(),
         Value::String(format!("{base}/{id}/actions/force-delete")),
     );
-    values.insert(
-        "title".into(),
-        Value::String(cx.resource.record_title(&record)),
-    );
-    page(&cx, &state, &user, "renox-admin/show.html", values)
+    values.insert("title".into(), Value::String(cx.title_of(&record, &texts)));
+    values.insert("label_lower".into(), Value::String(lower(&label)));
+    let tabs = cx.relation_tabs(&user, &texts, &id);
+    values.insert("current_tab".into(), Value::String(format!("{base}/{id}")));
+    values.insert("relations".into(), to_json(&tabs)?);
+    page(&cx, &state, &user, "renox-admin/show.html", values, &texts)
 }
 
 async fn edit<R: AdminResource>(
@@ -904,24 +1330,29 @@ async fn edit<R: AdminResource>(
     Path(id): Path<String>,
 ) -> Result<View> {
     cx.panel.check(&user)?;
+    let texts = Texts::new(&state);
     let record = cx.find(&state.db, &id, false).await?;
     cx.authorize(&user, "update", Some(&record))?;
     let json = to_json(&record)?;
-    let fields = cx.fields(&state, Some(&json)).await?;
+    let fields = cx.fields(&state, Some(&json), &texts).await?;
     let base = cx.base();
     let id = record.id().to_string();
-    let label = cx.resource.label().to_owned();
+    let label = cx.label(&texts);
+    let title = cx.title_of(&record, &texts);
     let mut values = Map::new();
     values.insert(
         "title".into(),
-        Value::String(format!("Edit {}", cx.resource.record_title(&record))),
+        Value::String(texts.get("edit_title", &[("title", &title)])),
     );
     values.insert("fields".into(), to_json(&fields)?);
     values.insert("action".into(), Value::String(format!("{base}/{id}")));
     values.insert("method".into(), Value::String("PUT".into()));
-    values.insert("submit_label".into(), Value::String("Save changes".into()));
+    values.insert(
+        "submit_label".into(),
+        Value::String(texts.get("save_changes", &[])),
+    );
     values.insert("record".into(), json);
-    if cx.resource.allows(&user, "delete", Some(&record)) {
+    if cx.allows(&user, "delete", Some(&record)) {
         values.insert(
             "delete".into(),
             json!({
@@ -931,7 +1362,16 @@ async fn edit<R: AdminResource>(
             }),
         );
     }
-    page(&cx, &state, &user, "renox-admin/form.html", values)
+    let has_view = !cx.resource.entries().is_empty();
+    let tabs = cx.relation_tabs(&user, &texts, &id);
+    let details = if has_view {
+        format!("{base}/{id}")
+    } else {
+        format!("{base}/{id}/edit")
+    };
+    values.insert("current_tab".into(), Value::String(details));
+    values.insert("relations".into(), to_json(&tabs)?);
+    page(&cx, &state, &user, "renox-admin/form.html", values, &texts)
 }
 
 async fn update<R: AdminResource>(
@@ -943,17 +1383,26 @@ async fn update<R: AdminResource>(
     req: Request,
 ) -> Result<Response> {
     cx.panel.check(&user)?;
+    let texts = Texts::new(&state);
     let mut record = cx.find(&state.db, &id, false).await?;
     cx.authorize(&user, "update", Some(&record))?;
-    let form: R::Form = match read_form(&state, req, &cx.money_fields()).await {
+    let form: R::Form = match read_form(&state, req, &cx.money_fields(), &[]).await {
         Ok(form) => form,
         Err(answer) => return Ok(*answer),
     };
     let rules = cx.rules(&form, Some(&record));
     check(&state.db, rules).await?;
+    let previous = to_json(&record)?;
     cx.resource.fill(&mut record, form);
     record.save(&state.db).await?;
-    let toast = Toast::success(format!("{} saved.", cx.resource.label()));
+    let saved = SaveContext {
+        state: state.clone(),
+        user: user.clone(),
+        created: false,
+        previous: Some(previous),
+    };
+    cx.resource.saved(&record, &saved).await?;
+    let toast = Toast::success(texts.get("saved", &[("label", &cx.label(&texts))]));
     Ok(done(&htmx, toast, &cx.base()))
 }
 
@@ -965,10 +1414,11 @@ async fn destroy<R: AdminResource>(
     Path(id): Path<String>,
 ) -> Result<Response> {
     cx.panel.check(&user)?;
+    let texts = Texts::new(&state);
     let mut record = cx.find(&state.db, &id, false).await?;
     cx.authorize(&user, "delete", Some(&record))?;
     record.delete(&state.db).await?;
-    let toast = Toast::success(format!("{} deleted.", cx.resource.label()));
+    let toast = Toast::success(texts.get("deleted", &[("label", &cx.label(&texts))]));
     // The grid's row action reloads the grid; the edit page's form goes
     // back to the list.
     if htmx.request {
@@ -1019,29 +1469,36 @@ impl Builtin {
         !matches!(self, Self::Delete)
     }
 
-    fn done(self, count: usize, label: &str, plural: &str) -> Toast {
+    fn done(self, count: usize, label: &str, plural: &str, texts: &Texts) -> Toast {
         let what = if count == 1 {
             format!("1 {}", label.to_lowercase())
         } else {
             format!("{count} {}", plural.to_lowercase())
         };
-        Toast::success(match self {
-            Self::Delete => format!("{what} deleted."),
-            Self::Restore => format!("{what} restored."),
-            Self::ForceDelete => format!("{what} deleted for good."),
-        })
+        let key = match self {
+            Self::Delete => "n_deleted",
+            Self::Restore => "n_restored",
+            Self::ForceDelete => "n_deleted_for_good",
+        };
+        Toast::success(texts.get(key, &[("what", &what)]))
     }
 }
 
-/// Runs action `key` on `records`, once each is allowed.
+/// Runs action `key` on `records`, once each is allowed. `posted` is the
+/// request's form, for an action that asks for input.
 async fn run<R: AdminResource>(
     cx: &Ctx<R>,
     state: &AppState,
     user: &AuthUser,
     key: &str,
     mut records: Vec<R::Model>,
+    posted: &[(String, String)],
+    texts: &Texts,
 ) -> Result<Toast> {
     if let Some(builtin) = Builtin::of(key, R::Model::SOFT_DELETES) {
+        if !cx.offers(builtin.ability()) {
+            return Err(Error::NotFound);
+        }
         if records
             .iter()
             .any(|record| !cx.resource.allows(user, builtin.ability(), Some(record)))
@@ -1058,7 +1515,7 @@ async fn run<R: AdminResource>(
             }
         }
         tx.commit().await?;
-        return Ok(builtin.done(count, cx.resource.label(), cx.resource.plural_label()));
+        return Ok(builtin.done(count, &cx.label(texts), &cx.plural(texts), texts));
     }
     let action = cx
         .resource
@@ -1072,11 +1529,32 @@ async fn run<R: AdminResource>(
     }) {
         return Err(Error::Forbidden);
     }
+    let input = if action.fields().is_empty() {
+        ActionInput::default()
+    } else {
+        check_input(
+            action.fields(),
+            posted,
+            money_decimals(state),
+            texts,
+            cx.resource.slug(),
+        )
+        .map_err(ValidationError::new)?
+    };
     let context = crate::ActionContext {
         state: state.clone(),
         user: user.clone(),
+        input,
     };
     action.run(records, context).await
+}
+
+/// Whether the custom action `key` asks for input.
+fn asks_input<R: AdminResource>(cx: &Ctx<R>, key: &str) -> bool {
+    cx.resource
+        .actions()
+        .iter()
+        .any(|action| action.key() == key && !action.fields().is_empty())
 }
 
 async fn bulk<R: AdminResource>(
@@ -1084,12 +1562,15 @@ async fn bulk<R: AdminResource>(
     State(state): State<AppState>,
     user: AuthUser,
     Path(key): Path<String>,
+    htmx: Htmx,
     request: GridRequest,
-    Form(selection): Form<Selection>,
-) -> Result<Toast> {
+    body: renox::axum::body::Bytes,
+) -> Result<Response> {
     cx.panel.check(&user)?;
+    let texts = Texts::new(&state);
     let builtin = Builtin::of(&key, R::Model::SOFT_DELETES);
     match builtin {
+        Some(builtin) if !cx.offers(builtin.bulk_ability()) => return Err(Error::NotFound),
         Some(builtin) if !cx.resource.allows(&user, builtin.bulk_ability(), None) => {
             return Err(Error::Forbidden);
         }
@@ -1110,16 +1591,38 @@ async fn bulk<R: AdminResource>(
     if builtin.is_some_and(Builtin::on_trashed) != trashed {
         return Err(Error::NotFound);
     }
-    let grid = cx.grid(&user, trashed);
+    let posted = parse_pairs(&body);
+    let mut selection = Selection::default();
+    for (name, value) in &posted {
+        match name.as_str() {
+            "ids" => {
+                selection.ids = value
+                    .split(',')
+                    .filter(|id| !id.is_empty())
+                    .map(str::to_owned)
+                    .collect()
+            }
+            "all" => selection.all = value == "true",
+            _ => {}
+        }
+    }
+    let grid = cx.grid(&user, trashed, &texts);
     let records = grid
         .selected(cx.scoped(filter), &request, &selection)?
         .limit(MAX_SELECTED)
         .get(&state.db)
         .await?;
     if records.is_empty() {
-        return Ok(Toast::info("Nothing was selected."));
+        return Ok(Toast::info(texts.get("nothing_selected", &[])).into_response());
     }
-    run(&cx, &state, &user, &key, records).await
+    let input = asks_input(&cx, &key);
+    let toast = run(&cx, &state, &user, &key, records, &posted, &texts).await?;
+    // An action with a sheet sits outside the grid: reload the page.
+    if input && htmx.request {
+        Ok((toast, HxRefresh).into_response())
+    } else {
+        Ok(toast.into_response())
+    }
 }
 
 async fn row_action<R: AdminResource>(
@@ -1128,8 +1631,10 @@ async fn row_action<R: AdminResource>(
     user: AuthUser,
     htmx: Htmx,
     Path((id, key)): Path<(String, String)>,
+    body: renox::axum::body::Bytes,
 ) -> Result<Response> {
     cx.panel.check(&user)?;
+    let texts = Texts::new(&state);
     let builtin = Builtin::of(&key, R::Model::SOFT_DELETES);
     let trashed = builtin.is_some_and(Builtin::on_trashed);
     if builtin.is_none()
@@ -1142,11 +1647,18 @@ async fn row_action<R: AdminResource>(
         return Err(Error::NotFound);
     }
     let record = cx.find(&state.db, &id, trashed).await?;
-    let toast = run(&cx, &state, &user, &key, vec![record]).await?;
-    // From the grid: the toast, and the grid reloads. From the view
-    // page's form: back to the list (the record may be gone).
+    let posted = parse_pairs(&body);
+    let input = asks_input(&cx, &key);
+    let toast = run(&cx, &state, &user, &key, vec![record], &posted, &texts).await?;
+    // From the grid: the toast, and the grid reloads (a sheet is outside
+    // it: the page does). From the view page's form: back to the list
+    // (the record may be gone).
     if htmx.request {
-        Ok(toast.into_response())
+        if input {
+            Ok((toast, HxRefresh).into_response())
+        } else {
+            Ok(toast.into_response())
+        }
     } else {
         Ok(done(&htmx, toast, &cx.base()))
     }

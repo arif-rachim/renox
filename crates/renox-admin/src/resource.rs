@@ -12,7 +12,7 @@ use renox::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::{Entry, Field};
+use crate::{Entry, Field, RelationManager};
 
 /// A boxed future that can be sent between threads, as an action returns.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -154,6 +154,67 @@ pub trait AdminResource: Send + Sync + 'static {
         Vec::new()
     }
 
+    /// Whether the panel offers a create page and a "New" button. Return
+    /// `false` for a resource that is only edited (a settings row, a
+    /// record other code creates): the create address answers 404.
+    fn creatable(&self) -> bool {
+        true
+    }
+
+    /// Whether records can be deleted from the panel (the delete buttons,
+    /// the bulk delete, the trash and its restore). Return `false` for an
+    /// edit-only resource: those addresses answer 404.
+    fn deletable(&self) -> bool {
+        true
+    }
+
+    /// Child rows managed from a record's own pages (Filament's relation
+    /// managers): its variants, photos or tags, each a tab of the record
+    /// with its own list. See [`RelationManager`].
+    fn relations(&self) -> Vec<RelationManager> {
+        Vec::new()
+    }
+
+    /// Runs after the create or edit page saved a record (Filament's
+    /// `afterSave`), with who saved it and, on an edit, the record as it was
+    /// ([`SaveContext::previous`]): audit an exact price change, refresh
+    /// search keywords. An error answers the request with it, though the
+    /// record is saved by then; do the work in a transaction of your own
+    /// when it must go in with the record.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use renox::grid::Column;
+    /// # use renox_admin::{AdminResource, Field, SaveContext};
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, name: String, price: i64 }
+    /// # impl Policy for Product { fn allows(&self, _: &User, _: &str) -> bool { true } }
+    /// # #[derive(serde::Deserialize, serde::Serialize, Validate)] struct ProductForm { #[validate(required)] name: String }
+    /// struct Products;
+    ///
+    /// impl AdminResource for Products {
+    /// #   type Model = Product;
+    /// #   type Form = ProductForm;
+    /// #   fn label(&self) -> &str { "Product" }
+    /// #   fn plural_label(&self) -> &str { "Products" }
+    /// #   fn columns(&self) -> Vec<Column> { vec![] }
+    /// #   fn fields(&self) -> Vec<Field> { vec![] }
+    /// #   fn fill(&self, p: &mut Product, f: ProductForm) { p.name = f.name; }
+    ///     // ...
+    ///     async fn saved(&self, product: &Product, cx: &SaveContext) -> Result {
+    ///         let before = cx.previous.as_ref().and_then(|old| old["price"].as_i64());
+    ///         if before.is_some_and(|before| before != product.price) {
+    ///             // Write the audit entry: who (`cx.user`), which product, from, to.
+    ///             let _ = (&cx.state.db, &cx.user);
+    ///         }
+    ///         Ok(())
+    ///     }
+    /// }
+    /// ```
+    fn saved(&self, record: &Self::Model, cx: &SaveContext) -> impl Future<Output = Result> + Send {
+        let _ = (record, cx);
+        async { Ok(()) }
+    }
+
     /// Every query the panel runs for this resource starts here: the
     /// model's query (with its default scope) by default. Narrow it to
     /// what the panel may ever show.
@@ -190,6 +251,78 @@ pub struct ActionContext {
     pub state: AppState,
     /// Who chose the action.
     pub user: AuthUser,
+    /// What the user typed in the action's form ([`AdminAction::form`]);
+    /// empty for an action without one.
+    pub input: ActionInput,
+}
+
+/// What the user typed into an action's form, already checked against the
+/// form's fields ([`AdminAction::form`]). Money fields are in the currency's
+/// smallest unit, toggles are `true` or `false`, and a field left empty is
+/// the empty text.
+///
+/// ```
+/// # use renox_admin::ActionInput;
+/// # fn demo(input: &ActionInput) {
+/// let percent: f64 = input.parse("percent").unwrap_or(0.0);
+/// let reason = input.text("reason");
+/// let notify = input.bool("notify");
+/// # let _ = (percent, reason, notify); }
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct ActionInput {
+    values: Vec<(String, String)>,
+}
+
+impl ActionInput {
+    pub(crate) fn new(values: Vec<(String, String)>) -> Self {
+        Self { values }
+    }
+
+    /// The value of field `name`, if the form had one.
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.values
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+
+    /// The value of field `name`, or `""`.
+    pub fn text(&self, name: &str) -> &str {
+        self.get(name).unwrap_or("")
+    }
+
+    /// The value of field `name` read as a `T` (a number, a date…), or
+    /// `None` when it is empty or doesn't read as one.
+    pub fn parse<T: std::str::FromStr>(&self, name: &str) -> Option<T> {
+        self.get(name)?.trim().parse().ok()
+    }
+
+    /// Whether the checkbox or toggle `name` was on.
+    pub fn bool(&self, name: &str) -> bool {
+        matches!(self.get(name), Some("true" | "on" | "1"))
+    }
+
+    /// Every field's name and value, in the form's order.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.values.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+}
+
+/// What a resource's [`saved`](AdminResource::saved) hook gets besides the
+/// record.
+#[derive(Clone)]
+#[non_exhaustive]
+pub struct SaveContext {
+    /// The app's state, e.g. its database (`state.db`).
+    pub state: AppState,
+    /// Who saved the record.
+    pub user: AuthUser,
+    /// The record was just created (the create page), not edited.
+    pub created: bool,
+    /// On an edit, the record as it was before the form changed it (its
+    /// fields as JSON); `None` for a new record.
+    pub previous: Option<renox::serde_json::Value>,
 }
 
 type Run<M> = Arc<dyn Fn(Vec<M>, ActionContext) -> BoxFuture<'static, Result<Toast>> + Send + Sync>;
@@ -223,6 +356,9 @@ pub struct AdminAction<M> {
     danger: bool,
     bulk: bool,
     row: bool,
+    form: Vec<Field>,
+    description: Option<String>,
+    submit: Option<String>,
     run: Run<M>,
 }
 
@@ -236,6 +372,9 @@ impl<M> Clone for AdminAction<M> {
             danger: self.danger,
             bulk: self.bulk,
             row: self.row,
+            form: self.form.clone(),
+            description: self.description.clone(),
+            submit: self.submit.clone(),
             run: self.run.clone(),
         }
     }
@@ -267,6 +406,9 @@ impl<M: Send + 'static> AdminAction<M> {
             danger: false,
             bulk: true,
             row: false,
+            form: Vec::new(),
+            description: None,
+            submit: None,
             run: Arc::new(move |records, cx| Box::pin(run(records, cx))),
         }
     }
@@ -300,6 +442,63 @@ impl<M: Send + 'static> AdminAction<M> {
         self.row = true;
         self.bulk = false;
         self
+    }
+
+    /// Asks for input first: the button opens a sheet with these fields
+    /// (any [`Field`] except `belongs_to`), and the action runs once they
+    /// are valid, with what was typed in [`ActionContext::input`]. A field
+    /// is checked as far as its declaration goes: `required`, numbers and
+    /// dates that read as such, `min` and `max`, a select's choices.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox_admin::{AdminAction, Field};
+    /// # #[derive(Model, serde::Serialize, Default, Clone)] struct Product { id: i64, price: i64 }
+    ///
+    /// let reprice = AdminAction::new("reprice", "Change price by %", |products: Vec<Product>, cx| async move {
+    ///     let percent: f64 = cx.input.parse("percent").unwrap_or(0.0);
+    ///     for product in &products {
+    ///         let price = (product.price as f64 * (1.0 + percent / 100.0)).round() as i64;
+    ///         Product::query()
+    ///             .where_eq("id", product.id)
+    ///             .update(&cx.state.db, &[("price", &price)])
+    ///             .await?;
+    ///     }
+    ///     Ok(Toast::success(format!("{} prices changed by {percent} %.", products.len())))
+    /// })
+    /// .form(vec![Field::number("percent", "Percent").required().min(-90).max(500).suffix("%")])
+    /// .description("Every selected product's price changes by this much.")
+    /// .submit_label("Change prices")
+    /// .row();
+    /// # let _ = reprice;
+    /// ```
+    pub fn form(mut self, fields: Vec<Field>) -> Self {
+        self.form = fields;
+        self
+    }
+
+    /// A line under the title of the input sheet ([`form`](Self::form)).
+    pub fn description(mut self, text: &str) -> Self {
+        self.description = Some(text.to_owned());
+        self
+    }
+
+    /// The input sheet's button, instead of the action's label.
+    pub fn submit_label(mut self, label: &str) -> Self {
+        self.submit = Some(label.to_owned());
+        self
+    }
+
+    pub(crate) fn fields(&self) -> &[Field] {
+        &self.form
+    }
+
+    pub(crate) fn describe(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    pub(crate) fn submit(&self) -> Option<&str> {
+        self.submit.as_deref()
     }
 
     pub(crate) fn key(&self) -> &str {

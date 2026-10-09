@@ -30,7 +30,11 @@ What each resource gets:
   `Validate` rules, with errors under their fields (htmx) and a toast after saving;
 - a view page (the kit's infolist), and delete with a confirmation; with soft deletes, a
   trash to restore from or delete for good;
-- bulk actions (delete, and the resource's own `AdminAction`s) and row actions;
+- bulk actions (delete, and the resource's own `AdminAction`s, which can ask for input in a
+  sheet) and row actions;
+- an after-save hook that gets the user, child rows managed as tabs of a record (relation
+  managers: has-many and pivot), edit-only resources, slots in the layout for the app's content,
+  and every word of the panel translatable (`renox.admin.*`);
 - the model's `Policy` asked before every page and button (`viewAny`, `view`, `create`,
   `update`, `delete`, `deleteAny`, `restore`, `forceDelete`, …);
 - a sidebar with every resource the user may see, and a dashboard with their counts.

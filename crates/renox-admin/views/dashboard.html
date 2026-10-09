@@ -4,7 +4,7 @@
 {% from "renox/ui.html" import page_header, stats, stat, empty %}
 
 {% block content %}
-{% call page_header("Dashboard") %}{% endcall %}
+{% call page_header(admin.text.dashboard) %}{% endcall %}
 {%- if cards %}
 {% call stats(4) %}
   {%- for card in cards %}
@@ -12,6 +12,6 @@
   {%- endfor %}
 {% endcall %}
 {%- else %}
-{{ empty("Nothing here yet", "No resources are open to you.") }}
+{{ empty(admin.text.nothing_yet, admin.text.no_resources) }}
 {%- endif %}
 {% endblock %}
