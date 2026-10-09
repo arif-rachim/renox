@@ -52,14 +52,29 @@ fn parse_local(text: Option<&str>) -> Option<NaiveDateTime> {
         .ok()
 }
 
-/// The next full hour after now, in `APP_TIMEZONE`.
-fn next_hour(config: &Config) -> NaiveDateTime {
-    let local = to_local(config, renox::db::now());
+/// The hours the rent form offers (`opens`/`closes` of its `datetime_range`).
+const OPENS: u32 = 8;
+const CLOSES: u32 = 20;
+
+/// The period the rent page proposes at `local` (now, in `APP_TIMEZONE`):
+/// from the next full hour for three hours, kept inside the hours the form
+/// can show. Outside them it proposes the next opening, because a time the
+/// form's lists lack is cleared by the form, which then re-asks the server.
+fn default_period(local: NaiveDateTime) -> (NaiveDateTime, NaiveDateTime) {
     let hour = local
         .date()
         .and_hms_opt(local.hour(), 0, 0)
         .unwrap_or(local);
-    hour + Duration::hours(1)
+    let mut start = hour + Duration::hours(1);
+    if start.hour() < OPENS {
+        start = start.date().and_hms_opt(OPENS, 0, 0).unwrap_or(start);
+    } else if start.hour() >= CLOSES - 1 {
+        start = (start.date() + Duration::days(1))
+            .and_hms_opt(OPENS, 0, 0)
+            .unwrap_or(start);
+    }
+    let closing = start.date().and_hms_opt(CLOSES, 0, 0).unwrap_or(start);
+    (start, (start + Duration::hours(3)).min(closing))
 }
 
 /// The model's name and size of each variant: two queries.
@@ -99,10 +114,14 @@ pub async fn search(
         .filter(|id| stores.iter().any(|s| s.id == *id))
         .or_else(|| stores.first().map(|s| s.id))
         .unwrap_or_default();
-    let start_local =
-        parse_local(query.starts_at.as_deref()).unwrap_or_else(|| next_hour(&state.config));
+    let (default_start, default_end) = default_period(to_local(&state.config, renox::db::now()));
+    let start_local = parse_local(query.starts_at.as_deref()).unwrap_or(default_start);
     let end_local =
-        parse_local(query.ends_at.as_deref()).unwrap_or(start_local + Duration::hours(3));
+        parse_local(query.ends_at.as_deref()).unwrap_or(if start_local == default_start {
+            default_end
+        } else {
+            start_local + Duration::hours(3)
+        });
     let (start, end) = (
         from_local(&state.config, start_local),
         from_local(&state.config, end_local),
@@ -647,4 +666,31 @@ pub async fn deposit_failed(state: &AppState, rental_id: i64) -> Result {
         .await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(day: u32, hour: u32, minute: u32) -> NaiveDateTime {
+        renox::chrono::NaiveDate::from_ymd_opt(2026, 10, day)
+            .unwrap()
+            .and_hms_opt(hour, minute, 0)
+            .unwrap()
+    }
+
+    #[test]
+    fn the_default_period_stays_inside_the_forms_hours() {
+        // Mid-morning: the next hour for three hours.
+        assert_eq!(default_period(at(9, 10, 30)), (at(9, 11, 0), at(9, 14, 0)));
+        // Late afternoon: the end stops at closing time (the form has no 22:00).
+        assert_eq!(default_period(at(9, 17, 5)), (at(9, 18, 0), at(9, 20, 0)));
+        // The last bookable hour keeps its two hours.
+        assert_eq!(default_period(at(9, 17, 59)), (at(9, 18, 0), at(9, 20, 0)));
+        // Evening and night: the next morning's opening.
+        assert_eq!(default_period(at(9, 18, 1)), (at(10, 8, 0), at(10, 11, 0)));
+        assert_eq!(default_period(at(9, 23, 30)), (at(10, 8, 0), at(10, 11, 0)));
+        // Before opening: today's opening.
+        assert_eq!(default_period(at(9, 3, 0)), (at(9, 8, 0), at(9, 11, 0)));
+    }
 }
