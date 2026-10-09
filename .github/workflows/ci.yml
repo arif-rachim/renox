@@ -180,11 +180,15 @@ jobs:
       - run: tests/cli/run.sh ${{ matrix.database }}
 
   browser:
-    name: browser
+    name: browser (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    # The suite takes about 5 minutes after the build; a hang fails here
-    # instead of after GitHub's six hours.
+    # Two halves in parallel keep the job under 10 minutes (#262); a hang
+    # fails here instead of after GitHub's six hours.
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [rest, bikeshop]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -198,11 +202,12 @@ jobs:
       # and the bike shop's pages, flows and blocks (bikeshop-*.test.mjs).
       - run: tests/browser/run.sh
         env:
+          BROWSER_SHARD: ${{ matrix.shard }}
           BROWSER_SCREENS: ${{ github.workspace }}/browser-screens
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: browser-screens
+          name: browser-screens-${{ matrix.shard }}
           path: browser-screens
 
   process:
