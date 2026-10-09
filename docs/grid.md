@@ -690,9 +690,35 @@ Good to know:
   staff page over tenant data, which starts from `Model::unscoped()`, still fills them in.
 - Table and column names may only have letters, digits and `_`.
 
+- `.summary(…)` and `Grid::groups` work on them too: the footer and each group's subtotal are
+  worked out by the database over every row the filters match, like for the model's own columns.
+
 > [!WARNING]
-> `.summary(…)` does nothing on these columns (summaries cover only the model's own columns),
-> and they can't be grouped by. `tags` filters also need a column of the model itself.
+> `tags` filters need a column of the model itself.
+
+### A computed column
+
+`Column::computed(sql)` makes any column's value a SQL expression of your own, where `{T}` stands
+for the model's table. A stock grid can show the stock value (what is on hand times the variant's
+cost) with no database view:
+
+```rust
+# use renox::grid::{Column, Summary};
+# fn demo() -> Column {
+Column::money("value", "Stock value")
+    .computed(
+        "{T}.\"on_hand\" * (SELECT \"cost\" FROM \"variants\" WHERE \"variants\".\"id\" = {T}.\"variant_id\")",
+    )
+    .summary(Summary::Sum)
+# }
+```
+
+It sorts, filters, searches, is summed and grouped by like the related columns above. Write the
+expression in your code, never from a request: values you need go into the model's columns or a
+subquery, not into the string.
+
+A `select` column whose options are all whole numbers (a `store_id`) filters an integer column:
+the grid compares the column as text, which both databases accept.
 
 ## Exports
 
