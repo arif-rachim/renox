@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -28,8 +27,6 @@ use crate::{
     AppState, Config, Environment, Error, Module, Registry, Result, RouteTable, Views, assets,
     auth, csrf, session, view,
 };
-
-type Seeder = Box<dyn Fn(AppState) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
 
 /// How long `serve` waits for running jobs after a shutdown signal.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
@@ -98,7 +95,6 @@ pub struct App {
     config: Option<Config>,
     modules: Vec<Box<dyn Module>>,
     migrations: Vec<Migration>,
-    seeders: Vec<Seeder>,
     gates: HashMap<String, Gate>,
     async_gates: HashMap<String, crate::auth::AsyncGate>,
     gate_before: Option<crate::auth::GateBefore>,
@@ -131,7 +127,6 @@ impl App {
             config: None,
             modules: Vec::new(),
             migrations: Vec::new(),
-            seeders: Vec::new(),
             gates: HashMap::new(),
             async_gates: HashMap::new(),
             gate_before: None,
@@ -245,8 +240,9 @@ impl App {
         self
     }
 
-    /// Registers a seeder for `db:seed`. Seeders run in registration order,
-    /// in the app's context (model hooks and `renox::context::app()` see
+    /// Registers a seeder for `db:seed`. Seeders run in registration order
+    /// (the app's, then each module's from `Registry::seeder`, in the order
+    /// the modules were added), in the app's context (model hooks and `renox::context::app()` see
     /// it), and get the app's state: `state.db`, its config, storage…
     ///
     /// ```
@@ -265,8 +261,7 @@ impl App {
         F: Fn(AppState) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result> + Send + 'static,
     {
-        self.seeders
-            .push(Box::new(move |state| Box::pin(seeder(state))));
+        self.registry.seeder(seeder);
         self
     }
 
@@ -563,6 +558,7 @@ impl App {
             auth,
             assets: static_assets,
             provided: mut module_provided,
+            seeders,
         } = self.registry;
         // The app's own `App::provide` values win over the modules'.
         module_provided.extend(self.provided);
@@ -861,7 +857,7 @@ impl App {
             router,
             state,
             migrator,
-            seeders: self.seeders,
+            seeders,
             handlers: Arc::new(jobs),
             schedule,
             zone,
@@ -1249,7 +1245,7 @@ pub struct Kernel {
     listing: Vec<RouteInfo>,
     state: AppState,
     migrator: Migrator,
-    seeders: Vec<Seeder>,
+    seeders: Vec<crate::registry::Seeder>,
     handlers: Handlers,
     schedule: Schedule,
     zone: Zone,

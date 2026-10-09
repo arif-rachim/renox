@@ -447,3 +447,55 @@ async fn the_scope_migration_keeps_global_roles_and_rolls_back() {
     ana.assign_role_in(db, "manager", &store(1)).await.unwrap();
     assert_eq!(count().await, 2);
 }
+
+/// #310: who may do something in a store, without naming roles.
+#[renox::test]
+async fn users_with_a_permission_are_listed_per_scope_and_date() {
+    let (app, _views) = boot().await;
+    let db = app.db();
+    let ids = |users: Vec<User>| users.into_iter().map(|u| u.id).collect::<Vec<_>>();
+    let ana = user(&app, "ana@example.com").await;
+    let bo = user(&app, "bo@example.com").await;
+    let cy = user(&app, "cy@example.com").await;
+    let di = user(&app, "di@example.com").await;
+    ana.assign_role_in(db, "manager", &store(1)).await.unwrap();
+    ana.assign_role_in(db, "manager", &store(2)).await.unwrap(); // listed once
+    bo.assign_role(db, "manager").await.unwrap(); // global: every store
+    cy.assign_role_in(db, "clerk", &store(1)).await.unwrap(); // no refunds
+    // Helping store 1 from tomorrow.
+    di.assign_role_in(db, "manager", &store(1))
+        .from(renox::db::now() + renox::chrono::Duration::days(1))
+        .await
+        .unwrap();
+
+    let (one, three) = (store(1), store(3));
+    let refunders = |scope| permissions::users_with_permission_in(db, "orders.refund", scope);
+    assert_eq!(ids(refunders(&one).await.unwrap()), [ana.id, bo.id]);
+    assert_eq!(ids(refunders(&three).await.unwrap()), [bo.id]);
+    assert_eq!(
+        ids(permissions::users_with_permission(db, "orders.refund")
+            .await
+            .unwrap()),
+        [bo.id]
+    );
+    assert_eq!(
+        ids(
+            permissions::users_with_permission_in(db, "orders.view", &store(1))
+                .await
+                .unwrap()
+        ),
+        [cy.id]
+    );
+    assert!(
+        permissions::users_with_permission_in(db, "no.such", &store(1))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+
+    app.travel(2 * DAY);
+    assert_eq!(
+        ids(app.at_travelled_time(refunders(&one)).await.unwrap()),
+        [ana.id, bo.id, di.id]
+    );
+}

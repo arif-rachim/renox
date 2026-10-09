@@ -435,18 +435,18 @@ example where it had to be:
 |---|---|
 | #299 | `request.route` / `route_is` give the wrong name on a path shared by several methods |
 | #300 | An htmx.rs doc example had Indonesian text |
-| #301 | `renox::Error` has no `Display` |
-| #302 | Modules can't add seeders (`App::seeder` has no `Registry` counterpart) |
-| #303 | App code can't run two statements on one generic `Executor` |
+| #301 | `renox::Error` has no `Display` (fixed in Renox 1.1) |
+| #302 | Modules can't add seeders (`App::seeder` has no `Registry` counterpart) (fixed in Renox 1.1) |
+| #303 | App code can't run two statements on one generic `Executor` (fixed in Renox 1.1) |
 | #304 | Full-text search: hyphenated codes match on SQLite but not when typed whole on PostgreSQL |
 | #305 | tests/browser lib: `press()` has no Delete key; clicks after scrolling in phone emulation land on `<html>` |
 | #306 | `Routes::etag` never answers 304 for HTML pages: the CSP nonce changes the body every request |
-| #307 | Apps can't accept "signed URL or logged-in session" on one route |
+| #307 | Apps can't accept "signed URL or logged-in session" on one route (fixed in Renox 1.1) |
 | #308 | A button's `disabled_reason` renders `aria-disabled` even when `disabled` is false |
-| #309 | `App::share` / `Registry::share` closures can't read the session |
-| #310 | Permissions: no `users_with_permission_in` (who may do X in store S) |
+| #309 | `App::share` / `Registry::share` closures can't read the session (fixed in Renox 1.1) |
+| #310 | Permissions: no `users_with_permission_in` (who may do X in store S) (fixed in Renox 1.1) |
 | #311 | `Kernel::run_scheduled` doesn't run at a travelled time |
-| #312 | A template variable named like an imported macro is shadowed silently |
+| #312 | A template variable named like an imported macro is shadowed silently (fixed in Renox 1.1) |
 | #313 | `renox::grid` can't sum or group by joined or computed columns |
 | #314 | renox-admin: actions with input, an after-save hook with the user, relation managers, an About-this-page slot |
 | #315 | renox-billing: guards for named subscriptions, pause, gateway webhook context |

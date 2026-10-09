@@ -117,6 +117,8 @@ const BUILTIN: &[(&str, &str)] = &[
 #[derive(Clone)]
 pub struct Views {
     reloader: Arc<AutoReloader>,
+    /// `APP_DEBUG`: also warn about values hidden by imported macros.
+    debug: bool,
 }
 
 /// What an `App::share` function knows about the request being rendered.
@@ -131,6 +133,19 @@ pub struct ViewContext {
     pub locale: String,
     /// The request's path, e.g. `/products`.
     pub path: String,
+    /// The request's session (absent only where no session middleware ran),
+    /// e.g. a guest's cart kept there:
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// App::new().share("cart_count", |ctx: renox::view::ViewContext| async move {
+    ///     let cart: Vec<i64> = ctx.session.and_then(|s| s.get("cart")).unwrap_or_default();
+    ///     Ok(cart.len())
+    /// })
+    /// # ;
+    /// ```
+    pub session: Option<crate::Session>,
 }
 
 pub(crate) type ShareFn = Arc<
@@ -153,6 +168,47 @@ where
         let compute = compute.clone();
         Box::pin(async move { Ok(Value::from_serialize(compute(ctx).await?)) })
     })
+}
+
+/// The names `{% from … import … %}` and `{% import … as … %}` bind in
+/// `source` that are also keys of one of `values` (the handler's context, the
+/// shared values): inside the template those names are the macros.
+fn hidden_by_imports(source: &str, values: &[&Value]) -> Vec<String> {
+    static FROM: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(
+            r#"(?s)\{%[-+]?\s*from\s+(?:"[^"]*"|'[^']*'|\S+)\s+import\s+(.*?)\s*[-+]?%\}"#,
+        )
+        .expect("valid regex")
+    });
+    static IMPORT: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"\{%[-+]?\s*import\s+(?:"[^"]*"|'[^']*'|\S+)\s+as\s+(\w+)"#)
+            .expect("valid regex")
+    });
+    let mut names: Vec<String> = Vec::new();
+    for found in FROM.captures_iter(source) {
+        let list = found[1]
+            .trim_end_matches("without context")
+            .trim_end_matches("with context");
+        for item in list.split(',') {
+            let name = item.rsplit(" as ").next().unwrap_or(item).trim();
+            if !name.is_empty() {
+                names.push(name.to_owned());
+            }
+        }
+    }
+    names.extend(
+        IMPORT
+            .captures_iter(source)
+            .map(|found| found[1].to_owned()),
+    );
+    names.retain(|name| {
+        values
+            .iter()
+            .any(|value| value.get_attr(name).is_ok_and(|v| !v.is_undefined()))
+    });
+    names.sort();
+    names.dedup();
+    names
 }
 
 /// Adds functions, filters or globals to the template environment; see
@@ -371,6 +427,7 @@ impl Views {
         });
         Self {
             reloader: Arc::new(reloader),
+            debug,
         }
     }
 
@@ -400,19 +457,45 @@ impl Views {
         // context; they reach the same values through `RequestGlobal`s.
         let _current = CurrentGlobals::set(globals.clone());
         // The last map wins: shared values, then the handler's, then Renox's.
+        // A value named like a macro the template imports is hidden by the
+        // macro, which fails far from the cause (#312): say so while debugging.
+        let hidden = if self.debug {
+            hidden_by_imports(template.source(), &[&shared, &view.ctx])
+        } else {
+            Vec::new()
+        };
+        for name in &hidden {
+            tracing::warn!(
+                template = %view.name,
+                name = %name,
+                "the view gets a value named like a macro the template imports; the macro hides it (rename one)"
+            );
+        }
         let ctx = merge_maps([shared, view.ctx.clone(), globals]);
         let stacks = crate::view_stack::Scope::begin();
-        let html = match &view.fragment {
-            Some(block) if htmx.wants_fragment() => {
+        let rendered = match &view.fragment {
+            Some(block) if htmx.wants_fragment() => (|| {
                 let mut captured = template.render_captured_to(ctx, std::io::sink())?;
                 let mut out = captured.with_state_mut(|state| state.render_block(block))?;
                 for extra in &view.also {
                     out.push_str(&captured.with_state_mut(|state| state.render_block(extra))?);
                 }
-                out
-            }
-            _ => template.render(ctx)?,
+                Ok::<_, minijinja::Error>(out)
+            })(),
+            _ => template.render(ctx),
         };
+        let html = rendered.map_err(|err| {
+            let err = anyhow::Error::from(err);
+            match hidden.as_slice() {
+                [] => err,
+                names => err.context(format!(
+                    "{} imports a macro named like a value the view gets ({}): \
+                     inside the template the name is the macro; rename the value or import the macro `as` another name",
+                    view.name,
+                    names.join(", ")
+                )),
+            }
+        })?;
         Ok(stacks.finish(html))
     }
 
@@ -840,6 +923,7 @@ pub(crate) async fn middleware(
                 user: current_user.as_ref().and_then(|c| c.user.clone()),
                 locale: locale.clone(),
                 path: path.clone(),
+                session: session.clone(),
             };
             match compute(ctx).await {
                 Ok(value) => {
@@ -923,6 +1007,7 @@ pub(crate) async fn middleware(
                     user: current_user.as_ref().and_then(|c| c.user.clone()),
                     locale: locale.clone(),
                     path: path.clone(),
+                    session: session.clone(),
                 };
                 // A share that fails here only leaves its value out: the page
                 // is about another error, which it mustn't hide.

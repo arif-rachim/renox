@@ -690,15 +690,61 @@ pub async fn users_with_role(db: &Db, role: &str) -> Result<Vec<User>> {
 /// The users who have `role` in `scope` now (given there, or globally),
 /// ordered by id, e.g. to notify the managers of one store.
 pub async fn users_with_role_in(db: &Db, role: &str, scope: &Scope) -> Result<Vec<User>> {
+    users_granted(
+        db,
+        "JOIN roles r ON r.id = ru.role_id WHERE r.name = ?",
+        role,
+        scope,
+    )
+    .await
+}
+
+/// The users a global role lets do `permission` now, ordered by id (e.g. to
+/// notify everyone who may approve refunds).
+pub async fn users_with_permission(db: &Db, permission: &str) -> Result<Vec<User>> {
+    users_with_permission_in(db, permission, &Scope::global()).await
+}
+
+/// The users who may do `permission` in `scope` now: through a role given
+/// there or a global one, within its dates, ordered by id. The question a
+/// job asks to notify "everyone who may take overdue bikes back in this
+/// store", without naming roles.
+///
+/// ```
+/// # use renox::prelude::*;
+/// # use renox::auth::permissions::{self, Scope};
+/// # #[derive(Model, serde::Serialize)] struct Store { id: i64 }
+/// # async fn demo(db: &renox::db::Db, store: &Store) -> Result {
+/// let staff = permissions::users_with_permission_in(db, "rentals.return", &Scope::of(store)).await?;
+/// # Ok(()) }
+/// ```
+pub async fn users_with_permission_in(
+    db: &Db,
+    permission: &str,
+    scope: &Scope,
+) -> Result<Vec<User>> {
+    users_granted(
+        db,
+        "JOIN permission_role pr ON pr.role_id = ru.role_id \
+         JOIN permissions p ON p.id = pr.permission_id WHERE p.name = ?",
+        permission,
+        scope,
+    )
+    .await
+}
+
+/// The users whose assignment, joined by `join` (which ends in a `WHERE`
+/// on `name`), is in effect in `scope` (or global) now.
+async fn users_granted(db: &Db, join: &str, name: &str, scope: &Scope) -> Result<Vec<User>> {
     let at = now();
-    let ids: Vec<i64> = sql("SELECT DISTINCT ru.user_id FROM role_user ru \
-         JOIN roles r ON r.id = ru.role_id \
-         WHERE r.name = ? \
+    let ids: Vec<i64> = sql(format!(
+        "SELECT DISTINCT ru.user_id FROM role_user ru {join} \
          AND ((ru.scope_type = '' AND ru.scope_id = '') OR (ru.scope_type = ? AND ru.scope_id = ?)) \
          AND (ru.starts_at IS NULL OR ru.starts_at <= ?) \
          AND (ru.ends_at IS NULL OR ru.ends_at > ?) \
-         ORDER BY ru.user_id")
-    .bind(role)
+         ORDER BY ru.user_id"
+    ))
+    .bind(name)
     .bind(scope.kind())
     .bind(scope.id())
     .bind(at)

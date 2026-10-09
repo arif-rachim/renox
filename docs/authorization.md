@@ -473,6 +473,10 @@ fn my_stores(query: renox::db::Query<Transfer>) -> renox::db::Query<Transfer> {
 - `permissions::users_with_role_in(&db, "manager", &scope)` lists who has the role in a store now
   (given there, or globally), for example to notify its managers. `users_with_role` lists the
   global ones.
+- `permissions::users_with_permission_in(&db, "rentals.return", &scope)` asks the same about a
+  permission: who may do it in that store now, through whichever role. A job uses it to notify
+  "everyone who may take overdue bikes back here" without naming roles.
+  `users_with_permission` lists who may do it through a global role.
 - Ended assignments stop counting by themselves. `rnx permissions:prune --days 30` deletes the
   ones that ended more than 30 days ago; schedule it if the table grows.
 

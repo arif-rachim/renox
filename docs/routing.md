@@ -1097,12 +1097,40 @@ Good to know:
 - The signature covers the path and the expiry time (it's an HMAC-SHA256 made with `APP_KEY`).
   So the link can't carry any other query string.
 - `state.sign_path(path, ttl)` signs a path that isn't a named route.
+- `renox::signed::verify(&state, &uri)` checks any URL (a path with its query) in a handler or
+  middleware, and answers `true` or `false`.
 - Changing (rotating) `APP_KEY` breaks every signed link already sent.
 - Private storage files get temporary links with `state.storage.temporary_url(…)`.
 
+### A signed link or a logged-in user
+
+Some pages are for both: a guest opens them from a mail (a signed link), a customer from their
+account. Take `Option<ValidSignature>`: it never refuses, and the handler decides.
+
+```rust
+use renox::prelude::*;
+use renox::signed::ValidSignature;
+
+async fn receipt(
+    signature: Option<ValidSignature>,
+    user: Option<AuthUser>,
+    Path(order): Path<i64>,
+) -> Result<String> {
+    if signature.is_none() && user.is_none() {
+        return Err(Error::Forbidden);
+    }
+    // A logged-in user still needs a check that the order is theirs (a policy).
+    Ok(format!("Order {order}"))
+}
+```
+
+The signature is checked against the whole URL, also inside a `Routes::group` (whose prefix
+axum takes off the request's path).
+
 > [!NOTE]
 > **Coming from Laravel:** `URL::temporarySignedRoute` and the `signed` middleware are
-> `state.signed_url(…)` and `ValidSignature`.
+> `state.signed_url(…)` and `ValidSignature`; `$request->hasValidSignature()` is
+> `Option<ValidSignature>` or `renox::signed::verify`.
 
 ## Maintenance mode
 

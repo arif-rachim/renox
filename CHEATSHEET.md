@@ -264,6 +264,7 @@ fn view_extras(app: App) -> App {
     })
     // In every view, computed per request (cache what doesn't change per request).
     .share("cart_count", |ctx: ViewContext| async move {
+        // A guest's cart kept in the session: ctx.session.and_then(|s| s.get::<Vec<i64>>("cart"))
         let Some(user) = ctx.user else { return Ok(0) };
         let n: i64 = renox::db::sql("SELECT COUNT(*) FROM cart_items WHERE user_id = ?")
             .bind(user.id)
@@ -1135,6 +1136,8 @@ fn seeders(app: App) -> App {
         let _invite = (state.encrypt("secret"), renox::random_token());
         Ok(())
     })
+    // A module adds its own in `Module::register`: registry.seeder(|state| async move { … }).
+    // The app's seeders run first, then the modules' in the order they were added.
 }
 
 /// A state: a plain function that changes the model.
@@ -1619,6 +1622,22 @@ async fn report(db: &Db) -> Result {
         })
         .await?;
     let _ = (name, raised, bonus, names, columns);
+    Ok(())
+}
+
+/// A helper that takes `&db` or `&mut tx` and runs two statements on it.
+async fn record<'c>(db: impl renox::db::Executor<'c>, product: i64, quantity: i64) -> Result {
+    let mut conn = db.into_conn(); // each statement gets conn.reborrow()
+    renox::db::sql("INSERT INTO movements (product_id, quantity) VALUES (?, ?)")
+        .bind(product)
+        .bind(quantity)
+        .execute(conn.reborrow())
+        .await?;
+    renox::db::sql("UPDATE levels SET quantity = quantity + ? WHERE product_id = ?")
+        .bind(quantity)
+        .bind(product)
+        .execute(conn.reborrow())
+        .await?;
     Ok(())
 }
 ```

@@ -74,7 +74,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/module.rs            Module trait: name, routes, migrations, register
   src/registry.rs          Registry: jobs, listeners, schedule, commands, channels, shares, templates,
                            assets (`Registry::asset`: files served before the session),
-                           provide (a module's values for `state.provided`, under the app's)
+                           provide (a module's values for `state.provided`, under the app's),
+                           seeders (`App::seeder` lands here too: the app's run first)
   src/routing.rs           Routes builder (get/post/…/name/group/require_auth/guest_only/
                            require_verified/throttle/cors/route_layer/merge/domain/fallback),
                            RouteTable + URLs (name_of for route_is), CurrentRoute
@@ -1365,6 +1366,16 @@ picks the build, not the terminal.
   **1.0.0: released 2026-10-08** (#356, tag `v1.0.0`, the ten crates on crates.io including
   the new renox-blocks, a GitHub release; #138). After it, #139: no `--version` anywhere, the
   semver job against crates.io. Ask the owner before every `cargo publish`.
+- **1.1, wave 1** (the gaps examples/bikeshop worked around, all additive: `cargo semver-checks`
+  against 1.0.0 passes): `Display` for `Error` (the message without the chain; no
+  `std::error::Error`, which would clash with the blanket `From`) #301, `Registry::seeder` #302,
+  `db::Conn` public with `Executor::into_conn` + `Conn::reborrow` #303, `signed::verify` public
+  and `Option<ValidSignature>`, which (like `ValidSignature`) now reads `OriginalUri` so a
+  signed route inside a `Routes::group` works #307, `ViewContext::session` #309,
+  `permissions::users_with_permission(_in)` #310, and, while debugging, a warning (and the
+  cause on a failed render) when a view value is named like a macro the template imports #312
+  (`view.rs::hidden_by_imports`). Tests in `crates/renox/tests/it/app_gaps.rs` (#310 in
+  scoped_roles.rs).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

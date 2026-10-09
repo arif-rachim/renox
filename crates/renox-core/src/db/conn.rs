@@ -445,8 +445,39 @@ impl fmt::Debug for Transaction {
 }
 
 /// Where a query runs: `&db` or `&mut tx`. Sealed: only those.
+///
+/// An executor is used up by one statement. A helper that runs several
+/// statements on whichever it is given turns it into a [`Conn`] first and
+/// [reborrows](Conn::reborrow) it for each one:
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::db::{Executor, sql};
+///
+/// /// Records a movement and updates the level, on `&db` or in `&mut tx`.
+/// async fn record<'c>(db: impl Executor<'c>, product: i64, quantity: i64) -> Result {
+///     let mut conn = db.into_conn();
+///     sql("INSERT INTO movements (product_id, quantity) VALUES (?, ?)")
+///         .bind(product)
+///         .bind(quantity)
+///         .execute(conn.reborrow())
+///         .await?;
+///     sql("UPDATE levels SET quantity = quantity + ? WHERE product_id = ?")
+///         .bind(quantity)
+///         .bind(product)
+///         .execute(conn.reborrow())
+///         .await?;
+///     Ok(())
+/// }
+/// # async fn demo(db: &renox::db::Db) -> Result {
+/// record(db, 1, 5).await?;
+/// let mut tx = db.begin().await?;
+/// record(&mut tx, 1, -2).await?;
+/// tx.commit().await?;
+/// # Ok(()) }
+/// ```
 pub trait Executor<'c>: Send + executor::Sealed {
-    #[doc(hidden)]
+    /// This executor as a [`Conn`], which can run several statements.
     fn into_conn(self) -> Conn<'c>;
 }
 
@@ -457,9 +488,15 @@ mod executor {
     impl Sealed for super::Conn<'_> {}
 }
 
-#[doc(hidden)]
+/// A connection for several statements: the pool (`&db`) or a transaction
+/// (`&mut tx`), from [`Executor::into_conn`]. It is an `Executor` itself;
+/// give each statement [`Conn::reborrow`] to keep it for the next one.
 pub enum Conn<'c> {
+    /// Statements run on the pool, each on any free connection.
+    #[doc(hidden)]
     Pool(&'c Db),
+    /// Statements run in the transaction.
+    #[doc(hidden)]
     Tx(&'c mut Transaction),
 }
 
@@ -490,16 +527,17 @@ impl Conn<'_> {
         }
     }
 
-    /// The same connection for one more statement.
-    pub(crate) fn reborrow(&mut self) -> Conn<'_> {
+    /// The same connection for one more statement (a model's `save`, a
+    /// query's `fetch_all`…), keeping this one for the next.
+    pub fn reborrow(&mut self) -> Conn<'_> {
         match self {
             Conn::Pool(db) => Conn::Pool(db),
             Conn::Tx(tx) => Conn::Tx(tx),
         }
     }
 
-    /// Which engine the query will run on, for SQL that differs.
-    pub(crate) fn dialect(&self) -> Dialect {
+    /// Which engine the statements run on, for SQL that differs.
+    pub fn dialect(&self) -> Dialect {
         match self {
             Conn::Pool(db) => db.dialect(),
             Conn::Tx(tx) => tx.dialect(),
