@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { Browser } from './lib/cdp.mjs';
 import { start } from './lib/app.mjs';
+import { logInWithFetch } from './lib/bikeshop.mjs';
 
 const STAFF_2FA_OPTIONAL = { BIKESHOP_STAFF_2FA: 'optional' };
 const PHONE = { width: 390, height: 844, deviceScaleFactor: 1, mobile: true };
@@ -54,18 +55,7 @@ async function openMenu(page) {
  *  form's fields, sent from the page: the demo accounts' box has a test of its own
  *  below, so the others don't depend on it. */
 async function logIn(page, email) {
-  await page.send('Network.clearBrowserCookies');
-  await page.goto(`${app.url}/login`);
-  await page.waitFor(() => location.pathname === '/login' && !!document.querySelector('form input[name=email]'), { message: 'the login form' });
-  // The form's own fields (its CSRF token too), sent with fetch: a submit
-  // clicked or requested in CI sometimes never left the page (#342).
-  const status = await page.eval(async (e) => {
-    const form = document.querySelector('form input[name=email]').form;
-    form.elements.email.value = e;
-    form.elements.password.value = 'password';
-    const res = await fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)) });
-    return `${res.status} ${new URL(res.url).pathname}`;
-  }, email);
+  const status = await logInWithFetch(page, app.url, email);
   assert.ok(!status.endsWith(' /login'), `logged in as ${email} (${status})`);
 }
 

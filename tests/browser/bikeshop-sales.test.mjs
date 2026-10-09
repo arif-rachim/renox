@@ -164,7 +164,9 @@ describe('bikeshop sales', () => {
         const select = document.querySelector('select[name=variant_id]');
         select.add(new Option(o.label, o.value, true, true));
       }, option);
-      await page.click('.bs-counter__find button[type=submit]');
+      // Sent with requestSubmit: a click on the button in CI sometimes never
+      // sent the form (#342, #327), and htmx hears the submit event the same.
+      await page.eval(() => document.querySelector('.bs-counter__find button[type=submit]').form.requestSubmit());
       await page.waitFor(() => document.querySelectorAll('.bs-cart__line--counter').length === 1);
       await page.settle();
       // The keypad types the amount received; the change is worked out.
