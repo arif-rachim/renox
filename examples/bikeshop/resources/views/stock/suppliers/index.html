@@ -10,7 +10,7 @@
     <rx-table :rows="suppliers" card caption="{{ t('stock.suppliers.title') }}" :key="row.supplier.id">
       {# [explain:stock.suppliers.template] #}
       <rx-column label="{{ t('stock.suppliers.name') }}"><a class="rx-link" href="{{ route('stock.suppliers.show', row.supplier.id) }}">{{ row.supplier.name }}</a></rx-column>
-      <rx-column label="{{ t('stock.suppliers.contact') }}">{{ row.supplier.email or "—" }}{% if row.supplier.phone %}<br><span class="rx-subtitle">{{ row.supplier.phone }}</span>{% endif %}</rx-column>
+      <rx-column label="{{ t('stock.suppliers.contact') }}">{{ row.supplier.email or "—" }}{{ ('<br><span class="rx-subtitle">' ~ (row.supplier.phone | e) ~ '</span>') | safe if row.supplier.phone }}</rx-column>
       <rx-column label="{{ t('stock.suppliers.lead_days') }}" align="num">{{ row.supplier.lead_days }}</rx-column>
       <rx-column label="{{ t('stock.suppliers.items') }}" align="num">{{ row.items }}</rx-column>
       <rx-column label="{{ t('stock.suppliers.open') }}" align="num">{{ row.open }}</rx-column>
