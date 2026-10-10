@@ -20,14 +20,7 @@
     account menu. On phones the links move to the kit's tab bar at the
     bottom of the screen (`navbar(…, tabs=…)`). The home page uses
     layouts/public.html. -#}
-{#- One sidebar link with its icon (the kit's classes, so it looks like
-    `sidebar_link`). -#}
-{% macro nav_item(href, label, icon_name, active=false) -%}
-{% from "renox/ui.html" import icon %}
-<a class="rx-sidebar__link app-nav-link" href="{{ href }}"{% if active %} aria-current="page"{% endif %}>{{ icon(icon_name, size=18) }}<span>{{ label }}</span></a>
-{%- endmacro %}
-<body class="rx-page rx-shell">
-  {% from "renox/ui.html" import sidebar, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, notification_bell, link_button %}
+<body class="rx-page">
   {%- if auth.check %}
   {%- set tabs = [{"href": route('dashboard'), "label": t('nav.dashboard'), "icon": "layout-dashboard", "active": route_is('dashboard')}] %}
   {%- if can('users.manage') %}{% set tabs = tabs + [{"href": route('users.index'), "label": t('nav.users'), "icon": "users", "active": route_is('users.*')}] %}{% endif %}
@@ -44,46 +37,48 @@
     {"href": route('register'), "label": t('nav.register'), "icon": "circle-user"},
   ] %}
   {%- endif %}
-  {% call sidebar(app.name, href=route('home')) %}
+  <rx-shell>
+  <rx-sidebar brand="{{ app.name }}" href="{{ route('home') }}">
     {%- if auth.check %}
-    {{ nav_item(route('dashboard'), t('nav.dashboard'), "layout-dashboard", active=route_is('dashboard')) }}
-    {{ nav_item(route('notifications.index'), t('nav.notifications'), "bell", active=route_is('notifications.*')) }}
+    <rx-sidebar-link route="dashboard" label="{{ t('nav.dashboard') }}" icon="layout-dashboard" :active="route_is('dashboard')"/>
+    <rx-sidebar-link route="notifications.index" label="{{ t('nav.notifications') }}" icon="bell" :active="route_is('notifications.*')"/>
     {#- Links behind a permission show only to those who have it
         (`can(…)` asks the Permissions module). -#}
     {%- if can('users.manage') or can('activity.view') %}
-    {{ sidebar_section(t('nav.admin')) }}
-    {%- if can('users.manage') %}{{ nav_item(route('users.index'), t('nav.users'), "users", active=route_is('users.*')) }}{% endif %}
-    {%- if can('activity.view') %}{{ nav_item(route('activity.index'), t('nav.activity'), "history", active=route_is('activity.*')) }}{% endif %}
+    <rx-sidebar-section title="{{ t('nav.admin') }}"/>
+    <rx-sidebar-link rx-if="can('users.manage')" route="users.index" label="{{ t('nav.users') }}" icon="users" :active="route_is('users.*')"/>
+    <rx-sidebar-link rx-if="can('activity.view')" route="activity.index" label="{{ t('nav.activity') }}" icon="history" :active="route_is('activity.*')"/>
     {%- endif %}
-    {{ sidebar_section(t('nav.app')) }}
-    {{ nav_item(route('home'), t('nav.home'), "house") }}
-    {{ nav_item(route('account.show'), t('nav.account'), "circle-user", active=route_is('account.*')) }}
+    <rx-sidebar-section title="{{ t('nav.app') }}"/>
+    <rx-sidebar-link route="home" label="{{ t('nav.home') }}" icon="house"/>
+    <rx-sidebar-link route="account.show" label="{{ t('nav.account') }}" icon="circle-user" :active="route_is('account.*')"/>
     {%- else %}
-    {{ nav_item(route('home'), t('nav.home'), "house") }}
+    <rx-sidebar-link route="home" label="{{ t('nav.home') }}" icon="house"/>
     {%- endif %}
-  {% endcall %}
+  </rx-sidebar>
   <div class="rx-shell__main">
-    {% call navbar(none, width="full", skip=false, tabs=tabs, tabs_label=t('nav.sections')) %}
+    <rx-navbar width="full" :skip="false" :tabs="tabs" tabs-label="{{ t('nav.sections') }}">
       <span class="rx-spacer"></span>
       {#- New notifications, live: Auth::new().notifications(). -#}
       {%- if auth.check %}
-      {{ notification_bell(unread_notifications) }}
-      {% call menu(auth.user.name, id="account-menu", variant="plain") %}
-        {{ menu_link(route('account.show'), t('nav.account')) }}
-        {{ menu_link(route('notifications.index'), t('nav.notifications')) }}
-        {{ menu_separator() }}
-        {{ menu_action(route('logout'), t('nav.log_out')) }}
-      {% endcall %}
+      <rx-notification-bell :count="unread_notifications"/>
+      <rx-menu label="{{ auth.user.name }}" id="account-menu" variant="plain">
+        <rx-menu-link route="account.show" label="{{ t('nav.account') }}"/>
+        <rx-menu-link route="notifications.index" label="{{ t('nav.notifications') }}"/>
+        <rx-menu-separator/>
+        <rx-menu-action route="logout" label="{{ t('nav.log_out') }}"/>
+      </rx-menu>
       {%- else %}
-      {{ link_button(route('login'), t('nav.log_in'), variant="plain", size="small") }}
-      {{ link_button(route('register'), t('nav.register'), variant="primary", size="small") }}
+      <rx-link-button route="login" label="{{ t('nav.log_in') }}" variant="plain" size="small"/>
+      <rx-link-button route="register" label="{{ t('nav.register') }}" variant="primary" size="small"/>
       {%- endif %}
-    {% endcall %}
+    </rx-navbar>
     <main class="rx-shell__content" id="main">
-      {% if flash.status %}{% from "renox/ui.html" import alert %}{{ alert(flash.status, kind="success") }}{% endif %}
+      <rx-alert rx-if="flash.status" kind="success">{{ flash.status }}</rx-alert>
       {% block content %}{% endblock %}
     </main>
   </div>
+  </rx-shell>
   {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}
   {{ toasts() }}
   {{ stack('scripts') }}

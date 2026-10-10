@@ -154,18 +154,12 @@ fn with_notifications(file: &str, contents: &str) -> String {
             "        // Login, register, /account, and the notification bell (/notifications).\n        \
              .module(renox::auth::Auth::new().account().notifications())\n",
         )],
-        "resources/views/layouts/app.html" => &[
-            (
-                "menu_separator, link_button %}",
-                "menu_separator, link_button, notification_bell %}",
-            ),
-            (
-                "    {% if auth.check %}\n",
-                "    {% if auth.check %}\n      \
+        "resources/views/layouts/app.html" => &[(
+            "    {% if auth.check %}\n",
+            "    {% if auth.check %}\n      \
                  {#- In-app notifications: a badge, a panel, new ones live (docs/mail.md). -#}\n      \
-                 {{ notification_bell(unread_notifications) }}\n",
-            ),
-        ],
+                 <rx-notification-bell :count=\"unread_notifications\"/>\n",
+        )],
         "tests/home.rs" => &[("", NOTIFICATIONS_TEST)],
         _ => &[],
     };
@@ -831,8 +825,7 @@ mod tests {
         );
         let layout = read_lf(root.join("resources/views/layouts/app.html"));
         assert!(
-            layout.contains("link_button, notification_bell %}")
-                && layout.contains("{{ notification_bell(unread_notifications) }}"),
+            layout.contains("<rx-notification-bell :count=\"unread_notifications\"/>"),
             "{layout}"
         );
         let tests = read_lf(root.join("tests/home.rs"));
@@ -845,14 +838,14 @@ mod tests {
         // Without the option, none of it; the starter kit has its own bell.
         run_in(dir.path(), "plain", None, SQLITE).unwrap();
         let layout = read_lf(dir.path().join("plain/resources/views/layouts/app.html"));
-        assert!(!layout.contains("notification_bell"));
+        assert!(!layout.contains("notification-bell"));
         let kit = Options {
             starter: true,
             ..bell
         };
         run_in(dir.path(), "kit", None, kit).unwrap();
         let layout = read_lf(dir.path().join("kit/resources/views/layouts/app.html"));
-        assert_eq!(layout.matches("{{ notification_bell(").count(), 1);
+        assert_eq!(layout.matches("<rx-notification-bell").count(), 1);
     }
 
     /// The `.rs` files under `dir`.
