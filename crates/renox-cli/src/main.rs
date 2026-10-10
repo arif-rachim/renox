@@ -8,6 +8,7 @@ mod new;
 mod scaffold;
 mod serve;
 mod tailwind;
+mod tools;
 
 use std::path::PathBuf;
 
