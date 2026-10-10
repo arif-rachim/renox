@@ -1,0 +1,290 @@
+//! Components with code generation of their own: `rx-page` and `rx-push` (Decisions 16 and 17 of
+//! #372).
+
+use super::Catalog;
+use super::CompileError;
+use super::attrs;
+use super::contracts::Contract;
+use super::contracts::Module;
+use super::emit::{check_attrs, emit_into, err, pad};
+use super::scan::Attr;
+use super::tree::Node;
+use std::collections::BTreeSet;
+use std::ops::Range;
+
+/// What nested code generation needs.
+pub(super) struct Ctx<'a, 'b> {
+    pub src: &'a str,
+    pub catalog: &'a Catalog<'a>,
+    pub used: &'b mut BTreeSet<Module>,
+    pub counter: &'b mut usize,
+}
+
+impl Ctx<'_, '_> {
+    fn nodes(
+        &mut self,
+        nodes: &[Node<'_>],
+        parent: &str,
+        out: &mut String,
+    ) -> Result<(), CompileError> {
+        emit_into(
+            self.src,
+            nodes,
+            self.catalog,
+            Some(parent),
+            self.used,
+            self.counter,
+            out,
+        )
+    }
+}
+
+fn bare(name: &str) -> &str {
+    name.strip_prefix(':').unwrap_or(name)
+}
+
+fn attr<'a, 'b>(attrs: &'b [Attr<'a>], name: &str) -> Option<&'b Attr<'a>> {
+    attrs.iter().find(|a| bare(a.name) == name)
+}
+
+fn text_prop(a: &Attr<'_>, tag: &str) -> Result<String, CompileError> {
+    attrs::prop_expr(a, attrs::Kind::Text, &[]).map_err(|m| err(a.line, format!("<{tag}> {m}")))
+}
+
+/// `<rx-page>`: `{% extends %}`, the `seo` block, the content block, then one block per slot.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn page(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    let layout = attr(attrs, "layout").expect("checked: required");
+    let value = layout.value.unwrap_or("");
+    if layout.name.starts_with(':') || value.contains("{{") || value.contains("{%") {
+        return Err(err(
+            layout.line,
+            "<rx-page> \"layout\" must be a file name, not {{ }}".to_owned(),
+        ));
+    }
+    // Split the children: `<rx-slot name="X">` become blocks, the rest is the content.
+    let mut content: Vec<Node<'_>> = Vec::new();
+    let mut slots: Vec<(&str, &[Node<'_>])> = Vec::new();
+    for child in children {
+        if let Node::Element {
+            name,
+            attrs: sa,
+            children: inner,
+            line: at,
+            ..
+        } = child
+            && name == "rx-slot"
+        {
+            let want = sa
+                .iter()
+                .find(|a| a.name == "name")
+                .and_then(|a| a.value)
+                .unwrap_or("");
+            if want.is_empty() {
+                return Err(err(*at, "<rx-slot> needs a name here".to_owned()));
+            }
+            if want == "content" {
+                return Err(err(
+                    *at,
+                    "<rx-page> \"content\" is the page itself, not a slot".to_owned(),
+                ));
+            }
+            if slots.iter().any(|(n, _)| *n == want) {
+                return Err(err(*at, format!("<rx-page> has the slot \"{want}\" twice")));
+            }
+            slots.push((want, inner));
+        } else {
+            content.push(child.clone());
+        }
+    }
+    let title = attr(attrs, "title");
+    let description = attr(attrs, "description");
+    let seo_slot = slots.iter().position(|(n, _)| *n == "seo");
+    if title.is_some() && seo_slot.is_some() {
+        return Err(err(line, "give title or a seo slot, not both".to_owned()));
+    }
+    out.push_str(&format!("{{% extends {} %}}", attrs::literal(value.trim())));
+    out.push_str(&pad(&cx.src[open.clone()]));
+    if let Some(t) = title {
+        let mut args = format!("title={}", text_prop(t, "rx-page")?);
+        if let Some(d) = description {
+            args.push_str(&format!(", description={}", text_prop(d, "rx-page")?));
+        }
+        out.push_str(&format!(
+            "{{% block seo %}}{{{{ seo({args}) }}}}{{% endblock %}}"
+        ));
+    }
+    out.push_str("{% block content %}");
+    cx.nodes(&content, "rx-page", out)?;
+    out.push_str("{% endblock %}");
+    // Error lines inside a moved slot can be off by the lines of the content above: accepted
+    // (Decision 16).
+    for (name, body) in slots {
+        out.push_str(&format!("{{% block {name} %}}"));
+        cx.nodes(body, "rx-page", out)?;
+        out.push_str("{% endblock %}");
+    }
+    if let Some(c) = close {
+        out.push_str(&pad(&cx.src[c.clone()]));
+    }
+    Ok(())
+}
+
+/// `<rx-push stack="…" once="…">`: `{% call push("S", once="O") %}…{% endcall %}`.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn push(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    if children
+        .iter()
+        .any(|c| matches!(c, Node::Element { name, .. } if name == "rx-slot"))
+    {
+        return Err(err(line, "<rx-push> has no named slots".to_owned()));
+    }
+    let stack = text_prop(attr(attrs, "stack").expect("checked: required"), "rx-push")?;
+    let mut args = stack;
+    if let Some(o) = attr(attrs, "once") {
+        args.push_str(&format!(", once={}", text_prop(o, "rx-push")?));
+    }
+    out.push_str(&format!("{{% call push({args}) %}}"));
+    out.push_str(&pad(&cx.src[open.clone()]));
+    cx.nodes(children, "rx-push", out)?;
+    out.push_str("{% endcall %}");
+    if let Some(c) = close {
+        out.push_str(&pad(&cx.src[c.clone()]));
+    }
+    Ok(())
+}
+
+/// A wizard step read from its tag: key, title, content, start tag, end tag.
+type Step<'a, 'b> = (
+    String,
+    Option<String>,
+    &'b [Node<'a>],
+    &'b Range<usize>,
+    Option<&'b Range<usize>>,
+);
+
+/// `<rx-wizard>`: the steps come from the `<rx-wizard-step>` children, and each gets the
+/// wizard's id (Decision 3 of #374).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn wizard(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    let step_contract = cx
+        .catalog
+        .contracts
+        .iter()
+        .find(|c| c.tag == "rx-wizard-step")
+        .expect("rx-wizard-step is built in");
+    let mut steps: Vec<Step<'_, '_>> = Vec::new();
+    let mut gaps = String::new();
+    for child in children {
+        match child {
+            Node::Text(span) => {
+                let text = &cx.src[span.clone()];
+                if !text.trim().is_empty() {
+                    return Err(err(
+                        line,
+                        "<rx-wizard> holds only <rx-wizard-step>".to_owned(),
+                    ));
+                }
+                gaps.push_str(&pad(text));
+            }
+            Node::Element {
+                name,
+                attrs: sa,
+                children: inner,
+                open: sopen,
+                close: sclose,
+                line: at,
+            } => {
+                if name != "rx-wizard-step" {
+                    return Err(err(
+                        *at,
+                        "<rx-wizard> holds only <rx-wizard-step>".to_owned(),
+                    ));
+                }
+                check_attrs(step_contract, sa, &[]).map_err(|m| err(*at, m))?;
+                let key = text_prop(attr(sa, "key").expect("checked: required"), name)?;
+                let title = attr(sa, "title").map(|t| text_prop(t, name)).transpose()?;
+                steps.push((key, title, inner, sopen, sclose.as_ref()));
+            }
+        }
+    }
+    cx.used.insert(Module::Ui);
+    let id = text_prop(attr(attrs, "id").expect("checked: required"), "rx-wizard")?;
+    let list: Vec<String> = steps
+        .iter()
+        .map(|(k, t, ..)| format!("[{k}, {}]", t.as_deref().unwrap_or(k)))
+        .collect();
+    let mut args = format!(
+        "id={id}, steps=[{}], submit_label={}",
+        list.join(", "),
+        text_prop(
+            attr(attrs, "submit-label").expect("checked: required"),
+            "rx-wizard"
+        )?
+    );
+    for (name, arg) in [
+        ("back-label", "back_label"),
+        ("next-label", "next_label"),
+        ("cancel-label", "cancel_label"),
+    ] {
+        if let Some(a) = attr(attrs, name) {
+            args.push_str(&format!(", {arg}={}", text_prop(a, "rx-wizard")?));
+        }
+    }
+    if let Some(a) = attr(attrs, "cancel") {
+        let e = attrs::prop_expr(a, attrs::Kind::Bool, &[])
+            .map_err(|m| err(a.line, format!("<rx-wizard> {m}")))?;
+        args.push_str(&format!(", cancel={e}"));
+    }
+    out.push_str(&format!("{{% call __rx_ui.wizard({args}) %}}"));
+    out.push_str(&pad(&cx.src[open.clone()]));
+    out.push_str(&gaps);
+    for (key, title, inner, sopen, sclose) in steps {
+        let mut call = format!("id={id}, key={key}");
+        if let Some(t) = title {
+            call.push_str(&format!(", title={t}"));
+        }
+        out.push_str(&format!("{{% call __rx_ui.wizard_step({call}) %}}"));
+        out.push_str(&pad(&cx.src[sopen.clone()]));
+        cx.nodes(inner, "rx-wizard-step", out)?;
+        out.push_str("{% endcall %}");
+        if let Some(c) = sclose {
+            out.push_str(&pad(&cx.src[c.clone()]));
+        }
+    }
+    out.push_str("{% endcall %}");
+    if let Some(c) = close {
+        out.push_str(&pad(&cx.src[c.clone()]));
+    }
+    Ok(())
+}

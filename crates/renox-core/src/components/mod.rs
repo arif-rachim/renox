@@ -9,6 +9,7 @@ mod attrs;
 mod contracts;
 mod emit;
 mod scan;
+mod special;
 pub(crate) mod suggest;
 mod tree;
 
@@ -348,6 +349,63 @@ mod tests {
         assert_eq!(
             msg("<rx-t label=\"a\"/>"),
             "<rx-t> belongs inside <rx-stack>"
+        );
+    }
+
+    #[test]
+    fn pages_extend_a_layout_and_move_slots() {
+        let c = |s: &str| compile("a.html", s, &builtin()).unwrap();
+        let msg = |s: &str| compile("a.html", s, &builtin()).unwrap_err().message;
+        assert_eq!(
+            c(
+                "<rx-page layout=\"layouts/staff.html\" title=\"{{ t('x') }}\">\n<p>a</p>\n</rx-page>"
+            ),
+            "{% extends \"layouts/staff.html\" %}{% block seo %}{{ seo(title=(t('x'))) }}{% endblock %}{% block content %}\n<p>a</p>\n{% endblock %}"
+        );
+        assert_eq!(
+            c(
+                "{# c #}\n<rx-page layout=\"l.html\" title=\"T\" description=\"D\">x<rx-slot name=\"scripts\">s</rx-slot></rx-page>\n"
+            ),
+            "{# c #}\n{% extends \"l.html\" %}{% block seo %}{{ seo(title=\"T\", description=\"D\") }}{% endblock %}{% block content %}x{% endblock %}{% block scripts %}s{% endblock %}\n"
+        );
+        assert_eq!(
+            c("<rx-page layout=\"l.html\"><rx-slot name=\"seo\">S</rx-slot>x</rx-page>"),
+            "{% extends \"l.html\" %}{% block content %}x{% endblock %}{% block seo %}S{% endblock %}"
+        );
+        assert_eq!(
+            msg("<rx-page layout=\"{{ l }}\">x</rx-page>"),
+            "<rx-page> \"layout\" must be a file name, not {{ }}"
+        );
+        assert_eq!(
+            msg("<p>a</p><rx-page layout=\"l.html\">x</rx-page>"),
+            "<rx-page> must hold the whole template"
+        );
+        assert_eq!(
+            msg("<rx-stack><rx-page layout=\"l.html\">x</rx-page></rx-stack>"),
+            "<rx-page> must hold the whole template"
+        );
+        assert_eq!(
+            msg(
+                "<rx-page layout=\"l.html\" title=\"T\"><rx-slot name=\"seo\">S</rx-slot></rx-page>"
+            ),
+            "give title or a seo slot, not both"
+        );
+        assert_eq!(
+            msg("<rx-page title=\"T\">x</rx-page>"),
+            "<rx-page> needs the attribute \"layout\""
+        );
+    }
+
+    #[test]
+    fn push_calls_the_stack_function() {
+        let c = |s: &str| compile("a.html", s, &builtin()).unwrap();
+        assert_eq!(
+            c("<rx-push stack=\"scripts\">\n<script></script>\n</rx-push>"),
+            "{% call push(\"scripts\") %}\n<script></script>\n{% endcall %}"
+        );
+        assert_eq!(
+            c("<rx-push stack=\"scripts\" once=\"chart\">x</rx-push>"),
+            "{% call push(\"scripts\", once=\"chart\") %}x{% endcall %}"
         );
     }
 }
