@@ -2,6 +2,7 @@
 //! connection pool, raw SQL, models, queries, pagination, migrations and
 //! factories.
 
+mod column;
 mod conn;
 mod encrypted;
 mod error;
@@ -25,6 +26,7 @@ use anyhow::Context;
 use axum::extract::FromRef;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 
+pub use column::{Col, Comparable, Condition};
 pub use conn::Conn;
 #[doc(hidden)]
 pub use conn::bounds;

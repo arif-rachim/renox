@@ -66,6 +66,7 @@ mod sessions;
 mod testing;
 mod testing_tools;
 mod tooling;
+mod typed_columns;
 mod types;
 mod ui;
 mod uploads;
