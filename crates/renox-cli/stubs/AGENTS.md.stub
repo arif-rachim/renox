@@ -73,6 +73,12 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 
 ## Things that trip agents up
 
+- Component tags (`<rx-card>`, `<app-price-tag>`, `rx-if`/`rx-for`, docs/ui.md "Components as
+  tags") are rewritten when a template loads. In an attribute, `title="{{ x }}"` is the value of
+  `x` and `:title="x"` is an expression (no `{{ }}` after the colon); `{% %}` there is an error.
+  `rx-else` goes on the very next sibling of its `rx-if` element, and never follows `rx-for`.
+  `class` is not allowed on kit tags (only on `rx-stack`, `rx-row`, `rx-form`). The templates of
+  plugins are not compiled: write macros in them. An `<app-…>` file needs `<rx-props>` first.
 - Route parameters are `{id}` (axum 0.8), not `:id`: `.get("/products/{id}", show)`.
 - `.require_auth()` guards only the routes added before it in that `Routes`; so do
   `.require_gate`, `.require_role`, `.require_permission`, `.require_ability` and
