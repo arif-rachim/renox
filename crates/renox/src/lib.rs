@@ -391,5 +391,27 @@ pub struct CheatSheet;
 /// #[derive(FromRow)]
 /// struct Row { #[row(default)] value: i64 }
 /// ```
+///
+/// Typed columns are checked by the compiler:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Product { id: i64, price: i64 }
+/// let _ = Product::query().where_(Product::PRICE.lt("cheap"));
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Product { id: i64, name: String }
+/// #[derive(Model, Default)]
+/// struct Order { id: i64, total: i64 }
+/// let _ = Order::query().order_by(Product::NAME);
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Product { id: i64, price: i64 }
+/// let _ = Product::PRCE;
+/// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;
