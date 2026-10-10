@@ -21,7 +21,6 @@ fn mac(key: &[u8], body: &str) -> String {
 }
 
 /// Signs a component's state; fails when the snapshot is over `max` bytes.
-#[allow(dead_code)]
 pub(crate) fn seal(key: &[u8], max: usize, name: &str, id: &str, state: &Value) -> Result<String> {
     let json = serde_json::to_vec(&json!({"c": name, "i": id, "s": state}))
         .map_err(|e| Error::Internal(e.into()))?;
@@ -38,7 +37,6 @@ pub(crate) fn seal(key: &[u8], max: usize, name: &str, id: &str, state: &Value) 
 }
 
 /// Checks a snapshot made by [`seal`] for component `name`; returns its id and state.
-#[allow(dead_code)]
 pub(crate) fn open(key: &[u8], max: usize, name: &str, sealed: &str) -> Result<(String, Value)> {
     if sealed.len() > max {
         return Err(stale());

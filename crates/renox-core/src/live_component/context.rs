@@ -23,13 +23,9 @@ pub struct LiveContext {
     pub(crate) state: AppState,
     session: Option<Session>,
     user: Option<AuthUser>,
-    #[allow(dead_code)]
     pub(crate) component: &'static str,
-    #[allow(dead_code)]
     pub(crate) toast: Option<Toast>,
-    #[allow(dead_code)]
     pub(crate) redirect: Option<String>,
-    #[allow(dead_code)]
     pub(crate) events: Vec<(String, serde_json::Value)>,
 }
 

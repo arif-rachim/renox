@@ -3,6 +3,8 @@
 
 mod snapshot;
 
+pub(crate) mod route;
+
 mod context;
 
 use std::collections::HashMap;
@@ -41,7 +43,6 @@ pub struct Mounted {
 }
 
 /// Renders `c` into a [`Mounted`].
-#[allow(dead_code)]
 pub(crate) async fn render<C: LiveComponent>(
     ctx: &LiveContext,
     c: &C,
@@ -83,10 +84,9 @@ pub(crate) type LiveFn = Arc<
 /// Registered components by name.
 pub(crate) type LiveMap = Arc<HashMap<&'static str, LiveFn>>;
 
-/// The entry point registered for `C`. The route fills this in later.
-#[allow(clippy::extra_unused_type_parameters)]
+/// The entry point registered for `C`.
 pub(crate) fn handler<C: LiveComponent>() -> LiveFn {
-    Arc::new(|_, _, _| Box::pin(async { Err(Error::NotFound) }))
+    Arc::new(|ctx, action, fields| Box::pin(route::run::<C>(ctx, action, fields)))
 }
 
 /// A live component: a serde struct whose fields are the state, and named
