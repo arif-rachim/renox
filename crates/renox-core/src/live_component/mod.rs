@@ -5,14 +5,40 @@ mod snapshot;
 
 mod context;
 
+use std::collections::HashMap;
 use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
+use axum::response::Response;
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 pub use context::LiveContext;
 
-use crate::Result;
+use crate::{Error, Result};
+
+/// A registered component's entry point: context, action name and the raw
+/// request fields in, a response out.
+pub(crate) type LiveFn = Arc<
+    dyn Fn(
+            LiveContext,
+            String,
+            Vec<(String, String)>,
+        ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send>>
+        + Send
+        + Sync,
+>;
+
+/// Registered components by name.
+pub(crate) type LiveMap = Arc<HashMap<&'static str, LiveFn>>;
+
+/// The entry point registered for `C`. The route fills this in later.
+#[allow(clippy::extra_unused_type_parameters)]
+pub(crate) fn handler<C: LiveComponent>() -> LiveFn {
+    Arc::new(|_, _, _| Box::pin(async { Err(Error::NotFound) }))
+}
 
 /// A live component: a serde struct whose fields are the state, and named
 /// actions that change it. The state travels in a signed snapshot.

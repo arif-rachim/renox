@@ -252,3 +252,77 @@ let cheap = Product::query()
 
 > [!WARNING]
 > Use `BIGINT` for `i64` columns. A plain `INTEGER` is 32-bit and won't read into an `i64`.
+
+## Checking models against the tables
+
+A model and its migration are written by hand, so they can drift apart: a column renamed in
+one and not the other, `Option<String>` over a `NOT NULL` column, a `String` over a number.
+`rnx db:check` builds the schema from your migrations on a scratch database and compares
+every registered model with its table. Register the models you want checked:
+
+```rust
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "products")]
+struct Product {
+    id: i64,
+    name: String,
+    price: i64,
+    note: Option<String>,
+}
+
+fn app() -> App {
+    // Registering the same model twice keeps one. In a module, use
+    // `app.model::<Product>()` inside `register`.
+    App::new().model::<Product>()
+}
+```
+
+What is compared, for each model:
+
+- the table exists, and every model column is in it;
+- the table has no `NOT NULL` column without a default (and not the primary key) that the
+  model lacks, because an insert would fail;
+- the column's type fits the field's (table below);
+- an `Option<T>` field sits over a nullable column, and a plain field over a `NOT NULL` one
+  (`id` is exempt);
+- a hand-written `impl Model` that gives no column info is reported, since there is nothing
+  to compare.
+
+| Field kind | SQLite (by affinity) | PostgreSQL |
+|---|---|---|
+| `i64`, `u32` / `i32`, `u16` / `i8`, `i16`, `u8` | INTEGER, NUMERIC | `bigint` / `integer` / `smallint` |
+| `f64` / `f32` | REAL, NUMERIC | `double precision` / `real` |
+| `String`, enums, `Ulid`, `Encrypted<T>` | TEXT | `text`, `character varying`, `character` |
+| `Vec<u8>` | BLOB | `bytea` |
+| `bool` | INTEGER, NUMERIC | `boolean` |
+| `DateTime` | TEXT, NUMERIC | `timestamp with time zone` |
+| `NaiveDateTime` | TEXT, NUMERIC | `timestamp without time zone` |
+| `NaiveDate` | TEXT, NUMERIC | `date` |
+| `NaiveTime` | TEXT, NUMERIC | `time without time zone` |
+| `Json<T>`, `serde_json::Value` | TEXT, NUMERIC | `jsonb`, `json`, `text`, `character varying` |
+| `Uuid` | BLOB, NUMERIC | `uuid` |
+
+The command prints the problems grouped by model and exits with 1 when there are any, so it
+fits a CI step. When all is well it prints `N model(s) match the schema.`
+
+The scratch database depends on `DATABASE_URL`. With PostgreSQL, the migrations run in a fresh
+schema on that server, dropped after the check. Otherwise they run on an in-memory SQLite
+database. Your real data is never touched, and there is no flag to point it elsewhere.
+
+A field whose type Renox does not know (a type of your own) skips the type check, and the
+rest still runs. To have it checked too, say which kind of column it fills:
+
+```rust
+use renox::db::{ColumnKind, ColumnType};
+
+struct Sku(String);
+
+impl ColumnType for Sku {
+    const KIND: ColumnKind = ColumnKind::Text;
+}
+```
+
+`#[derive(DbEnum)]` already counts as text. To run the same check inside your tests, see
+`assert_models_match_schema` in [the testing guide](testing.md).
