@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::column::{CondKind, Condition};
+use super::column::{CondKind, Condition, IntoColumn};
 use super::paginate::{CursorPage, SimplePage};
 use super::{Db, DbValue, Dialect, Executor, FromDb, Model, Paginated, ToDbValue, now, quote, sql};
 use crate::Result;
@@ -604,16 +604,16 @@ impl<M: Model> Query<M> {
     }
 
     /// Sorts by `column`, ascending; call again to add tie-breakers.
-    pub fn order_by(mut self, column: &str) -> Self {
-        if let Some(column) = self.column(column) {
+    pub fn order_by(mut self, column: impl IntoColumn<M>) -> Self {
+        if let Some(column) = self.column(column.column_name()) {
             self.order.push(Order::Sql(format!("{column} ASC")));
         }
         self
     }
 
     /// Sorts by `column`, descending; call again to add tie-breakers.
-    pub fn order_by_desc(mut self, column: &str) -> Self {
-        if let Some(column) = self.column(column) {
+    pub fn order_by_desc(mut self, column: impl IntoColumn<M>) -> Self {
+        if let Some(column) = self.column(column.column_name()) {
             self.order.push(Order::Sql(format!("{column} DESC")));
         }
         self
@@ -974,9 +974,9 @@ impl<M: Model> Query<M> {
     pub async fn pluck<'c, T: FromDb, E: Executor<'c>>(
         mut self,
         db: E,
-        column: &str,
+        column: impl IntoColumn<M>,
     ) -> Result<Vec<T>> {
-        let Some(column) = self.column(column) else {
+        let Some(column) = self.column(column.column_name()) else {
             return Err(self.check().unwrap_err());
         };
         self.check()?;
