@@ -390,6 +390,25 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
         crate::format::touched(&path);
     }
 
+    let already = crate::tools::configured_texts(None)
+        .iter()
+        .any(|t| crate::tools::mentions_linker(t).is_some());
+    let found = crate::tools::fast_linker(
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        cfg!(target_env = "gnu"),
+        |p| crate::tools::find(p).is_some(),
+    );
+    if let Some((linker, text)) = linker_file(found, std::env::consts::ARCH, already) {
+        let path = root.join(".cargo/config.toml");
+        fs::create_dir_all(path.parent().expect("has a parent"))?;
+        fs::write(&path, text).with_context(|| format!("could not write {}", path.display()))?;
+        println!(
+            "Linking with {} (found on this machine): .cargo/config.toml, kept out of Git.",
+            linker.name()
+        );
+    }
+
     if tailwind {
         use_tailwind(root)?;
     }
@@ -408,6 +427,21 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
         );
     }
     Ok(())
+}
+
+/// The `.cargo/config.toml` for the fast linker `found` on this machine, unless
+/// the machine's configuration `already` chooses one.
+fn linker_file(
+    found: Option<crate::tools::Linker>,
+    arch: &str,
+    already: bool,
+) -> Option<(crate::tools::Linker, String)> {
+    if already {
+        return None;
+    }
+    let linker = found?;
+    let text = crate::tools::linker_config(linker, crate::tools::linux_target(arch)?);
+    Some((linker, text))
 }
 
 /// `--tailwind`: the app's styles move into Tailwind's input, the layout
@@ -637,6 +671,24 @@ mod tests {
     }
 
     #[test]
+    fn linker_file_follows_what_is_found() {
+        use crate::tools::Linker;
+        assert!(linker_file(Some(Linker::Mold), "x86_64", true).is_none());
+        assert!(linker_file(None, "x86_64", false).is_none());
+        let (l, text) = linker_file(Some(Linker::Mold), "x86_64", false).unwrap();
+        assert_eq!(l, Linker::Mold);
+        assert!(
+            text.contains("[target.x86_64-unknown-linux-gnu]") && text.contains("fuse-ld=mold")
+        );
+        let (l, text) = linker_file(Some(Linker::Lld), "aarch64", false).unwrap();
+        assert_eq!(l, Linker::Lld);
+        assert!(
+            text.contains("[target.aarch64-unknown-linux-gnu]") && text.contains("fuse-ld=lld")
+        );
+        assert!(linker_file(Some(Linker::Mold), "riscv64", false).is_none());
+    }
+
+    #[test]
     fn makes_an_app_with_every_placeholder_filled() {
         let dir = tempfile::tempdir().unwrap();
         let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -655,6 +707,8 @@ mod tests {
         let cargo = fs::read_to_string(root.join("Cargo.toml")).unwrap();
         assert!(cargo.contains("name = \"coffee-shop\""), "{cargo}");
         assert!(cargo.contains("renox = { path = "), "{cargo}");
+        let ignore = fs::read_to_string(root.join(".gitignore")).unwrap();
+        assert!(ignore.contains("/.cargo/config.toml"), "{ignore}");
         // The real .env has a key; the example doesn't.
         let env = read_lf(root.join(".env"));
         assert!(env.contains("APP_KEY=base64:"), "{env}");

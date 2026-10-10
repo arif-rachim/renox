@@ -98,6 +98,9 @@ RNX="$CARGO_TARGET_DIR/debug/rnx"
 step "rnx new shop --database $DATABASE"
 new_app shop --database "$DATABASE"
 use_database shop
+if [ "$(uname -m)" = x86_64 ] && command -v mold >/dev/null && command -v clang >/dev/null; then
+    grep -q 'fuse-ld=mold' .cargo/config.toml
+elif [ "$(uname -m)" = x86_64 ]; then test ! -e .cargo/config.toml; fi
 grep '^renox' Cargo.toml
 
 step "no template placeholder left in the new app"
@@ -122,8 +125,8 @@ step "every generator"
 "$RNX" make:policy Book --module catalog
 "$RNX" make:mail order_shipped
 "$RNX" make:migration add_sku_to_products
-"$RNX" make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
-"$RNX" make:module tags --resource
+"$RNX" make:module products --resource $(runs || echo --no-migrate) --fields "name:string price:money notes:text active:bool due_on:date"
+"$RNX" make:module tags --resource --no-migrate
 "$RNX" make:factory Book --module catalog
 "$RNX" make:seeder DemoData
 "$RNX" make:test Checkout
@@ -166,6 +169,7 @@ if runs; then
     step "the app's own commands"
     cargo run -q -- migrate
     cargo run -q -- migrate:status
+    cargo run -q -- migrate:status | grep -q 'ran.*create_products_table'
     cargo run -q -- catalog:import
     # A typed command (clap): its flags, its --help, and a clear error.
     cargo run -q -- catalog:import --dry-run | grep -q 'dry run'
