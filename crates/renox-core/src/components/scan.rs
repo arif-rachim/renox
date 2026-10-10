@@ -69,7 +69,10 @@ impl<'a> Scanner<'a> {
 
     /// The end (exclusive) of the `{{`, `{%` or `{#` block starting at `at`, if one starts there.
     fn jinja_end(&self, at: usize) -> Result<Option<usize>, CompileError> {
-        let rest = &self.src[at..];
+        // Callers step byte by byte, so `at` may fall inside a multi-byte character.
+        let Some(rest) = self.src.get(at..) else {
+            return Ok(None);
+        };
         let close = if rest.starts_with("{{") {
             "}}"
         } else if rest.starts_with("{%") {
@@ -306,6 +309,12 @@ pub(crate) fn scan(src: &str) -> Result<Vec<Token<'_>>, CompileError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn non_ascii_attribute_values_scan() {
+        let toks = scan(r#"<rx-menu-action action="/x" label="Español"/>"#).unwrap();
+        assert_eq!(toks.len(), 1);
+    }
+
     use super::*;
 
     fn kinds(src: &str) -> Vec<String> {
