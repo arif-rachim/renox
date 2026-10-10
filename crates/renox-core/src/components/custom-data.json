@@ -3035,6 +3035,229 @@
       ],
       "description": "Links that look like a segmented control, for switching between pages.",
       "name": "rx-link-tabs"
+    },
+    {
+      "attributes": [
+        {
+          "description": "The brand name.",
+          "name": "brand",
+          "values": []
+        },
+        {
+          "description": "Where the brand links to (`/` by default).",
+          "name": "href",
+          "values": []
+        },
+        {
+          "description": "The URL of the brand's logo image.",
+          "name": "logo",
+          "values": []
+        },
+        {
+          "description": "Shows the brand's initial in a badge.",
+          "name": "mark",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "How wide the bar's content is: narrow, wide or full.",
+          "name": "width",
+          "values": []
+        },
+        {
+          "description": "What screen readers call the navigation.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "Whether the skip link shows (`:skip=\"false\"` hides it).",
+          "name": "skip",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "The phone tab bar: a list of tabs.",
+          "name": ":tabs",
+          "values": []
+        },
+        {
+          "description": "What screen readers call the tab bar.",
+          "name": "tabs-label",
+          "values": []
+        }
+      ],
+      "description": "The bar across the top: brand, links, search and the account menu.",
+      "name": "rx-navbar"
+    },
+    {
+      "attributes": [],
+      "description": "The navbar's links, kept together (a row that scrolls on phones).",
+      "name": "rx-nav-links"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The address; or use route.",
+          "name": "href",
+          "values": []
+        },
+        {
+          "description": "(required) The label; or give it as content.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "Marks the current section, e.g. `:active=\"route_is('orders.*')\"`.",
+          "name": "active",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "A count after the label.",
+          "name": "badge",
+          "values": []
+        }
+      ],
+      "description": "One link of a navbar; `active` marks the current section.",
+      "name": "rx-nav-link"
+    },
+    {
+      "attributes": [
+        {
+          "description": "What screen readers call the toggle.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "The box's id.",
+          "name": "id",
+          "values": []
+        }
+      ],
+      "description": "The navbar's search: a toggle button and the box it opens.",
+      "name": "rx-nav-search"
+    },
+    {
+      "attributes": [
+        {
+          "description": "The brand name.",
+          "name": "brand",
+          "values": []
+        },
+        {
+          "description": "Where the brand links to (`/` by default).",
+          "name": "href",
+          "values": []
+        },
+        {
+          "description": "The URL of the brand's logo image.",
+          "name": "logo",
+          "values": []
+        },
+        {
+          "description": "Shows the brand's initial in a badge (on by default).",
+          "name": "mark",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "What screen readers call the navigation.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "Whether the skip link shows (`:skip=\"false\"` hides it).",
+          "name": "skip",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "Navigation down the side, for back offices.",
+      "name": "rx-sidebar"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The address; or use route.",
+          "name": "href",
+          "values": []
+        },
+        {
+          "description": "(required) The label; or give it as content.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "Marks the current section.",
+          "name": "active",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "A count after the label.",
+          "name": "badge",
+          "values": []
+        },
+        {
+          "description": "An icon's name, shown before the label.",
+          "name": "icon",
+          "values": []
+        }
+      ],
+      "description": "One link of a sidebar; `active` marks the current section.",
+      "name": "rx-sidebar-link"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The heading; or give it as content.",
+          "name": "title",
+          "values": []
+        }
+      ],
+      "description": "A heading between groups of sidebar links.",
+      "name": "rx-sidebar-section"
+    },
+    {
+      "attributes": [],
+      "description": "The frame of a back office: a sidebar and the main column beside it.",
+      "name": "rx-shell"
     }
   ],
   "version": 1.1
