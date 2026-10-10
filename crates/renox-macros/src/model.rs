@@ -8,6 +8,8 @@ struct Field {
     name: String,
     ty: Type,
     skip: bool,
+    default: Option<LitStr>,
+    references: Option<LitStr>,
     vis: syn::Visibility,
     form: FormField,
 }
@@ -38,6 +40,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let mut typed_columns = true;
     let mut search: Option<LitStr> = None;
     let mut search_language: Option<LitStr> = None;
+    let mut index_specs: Vec<(bool, Vec<syn::Ident>)> = Vec::new();
     let mut form = false;
     for attr in input.attrs.iter().filter(|a| a.path().is_ident("model")) {
         attr.parse_nested_meta(|meta| {
@@ -65,9 +68,23 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             } else if meta.path.is_ident("search_language") {
                 search_language = Some(meta.value()?.parse::<LitStr>()?);
                 Ok(())
+            } else if meta.path.is_ident("index") || meta.path.is_ident("unique") {
+                let unique = meta.path.is_ident("unique");
+                let mut cols = Vec::new();
+                meta.parse_nested_meta(|inner| {
+                    cols.push(inner.path.get_ident().cloned().ok_or_else(|| {
+                        inner.error("expected a column name")
+                    })?);
+                    Ok(())
+                })?;
+                if cols.is_empty() {
+                    return Err(meta.error("expected at least one column"));
+                }
+                index_specs.push((unique, cols));
+                Ok(())
             } else {
                 Err(meta.error(
-                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `no_typed_columns`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"` or `form`",
+                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `no_typed_columns`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"`, `form`, `index(col, …)` or `unique(col, …)`",
                 ))
             }
         })?;
@@ -89,13 +106,22 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let mut fields = Vec::new();
     for field in &named.named {
         let mut skip = false;
+        let mut default = None;
+        let mut references = None;
         for attr in field.attrs.iter().filter(|a| a.path().is_ident("model")) {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("skip") {
                     skip = true;
                     Ok(())
+                } else if meta.path.is_ident("default") {
+                    default = Some(meta.value()?.parse::<LitStr>()?);
+                    Ok(())
+                } else if meta.path.is_ident("references") {
+                    references = Some(meta.value()?.parse::<LitStr>()?);
+                    Ok(())
                 } else {
-                    Err(meta.error("expected `skip`"))
+                    Err(meta
+                        .error("expected `skip`, `default = \"…\"` or `references = \"table\"`"))
                 }
             })?;
         }
@@ -125,12 +151,20 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 "#[form(…)] needs #[model(form)] on the struct",
             ));
         }
+        if form_field.upload && !is_string_or_option_string(&field.ty) {
+            return Err(Error::new_spanned(
+                &field.ty,
+                "`upload` goes on a String or Option<String> column (the stored path)",
+            ));
+        }
         let field_ident = field.ident.clone().expect("named fields have identifiers");
         fields.push(Field {
             name: field_ident.to_string().trim_start_matches("r#").to_owned(),
             ident: field_ident,
             ty: field.ty.clone(),
             skip,
+            default,
+            references,
             vis: field.vis.clone(),
             form: form_field,
         });
@@ -157,6 +191,31 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         .filter(|f| !f.skip)
         .map(|f| f.name.as_str())
         .collect();
+
+    let mut index_items = Vec::new();
+    for (unique, cols) in &index_specs {
+        let mut names = Vec::new();
+        for col in cols {
+            let name = col.to_string();
+            let name = name.trim_start_matches("r#").to_owned();
+            if !columns.contains(&name.as_str()) {
+                let kind = if *unique { "unique" } else { "index" };
+                return Err(Error::new_spanned(
+                    col,
+                    format!("`{kind}`: `{name}` isn't a column of this model"),
+                ));
+            }
+            names.push(name);
+        }
+        index_items.push(quote! { ::renox::db::ModelIndex::new(&[#(#names),*], #unique) });
+    }
+    let indexes_fn = (!index_items.is_empty()).then(|| {
+        quote! {
+            fn indexes() -> ::std::vec::Vec<::renox::db::ModelIndex> {
+                ::std::vec![#(#index_items),*]
+            }
+        }
+    });
 
     let mut searchable: Vec<String> = Vec::new();
     if let Some(lit) = &search {
@@ -247,13 +306,15 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         let (name, ty) = (&f.name, &f.ty);
         let rust_type = quote!(#ty).to_string();
         let nullable = is_option(ty);
+        let default = f.default.as_ref().map(|l| quote! { .default_sql(#l) });
+        let references = f.references.as_ref().map(|l| quote! { .references(#l) });
         quote! {
             ::renox::db::ModelColumn::new(
                 #name,
                 #rust_type,
                 (&::renox::db::schema::ColumnProbe::<#ty>::new()).kind(),
                 #nullable,
-            )
+            ) #default #references
         }
     });
     let forget_timestamps = ["created_at", "updated_at"].map(|name| {
@@ -345,6 +406,8 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 ::std::vec![#(#column_infos),*]
             }
 
+            #indexes_fn
+
             fn forget_timestamps(&mut self) {
                 #(#forget_timestamps)*
             }
@@ -356,6 +419,28 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             #hooks_fns
         }
     })
+}
+
+/// `String` or `Option<String>` (by the last path segment).
+fn is_string_or_option_string(ty: &Type) -> bool {
+    let last = |ty: &Type| match ty {
+        Type::Path(p) if p.qself.is_none() => p.path.segments.last().cloned(),
+        _ => None,
+    };
+    let Some(seg) = last(ty) else { return false };
+    if seg.ident == "String" {
+        return true;
+    }
+    if seg.ident != "Option" {
+        return false;
+    }
+    match &seg.arguments {
+        syn::PathArguments::AngleBracketed(a) => matches!(
+            a.args.first(),
+            Some(syn::GenericArgument::Type(inner)) if last(inner).is_some_and(|s| s.ident == "String")
+        ),
+        _ => false,
+    }
 }
 
 fn is_option(ty: &Type) -> bool {
@@ -380,6 +465,14 @@ fn form_tokens(input: &DeriveInput, fields: &[Field]) -> TokenStream {
         .collect();
     let members = included.iter().map(|f| {
         let (field_vis, name, ty) = (&f.vis, &f.ident, &f.ty);
+        if f.form.upload {
+            let rules = f.form.rules.iter().map(|r| quote! { #[validate(#r)] });
+            return quote! {
+                #(#rules)*
+                #[serde(skip_serializing)]
+                #field_vis #name: ::core::option::Option<::renox::Upload>
+            };
+        }
         let rules = f.form.rules.iter().map(|r| quote! { #[validate(#r)] });
         let default = matches!(ty, Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
             .then(|| quote! { #[serde(default)] });

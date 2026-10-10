@@ -131,6 +131,10 @@ pub struct ModelColumn {
     pub kind: ColumnKind,
     /// Whether the field is an `Option`.
     pub nullable: bool,
+    /// The SQL default from `#[model(default = "…")]`, if any.
+    pub default: Option<&'static str>,
+    /// The table from `#[model(references = "…")]`, if any.
+    pub references: Option<&'static str>,
 }
 
 impl ModelColumn {
@@ -146,7 +150,39 @@ impl ModelColumn {
             rust_type,
             kind,
             nullable,
+            default: None,
+            references: None,
         }
+    }
+
+    /// Sets the column's SQL default (`#[model(default = "0")]`).
+    pub const fn default_sql(mut self, sql: &'static str) -> Self {
+        self.default = Some(sql);
+        self
+    }
+
+    /// Sets the table the column points at (`#[model(references = "users")]`).
+    pub const fn references(mut self, table: &'static str) -> Self {
+        self.references = Some(table);
+        self
+    }
+}
+
+/// An index a model declares with `#[model(index(a, b))]` or
+/// `#[model(unique(a))]`.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ModelIndex {
+    /// The indexed columns, in order.
+    pub columns: &'static [&'static str],
+    /// Whether the index is unique.
+    pub unique: bool,
+}
+
+impl ModelIndex {
+    /// Describes one index.
+    pub const fn new(columns: &'static [&'static str], unique: bool) -> Self {
+        Self { columns, unique }
     }
 }
 

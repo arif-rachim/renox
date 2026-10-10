@@ -462,7 +462,7 @@ pub fn resource(
         ),
         None => Default::default(),
     };
-    let tests = replace(TESTS)
+    let mut tests = replace(TESTS)
         .replace("__form1__", &form(false))
         .replace("__form2__", &form(true))
         .replace("__seen_first__", &seen_first)
@@ -470,6 +470,9 @@ pub fn resource(
         .replace("__has_row__", &replace(&has_row))
         .replace("__has_changed__", &replace(&has_changed))
         .replace("__invalid__", &replace(&invalid));
+    if !schema_test_exists(&root.join("tests")) {
+        tests.push_str(&replace(SCHEMA_TEST));
+    }
     write_new(&root.join("tests").join(format!("{module}.rs")), &tests)?;
 
     // The table.
@@ -505,6 +508,28 @@ pub fn resource(
         &format!("app::{module}::{module_type}"),
     )?;
     Ok(path)
+}
+
+/// The test that compares the registered models with the migrated tables.
+const SCHEMA_TEST: &str = r#"
+#[renox::test]
+async fn the_models_match_the_schema() {
+    TestApp::new(__crate__::app())
+        .await
+        .assert_models_match_schema()
+        .await;
+}
+"#;
+
+/// Whether a file in `tests/` already has the schema test (it is added once per app).
+fn schema_test_exists(dir: &Path) -> bool {
+    fs::read_dir(dir).is_ok_and(|entries| {
+        entries.flatten().any(|entry| {
+            entry.path().extension().is_some_and(|e| e == "rs")
+                && fs::read_to_string(entry.path())
+                    .is_ok_and(|text| text.contains("assert_models_match_schema"))
+        })
+    })
 }
 
 const MODEL: &str = r#"use renox::fake::Fake;
@@ -544,6 +569,10 @@ pub struct __Module__;
 impl Module for __Module__ {
     fn name(&self) -> &'static str {
         "__module__"
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.model::<__Model__>();
     }
 
     fn routes(&self) -> Routes {
@@ -895,6 +924,16 @@ mod tests {
         let tests = read(&dir, "tests/products.rs");
         assert!(tests.contains("my_shop::app()"));
         assert!(!tests.contains("__"));
+        assert!(
+            module.contains("fn register(&self, app: &mut Registry)")
+                && module.contains("app.model::<Product>();"),
+            "{module}"
+        );
+        assert!(tests.contains("assert_models_match_schema"));
+        // A second resource does not add the schema test again.
+        resource(dir.path(), "orders", None, Some("note")).unwrap();
+        let both = format!("{tests}{}", read(&dir, "tests/orders.rs"));
+        assert_eq!(both.matches("assert_models_match_schema").count(), 1);
 
         let migrations: Vec<_> = fs::read_dir(dir.path().join("migrations"))
             .unwrap()
