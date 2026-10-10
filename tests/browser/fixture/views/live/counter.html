@@ -7,3 +7,9 @@
   <button id="rename-go" type="submit">Rename</button>
 </form>
 <p>Name: <span id="shown-name">{{ state.name }}</span></p>
+<input id="search" rx-model.live="search">
+<span id="echo">{{ state.search }}</span>
+<input id="lazy" rx-model.blur="lazy">
+<span id="lazy-echo">{{ state.lazy }}</span>
+<input id="nick" rx-model="nick">
+<span id="nick-echo">{{ state.nick }}</span>

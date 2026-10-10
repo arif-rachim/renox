@@ -146,6 +146,9 @@ async fn rename_category(
 struct Counter {
     count: i64,
     name: String,
+    search: String,
+    nick: String,
+    lazy: String,
 }
 
 impl LiveComponent for Counter {
