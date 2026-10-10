@@ -26,7 +26,7 @@ use anyhow::Context;
 use axum::extract::FromRef;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 
-pub use column::{Col, Comparable, Condition};
+pub use column::{Col, Comparable, Condition, IntoColumn};
 pub use conn::Conn;
 #[doc(hidden)]
 pub use conn::bounds;

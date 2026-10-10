@@ -155,3 +155,65 @@ async fn an_unknown_column_is_the_usual_error() {
         .unwrap_err();
     assert!(err.to_string().contains("has no column"), "{err}");
 }
+
+#[renox::test]
+async fn ordering_and_plucking_take_typed_columns() {
+    let app = seed().await;
+    let db = app.db();
+
+    let got = Product::query()
+        .order_by(Product::NAME)
+        .get(db)
+        .await
+        .unwrap();
+    assert_eq!(names(&got), ["Apple", "Banana", "Cherry", "Date"]);
+    let got = Product::query()
+        .order_by_desc(Product::PRICE)
+        .get(db)
+        .await
+        .unwrap();
+    assert_eq!(names(&got), ["Cherry", "Banana", "Apple", "Date"]);
+
+    let names: Vec<String> = Product::query()
+        .order_by_desc(Product::NAME)
+        .pluck(db, Product::NAME)
+        .await
+        .unwrap();
+    assert_eq!(names, ["Date", "Cherry", "Banana", "Apple"]);
+    let prices = Product::query()
+        .order_by(Product::PRICE)
+        .pluck::<i64, _>(db, Product::PRICE)
+        .await
+        .unwrap();
+    assert_eq!(prices, [1, 10_000, 20_000, 30_000]);
+}
+
+#[renox::test]
+#[allow(clippy::needless_borrows_for_generic_args)]
+async fn string_columns_still_work_in_every_form() {
+    let app = seed().await;
+    let db = app.db();
+    let owned = String::from("name");
+    let literal = "price";
+
+    let got = Product::query()
+        .order_by(&owned)
+        .order_by_desc(&literal)
+        .order_by(owned.clone())
+        .get(db)
+        .await
+        .unwrap();
+    assert_eq!(got.len(), 4);
+    let names: Vec<String> = Product::query()
+        .order_by("id")
+        .pluck(db, &owned)
+        .await
+        .unwrap();
+    assert_eq!(names, ["Apple", "Banana", "Cherry", "Date"]);
+    let prices = Product::query()
+        .order_by("id")
+        .pluck::<i64, _>(db, &literal)
+        .await
+        .unwrap();
+    assert_eq!(prices.len(), 4);
+}
