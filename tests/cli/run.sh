@@ -169,6 +169,7 @@ if runs; then
     step "the app's own commands"
     cargo run -q -- migrate
     cargo run -q -- migrate:status
+    cargo run -q -- db:check
     cargo run -q -- migrate:status | grep -q 'ran.*create_products_table'
     cargo run -q -- catalog:import
     # A typed command (clap): its flags, its --help, and a clear error.

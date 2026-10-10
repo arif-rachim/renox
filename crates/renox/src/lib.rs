@@ -415,6 +415,19 @@ pub struct CheatSheet;
 /// let _ = Product::PRCE;
 /// ```
 ///
+/// Index columns must exist, and a default is a string:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(index(nope))]
+/// struct Post { id: i64, title: String }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Post { id: i64, #[model(default = 0)] views: i64 }
+/// ```
+///
 /// Form misuse:
 /// ```compile_fail
 /// # use renox::prelude::*;
