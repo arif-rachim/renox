@@ -247,3 +247,37 @@ async fn a_page_block_renders_as_a_fragment() {
     res.assert_ok().assert_see("<p>inner</p>");
     assert!(!res.text().contains("<html>"), "{}", res.text());
 }
+
+#[renox::test]
+async fn rx_wizard_matches_the_macro() {
+    same(
+        &format!("{UI}{{% call ui.wizard(id=\"w\", steps=[[\"a\", \"First\"], [\"b\", (second)]], submit_label=\"Save\", cancel=true, back_label=\"Prev\") %}}{{% call ui.wizard_step(id=\"w\", key=\"a\", title=\"First\") %}}<p>one</p>{{% endcall %}}{{% call ui.wizard_step(id=\"w\", key=\"b\", title=(second)) %}}<p>two</p>{{% endcall %}}{{% endcall %}}"),
+        "<rx-wizard id=\"w\" submit-label=\"Save\" cancel back-label=\"Prev\">\n<rx-wizard-step key=\"a\" title=\"First\"><p>one</p></rx-wizard-step>\n<rx-wizard-step key=\"b\" title=\"{{ second }}\"><p>two</p></rx-wizard-step>\n</rx-wizard>",
+        serde_json::json!({"second": "Second"}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_wizard_holds_only_steps() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        "<rx-wizard id=\"w\" submit-label=\"Save\"><p>x</p></rx-wizard>",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-wizard-step key=\"a\">x</rx-wizard-step>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Pair(serde_json::json!({}))), move |c| {
+        c.views_path = path
+    })
+    .await;
+    let m = app.get("/m").await.text();
+    assert!(m.contains("holds only &lt;rx-wizard-step&gt;"), "{m}");
+    let r = app.get("/r").await.text();
+    assert!(r.contains("belongs inside &lt;rx-wizard&gt;"), "{r}");
+}

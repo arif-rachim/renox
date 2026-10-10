@@ -173,3 +173,118 @@ pub(super) fn push(
     }
     Ok(())
 }
+
+/// A wizard step read from its tag: key, title, content, start tag, end tag.
+type Step<'a, 'b> = (
+    String,
+    Option<String>,
+    &'b [Node<'a>],
+    &'b Range<usize>,
+    Option<&'b Range<usize>>,
+);
+
+/// `<rx-wizard>`: the steps come from the `<rx-wizard-step>` children, and each gets the
+/// wizard's id (Decision 3 of #374).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn wizard(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    let step_contract = cx
+        .catalog
+        .contracts
+        .iter()
+        .find(|c| c.tag == "rx-wizard-step")
+        .expect("rx-wizard-step is built in");
+    let mut steps: Vec<Step<'_, '_>> = Vec::new();
+    let mut gaps = String::new();
+    for child in children {
+        match child {
+            Node::Text(span) => {
+                let text = &cx.src[span.clone()];
+                if !text.trim().is_empty() {
+                    return Err(err(
+                        line,
+                        "<rx-wizard> holds only <rx-wizard-step>".to_owned(),
+                    ));
+                }
+                gaps.push_str(&pad(text));
+            }
+            Node::Element {
+                name,
+                attrs: sa,
+                children: inner,
+                open: sopen,
+                close: sclose,
+                line: at,
+            } => {
+                if name != "rx-wizard-step" {
+                    return Err(err(
+                        *at,
+                        "<rx-wizard> holds only <rx-wizard-step>".to_owned(),
+                    ));
+                }
+                check_attrs(step_contract, sa, &[]).map_err(|m| err(*at, m))?;
+                let key = text_prop(attr(sa, "key").expect("checked: required"), name)?;
+                let title = attr(sa, "title").map(|t| text_prop(t, name)).transpose()?;
+                steps.push((key, title, inner, sopen, sclose.as_ref()));
+            }
+        }
+    }
+    cx.used.insert(Module::Ui);
+    let id = text_prop(attr(attrs, "id").expect("checked: required"), "rx-wizard")?;
+    let list: Vec<String> = steps
+        .iter()
+        .map(|(k, t, ..)| format!("[{k}, {}]", t.as_deref().unwrap_or(k)))
+        .collect();
+    let mut args = format!(
+        "id={id}, steps=[{}], submit_label={}",
+        list.join(", "),
+        text_prop(
+            attr(attrs, "submit-label").expect("checked: required"),
+            "rx-wizard"
+        )?
+    );
+    for (name, arg) in [
+        ("back-label", "back_label"),
+        ("next-label", "next_label"),
+        ("cancel-label", "cancel_label"),
+    ] {
+        if let Some(a) = attr(attrs, name) {
+            args.push_str(&format!(", {arg}={}", text_prop(a, "rx-wizard")?));
+        }
+    }
+    if let Some(a) = attr(attrs, "cancel") {
+        let e = attrs::prop_expr(a, attrs::Kind::Bool, &[])
+            .map_err(|m| err(a.line, format!("<rx-wizard> {m}")))?;
+        args.push_str(&format!(", cancel={e}"));
+    }
+    out.push_str(&format!("{{% call __rx_ui.wizard({args}) %}}"));
+    out.push_str(&pad(&cx.src[open.clone()]));
+    out.push_str(&gaps);
+    for (key, title, inner, sopen, sclose) in steps {
+        let mut call = format!("id={id}, key={key}");
+        if let Some(t) = title {
+            call.push_str(&format!(", title={t}"));
+        }
+        out.push_str(&format!("{{% call __rx_ui.wizard_step({call}) %}}"));
+        out.push_str(&pad(&cx.src[sopen.clone()]));
+        cx.nodes(inner, "rx-wizard-step", out)?;
+        out.push_str("{% endcall %}");
+        if let Some(c) = sclose {
+            out.push_str(&pad(&cx.src[c.clone()]));
+        }
+    }
+    out.push_str("{% endcall %}");
+    if let Some(c) = close {
+        out.push_str(&pad(&cx.src[c.clone()]));
+    }
+    Ok(())
+}

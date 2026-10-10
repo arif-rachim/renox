@@ -402,6 +402,9 @@ fn emit_node(
             Special::Push => {
                 special::push(&mut cx, contract, attrs, children, open, close, *line, out)
             }
+            Special::Wizard => {
+                special::wizard(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
             _ => Err(err(*line, format!("<{name}> is not supported yet"))),
         };
     }
