@@ -319,7 +319,8 @@ crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, se
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
                            standalone CLI: download via curl + SHA-256 check, build/watch; used by
-                           new --tailwind, serve, build)
+                           new --tailwind, serve, build), doctor.rs (rnx doctor),
+                           tools.rs (programs on PATH, the fast linker rnx new writes)
   build.rs                 sets RENOX_GIT_REV (the commit `rnx new` pins apps to)
   stubs/starter/           `rnx new --starter`: the starter kit's files, written over the
                            stubs below (same path) or next to them (`STARTER` in new.rs)

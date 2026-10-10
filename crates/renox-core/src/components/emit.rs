@@ -47,27 +47,6 @@ fn row() -> Option<(String, String)> {
     ROW.with(|r| r.borrow().clone())
 }
 
-/// Whether a macro component hands the attribute on in `attrs` (Decision 12 of #372).
-fn passes_through(name: &str) -> bool {
-    name.contains('-')
-        || name.starts_with('@')
-        || matches!(
-            name,
-            "min"
-                | "max"
-                | "step"
-                | "pattern"
-                | "minlength"
-                | "maxlength"
-                | "inputmode"
-                | "autofocus"
-                | "tabindex"
-                | "title"
-                | "form"
-                | "accept"
-        )
-}
-
 fn bare(name: &str) -> &str {
     name.strip_prefix(':').unwrap_or(name)
 }
@@ -129,16 +108,8 @@ pub(super) fn check_attrs(
         if n == "route" {
             continue;
         }
-        if n == "class" && contract.attrs {
-            if element {
-                continue;
-            }
-            return Err(format!(
-                "<{tag}> doesn't take class yet; merging class comes with #373"
-            ));
-        }
         if contract.props.iter().any(|p| p.name == n)
-            || (contract.attrs && (element || passes_through(n)))
+            || (contract.attrs && (element || !a.name.starts_with(':')))
         {
             continue;
         }

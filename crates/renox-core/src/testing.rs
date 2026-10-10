@@ -498,6 +498,50 @@ impl TestApp {
         self.request().htmx()
     }
 
+    /// Starts a test of a live component from `component`'s state: the way
+    /// a browser holds a component after a page mounted it.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use renox::testing::TestApp;
+    /// # #[derive(serde::Serialize, serde::Deserialize, Default)]
+    /// # struct Counter { count: i64 }
+    /// # impl LiveComponent for Counter {
+    /// #     const NAME: &'static str = "counter";
+    /// #     const VIEW: &'static str = "live/counter.html";
+    /// #     async fn call(&mut self, _: &str, _: Vec<serde_json::Value>,
+    /// #         _: &mut renox::live_component::LiveContext) -> Result { Ok(()) }
+    /// # }
+    /// # async fn demo(app: TestApp) {
+    /// let mut counter = app.live(Counter::default());
+    /// counter.call("increment").await.assert_ok();
+    /// assert_eq!(counter.component().count, 0);
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// When the state can't be sealed (for example, it is over
+    /// `LIVE_SNAPSHOT_MAX_SIZE`).
+    pub fn live<C: crate::live_component::LiveComponent>(&self, component: C) -> LiveTest<'_, C> {
+        let state = serde_json::to_value(&component)
+            .unwrap_or_else(|e| panic!("live component `{}` can't be serialized: {e}", C::NAME));
+        let snapshot = crate::live_component::snapshot::seal(
+            self.state().key.signing(),
+            self.state().config.live_snapshot_max,
+            C::NAME,
+            "rx-live-test",
+            &state,
+        )
+        .unwrap_or_else(|e| panic!("live component `{}` can't be sealed: {e:?}", C::NAME));
+        LiveTest {
+            app: self,
+            snapshot,
+            fields: Vec::new(),
+            marker: std::marker::PhantomData,
+        }
+    }
+
     /// A GET request.
     pub async fn get(&self, uri: &str) -> TestResponse {
         self.request().get(uri).await
@@ -1078,5 +1122,71 @@ fn json_contains(actual: &serde_json::Value, expected: &serde_json::Value) -> bo
             a.len() == e.len() && a.iter().zip(e).all(|(av, ev)| json_contains(av, ev))
         }
         _ => actual == expected,
+    }
+}
+
+/// A live component under test, made by [`TestApp::live`]. It keeps the
+/// component's signed snapshot between calls, as the page does, and sends the
+/// fields set with [`set`](Self::set) on every call.
+pub struct LiveTest<'a, C> {
+    app: &'a TestApp,
+    snapshot: String,
+    fields: Vec<(String, String)>,
+    marker: std::marker::PhantomData<fn() -> C>,
+}
+
+impl<C: crate::live_component::LiveComponent> LiveTest<'_, C> {
+    /// Sets a form field, like typing in an input bound to the component.
+    /// It is sent with every call from now on.
+    pub fn set(&mut self, name: &str, value: impl ToString) -> &mut Self {
+        let value = value.to_string();
+        match self.fields.iter_mut().find(|(n, _)| n == name) {
+            Some(field) => field.1 = value,
+            None => self.fields.push((name.to_string(), value)),
+        }
+        self
+    }
+
+    /// Calls an action without arguments.
+    pub async fn call(&mut self, action: &str) -> TestResponse {
+        self.call_with(action, serde_json::json!([])).await
+    }
+
+    /// Calls an action with its arguments (a JSON array). When the answer is
+    /// a 200, the component's new snapshot is kept for the next call.
+    pub async fn call_with(&mut self, action: &str, args: serde_json::Value) -> TestResponse {
+        let args = args.to_string();
+        let mut form: Vec<(&str, &str)> = vec![("_snapshot", &self.snapshot), ("_args", &args)];
+        form.extend(self.fields.iter().map(|(n, v)| (n.as_str(), v.as_str())));
+        let uri = format!("/_renox/live/{}/{action}", C::NAME);
+        let res = self.app.htmx().post(&uri, &form).await;
+        if res.status.as_u16() == 200 {
+            let html = res.text();
+            const MARK: &str = "data-rx-snapshot=\"";
+            if let Some(start) = html.find(MARK).map(|i| i + MARK.len())
+                && let Some(len) = html[start..].find('"')
+            {
+                self.snapshot = html[start..start + len].to_string();
+            }
+        }
+        res
+    }
+
+    /// The component as of the last answer.
+    ///
+    /// # Panics
+    ///
+    /// When the snapshot can't be read back.
+    pub fn component(&self) -> C {
+        let state = self.app.state();
+        let (_, value) = crate::live_component::snapshot::open(
+            state.key.signing(),
+            state.config.live_snapshot_max,
+            C::NAME,
+            &self.snapshot,
+        )
+        .unwrap_or_else(|e| panic!("live snapshot of `{}` is unreadable: {e:?}", C::NAME));
+        serde_json::from_value(value)
+            .unwrap_or_else(|e| panic!("live component `{}` can't be read: {e}", C::NAME))
     }
 }

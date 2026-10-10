@@ -372,6 +372,19 @@ async fn a_page_with_two_components_loads_idiomorph_once() {
     assert_eq!(body.matches("/_renox/live-").count(), 1);
 }
 
+#[renox::test]
+async fn the_test_helper_keeps_state_between_calls() {
+    let (app, _dir) = actions_app().await;
+    let mut c = app.live(Counter::default());
+    c.set("search", "tea");
+    c.call("increment").await.assert_see("<b>1</b>");
+    c.call("increment").await.assert_see("<b>2</b>tea");
+    c.call_with("add", json!([5])).await.assert_see("<b>7</b>");
+    let state = c.component();
+    assert_eq!(state.count, 7);
+    assert_eq!(state.search, "tea");
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct Todo {
     done: Vec<i64>,

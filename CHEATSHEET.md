@@ -18,6 +18,7 @@ business ([llms.txt](llms.txt) maps its files).
 rnx new shop                         # or: --database postgres, --tailwind (Tailwind CSS, no Node)
 rnx new desk --starter               # the starter kit: verification, roles, dashboard, users, activity log
 rnx key:generate                     # APP_KEY into .env (made from .env.example if missing); --show only prints it
+rnx doctor                           # checks Rust, linker, sccache, .env, APP_KEY, database, migrations
 rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs
 rnx make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"

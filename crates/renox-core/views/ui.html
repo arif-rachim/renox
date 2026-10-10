@@ -513,12 +513,12 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endmacro -%}
 
 {% macro button(label, variant="primary", type="submit", name=none, value=none, size=none, block=false, attrs={}, icon=none, badge=none, key=none, disabled=none, disabled_reason=none) -%}
-<button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if block %} rx-button--block{% endif %}" type="{{ type }}"
-  {%- if name %} name="{{ name }}"{% endif %}{% if value is not none %} value="{{ value }}"{% endif %}{{ _button_state(key, disabled, disabled_reason) }}{{ _attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</button>
+<button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if block %} rx-button--block{% endif %}{% if attrs.class %} {{ attrs.class }}{% endif %}" type="{{ type }}"
+  {%- if name %} name="{{ name }}"{% endif %}{% if value is not none %} value="{{ value }}"{% endif %}{{ _button_state(key, disabled, disabled_reason) }}{{ _root_attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</button>
 {%- endmacro %}
 
 {% macro link_button(href, label, variant="secondary", size=none, attrs={}, icon=none, badge=none, key=none, new_tab=false) -%}
-<a class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}" href="{{ href }}"{% if new_tab %} target="_blank" rel="noopener"{% endif %}{{ _button_state(key, false, none) }}{{ _attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</a>
+<a class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if attrs.class %} {{ attrs.class }}{% endif %}" href="{{ href }}"{% if new_tab %} target="_blank" rel="noopener"{% endif %}{{ _button_state(key, false, none) }}{{ _root_attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</a>
 {%- endmacro %}
 
 {#- A button with only an icon: `label` is what screen readers say and its
