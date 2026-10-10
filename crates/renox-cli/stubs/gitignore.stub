@@ -2,3 +2,5 @@
 /storage
 .env
 /dist
+# Written by rnx new for this machine's linker
+/.cargo/config.toml
