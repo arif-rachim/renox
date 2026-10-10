@@ -127,6 +127,7 @@ step "every generator"
 "$RNX" make:migration add_sku_to_products
 "$RNX" make:module products --resource $(runs || echo --no-migrate) --fields "name:string price:money notes:text active:bool due_on:date"
 "$RNX" make:module tags --resource --no-migrate
+if grep -n '{%' resources/views/products/*.html resources/views/tags/*.html; then echo "FAIL: {% %} in generated views"; exit 1; fi
 "$RNX" make:factory Book --module catalog
 "$RNX" make:seeder DemoData
 "$RNX" make:test Checkout
