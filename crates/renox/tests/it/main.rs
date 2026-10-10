@@ -13,6 +13,7 @@ mod auth;
 mod auth_edges;
 mod auth_email;
 mod authorization;
+mod auto_migrations;
 mod background;
 mod background_edges;
 mod background_resilience;
