@@ -255,6 +255,22 @@ Price and weight sit next to each other. City takes the whole row (`span="full"`
 suggests three cities. Below, a "Delivery" group asks for a speed (one choice) and extras
 (any number).
 
+The same fields as tags, for pages that use components (`name` and `label` are required;
+names with an underscore use a dash, so `current_name` is `current-name`; lists and other values
+are given with a colon, `:options="…"`):
+
+| Tag | Macro |
+|---|---|
+| `<rx-radio>` | `radio(name, label, options, selected, hint, required, inline, columns, …)` |
+| `<rx-checkbox-list>` | `checkbox_list(name, label, options, selected, hint, required, inline, columns, …)` |
+| `<rx-toggle-buttons>` | `toggle_buttons(name, label, options, selected, multiple, …)` |
+| `<rx-file>` | `file(name, label, accept, multiple, current, current_name, preview, …)` |
+| `<rx-date-picker>` | `date_picker(name, label, value, min, max, placeholder, readonly, disabled_dates, closed_weekdays, …)` |
+| `<rx-tags-input>` | `tags_input(name, label, value, suggestions, placeholder, …)` |
+
+Each also takes `hint`, `required`, `id`, `disabled`, `span` and `bag`, and passes any other
+attribute to the field.
+
 ### Rows of fields
 
 Some forms have a list inside them: the people to invite to a team, the lines of an order.
@@ -644,6 +660,7 @@ These macros also have tags. Each renders the same HTML as its macro (a test che
 
 | Tag | Macro |
 | --- | --- |
+| `<rx-repeater name label :rows add-label item-label min max :reorderable hint id span>` with `row` and `prefix` in its content | `{% call(row, prefix) repeater(…) %}`. `prefix` is the row's name part, like `lines[0]`, so a field is `name="{{ prefix }}[qty]"`. |
 | `<rx-key-value name label :value key-label value-label add-label hint id span>` | `key_value(…)` |
 | `<rx-fieldset legend hint columns>…</rx-fieldset>` | `{% call fieldset(…) %}` |
 | `<rx-show-when field values>…</rx-show-when>` | `{% call show_when(field, values) %}` |

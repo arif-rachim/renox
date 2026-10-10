@@ -754,6 +754,110 @@ async fn rx_form_rejects_a_bad_method() {
     assert!(r.contains("must be one of"), "{r}");
 }
 
+#[derive(serde::Deserialize)]
+struct Choices {
+    plan: String,
+    #[serde(default)]
+    extras: Vec<String>,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+impl Validate for Choices {
+    fn rules(&self, v: &mut Validator) {
+        v.field("plan", &self.plan)
+            .one_of(&["free".to_string(), "pro".to_string()]);
+        let _ = (&self.extras, &self.tags);
+    }
+}
+
+struct ChoicePages;
+
+impl Module for ChoicePages {
+    fn name(&self) -> &'static str {
+        "choice-pages"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/m", || async { view("m.html", context! {}) })
+            .get("/r", || async { view("r.html", context! {}) })
+            .post("/save", |Valid(_): Valid<Choices>| async { "ok" })
+    }
+}
+
+#[renox::test]
+async fn choice_fields_match_the_macros_and_refill_after_a_failed_submit() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        format!(
+            "{UI}{{{{ ui.radio(name=\"plan\", label=\"Plan\", options=[[\"free\", \"Free\"], [\"pro\", \"Pro\", \"Teams\"]], hint=\"Pick\", required=true, inline=true, attrs={{\"data-x\": \"1\"}}) }}}}\
+             {{{{ ui.checkbox_list(name=\"extras\", label=\"Extras\", options=[\"gift\", [\"note\", \"Card\"]], selected=[\"gift\"], columns=2) }}}}\
+             {{{{ ui.tags_input(name=\"tags\", label=\"Tags\", value=[\"a\"], suggestions=[\"b\", \"c\"], placeholder=\"Add\") }}}}"
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-radio name=\"plan\" label=\"Plan\" :options=\"[['free', 'Free'], ['pro', 'Pro', 'Teams']]\" hint=\"Pick\" required inline data-x=\"1\"/>\
+         <rx-checkbox-list name=\"extras\" label=\"Extras\" :options=\"['gift', ['note', 'Card']]\" :selected=\"['gift']\" columns=\"2\"/>\
+         <rx-tags-input name=\"tags\" label=\"Tags\" :value=\"['a']\" :suggestions=\"['b', 'c']\" placeholder=\"Add\"/>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(ChoicePages), move |c| c.views_path = path).await;
+    let bad = [
+        ("plan", "gold"),
+        ("extras", "note"),
+        ("tags", "x"),
+        ("tags", "y"),
+    ];
+    let mut pages = Vec::new();
+    for page in ["/m", "/r"] {
+        app.request()
+            .header("referer", page)
+            .post("/save", &bad)
+            .await
+            .assert_redirect(page);
+        let r = app.get(page).await;
+        r.assert_ok();
+        pages.push(normalize(&r.text()));
+    }
+    assert!(pages[0].contains("aria-invalid=\"true\""), "{}", pages[0]);
+    assert!(pages[0].contains("value=\"x\""), "{}", pages[0]);
+    assert_eq!(pages[0], pages[1]);
+}
+
+#[renox::test]
+async fn rx_toggle_buttons_and_rx_file_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.toggle_buttons(name=\"mode\", label=\"Mode\", options=[[\"a\", \"A\"], [\"b\", \"B\"]], selected=\"b\", hint=\"One\") }}}}\
+             {{{{ ui.toggle_buttons(name=\"days\", label=\"Days\", options=[\"mon\", \"tue\"], selected=[\"tue\"], multiple=true) }}}}\
+             {{{{ ui.file(name=\"doc\", label=\"Document\", accept=\"image/*\", multiple=true, current=\"/f/a.png\", current_name=\"a.png\", preview=true, required=true) }}}}"
+        ),
+        "<rx-toggle-buttons name=\"mode\" label=\"Mode\" :options=\"[['a', 'A'], ['b', 'B']]\" :selected=\"'b'\" hint=\"One\"/>\
+         <rx-toggle-buttons name=\"days\" label=\"Days\" :options=\"['mon', 'tue']\" :selected=\"['tue']\" multiple/>\
+         <rx-file name=\"doc\" label=\"Document\" accept=\"image/*\" multiple current=\"/f/a.png\" current-name=\"a.png\" preview required/>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_date_picker_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.date_picker(name=\"day\", label=\"Day\", value=\"2026-01-05\", min=\"2026-01-01\", max=\"2026-12-31\", hint=\"Pick\", required=true, readonly=true, disabled_dates=[\"2026-01-06\"], closed_weekdays=[0, 6]) }}}}"
+        ),
+        "<rx-date-picker name=\"day\" label=\"Day\" :value=\"'2026-01-05'\" min=\"2026-01-01\" max=\"2026-12-31\" hint=\"Pick\" required readonly :disabled-dates=\"['2026-01-06']\" :closed-weekdays=\"[0, 6]\"/>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
 #[renox::test]
 async fn rx_layout_fields_match_the_macros() {
     same(
@@ -804,4 +908,102 @@ async fn rx_select_options_url_and_editable_match_the_macro() {
         "{html}"
     );
     assert!(html.contains("data-rx-editable"), "{html}");
+}
+
+#[derive(serde::Deserialize)]
+struct OrderLine {
+    #[allow(dead_code)]
+    name: String,
+    qty: i64,
+}
+
+#[derive(serde::Deserialize)]
+struct Order {
+    lines: Vec<OrderLine>,
+}
+
+impl Validate for OrderLine {
+    fn rules(&self, v: &mut Validator) {
+        v.field("qty", &self.qty).min(1);
+    }
+}
+
+impl Validate for Order {
+    fn rules(&self, v: &mut Validator) {
+        v.nested("lines", &self.lines);
+    }
+}
+
+struct RepeaterPages;
+
+impl Module for RepeaterPages {
+    fn name(&self) -> &'static str {
+        "repeater-pages"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/m", || async {
+                view(
+                    "m.html",
+                    context! { lines => vec![context! { name => "Tea", qty => 1 }] },
+                )
+            })
+            .get("/r", || async {
+                view(
+                    "r.html",
+                    context! { lines => vec![context! { name => "Tea", qty => 1 }] },
+                )
+            })
+            .post("/save", |Valid(_): Valid<Order>| async { "ok" })
+    }
+}
+
+#[renox::test]
+async fn rx_repeater_matches_the_macro_and_shows_errors_on_nested_names() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        format!(
+            "{UI}{{% call(row, prefix) ui.repeater(name=\"lines\", label=\"Lines\", rows=(lines), min=1, max=5, item_label=\"Line\", add_label=\"More\", hint=\"Items\", reorderable=false) %}}\
+             {{{{ ui.input(name=(prefix) ~ \"[name]\", label=\"Name\", value=(row.name)) }}}}\
+             {{{{ ui.input(name=(prefix) ~ \"[qty]\", label=\"Qty\", type=\"number\", value=(row.qty)) }}}}{{% endcall %}}"
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-repeater name=\"lines\" label=\"Lines\" :rows=\"lines\" min=\"1\" max=\"5\" item-label=\"Line\" add-label=\"More\" hint=\"Items\" :reorderable=\"false\">\
+         <rx-input name=\"{{ prefix }}[name]\" label=\"Name\" :value=\"row.name\"/>\
+         <rx-input name=\"{{ prefix }}[qty]\" label=\"Qty\" type=\"number\" :value=\"row.qty\"/></rx-repeater>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(RepeaterPages), move |c| {
+        c.views_path = path
+    })
+    .await;
+    let bad = [
+        ("lines[0][name]", "Tea"),
+        ("lines[0][qty]", "1"),
+        ("lines[1][name]", "Cake"),
+        ("lines[1][qty]", "0"),
+    ];
+    let mut pages = Vec::new();
+    for page in ["/m", "/r"] {
+        let fresh = normalize(&app.get(page).await.assert_ok().text());
+        assert!(fresh.contains("name=\"lines[0][qty]\""), "{fresh}");
+        app.request()
+            .header("referer", page)
+            .post("/save", &bad)
+            .await
+            .assert_redirect(page);
+        let r = app.get(page).await;
+        r.assert_ok();
+        pages.push(normalize(&r.text()));
+    }
+    assert!(pages[0].contains("name=\"lines[1][qty]\""), "{}", pages[0]);
+    assert!(pages[0].contains("value=\"Cake\""), "{}", pages[0]);
+    assert!(pages[0].contains("aria-invalid=\"true\""), "{}", pages[0]);
+    assert_eq!(pages[0], pages[1]);
 }
