@@ -22,6 +22,7 @@ rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs
 rnx make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
                                      # model, migration, factory, form, 7 handlers, UI-kit views, tests
+                                     # runs migrate (asks outside APP_ENV=local; --no-migrate), prints the URL; --open opens it
 rnx make:model Product --module products --migration   # --key ulid|uuid|string for other ids
 rnx make:migration add_sku_to_products
 rnx make:policy Product --module products
