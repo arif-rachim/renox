@@ -730,6 +730,8 @@ struct Product {
 /// `#[model(table = "products", index(user_id))]` and `#[model(default = "0")] price: i64`.
 /// In a test, `TestApp::new(app).await.assert_views_compile()` (or `rnx view:check`) compiles
 /// every template and checks its `route('name')` calls.
+/// `rnx view:data` writes `.vscode/renox-components.json` (VS Code tag autocomplete; `rnx serve`
+/// refreshes it, `rnx new` sets `html.customData`). JetBrains isn't covered.
 /// Register the model so `rnx db:check` (and `assert_models_match_schema` in tests)
 /// compares its fields with the table. In a module: `app.model::<Product>()` in `register`.
 fn checked() -> App {

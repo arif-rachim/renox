@@ -27,6 +27,7 @@ full reload.
 - [Components](#components-see-the-request): your own reusable pieces, which can see the
   request (old input, errors, translations).
 - [Components as tags](#components-as-tags): the kit written as `<rx-…>` HTML tags.
+  Includes [editor autocomplete](#editor-autocomplete) for VS Code.
 - [The UI kit](#the-ui-kit) that ships with Renox (`renox/ui.html`):
   - form fields;
   - the page's frame (navigation bar, sidebar, page headers);
@@ -1148,6 +1149,28 @@ navbar) have no tag yet; call their macros as shown above.
 > **Not compiled yet:** the templates of the plugins (renox-2fa, oauth, admin, billing,
 > editors) are added with `add_template`, not loaded from files, so tags in them are not
 > rewritten. Write plugin templates with macros.
+
+### Editor autocomplete
+
+VS Code can suggest the kit's tags and their attributes while you type a template. Renox writes
+the list for it: `<app> view:data` (or `rnx view:data`) writes `.vscode/renox-components.json`,
+built from the components your app has, the kit's and your own. `rnx new` already points
+VS Code at that file (`.vscode/settings.json` sets `html.customData`), keeps the file out of
+git, and `rnx serve` refreshes it after every successful build, so a new component shows up
+without any step from you. If a refresh fails, `rnx serve` prints a warning and carries on.
+
+To set it up in an older app, run `rnx view:data` once and add this to `.vscode/settings.json`:
+
+```json
+{ "html.customData": ["./.vscode/renox-components.json"] }
+```
+
+An app command named `view:data` replaces the built-in one. `--out PATH` writes the file
+somewhere else.
+
+> [!NOTE]
+> JetBrains IDEs don't read this file: they use their own format (Web Types), which Renox
+> doesn't write yet.
 
 ## Toasts
 

@@ -70,6 +70,8 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 - After changing a model or a migration, run `rnx db:check` (it compares every `app.model::<…>()`
   with the tables the migrations build). After editing templates, run `rnx view:check` (it
   compiles every template and checks each `route('name')`); `tests/home.rs` runs it too.
+- `rnx view:data` writes `.vscode/renox-components.json` (VS Code autocomplete for the kit's tags;
+  git-ignored, refreshed by `rnx serve`). Don't edit it by hand.
 
 ## Things that trip agents up
 
