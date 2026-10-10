@@ -20,7 +20,7 @@ use crate::{AppState, Config, Error, Htmx, RouteTable, Session, assets};
 
 /// Templates that ship with Renox. An app overrides one by creating a file
 /// with the same name in its views directory.
-const BUILTIN: &[(&str, &str)] = &[
+pub(crate) const BUILTIN: &[(&str, &str)] = &[
     ("renox/error.html", include_str!("../views/error.html")),
     (
         "renox/pagination.html",
@@ -240,7 +240,24 @@ impl Views {
                 env.set_undefined_behavior(minijinja::UndefinedBehavior::SemiStrict);
             }
             let loader_dir = dir.clone();
-            env.set_loader(move |name| load(&loader_dir, embedded, name));
+            env.set_loader(move |name| {
+                let Some(src) = load(&loader_dir, embedded, name)? else {
+                    return Ok(None);
+                };
+                let lookup = |n: &str| load(&loader_dir, embedded, n).ok().flatten();
+                let catalog = crate::components::Catalog {
+                    contracts: &[],
+                    lookup: &lookup,
+                };
+                crate::components::compile(name, &src, &catalog)
+                    .map(Some)
+                    .map_err(|e| {
+                        minijinja::Error::new(
+                            ErrorKind::SyntaxError,
+                            format!("{name}:{}: {}", e.line, e.message),
+                        )
+                    })
+            });
 
             let routes = routes.clone();
             env.add_function(
