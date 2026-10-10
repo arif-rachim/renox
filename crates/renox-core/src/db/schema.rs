@@ -225,6 +225,7 @@ pub(crate) struct ModelInfo {
     pub(crate) name: &'static str,
     pub(crate) table: &'static str,
     pub(crate) columns: fn() -> Vec<ModelColumn>,
+    pub(crate) indexes: fn() -> Vec<super::ModelIndex>,
 }
 
 /// Describes `M` for the registry.
@@ -234,6 +235,7 @@ pub(crate) fn model_info<M: super::Model>() -> ModelInfo {
         name: std::any::type_name::<M>(),
         table: M::TABLE,
         columns: M::column_info,
+        indexes: M::indexes,
     }
 }
 

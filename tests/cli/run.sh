@@ -182,6 +182,29 @@ if runs; then
     grep -q 'Usage: catalog:import' "$WORK/err.txt"
     cargo run -q -- route:list
 
+    step "make:migration --auto: add a column, then an index, from the models"
+    edit_model() {
+        python3 - "$1" "$2" <<'PY'
+import sys
+old, new = sys.argv[1], sys.argv[2]
+p = "src/app/catalog/model.rs"
+s = open(p).read()
+assert old in s, "missing: " + old
+open(p, "w").write(s.replace(old, new, 1))
+PY
+    }
+    edit_model '    pub updated_at: Option<DateTime>,
+' '    pub updated_at: Option<DateTime>,
+    pub sku: Option<String>,
+'
+    "$RNX" make:migration --auto add_sku
+    edit_model '#[model(table = "books")]' '#[model(table = "books", index(sku))]'
+    "$RNX" make:migration --auto index_sku
+    cargo run -q -- migrate
+    cargo run -q -- db:check
+    cargo test
+    "$RNX" make:migration --auto | grep -q 'Nothing to change'
+
     if [ "$DATABASE" = sqlite ]; then
         step "the app over HTTP: every page, a --resource module's forms (tests/cli/smoke.py)"
         smoke 3191 resources

@@ -9,6 +9,7 @@ use super::{ColumnKind, Dialect, ModelColumn, ModelIndex};
 /// A table as the database has it.
 #[derive(Debug, Clone)]
 pub(crate) struct TableState {
+    #[allow(dead_code)] // kept for debugging output
     pub table: String,
     pub columns: Vec<TableColumn>,
     pub indexes: Vec<TableIndex>,
