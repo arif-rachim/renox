@@ -595,6 +595,31 @@ struct SignIn {
 </form>
 ```
 
+A form that mirrors a model comes from the model: `#[model(table = "products", form)]` generates
+`ProductForm` (Deserialize + Serialize + Validate), rules in `#[form(validate(required, max = 100))]`
+on the fields, `#[form(skip)]` / `#[form(upload)]`, and `form.fill(&mut product)`:
+
+```rust
+use renox::prelude::*;
+use serde::Serialize;
+
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "gadgets", form)]
+pub struct Gadget {
+    pub id: i64,
+    #[form(validate(required, max = 100))]
+    pub name: String,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+async fn save_gadget(Valid(form): Valid<GadgetForm>) -> Result<()> {
+    let mut gadget = Gadget::default();
+    form.fill(&mut gadget);
+    Ok(())
+}
+```
+
 A form request (Laravel's `FormRequest`) adds three optional steps around the rules: tidy the
 input first (`prepare`), check the user may send it (`authorize`), and run extra checks at the
 end (`after`).

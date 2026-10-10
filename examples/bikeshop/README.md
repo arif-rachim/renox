@@ -394,6 +394,8 @@ $ cargo run -- schedule:list
 The Rust tests are in [tests/](tests/), one file per area; the browser tests are
 `tests/browser/bikeshop-*.test.mjs` at the repository's root.
 
+**Forms from models.** The admin's brand form is not written by hand: `Brand` in [src/app/catalog/model.rs](src/app/catalog/model.rs) is `#[model(table = "brands", form)]` with `#[form(validate(...))]` rules, which generates `BrandForm` and `fill` (docs/validation.md, "Forms from models").
+
 ## Adding a page
 
 1. Add the route to the area's `routes()` in `src/app/<area>/mod.rs`, with a `.name(…)`.
