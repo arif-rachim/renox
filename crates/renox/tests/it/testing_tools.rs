@@ -294,3 +294,24 @@ async fn scheduled_tasks_run_at_the_travelled_time() {
     );
     assert!(app.run_scheduled("nope").await.is_err(), "an unknown task");
 }
+
+#[renox::test]
+async fn assert_views_compile_passes_and_names_broken_templates() {
+    let dir = tempfile::tempdir().unwrap();
+    let views = dir.path().join("views");
+    std::fs::create_dir_all(&views).unwrap();
+    std::fs::write(views.join("ok.html"), "<p>{{ 1 + 1 }}</p>").unwrap();
+    let path = views.clone();
+    let app = TestApp::with_config(App::new(), move |c| c.views_path = path).await;
+    app.assert_views_compile();
+
+    std::fs::write(views.join("broken.html"), "{% if %}").unwrap();
+    let path = views.clone();
+    let app = TestApp::with_config(App::new(), move |c| c.views_path = path).await;
+    let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        app.assert_views_compile();
+    }))
+    .expect_err("a broken template fails the check");
+    let message = failed.downcast_ref::<String>().cloned().unwrap_or_default();
+    assert!(message.contains("broken.html"), "{message}");
+}
