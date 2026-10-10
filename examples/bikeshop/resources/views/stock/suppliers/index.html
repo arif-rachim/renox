@@ -1,35 +1,21 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, link_button, table, empty %}
-{% from "stock/_parts.html" import styles %}
-{% block seo %}{{ seo(title=t('stock.suppliers.title')) }}{% endblock %}
-
 {#- The suppliers (#240): contact, lead time, price list size, open orders. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack" data-bs-reveal>
-  {% call page_header(t('stock.suppliers.title'), subtitle=t('stock.suppliers.lead')) %}
-    {{ link_button(route('stock.purchasing'), t('stock.purchasing.title')) }}
-    {{ link_button(route('stock.suppliers.create'), t('stock.suppliers.new'), variant="primary", icon="plus") }}
-  {% endcall %}
-  {%- if suppliers.items %}
-  <div class="rx-card">
-  {% call table([t('stock.suppliers.name'), t('stock.suppliers.contact'), [t('stock.suppliers.lead_days'), "num"], [t('stock.suppliers.items'), "num"], [t('stock.suppliers.open'), "num"]], caption=t('stock.suppliers.title')) %}
-    {# [explain:stock.suppliers.template] #}
-    {%- for row in suppliers.items %}
-    <tr>
-      <td><a class="rx-link" href="{{ route('stock.suppliers.show', row.supplier.id) }}">{{ row.supplier.name }}</a></td>
-      <td>{{ row.supplier.email or "—" }}{% if row.supplier.phone %}<br><span class="rx-subtitle">{{ row.supplier.phone }}</span>{% endif %}</td>
-      <td class="rx-num">{{ row.supplier.lead_days }}</td>
-      <td class="rx-num">{{ row.items }}</td>
-      <td class="rx-num">{{ row.open }}</td>
-    </tr>
-    {%- endfor %}
-    {# [/explain:stock.suppliers.template] #}
-  {% endcall %}
-  </div>
-  {% from "renox/pagination.html" import pagination %}{{ pagination(suppliers) }}
-  {%- else %}
-  <div class="rx-card">{{ empty(t('stock.suppliers.empty'), action_href=route('stock.suppliers.create'), action_label=t('stock.suppliers.new'), icon="building-2") }}</div>
-  {%- endif %}
-</div>
-{% endblock %}
+<rx-page layout="layouts/staff.html" title="{{ t('stock.suppliers.title') }}">
+  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
+  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+  <rx-stack data-bs-reveal>
+    <rx-page-header title="{{ t('stock.suppliers.title') }}" subtitle="{{ t('stock.suppliers.lead') }}">
+      <rx-link-button route="stock.purchasing" label="{{ t('stock.purchasing.title') }}"/>
+      <rx-link-button route="stock.suppliers.create" label="{{ t('stock.suppliers.new') }}" variant="primary" icon="plus"/>
+    </rx-page-header>
+    <rx-table :rows="suppliers" card caption="{{ t('stock.suppliers.title') }}" :key="row.supplier.id">
+      {# [explain:stock.suppliers.template] #}
+      <rx-column label="{{ t('stock.suppliers.name') }}"><a class="rx-link" href="{{ route('stock.suppliers.show', row.supplier.id) }}">{{ row.supplier.name }}</a></rx-column>
+      <rx-column label="{{ t('stock.suppliers.contact') }}">{{ row.supplier.email or "—" }}{% if row.supplier.phone %}<br><span class="rx-subtitle">{{ row.supplier.phone }}</span>{% endif %}</rx-column>
+      <rx-column label="{{ t('stock.suppliers.lead_days') }}" align="num">{{ row.supplier.lead_days }}</rx-column>
+      <rx-column label="{{ t('stock.suppliers.items') }}" align="num">{{ row.items }}</rx-column>
+      <rx-column label="{{ t('stock.suppliers.open') }}" align="num">{{ row.open }}</rx-column>
+      {# [/explain:stock.suppliers.template] #}
+      <rx-slot name="empty"><div class="rx-card"><rx-empty title="{{ t('stock.suppliers.empty') }}" route="stock.suppliers.create" action-label="{{ t('stock.suppliers.new') }}" icon="building-2"/></div></rx-slot>
+    </rx-table>
+  </rx-stack>
+</rx-page>
