@@ -37,6 +37,7 @@ pub struct Registry {
     pub(crate) provided: HashMap<TypeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>,
     /// Seeders for `db:seed`: the app's (`App::seeder`), then the modules'.
     pub(crate) seeders: Vec<Seeder>,
+    pub(crate) models: Vec<crate::db::schema::ModelInfo>,
 }
 
 /// A seeder registered with `App::seeder` or `Registry::seeder`.
@@ -52,6 +53,16 @@ pub(crate) struct StaticAsset {
 }
 
 impl Registry {
+    /// Tells `db:check` about a model, so its fields are compared with the
+    /// table. Registering the same model twice keeps one.
+    pub fn model<M: crate::db::Model>(&mut self) -> &mut Self {
+        let info = crate::db::schema::model_info::<M>();
+        if !self.models.iter().any(|m| m.type_id == info.type_id) {
+            self.models.push(info);
+        }
+        self
+    }
+
     /// Lets workers run jobs of type `J`.
     pub fn job<J: Job>(&mut self) -> &mut Self {
         if self.jobs.insert(J::NAME, handler::<J>()).is_some() {
