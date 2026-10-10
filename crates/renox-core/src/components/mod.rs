@@ -8,6 +8,8 @@ mod app;
 #[allow(dead_code)]
 mod attrs;
 mod contracts;
+#[allow(dead_code)]
+mod custom_data;
 mod emit;
 mod plugin;
 mod scan;
