@@ -18,6 +18,37 @@
     return { action: m[1], args: args };
   }
 
+  var MODEL_SELECTOR = "[rx-model], [rx-model\\.live], [rx-model\\.blur]";
+
+  // { name, mode } from rx-model, rx-model.live or rx-model.blur; null if none.
+  function modelOf(el) {
+    var modes = ["", "live", "blur"];
+    for (var i = 0; i < modes.length; i++) {
+      var attr = modes[i] ? "rx-model." + modes[i] : "rx-model";
+      if (el.hasAttribute(attr)) return { name: el.getAttribute(attr), mode: modes[i] || "plain" };
+    }
+    return null;
+  }
+
+  // The component's model fields as { name: value }.
+  function models(wrapper) {
+    var out = {};
+    wrapper.querySelectorAll(MODEL_SELECTOR).forEach(function (el) {
+      var m = modelOf(el);
+      if (!m || !m.name) return;
+      out[m.name] = el.type === "checkbox" ? (el.checked ? "true" : "false") : el.value;
+    });
+    return out;
+  }
+
+  // A model input without a name gets its model name (a morph removes it).
+  function nameModels(root) {
+    root.querySelectorAll(MODEL_SELECTOR).forEach(function (el) {
+      var m = modelOf(el);
+      if (m && m.name && !el.getAttribute("name")) el.setAttribute("name", m.name);
+    });
+  }
+
   // Sends an action to the component's route; the answer is morphed in
   // by the htmx:afterRequest listener below.
   function send(wrapper, action, args, extra) {
@@ -25,6 +56,8 @@
       _snapshot: wrapper.getAttribute("data-rx-snapshot"),
       _args: JSON.stringify(args)
     };
+    var fields = models(wrapper);
+    Object.keys(fields).forEach(function (k) { values[k] = fields[k]; });
     if (extra) Object.keys(extra).forEach(function (k) { values[k] = extra[k]; });
     wrapper.setAttribute("aria-busy", "true");
     htmx.ajax(
@@ -43,6 +76,24 @@
     if (!call) return;
     event.preventDefault();
     send(wrapper, call.action, call.args);
+  });
+
+  document.addEventListener("input", function (event) {
+    var el = event.target;
+    if (!el.matches || !el.hasAttribute("rx-model.live")) return;
+    var wrapper = el.closest("[data-rx-live]");
+    if (!wrapper) return;
+    clearTimeout(wrapper._rxTimer);
+    wrapper._rxTimer = setTimeout(function () {
+      send(wrapper, "_refresh", [], {});
+    }, 300);
+  });
+
+  document.addEventListener("change", function (event) {
+    var el = event.target;
+    if (!el.matches || !el.hasAttribute("rx-model.blur")) return;
+    var wrapper = el.closest("[data-rx-live]");
+    if (wrapper) send(wrapper, "_refresh", [], {});
   });
 
   // In the capture phase, and prevented, so the kit's busy-button submit
@@ -69,10 +120,14 @@
         ignoreActiveValue: true
       });
       htmx.process(w);
+      nameModels(w);
       // The kit's setup and its parts loader listen to htmx:load.
       w.dispatchEvent(new CustomEvent("htmx:load", { bubbles: true }));
     }
   });
 
-  window.RenoxLive = { parseCall: parseCall, send: send };
+  nameModels(document);
+  document.addEventListener("DOMContentLoaded", function () { nameModels(document); });
+
+  window.RenoxLive = { parseCall: parseCall, send: send, modelOf: modelOf, models: models };
 })();
