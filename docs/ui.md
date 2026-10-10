@@ -107,6 +107,12 @@ The first line imports the macro. The second calls it, with the field's name and
 > a warning naming both, and a page that then fails says why. Rename the value, or import the
 > macro under another name (`import history as history_list`).
 
+### Checking templates
+
+`rnx view:check` (or `app.assert_views_compile()` in a test) compiles every template and checks
+each literal `route('name')` against the route table, printing `template:line: message` per
+problem. See [the testing guide](testing.md#templates).
+
 ### Only once per page
 
 `{% if once('datepicker') %}<script …>{% endif %}` is true only the first time a key is asked

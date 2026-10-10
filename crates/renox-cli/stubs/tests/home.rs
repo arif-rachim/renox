@@ -55,3 +55,9 @@ async fn the_models_match_the_schema() {
         .assert_models_match_schema()
         .await;
 }
+
+#[renox::test]
+async fn every_view_compiles() {
+    let app = TestApp::new({{crate_name}}::app()).await;
+    app.assert_views_compile();
+}
