@@ -33,6 +33,8 @@ pub(crate) enum Module {
     /// `renox/pagination.html`.
     #[allow(dead_code)]
     Pagination,
+    /// `renox/grid.html`.
+    Grid,
     /// A template a plugin registered a component for.
     Custom {
         /// The template name.
@@ -48,6 +50,7 @@ impl Module {
         match self {
             Module::Ui => "renox/ui.html",
             Module::Pagination => "renox/pagination.html",
+            Module::Grid => "renox/grid.html",
             Module::Custom { path, .. } => path,
         }
     }
@@ -57,6 +60,7 @@ impl Module {
         match self {
             Module::Ui => "__rx_ui",
             Module::Pagination => "__rx_pagination",
+            Module::Grid => "__rx_grid",
             Module::Custom { alias, .. } => alias,
         }
     }
@@ -1453,6 +1457,29 @@ pub(crate) static BUILTIN: &[Contract] = &[
         events: &[],
         route_prop: None,
         attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-grid",
+        doc: "The data grid of a `renox::grid` page; the content draws the `custom` columns.",
+        render: Render::Macro {
+            module: Module::Grid,
+            name: "grid",
+        },
+        props: &[
+            data("page", true, "The `GridPage` the handler built."),
+            data("tools", false, "Extra content for the grid's toolbar."),
+        ],
+        slots: &[Slot {
+            name: "",
+            into: None,
+            args: &["row", "column"],
+            optional: true,
+            doc: "Draws a `custom` column: it receives the row and the column.",
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: true,
         parent: None,
     },
 ];

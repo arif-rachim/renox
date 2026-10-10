@@ -1008,6 +1008,68 @@ async fn rx_repeater_matches_the_macro_and_shows_errors_on_nested_names() {
     assert_eq!(pages[0], pages[1]);
 }
 
+/// `<rx-grid>` over a real grid page of users, with a `custom` column drawn by the slot.
+#[renox::test]
+async fn rx_grid_matches_the_macro() {
+    use renox::grid::{Column, Grid, GridRequest};
+
+    async fn show(name: &'static str, request: GridRequest) -> Result<View> {
+        let page = Grid::new("people")
+            .column(Column::text("name", "Name"))
+            .column(Column::custom("note", "Note"))
+            .page(User::query(), &request)
+            .await?;
+        Ok(view(name, context! { page => page }))
+    }
+    struct People;
+    impl Module for People {
+        fn name(&self) -> &'static str {
+            "people"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new()
+                .get("/m", |request: GridRequest| show("m.html", request))
+                .get("/r", |request: GridRequest| show("r.html", request))
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        "{% from \"renox/grid.html\" import grid %}{% call(row, column) grid(page) %}<b>{{ column.key }}:{{ row.name }}</b>{% endcall %}",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-grid :page=\"page\"><b>{{ column.key }}:{{ row.name }}</b></rx-grid>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Auth::new()).module(People), move |c| {
+        c.views_path = path
+    })
+    .await;
+    for name in ["Ann", "Ben"] {
+        User::register(
+            app.db(),
+            name,
+            &format!("{name}@example.com"),
+            "password123",
+        )
+        .await
+        .unwrap();
+    }
+    let (m, r) = (app.get("/m").await, app.get("/r").await);
+    m.assert_ok();
+    r.assert_ok();
+    // The two pages differ only in their own URL.
+    let (m, r) = (
+        normalize(&m.text()),
+        normalize(&r.text()).replace("=\"/r\"", "=\"/m\""),
+    );
+    assert!(m.contains("note:Ann") && m.contains("data-rx-component=\"grid\""));
+    assert_eq!(m, r);
+}
+
 #[renox::test]
 async fn rx_infolist_and_entry_match_the_macros() {
     same(
