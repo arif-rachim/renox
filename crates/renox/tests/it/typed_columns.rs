@@ -17,11 +17,20 @@ struct Product {
     note: Option<String>,
 }
 
-impl Product {
-    const ID: Col<Product, i64> = Col::new("id");
-    const NAME: Col<Product, String> = Col::new("name");
-    const PRICE: Col<Product, i64> = Col::new("price");
-    const NOTE: Col<Product, Option<String>> = Col::new("note");
+#[derive(Model, serde::Serialize, Default, Debug, Clone)]
+#[model(table = "typed_products", no_typed_columns)]
+struct Plain {
+    id: i64,
+    name: String,
+}
+
+impl Plain {
+    const NAME: &'static str = "own constant";
+}
+
+#[renox::test]
+async fn no_typed_columns_leaves_the_names_free() {
+    assert_eq!(Plain::NAME, "own constant");
 }
 
 async fn seed() -> TestApp {

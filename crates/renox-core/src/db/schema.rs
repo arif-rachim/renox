@@ -181,6 +181,26 @@ impl<T> UnknownColumn for &ColumnProbe<T> {
     }
 }
 
+/// A model registered with `App::model`, for `db:check`.
+#[derive(Clone)]
+#[allow(dead_code)] // read by the schema comparison (370.4)
+pub(crate) struct ModelInfo {
+    pub(crate) type_id: std::any::TypeId,
+    pub(crate) name: &'static str,
+    pub(crate) table: &'static str,
+    pub(crate) columns: fn() -> Vec<ModelColumn>,
+}
+
+/// Describes `M` for the registry.
+pub(crate) fn model_info<M: super::Model>() -> ModelInfo {
+    ModelInfo {
+        type_id: std::any::TypeId::of::<M>(),
+        name: std::any::type_name::<M>(),
+        table: M::TABLE,
+        columns: M::column_info,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -81,3 +81,43 @@ test('a confirm says confirmed when Delete is pressed', () =>
     assert.deepEqual(JSON.parse(await page.eval(() => sessionStorage.getItem('confirmed'))), ['ev-confirm', { id: 'ev-confirm' }]);
     page.assertClean({ allow: [/422/] });
   }));
+
+// #423: tabs and wizards say `changed`, only when the selection really changes.
+const listenChanged = (page) =>
+  page.eval(() => {
+    window.__ch = [];
+    for (const n of ['rx:tabs:changed', 'rx:wizard:changed'])
+      document.addEventListener(n, (e) => window.__ch.push([n, e.detail]));
+  });
+const changes = (page) => page.eval(() => window.__ch);
+
+test('tabs say changed on a click and on ArrowRight, never for the selected tab', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/events`);
+    await listenChanged(page);
+    await page.click('#evt-tab-a');
+    assert.deepEqual(await changes(page), [], 'already selected');
+    await page.click('#evt-tab-b');
+    assert.deepEqual(await changes(page), [['rx:tabs:changed', { name: 'b' }]]);
+    await page.eval(() => document.querySelector('#evt-tab-b').focus());
+    await page.press('ArrowLeft');
+    assert.deepEqual((await changes(page)).length, 2);
+    await page.press('ArrowRight');
+    assert.deepEqual((await changes(page)).length, 3);
+    page.assertClean({ allow: [/422/] });
+  }));
+
+test('a wizard says changed on Next, not when its sheet opens', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/events`);
+    await listenChanged(page);
+    await page.click('[data-rx-open="wizard-sheet"]');
+    await page.waitFor(() => document.querySelector('#wizard-sheet').open);
+    await page.waitFor(() => document.querySelector('[data-rx-wizard][data-rx-ready]'));
+    assert.deepEqual(await changes(page), []);
+    await page.type('#ws-from', 'Bandung');
+    await page.click('#wizard-sheet [data-rx-wizard-next]');
+    await page.waitFor(() => window.__ch.length > 0);
+    assert.deepEqual(await changes(page), [['rx:wizard:changed', { name: 'end', index: 1 }]]);
+    page.assertClean({ allow: [/422/] });
+  }));

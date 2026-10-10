@@ -1,6 +1,4 @@
 //! Programs on this machine and the fast linker `rnx new` can pick.
-// Used by `rnx new` (#389 (379.3)) and `rnx doctor` (#390 (379.4)); #390 (379.4) removes this.
-#![allow(dead_code)]
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};

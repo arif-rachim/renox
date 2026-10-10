@@ -1,6 +1,7 @@
 //! `rnx`: the command-line tool for the Renox web framework.
 
 mod deploy;
+mod doctor;
 mod finish;
 mod format;
 mod generate;
@@ -53,6 +54,12 @@ enum Command {
         /// notifications, live (the starter kit always has it).
         #[arg(long)]
         notifications: bool,
+    },
+    /// Check this machine and app, and say how to fix what's missing.
+    Doctor {
+        /// Skip building the app (no database or migrations check).
+        #[arg(long)]
+        no_build: bool,
     },
     /// Run the app, rebuilding and restarting it when source files change.
     Serve {
@@ -275,6 +282,7 @@ fn run(command: Command) -> Result<()> {
             println!("{}", tailwind::binary()?.display());
             Ok(())
         }
+        Command::Doctor { no_build } => doctor::run(no_build),
         Command::Serve { cargo_args } => serve::run(&cargo_args),
         Command::KeyGenerate { show } => key_generate(show),
         Command::Build => deploy::build(&app_root()?),
@@ -599,6 +607,10 @@ mod tests {
         assert!(matches!(
             parse(&["make:module", "products", "--resource", "--fields", "name price:money"]),
             Command::MakeModule { resource: true, fields: Some(f), model: None, .. } if f == "name price:money"
+        ));
+        assert!(matches!(
+            parse(&["doctor", "--no-build"]),
+            Command::Doctor { no_build: true }
         ));
         assert!(matches!(
             parse(&[

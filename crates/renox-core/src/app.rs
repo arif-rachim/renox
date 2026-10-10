@@ -342,6 +342,19 @@ impl App {
         self
     }
 
+    /// Registers a model for `db:check`, which compares its fields with the
+    /// table. Registering it twice keeps one.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64 }
+    /// let app = App::new().model::<Product>();
+    /// ```
+    pub fn model<M: crate::db::Model>(mut self) -> Self {
+        self.registry.model::<M>();
+        self
+    }
+
     /// Lets queue workers run jobs of type `J`.
     pub fn job<J: Job>(mut self) -> Self {
         self.registry.job::<J>();
@@ -559,6 +572,7 @@ impl App {
             assets: static_assets,
             provided: mut module_provided,
             seeders,
+            models,
         } = self.registry;
         // The app's own `App::provide` values win over the modules'.
         module_provided.extend(self.provided);
@@ -858,6 +872,7 @@ impl App {
             state,
             migrator,
             seeders,
+            models,
             handlers: Arc::new(jobs),
             schedule,
             zone,
@@ -1246,6 +1261,7 @@ pub struct Kernel {
     state: AppState,
     migrator: Migrator,
     seeders: Vec<crate::registry::Seeder>,
+    models: Vec<crate::db::schema::ModelInfo>,
     handlers: Handlers,
     schedule: Schedule,
     zone: Zone,
@@ -1253,6 +1269,12 @@ pub struct Kernel {
 }
 
 impl Kernel {
+    /// The models registered with `App::model`, once each.
+    #[allow(dead_code)] // read by `db:check` (370.5)
+    pub(crate) fn models(&self) -> &[crate::db::schema::ModelInfo] {
+        &self.models
+    }
+
     /// Runs the app command `name` (see [`App::command`]), e.g. from a test.
     pub async fn call(
         &self,
@@ -2005,5 +2027,56 @@ mod tests {
             table.contains("active scope (permissions::set_scope)"),
             "{table}"
         );
+    }
+
+    struct Note;
+    impl crate::db::FromRow for Note {
+        fn from_row(_: &crate::db::Row) -> Result<Self, crate::db::DbError> {
+            Ok(Note)
+        }
+    }
+    impl crate::db::Model for Note {
+        const TABLE: &'static str = "notes";
+        const COLUMNS: &'static [&'static str] = &["id"];
+        type Key = i64;
+        fn id(&self) -> i64 {
+            0
+        }
+        fn set_id(&mut self, _: i64) {}
+        fn values(&self) -> Vec<crate::db::DbValue> {
+            Vec::new()
+        }
+    }
+
+    struct Registers;
+    impl Module for Registers {
+        fn name(&self) -> &'static str {
+            "registers"
+        }
+        fn register(&self, app: &mut Registry) {
+            app.model::<crate::auth::User>();
+        }
+    }
+
+    #[tokio::test]
+    async fn models_are_kept_once_from_the_app_and_modules() {
+        let boot = |app: App| async move { app.config(Config::default()).boot().await.unwrap() };
+        let one = boot(
+            App::new()
+                .model::<crate::auth::User>()
+                .model::<crate::auth::User>()
+                .module(Registers),
+        )
+        .await;
+        assert_eq!(one.models().len(), 1);
+        assert_eq!(one.models()[0].table, "users");
+        let two = boot(
+            App::new()
+                .model::<crate::auth::User>()
+                .model::<Note>()
+                .module(Registers),
+        )
+        .await;
+        assert_eq!(two.models().len(), 2);
     }
 }
