@@ -9,7 +9,7 @@ mod attrs;
 mod contracts;
 mod emit;
 mod scan;
-mod suggest;
+pub(crate) mod suggest;
 mod tree;
 
 pub(crate) use contracts::{BUILTIN, Contract};
@@ -124,6 +124,39 @@ mod tests {
         assert_eq!(
             compile("a.html", "<rx-stack />", &builtin()).unwrap(),
             "<div class=\"rx-stack\"></div>"
+        );
+    }
+
+    #[test]
+    fn macro_components_call_the_kit() {
+        let out = compile(
+            "a.html",
+            "<rx-card title=\"Contact\" subtitle=\"{{ t('a') }}\">body</rx-card>",
+            &builtin(),
+        )
+        .unwrap();
+        assert_eq!(
+            out,
+            "{% import \"renox/ui.html\" as __rx_ui %}{% call __rx_ui.card(title=\"Contact\", subtitle=(t('a'))) %}body{% endcall %}"
+        );
+        let out = compile(
+            "a.html",
+            "<rx-page-header title=\"T\" badge-kind=\"info\"> </rx-page-header><rx-badge text=\"x\"/><rx-badge text=\"y\"/>",
+            &builtin(),
+        )
+        .unwrap();
+        assert_eq!(
+            out,
+            "{% import \"renox/ui.html\" as __rx_ui %}{{ __rx_ui.page_header(title=\"T\", badge_kind=\"info\") }}{{ __rx_ui.badge(text=\"x\") }}{{ __rx_ui.badge(text=\"y\") }}"
+        );
+        let msg = |s: &str| compile("a.html", s, &builtin()).unwrap_err().message;
+        assert_eq!(
+            msg("<rx-badge lable=\"x\"/>"),
+            "<rx-badge> has no attribute \"lable\". It takes: text, kind"
+        );
+        assert_eq!(
+            msg("<rx-badge/>"),
+            "<rx-badge> needs the attribute \"text\""
         );
     }
 

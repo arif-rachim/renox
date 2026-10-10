@@ -128,7 +128,6 @@ pub struct Views {
 
 /// One template that does not compile, found by [`Views::check`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct ViewProblem {
     /// The template's name, e.g. `products/index.html`.
     pub template: String,
@@ -507,7 +506,6 @@ impl Views {
 
     /// The name of every template: the app's files (or the embedded ones),
     /// the built-in ones and those added to the environment, sorted.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn names(&self) -> Vec<String> {
         let mut names = Vec::new();
         match self.embedded {
@@ -524,8 +522,7 @@ impl Views {
     }
 
     /// Compiles every template and returns those that fail, in name order.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn check(&self, _routes: &RouteTable) -> Vec<ViewProblem> {
+    pub(crate) fn check(&self, routes: &RouteTable) -> Vec<ViewProblem> {
         let names = self.names();
         let env = match self.reloader.acquire_env() {
             Ok(env) => env,
@@ -539,8 +536,13 @@ impl Views {
         };
         let mut problems = Vec::new();
         for name in names {
-            if let Err(err) = env.get_template(&name) {
-                problems.push(problem(&name, &err));
+            match env.get_template(&name) {
+                Err(err) => problems.push(problem(&name, &err)),
+                // The framework's own templates show example names in their docs.
+                Ok(template) if !name.starts_with("renox/") => {
+                    check_route_names(&name, template.source(), routes, &mut problems);
+                }
+                Ok(_) => {}
             }
         }
         problems
@@ -846,9 +848,35 @@ fn load(
         .map(|(_, source)| (*source).to_owned()))
 }
 
+/// Reports every literal `route('name')` in the compiled `source` that no route has.
+fn check_route_names(
+    template: &str,
+    source: &str,
+    routes: &RouteTable,
+    problems: &mut Vec<ViewProblem>,
+) {
+    static ROUTE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"\broute\(\s*["']([^"']+)["']"#).expect("valid regex")
+    });
+    for caps in ROUTE.captures_iter(source) {
+        let name = &caps[1];
+        if routes.path(name).is_some() {
+            continue;
+        }
+        let hint = crate::components::suggest::did_you_mean(name, routes.names())
+            .map(|x| format!("; did you mean \"{x}\"?"))
+            .unwrap_or_default();
+        let offset = caps.get(0).map_or(0, |m| m.start());
+        problems.push(ViewProblem {
+            template: template.to_owned(),
+            line: Some(source[..offset].matches('\n').count() + 1),
+            message: format!("unknown route \"{name}\"{hint}"),
+        });
+    }
+}
+
 /// A [`ViewProblem`] from a compile error. The component compiler's details
 /// already start with `name:line: `, which is taken out of the message.
-#[cfg_attr(not(test), allow(dead_code))]
 fn problem(name: &str, err: &minijinja::Error) -> ViewProblem {
     let detail = err.detail().unwrap_or("could not be compiled");
     if let Some(rest) = detail.strip_prefix(name).and_then(|r| r.strip_prefix(':'))
@@ -1569,6 +1597,35 @@ mod tests {
                 .to_string()
                 .starts_with("sub/typo.html:2: unknown component"),
         );
+    }
+
+    #[test]
+    fn check_reports_unknown_route_names_with_a_suggestion() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("p.html"),
+            "<a href=\"{{ route('products.index') }}\">ok</a>\n\
+             <a href=\"{{ route('products.indx') }}\">typo</a>\n\
+             <a href=\"{{ route('shop.home') }}\">domain</a>\n\
+             <a href=\"{{ route('nothing.like.it') }}\">far</a>\n",
+        )
+        .unwrap();
+        let mut routes = RouteTable::default();
+        routes
+            .insert("products.index".into(), "/products".into())
+            .unwrap();
+        // A route defined inside `Routes::domain` is in the table as well.
+        routes.insert("shop.home".into(), "/".into()).unwrap();
+        routes.set_domain("shop.home", "shop.example.com");
+        let problems = views_in(dir.path()).check(&routes);
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert_eq!(problems[0].line, Some(2));
+        assert_eq!(
+            problems[0].to_string(),
+            "p.html:2: unknown route \"products.indx\"; did you mean \"products.index\"?"
+        );
+        assert_eq!(problems[1].line, Some(4));
+        assert!(!problems[1].message.contains("did you mean"));
     }
 
     fn env() -> Environment<'static> {
