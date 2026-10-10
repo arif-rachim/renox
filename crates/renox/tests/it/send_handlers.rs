@@ -12,7 +12,7 @@ use renox::prelude::*;
 use renox::testing::TestApp;
 
 #[derive(Model, serde::Serialize, Default, Clone)]
-#[model(table = "notes")]
+#[model(table = "notes", no_typed_columns)]
 struct Note {
     id: i64,
     body: String,
