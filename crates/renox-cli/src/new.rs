@@ -776,6 +776,7 @@ mod tests {
         let tests = fs::read_to_string(root.join("tests/home.rs")).unwrap();
         assert!(tests.contains("use desk::roles"), "{tests}");
         assert!(tests.contains("assert_models_match_schema"), "{tests}");
+        assert!(tests.contains("assert_views_compile"), "{tests}");
         // AGENTS.md says where the page patterns live, once, before the traps.
         let agents = read_lf(root.join("AGENTS.md"));
         let notes = agents

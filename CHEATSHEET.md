@@ -705,6 +705,8 @@ struct Product {
     deleted_at: Option<DateTime>,
 }
 
+/// In a test, `TestApp::new(app).await.assert_views_compile()` (or `rnx view:check`) compiles
+/// every template and checks its `route('name')` calls.
 /// Register the model so `rnx db:check` (and `assert_models_match_schema` in tests)
 /// compares its fields with the table. In a module: `app.model::<Product>()` in `register`.
 fn checked() -> App {
