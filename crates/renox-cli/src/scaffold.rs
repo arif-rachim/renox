@@ -427,7 +427,7 @@ pub fn resource(
         ),
         None => Default::default(),
     };
-    let mut tests = replace(TESTS)
+    let tests = replace(TESTS)
         .replace("__form1__", &form(false))
         .replace("__form2__", &form(true))
         .replace("__seen_first__", &seen_first)
@@ -435,9 +435,6 @@ pub fn resource(
         .replace("__has_row__", &replace(&has_row))
         .replace("__has_changed__", &replace(&has_changed))
         .replace("__invalid__", &replace(&invalid));
-    if !schema_test_exists(&root.join("tests")) {
-        tests.push_str(&replace(SCHEMA_TEST));
-    }
     write_new(&root.join("tests").join(format!("{module}.rs")), &tests)?;
 
     // The table.
@@ -473,28 +470,6 @@ pub fn resource(
         &format!("app::{module}::{module_type}"),
     )?;
     Ok(path)
-}
-
-/// The test that compares the registered models with the migrated tables.
-const SCHEMA_TEST: &str = r#"
-#[renox::test]
-async fn the_models_match_the_schema() {
-    TestApp::new(__crate__::app())
-        .await
-        .assert_models_match_schema()
-        .await;
-}
-"#;
-
-/// Whether a file in `tests/` already has the schema test (it is added once per app).
-fn schema_test_exists(dir: &Path) -> bool {
-    fs::read_dir(dir).is_ok_and(|entries| {
-        entries.flatten().any(|entry| {
-            entry.path().extension().is_some_and(|e| e == "rs")
-                && fs::read_to_string(entry.path())
-                    .is_ok_and(|text| text.contains("assert_models_match_schema"))
-        })
-    })
 }
 
 const MODEL: &str = r#"use renox::fake::Fake;
@@ -690,7 +665,20 @@ async fn __module___are_created_listed_changed_and_deleted() {
     app.delete("/__path__/1").await.assert_redirect("/__path__");
     app.assert_database_count("__table__", 0).await;
     app.get("/__path__/1").await.assert_not_found();
-}__invalid__"#;
+}__invalid__
+
+#[renox::test]
+async fn __module___match_their_table() {
+    let app = TestApp::new(__crate__::app()).await;
+    app.assert_models_match_schema().await;
+}
+
+#[renox::test]
+async fn __module___views_compile() {
+    let app = TestApp::new(__crate__::app()).await;
+    app.assert_views_compile();
+}
+"#;
 
 #[cfg(test)]
 mod tests {
@@ -854,10 +842,15 @@ mod tests {
             "{module}"
         );
         assert!(tests.contains("assert_models_match_schema"));
-        // A second resource does not add the schema test again.
+        assert!(tests.contains("async fn products_match_their_table()"));
+        assert!(tests.contains("app.assert_views_compile();"));
+        // Every resource carries both checks.
         resource(dir.path(), "orders", None, Some("note")).unwrap();
-        let both = format!("{tests}{}", read(&dir, "tests/orders.rs"));
-        assert_eq!(both.matches("assert_models_match_schema").count(), 1);
+        let orders = read(&dir, "tests/orders.rs");
+        assert!(
+            orders.contains("orders_match_their_table") && orders.contains("orders_views_compile")
+        );
+        assert!(!orders.contains("__"));
 
         let migrations: Vec<_> = fs::read_dir(dir.path().join("migrations"))
             .unwrap()
