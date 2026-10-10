@@ -39,6 +39,7 @@ pub mod prelude {
     pub use renox_core::auth::{Auth, Can, User};
     pub use renox_core::db::{DateTime, Db, Factory, FromRow, Model, Page, Paginated};
     pub use renox_core::events::Event;
+    pub use renox_core::live_component::LiveComponent;
     pub use renox_core::queue::{Job, JobContext};
     pub use renox_core::serde_json::json;
     pub use renox_core::webhook::{Webhook, WebhookCall, WebhookRequest};
