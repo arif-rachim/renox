@@ -179,6 +179,52 @@ mod tests {
     }
 
     #[test]
+    fn control_flow_wraps_elements_and_components() {
+        let c = |s: &str| compile("a.html", s, &builtin()).unwrap();
+        assert_eq!(
+            c("<tr class=\"a\" rx-for=\"s in xs\">x</tr>"),
+            "{% for s in xs %}<tr class=\"a\">x</tr>{% endfor %}"
+        );
+        assert_eq!(
+            c("<p rx-if=\"a\">A</p>\n<p rx-else>B</p>"),
+            "{% if a %}<p>A</p>\n{% else %}<p>B</p>{% endif %}"
+        );
+        assert_eq!(
+            c("<rx-badge can=\"update\" text=\"x\"/>"),
+            "{% import \"renox/ui.html\" as __rx_ui %}{% if can(\"update\") %}{{ __rx_ui.badge(text=\"x\") }}{% endif %}"
+        );
+        assert_eq!(
+            c("<rx-badge rx-for=\"s in xs\" rx-if=\"s.ok\" can=\"a\" text=\"x\"/>"),
+            "{% import \"renox/ui.html\" as __rx_ui %}{% for s in xs %}{% if s.ok and can(\"a\") %}{{ __rx_ui.badge(text=\"x\") }}{% endif %}{% endfor %}"
+        );
+    }
+
+    #[test]
+    fn control_flow_keeps_the_line_count() {
+        let src = "<p\n  class=\"a\"\n  rx-if=\"a\"\n>A</p>\n<!-- c -->\n<p rx-else>B</p>\n<tr\n rx-for=\"s in xs\">x</tr>";
+        let out = compile("a.html", src, &builtin()).unwrap();
+        assert_eq!(src.lines().count(), out.lines().count(), "{out}");
+    }
+
+    #[test]
+    fn control_flow_errors() {
+        let msg = |s: &str| compile("a.html", s, &builtin()).unwrap_err().message;
+        assert_eq!(
+            msg("<p rx-else>B</p>"),
+            "rx-else must follow an element with rx-if"
+        );
+        assert_eq!(
+            msg("<p rx-for=\"a in b\" rx-if=\"a\">A</p><p rx-else>B</p>"),
+            "rx-else can't follow an element with rx-for"
+        );
+        assert_eq!(msg("<p rx-if>A</p>"), "rx-if needs a condition");
+        assert_eq!(
+            msg("<p rx-for=\"xs\">A</p>"),
+            "rx-for needs \"item in list\""
+        );
+    }
+
+    #[test]
     fn contract_errors_use_the_fixed_texts() {
         use contracts::{Prop, Render};
         const PROPS: &[Prop] = &[
