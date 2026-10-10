@@ -12,7 +12,7 @@ use renox::prelude::*;
 use renox::testing::TestApp;
 
 #[derive(Model, serde::Serialize, Default, Clone)]
-#[model(table = "notes")]
+#[model(table = "notes", no_typed_columns)]
 struct Note {
     id: i64,
     body: String,
@@ -25,6 +25,10 @@ struct Tag {
     id: i64,
     note_id: Option<i64>,
     name: String,
+}
+
+impl Note {
+    const BODY: renox::db::Col<Note, String> = renox::db::Col::new("body");
 }
 
 const NOTE_TAGS: Pivot = Pivot::new("note_tags", "note_id", "tag_id");
@@ -112,6 +116,18 @@ async fn queries(State(state): State<AppState>) -> Result<String> {
         .await?;
     tx.commit().await?;
     Ok(format!("{seen} {cached} {helped} {}", names.len()))
+}
+
+/// Typed columns in a routed handler.
+async fn typed(State(db): State<Db>) -> Result<String> {
+    let notes = Note::query()
+        .where_(Note::BODY.like("%"))
+        .order_by(Note::BODY)
+        .order_by_desc(Note::BODY)
+        .get(&db)
+        .await?;
+    let bodies: Vec<String> = Note::query().pluck(&db, Note::BODY).await?;
+    Ok(format!("{} {}", notes.len(), bodies.len()))
 }
 
 /// The rest of the query builder and model API, each awaited in a handler.
@@ -679,6 +695,7 @@ impl Module for Handlers {
         Routes::new()
             .get("/relations", relations)
             .get("/queries", queries)
+            .get("/typed", typed)
             .get("/more", more)
             .get("/access", access)
             .get("/trends", trends)
@@ -727,6 +744,7 @@ async fn data_apis_work_in_routed_handlers() {
         .assert_ok()
         .assert_see("1 1 0 0 [1]");
     app.get("/queries").await.assert_ok().assert_see("2 2 2 2");
+    app.get("/typed").await.assert_ok();
     app.get("/more")
         .await
         .assert_ok()
