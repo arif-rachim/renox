@@ -466,6 +466,10 @@ classes keep working next to the utilities.
     <rx-slot name="empty"><rx-empty title="No products"/></rx-slot>
   </rx-table>
   <rx-form action="{{ route('products.store') }}"><rx-input name="name" label="Name" required/><rx-button>Save</rx-button></rx-form>
+  <rx-repeater name="hours" label="Hours" :rows="hours" max="7">  {# row and prefix in the content #}
+    <rx-input name="{{ prefix }}[opens]" label="Opens" type="time" :value="row.opens"/>
+  </rx-repeater>
+  <rx-wizard id="signup" submit-label="Create"><rx-wizard-step key="a" title="Name"><rx-input name="name" label="Name"/></rx-wizard-step></rx-wizard>
   <li rx-for="p in products" rx-if="p.active">{{ p.name }}</li>   {# rx-else on the next sibling #}
   <app-price-tag :amount="p.price"/>                              {# components/price_tag.html, starts with <rx-props amount> #}
 </rx-page>

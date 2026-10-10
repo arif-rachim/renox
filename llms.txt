@@ -194,7 +194,7 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
   counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, components as tags (`<rx-card>`,
-  `<app-price-tag>`, `rx-if`/`rx-for`, `rx-page`, `rx-table`; compiled in
+  `<app-price-tag>`, `rx-if`/`rx-for`, `rx-page`, `rx-table`, form tags such as `rx-repeater` and `rx-wizard`; compiled in
   `crates/renox-core/src/components/`; bikeshop's supplier pages show them), the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`,
   buttons beside an entry's value with `prefix_actions`/`suffix_actions`;

@@ -293,6 +293,23 @@ them into a `Vec`.
 {% endcall %}
 ```
 
+The same form as tags. `<rx-wizard>` takes the steps from its `<rx-wizard-step>` children
+(`key` is required, `title` is the name in the progress list) and gives its `id` to each step,
+so you do not repeat it. `<rx-repeater>` hands `row` and `prefix` to its content:
+
+```html
+<rx-wizard id="new-team" submit-label="Create team">
+  <rx-wizard-step key="name" title="Name">
+    <rx-input name="name" label="Name" required/>
+  </rx-wizard-step>
+  <rx-wizard-step key="members" title="Members">
+    <rx-repeater name="invites" label="Members" item-label="Member" max="10">
+      <rx-input name="{{ prefix }}[email]" label="Email" type="email" :value="row.email" required/>
+    </rx-repeater>
+  </rx-wizard-step>
+</rx-wizard>
+```
+
 The wizard has two steps: first the team's name, then its members. In the second step, the
 repeater lets people add up to 10 rows, each with an email field. `prefix` is the row's part
 of the name (`invites[0]`), so `prefix ~ "[email]"` gives `invites[0][email]`.
@@ -667,9 +684,20 @@ These macros also have tags. Each renders the same HTML as its macro (a test che
 | `<rx-fieldset legend hint columns>…</rx-fieldset>` | `{% call fieldset(…) %}` |
 | `<rx-show-when field values>…</rx-show-when>` | `{% call show_when(field, values) %}` |
 | `<rx-hide-when field values>…</rx-hide-when>` | `{% call hide_when(field, values) %}` |
+| `<rx-wizard id submit-label back-label next-label cancel cancel-label>` with `<rx-wizard-step key title>` children | `{% call wizard(id, steps, submit_label, …) %}` + `{% call wizard_step(id, key, title=…) %}`. The steps list and each step's `id` come from the children. |
 
 `values` is one word (`values="courier"`) or a list (`:values="['courier', 'post']"`).
-`<rx-select>` takes `options-url` and `editable` for options answered by the server.
+A field that shows only when another has a value:
+
+```html
+<rx-radio name="delivery" label="Delivery" :options="[['post', 'Post'], ['courier', 'Courier']]" selected="post"/>
+<rx-show-when field="delivery" values="courier">
+  <rx-input name="address" label="Courier address"/>
+</rx-show-when>
+```
+
+`<rx-select>` takes `options-url` (where the server answers searches) and `editable` (people can add
+and rename options), like `select(…, options_url=…, editable=true)`.
 
 ### More classes and options
 
