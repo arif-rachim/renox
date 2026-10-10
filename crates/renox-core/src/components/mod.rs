@@ -9,7 +9,7 @@ mod attrs;
 mod contracts;
 mod emit;
 mod scan;
-mod suggest;
+pub(crate) mod suggest;
 mod tree;
 
 pub(crate) use contracts::{BUILTIN, Contract};

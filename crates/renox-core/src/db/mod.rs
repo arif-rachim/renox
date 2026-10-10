@@ -21,6 +21,8 @@ pub mod schema;
 pub(crate) mod schema_check;
 #[allow(dead_code)] // used by `db:diff` (371.6)
 pub(crate) mod schema_diff;
+#[allow(dead_code)] // used by `db:diff` (371.6)
+pub(crate) mod schema_sql;
 pub mod search;
 mod value;
 
