@@ -65,6 +65,8 @@ pub(crate) enum Special {
     Form,
     /// `rx-table`.
     Table,
+    /// `rx-column`, made by its parent.
+    Column,
     /// `rx-wizard`.
     Wizard,
     /// `rx-wizard-step`, made by its parent.
@@ -423,6 +425,84 @@ pub(crate) static BUILTIN: &[Contract] = &[
         route_prop: None,
         attrs: false,
         parent: Some("rx-wizard"),
+    },
+    Contract {
+        tag: "rx-table",
+        doc: "A table written as columns; the rows are looped and a page of rows gets its links.",
+        render: Render::Special(Special::Table),
+        props: &[
+            Prop {
+                name: "rows",
+                kind: Kind::Data,
+                required: true,
+                values: &[],
+                doc: "The rows: a list, or a page (`Paginated` / `SimplePage`).",
+            },
+            text("as", false, "The row's name in the cells; row by default."),
+            Prop {
+                name: "key",
+                kind: Kind::Data,
+                required: false,
+                values: &[],
+                doc: "The row's key for route and can; {as}.id by default.",
+            },
+            text("caption", false, "A caption for screen readers."),
+            text(
+                "id",
+                false,
+                "The id of the table's wrapper; rx-table-N by default.",
+            ),
+            flag("card", "Puts the table in a card."),
+        ],
+        slots: &[
+            Slot {
+                doc: "Only `<rx-column>` and `<rx-row-actions>`.",
+                ..DEFAULT_SLOT
+            },
+            Slot {
+                name: "empty",
+                optional: true,
+                doc: "What shows when there are no rows.",
+                ..DEFAULT_SLOT
+            },
+        ],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-column",
+        doc: "One column of a table; the content is its cell, with the row in scope.",
+        render: Render::Special(Special::Column),
+        props: &[
+            text("label", true, "The column heading."),
+            choice(
+                "align",
+                &["start", "num"],
+                "num aligns the cell to the end.",
+            ),
+            flag("hide-narrow", "Hides the column on narrow screens."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: Some("rx-table"),
+    },
+    Contract {
+        tag: "rx-row-actions",
+        doc: "A row of small buttons; in a table it is the last column.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "row_actions",
+        },
+        props: &[],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
     },
     Contract {
         tag: "rx-button",

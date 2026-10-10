@@ -468,6 +468,135 @@ async fn rx_alert_and_rx_empty_match_the_macros() {
     .await;
 }
 
+/// Serves `m.html` / `r.html` with `ctx`, plus a named route with a parameter.
+struct Tables(serde_json::Value);
+
+impl Module for Tables {
+    fn name(&self) -> &'static str {
+        "tables"
+    }
+
+    fn routes(&self) -> Routes {
+        let (a, b) = (self.0.clone(), self.0.clone());
+        Routes::new()
+            .get("/m", move || {
+                let ctx = a.clone();
+                async move { view("m.html", ctx) }
+            })
+            .get("/r", move || {
+                let ctx = b.clone();
+                async move { view("r.html", ctx) }
+            })
+            .get("/items/{id}", || async { "item" })
+            .name("items.show")
+    }
+}
+
+async fn tables(rx_src: &str, ctx: serde_json::Value) -> (TestApp, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("m.html"), "").unwrap();
+    std::fs::write(dir.path().join("r.html"), rx_src).unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(Tables(ctx)), move |c| c.views_path = path).await;
+    (app, dir)
+}
+
+#[renox::test]
+async fn rx_table_over_a_list_matches_the_macro() {
+    let ctx = serde_json::json!({"items": [
+        {"id": 1, "name": "Ann", "qty": 3},
+        {"id": 2, "name": "Bob", "qty": 4},
+    ]});
+    same(
+        &format!(
+            "{UI}<div class=\"rx-stack\" id=\"rx-table-1\">{{% if items %}}{{% call ui.table(head=[\"Name\", [\"Qty\", \"num\"], [\"Note\", \"hide-narrow\"], [\"Both\", \"num rx-hide-narrow\"], [\"\", \"num\"]], caption=\"People\") %}}\
+             {{% for p in items %}}<tr><td>{{{{ p.name }}}}</td><td class=\"rx-num\">{{{{ p.qty }}}}</td>\
+             <td class=\"rx-hide-narrow\">n</td><td class=\"rx-num rx-hide-narrow\">b</td>\
+             <td class=\"rx-num\">{{% call ui.row_actions() %}}<a href=\"/x\">x</a>{{% endcall %}}</td></tr>{{% endfor %}}{{% endcall %}}{{% endif %}}</div>"
+        ),
+        "<rx-table :rows=\"items\" as=\"p\" caption=\"People\">\n\
+         <rx-column label=\"Name\">{{ p.name }}</rx-column>\n\
+         <rx-column label=\"Qty\" align=\"num\">{{ p.qty }}</rx-column>\n\
+         <rx-column label=\"Note\" hide-narrow>n</rx-column>\n\
+         <rx-column label=\"Both\" align=\"num\" hide-narrow>b</rx-column>\n\
+         <rx-row-actions><a href=\"/x\">x</a></rx-row-actions>\n\
+         </rx-table>",
+        ctx,
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_table_pages_get_links_and_the_empty_slot_shows() {
+    let items: Vec<serde_json::Value> = (11..=20).map(|i| serde_json::json!({"id": i})).collect();
+    let page = Paginated::new(items, 2, 10, 25);
+    let src = "<rx-table :rows=\"rows\" id=\"things\" card>\
+               <rx-column label=\"Id\">{{ row.id }}</rx-column>\
+               <rx-slot name=\"empty\"><p>Nothing yet</p></rx-slot></rx-table>";
+    let (app, _dir) = tables(
+        src,
+        serde_json::json!({"rows": serde_json::to_value(&page).unwrap()}),
+    )
+    .await;
+    let r = app.get("/r").await;
+    r.assert_ok();
+    let t = r.text();
+    assert!(t.contains("id=\"things\""), "{t}");
+    assert!(
+        t.contains("<div class=\"rx-card\"><div class=\"rx-table-wrap\">"),
+        "{t}"
+    );
+    assert!(t.contains("hx-target=\"#things\""), "{t}");
+    assert!(t.contains("hx-select=\"#things\""), "{t}");
+    assert!(t.contains("class=\"pagination\""), "{t}");
+    assert!(t.contains("<td>20</td>"), "{t}");
+    assert!(!t.contains("Nothing yet"), "{t}");
+
+    let (app, _dir) = tables(src, serde_json::json!({"rows": []})).await;
+    let t = app.get("/r").await.text();
+    assert!(t.contains("<p>Nothing yet</p>"), "{t}");
+    assert!(!t.contains("<table"), "{t}");
+}
+
+#[renox::test]
+async fn rx_table_row_routes_and_abilities() {
+    let ctx = serde_json::json!({"rows": [
+        {"id": 7, "_can": {"edit": true}},
+        {"id": 8, "_can": {"edit": false}},
+    ]});
+    let (app, _dir) = tables(
+        "<rx-table :rows=\"rows\"><rx-column label=\"Id\">{{ row.id }}</rx-column>\
+         <rx-row-actions><rx-link-button route=\"items.show\" can=\"edit\">Edit</rx-link-button></rx-row-actions></rx-table>",
+        ctx,
+    )
+    .await;
+    let t = app.get("/r").await.text();
+    assert!(t.contains("href=\"/items/7\""), "{t}");
+    assert!(!t.contains("/items/8"), "{t}");
+}
+
+#[renox::test]
+async fn rx_table_holds_columns_only() {
+    let (app, _dir) = tables(
+        "<rx-table :rows=\"[]\"><p>no</p></rx-table>",
+        serde_json::json!({}),
+    )
+    .await;
+    let t = app.get("/r").await.text();
+    assert!(
+        t.contains("&lt;rx-table&gt; holds &lt;rx-column&gt;, &lt;rx-row-actions&gt; and &lt;rx-slot name=&quot;empty&quot;&gt;"),
+        "{t}"
+    );
+    let (app, _dir) = tables(
+        "<rx-column label=\"x\">y</rx-column>",
+        serde_json::json!({}),
+    )
+    .await;
+    let t = app.get("/r").await.text();
+    assert!(t.contains("belongs inside &lt;rx-table&gt;"), "{t}");
+}
+
 #[derive(serde::Deserialize)]
 struct Fields {
     name: String,
