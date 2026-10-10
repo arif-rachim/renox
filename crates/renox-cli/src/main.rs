@@ -217,6 +217,9 @@ enum Command {
     /// List migrations and whether they have run.
     #[command(name = "migrate:status")]
     MigrateStatus,
+    /// Compare the registered models with the tables the migrations build.
+    #[command(name = "db:check")]
+    DbCheck,
     /// Run the app's seeders.
     #[command(name = "db:seed")]
     DbSeed,
@@ -338,6 +341,7 @@ fn run(command: Command) -> Result<()> {
         Command::MigrateRollback { args } => app_command("migrate:rollback", &args),
         Command::MigrateFresh { args } => app_command("migrate:fresh", &args),
         Command::MigrateStatus => app_command("migrate:status", &[]),
+        Command::DbCheck => app_command("db:check", &[]),
         Command::DbSeed => app_command("db:seed", &[]),
         Command::App(args) => match args.split_first() {
             Some((command, rest)) => app_command(command, rest),

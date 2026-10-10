@@ -775,6 +775,7 @@ mod tests {
         assert!(root.join("src/app/users/mod.rs").is_file());
         let tests = fs::read_to_string(root.join("tests/home.rs")).unwrap();
         assert!(tests.contains("use desk::roles"), "{tests}");
+        assert!(tests.contains("assert_models_match_schema"), "{tests}");
         // AGENTS.md says where the page patterns live, once, before the traps.
         let agents = read_lf(root.join("AGENTS.md"));
         let notes = agents
@@ -822,7 +823,9 @@ mod tests {
         );
         let tests = read_lf(root.join("tests/home.rs"));
         assert!(
-            tests.contains("relay::app()") && tests.contains("fn the_bell_shows_notifications"),
+            tests.contains("relay::app()")
+                && tests.contains("fn the_bell_shows_notifications")
+                && tests.contains("assert_models_match_schema"),
             "{tests}"
         );
         // Without the option, none of it; the starter kit has its own bell.
