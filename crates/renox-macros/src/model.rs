@@ -125,6 +125,12 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 "#[form(…)] needs #[model(form)] on the struct",
             ));
         }
+        if form_field.upload && !is_string_or_option_string(&field.ty) {
+            return Err(Error::new_spanned(
+                &field.ty,
+                "`upload` goes on a String or Option<String> column (the stored path)",
+            ));
+        }
         let field_ident = field.ident.clone().expect("named fields have identifiers");
         fields.push(Field {
             name: field_ident.to_string().trim_start_matches("r#").to_owned(),
@@ -358,6 +364,28 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     })
 }
 
+/// `String` or `Option<String>` (by the last path segment).
+fn is_string_or_option_string(ty: &Type) -> bool {
+    let last = |ty: &Type| match ty {
+        Type::Path(p) if p.qself.is_none() => p.path.segments.last().cloned(),
+        _ => None,
+    };
+    let Some(seg) = last(ty) else { return false };
+    if seg.ident == "String" {
+        return true;
+    }
+    if seg.ident != "Option" {
+        return false;
+    }
+    match &seg.arguments {
+        syn::PathArguments::AngleBracketed(a) => matches!(
+            a.args.first(),
+            Some(syn::GenericArgument::Type(inner)) if last(inner).is_some_and(|s| s.ident == "String")
+        ),
+        _ => false,
+    }
+}
+
 fn is_option(ty: &Type) -> bool {
     matches!(ty, Type::Path(path) if path.path.segments.last().is_some_and(|s| s.ident == "Option"))
 }
@@ -380,6 +408,14 @@ fn form_tokens(input: &DeriveInput, fields: &[Field]) -> TokenStream {
         .collect();
     let members = included.iter().map(|f| {
         let (field_vis, name, ty) = (&f.vis, &f.ident, &f.ty);
+        if f.form.upload {
+            let rules = f.form.rules.iter().map(|r| quote! { #[validate(#r)] });
+            return quote! {
+                #(#rules)*
+                #[serde(skip_serializing)]
+                #field_vis #name: ::core::option::Option<::renox::Upload>
+            };
+        }
         let rules = f.form.rules.iter().map(|r| quote! { #[validate(#r)] });
         let default = matches!(ty, Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
             .then(|| quote! { #[serde(default)] });
