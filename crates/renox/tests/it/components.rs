@@ -1316,3 +1316,38 @@ async fn rx_link_tabs_matches_the_macro() {
     )
     .await;
 }
+
+#[renox::test]
+async fn rx_navbar_and_links_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.navbar(\"Shop\", href=\"/home\", mark=true, width=\"full\", tabs=(tabs)) %}}\
+             {{% call ui.nav_links() %}}{{{{ ui.nav_link(\"/a\", \"Alpha\", active=true, badge=3) }}}}{{{{ ui.nav_link(\"/b\", \"Beta\") }}}}{{% endcall %}}\
+             {{% call ui.nav_search(label=\"Find\", id=\"s1\") %}}<input name=\"q\">{{% endcall %}}{{% endcall %}}\
+             {{% call ui.navbar(none, skip=false) %}}x{{% endcall %}}"
+        ),
+        "<rx-navbar brand=\"Shop\" href=\"/home\" mark width=\"full\" :tabs=\"tabs\">\
+         <rx-nav-links><rx-nav-link href=\"/a\" :active=\"true\" badge=\"3\">Alpha</rx-nav-link><rx-nav-link href=\"/b\" label=\"Beta\"/></rx-nav-links>\
+         <rx-nav-search label=\"Find\" id=\"s1\"><input name=\"q\"></rx-nav-search></rx-navbar>\
+         <rx-navbar :skip=\"false\">x</rx-navbar>",
+        serde_json::json!({"tabs": [{"label": "Home", "href": "/"}]}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_sidebar_and_shell_match_the_macros() {
+    same(
+        &format!(
+            "{UI}<div class=\"rx-shell\" id=\"sh\">{{% call ui.sidebar(\"Admin\", logo=\"/l.png\") %}}\
+             {{{{ ui.sidebar_section(\"Manage\") }}}}{{{{ ui.sidebar_link(\"/o\", \"Orders\", active=true, badge=2, icon=\"home\") }}}}\
+             {{{{ ui.sidebar_link(\"/p\", \"Products\") }}}}{{% endcall %}}<div class=\"rx-shell__main\">hi</div></div>"
+        ),
+        "<rx-shell id=\"sh\"><rx-sidebar brand=\"Admin\" logo=\"/l.png\">\
+         <rx-sidebar-section>Manage</rx-sidebar-section>\
+         <rx-sidebar-link href=\"/o\" :active=\"true\" badge=\"2\" icon=\"home\">Orders</rx-sidebar-link>\
+         <rx-sidebar-link href=\"/p\" label=\"Products\"/></rx-sidebar><div class=\"rx-shell__main\">hi</div></rx-shell>",
+        serde_json::json!({}),
+    )
+    .await;
+}
