@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use super::column::{CondKind, Condition};
 use super::paginate::{CursorPage, SimplePage};
 use super::{Db, DbValue, Dialect, Executor, FromDb, Model, Paginated, ToDbValue, now, quote, sql};
 use crate::Result;
@@ -282,6 +283,17 @@ impl<M: Model> Query<M> {
     /// Filters on `column = value`.
     pub fn where_eq(self, column: &str, value: impl ToDbValue) -> Self {
         self.where_op(column, "=", value)
+    }
+
+    /// Filters on a typed [`Condition`] made by a [`Col`](super::Col), like
+    /// `Product::PRICE.lt(20_000)`.
+    pub fn where_(self, condition: Condition<M>) -> Self {
+        match condition.kind {
+            CondKind::Op(column, op, value) => self.where_op(column, op, value),
+            CondKind::Null(column, true) => self.where_null(column),
+            CondKind::Null(column, false) => self.where_not_null(column),
+            CondKind::In(column, values) => self.where_in(column, values),
+        }
     }
 
     /// Filters with a comparison: `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `like`, `not like`.

@@ -236,6 +236,7 @@ breaking anyone.
 - `db::Executor` is sealed: only `&Db` and `&mut Transaction` (and the `db::Conn` that
   `into_conn` makes of them, for several statements).
 - `db::relations::ForeignKey` is sealed: only a key type or an `Option` of one.
+- `db::Comparable` (which values a typed `Col` accepts) is implemented by Renox only.
 
 ### Why `Dialect` isn't on the list
 
