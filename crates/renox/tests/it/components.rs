@@ -13,6 +13,7 @@ impl Module for Pages {
     fn routes(&self) -> Routes {
         Routes::new()
             .get("/plain", || async { view("plain.html", context! {}) })
+            .get("/stack", || async { view("stack.html", context! {}) })
             .get("/page", || async { view("page.html", context! {}) })
     }
 }
@@ -24,6 +25,7 @@ async fn app() -> (TestApp, tempfile::TempDir) {
         "plain.html",
         "<h1 class=\"rx-title\">Plain {{ 1 + 1 }}</h1>",
     );
+    write("stack.html", "<rx-stack>\n<p>in</p>\n</rx-stack>");
     write("page.html", "<h1>Page</h1>\n<rx-nope>x</rx-nope>\n");
     let path = dir.path().to_path_buf();
     let app = TestApp::with_config(App::new().module(Pages), move |c| c.views_path = path).await;
@@ -50,4 +52,13 @@ async fn pages_without_components_render_as_before() {
         .await
         .assert_ok()
         .assert_see("<h1 class=\"rx-title\">Plain 2</h1>");
+}
+
+#[renox::test]
+async fn rx_stack_renders_a_div() {
+    let (app, _dir) = app().await;
+    app.get("/stack")
+        .await
+        .assert_ok()
+        .assert_see("<div class=\"rx-stack\">\n<p>in</p>\n</div>");
 }

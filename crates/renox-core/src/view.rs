@@ -247,7 +247,7 @@ impl Views {
                 };
                 let lookup = |n: &str| load(&loader_dir, embedded, n).ok().flatten();
                 let catalog = crate::components::Catalog {
-                    contracts: &[],
+                    contracts: crate::components::BUILTIN,
                     lookup: &lookup,
                 };
                 crate::components::compile(name, &src, &catalog)
