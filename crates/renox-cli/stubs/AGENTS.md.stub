@@ -39,7 +39,7 @@ Prefer them over writing boilerplate by hand:
 
 ```bash
 rnx make:module products                               # src/app/products + view + registration
-rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD, with tests
+rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD, with tests; runs migrate (asks outside APP_ENV=local; --no-migrate), prints the URL; --open opens it
 rnx make:model Product --module products --migration   # model + migrations/*.sql
 rnx make:model Invoice --module billing --key ulid -m  # id: Ulid (also uuid, string)
 rnx make:policy Product --module products
