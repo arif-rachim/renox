@@ -9,14 +9,13 @@ use super::contracts::Module;
 use super::emit::{check_attrs, emit_into, err, pad};
 use super::scan::Attr;
 use super::tree::Node;
-use std::collections::BTreeSet;
 use std::ops::Range;
 
 /// What nested code generation needs.
 pub(super) struct Ctx<'a, 'b> {
     pub src: &'a str,
     pub catalog: &'a Catalog<'a>,
-    pub used: &'b mut BTreeSet<Module>,
+    pub used: &'b mut super::emit::Used,
     pub counter: &'b mut usize,
 }
 
@@ -238,7 +237,10 @@ pub(super) fn wizard(
             }
         }
     }
-    cx.used.insert(Module::Ui);
+    cx.used.insert(super::emit::Import {
+        alias: Module::Ui.alias().to_owned(),
+        path: Module::Ui.path().to_owned(),
+    });
     let id = text_prop(attr(attrs, "id").expect("checked: required"), "rx-wizard")?;
     let list: Vec<String> = steps
         .iter()

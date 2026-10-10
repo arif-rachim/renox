@@ -759,15 +759,32 @@ pub async fn handle(req: Request, next: Next) -> Response {
     )
 }
 
-pub fn component(root: &Path, name: &str) -> Result<()> {
+pub fn component(root: &Path, name: &str, macro_form: bool) -> Result<()> {
     check_name(name)?;
     let snake = name.to_snake_case();
     let path = root.join(format!("resources/views/components/{snake}.html"));
-    let body = COMPONENT.replace("NAME", &snake);
-    write_new(&path, &body)?;
-    println!("Use it with: {{% from \"components/{snake}.html\" import {snake} %}}");
+    if macro_form {
+        write_new(&path, &COMPONENT.replace("NAME", &snake))?;
+        println!("Use it with: {{% from \"components/{snake}.html\" import {snake} %}}");
+    } else {
+        let kebab = name.to_kebab_case();
+        write_new(&path, &COMPONENT_TAG.replace("KEBAB", &kebab))?;
+        println!("Use it with: <app-{kebab} name=\"…\" label=\"…\">");
+    }
     Ok(())
 }
+
+const COMPONENT_TAG: &str = r#"<rx-props name label>
+{#- <app-KEBAB name="…" label="…"></app-KEBAB> in any page. It sees the request
+    like the page does: old(), error(), t(), csrf_field(), can(), auth, request. -#}
+<div class="rx-field">
+  <label class="rx-label" for="rx-{{ name }}">{{ label }}</label>
+  <input class="rx-input" id="rx-{{ name }}" name="{{ name }}" value="{{ old(name) }}"
+    {%- if error(name) %} aria-invalid="true"{% endif %} aria-describedby="rx-{{ name }}-error">
+  <p class="rx-error" id="rx-{{ name }}-error" data-error-for="{{ name }}" aria-live="polite">{{ error(name) }}</p>
+  <rx-slot />
+</div>
+"#;
 
 const COMPONENT: &str = r#"{#- {% from "components/NAME.html" import NAME %}{{ NAME("field", "Label") }}
     A component sees the request like the page does: old(), error(), t(),
@@ -974,11 +991,21 @@ mod tests {
     #[test]
     fn components_use_the_request_helpers() {
         let dir = app();
-        component(dir.path(), "PriceTag").unwrap();
+        component(dir.path(), "PriceTag", false).unwrap();
         let body = read(&dir, "resources/views/components/price_tag.html");
-        assert!(body.contains("{% macro price_tag(name, label) -%}"));
+        assert!(body.starts_with("<rx-props name label>"), "{body}");
+        assert!(body.contains("<app-price-tag name=") && body.contains("<rx-slot />"));
         assert!(body.contains("{{ old(name) }}") && body.contains("{{ error(name) }}"));
-        assert!(component(dir.path(), "PriceTag").is_err(), "no overwrite");
+        assert!(!body.contains("macro"), "{body}");
+        assert!(
+            component(dir.path(), "PriceTag", false).is_err(),
+            "no overwrite"
+        );
+
+        component(dir.path(), "LegacyTag", true).unwrap();
+        let body = read(&dir, "resources/views/components/legacy_tag.html");
+        assert!(body.contains("{% macro legacy_tag(name, label) -%}"));
+        assert!(body.contains("{{ old(name) }}") && body.contains("{{ error(name) }}"));
     }
 
     // #248: the generators the tests above don't call, and the helpers'
