@@ -3,8 +3,9 @@
 //! a `{# … #}` comment, so the lines of the source stay where they were (Decision 8 of #372).
 
 use super::attrs::{self, Kind};
-use super::contracts::{Contract, Render, Slot};
+use super::contracts::{Contract, Render, Slot, Special};
 use super::scan::Attr;
+use super::special::{self, Ctx};
 use super::tree::{self, Node};
 use super::{Catalog, CompileError, suggest};
 use std::collections::BTreeSet;
@@ -87,7 +88,7 @@ pub(super) fn check_names(
     Ok(())
 }
 
-fn err(line: usize, message: String) -> CompileError {
+pub(super) fn err(line: usize, message: String) -> CompileError {
     CompileError { line, message }
 }
 
@@ -100,6 +101,30 @@ pub(crate) fn emit(
     let mut out = String::with_capacity(src.len());
     let mut used = Used::new();
     let mut counter = 0;
+    let is_page = |n: &Node<'_>| matches!(n, Node::Element { name, .. } if name == "rx-page");
+    if nodes.iter().any(is_page) {
+        let stray = nodes.iter().find_map(|n| match n {
+            Node::Text(s) if !blank(&src[s.clone()]) => {
+                Some(1 + src[..s.start].matches('\n').count())
+            }
+            Node::Element { line, .. } if !is_page(n) => Some(*line),
+            _ => None,
+        });
+        let second = nodes
+            .iter()
+            .filter(|n| is_page(n))
+            .nth(1)
+            .and_then(|n| match n {
+                Node::Element { line, .. } => Some(*line),
+                _ => None,
+            });
+        if let Some(line) = stray.or(second) {
+            return Err(err(
+                line,
+                "<rx-page> must hold the whole template".to_owned(),
+            ));
+        }
+    }
     emit_into(src, nodes, catalog, None, &mut used, &mut counter, &mut out)?;
     if used.is_empty() {
         return Ok(out);
@@ -386,6 +411,33 @@ fn emit_node(
         && parent != Some(p)
     {
         return Err(err(*line, format!("<{name}> belongs inside <{p}>")));
+    }
+    if let Render::Special(sp) = contract.render {
+        let mut cx = Ctx {
+            src,
+            catalog,
+            used,
+            counter,
+        };
+        let close = close.as_ref();
+        return match sp {
+            Special::Page => {
+                if parent.is_some() {
+                    return Err(err(
+                        *line,
+                        "<rx-page> must hold the whole template".to_owned(),
+                    ));
+                }
+                special::page(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::Push => {
+                special::push(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::Wizard => {
+                special::wizard(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            _ => Err(err(*line, format!("<{name}> is not supported yet"))),
+        };
     }
     let parts = split_slots(src, contract, children, *line)?;
     let filled: Vec<&str> = parts.iter().filter_map(|(slot, _)| slot.into).collect();

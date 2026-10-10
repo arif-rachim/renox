@@ -42,6 +42,7 @@ Commands:
   migrate:fresh [--seed]    Drop all tables, run every migration, optionally seed
   migrate:status            List migrations and whether they have run
   db:check                  Compare the registered models with the tables the migrations build
+  db:diff [name] [--yes]    Write a migration for what changed in the registered models
   db:seed                   Run the seeders
   queue:work [--queue a,b] [--workers N] [--once]
                             Run queued jobs (until stopped, or --once for what's there)
@@ -976,6 +977,9 @@ impl App {
                     kernel.seed().await?;
                     println!("Seeded.");
                 }
+            }
+            "db:diff" if !kernel.commands.iter().any(|c| c.name == "db:diff") => {
+                crate::db::auto_migration::run(&kernel, &args[1..]).await?
             }
             "db:check" if !kernel.commands.iter().any(|c| c.name == "db:check") => {
                 kernel.db_check().await?
