@@ -181,6 +181,138 @@ async fn control_flow_renders_lists_and_empty_lists() {
     .await;
 }
 
+struct One;
+
+impl Module for One {
+    fn name(&self) -> &'static str {
+        "one"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/p", || async { view("p.html", context! {}) })
+    }
+}
+
+/// Writes the files (paths relative to the views directory) and gets `/p`.
+async fn render_files(files: &[(&str, &str)]) -> renox::testing::TestResponse {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, body) in files {
+        let path = dir.path().join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(One), move |c| c.views_path = path).await;
+    app.get("/p").await
+}
+
+const PRICE_TAG: (&str, &str) = (
+    "components/price_tag.html",
+    "<rx-props amount currency=\"USD\">\n<b>{{ amount }} {{ currency }}</b><rx-slot />",
+);
+
+#[renox::test]
+async fn an_app_component_renders_with_defaults_and_content() {
+    let res = render_files(&[
+        PRICE_TAG,
+        ("p.html", "<app-price-tag :amount=\"3\">!</app-price-tag>"),
+    ])
+    .await;
+    res.assert_ok();
+    assert_eq!(normalize(&res.text()), "<b>3 USD</b>!");
+    let res = render_files(&[
+        PRICE_TAG,
+        ("p.html", "<app-price-tag :amount=\"3\" currency=\"EUR\"/>"),
+    ])
+    .await;
+    assert_eq!(normalize(&res.text()), "<b>3 EUR</b>");
+}
+
+#[renox::test]
+async fn an_app_component_with_a_missing_required_prop_fails() {
+    let res = render_files(&[PRICE_TAG, ("p.html", "\n<app-price-tag/>")]).await;
+    res.assert_status(500);
+    assert!(
+        res.text()
+            .contains("p.html:2: &lt;app-price-tag&gt; needs the attribute &quot;amount&quot;"),
+        "{}",
+        res.text()
+    );
+}
+
+#[renox::test]
+async fn an_unknown_prop_of_an_app_component_gets_a_suggestion() {
+    let res = render_files(&[
+        PRICE_TAG,
+        ("p.html", "<app-price-tag :amount=\"1\" curency=\"EUR\"/>"),
+    ])
+    .await;
+    res.assert_status(500);
+    assert!(
+        res.text()
+            .contains("has no attribute &quot;curency&quot;; did you mean &quot;currency&quot;?"),
+        "{}",
+        res.text()
+    );
+}
+
+#[renox::test]
+async fn an_app_component_takes_named_slots() {
+    let res = render_files(&[
+        (
+            "components/panel.html",
+            "<rx-props title=\"T\">\n<h2>{{ title }}</h2><rx-slot /><footer><rx-slot name=\"foot\" /></footer>",
+        ),
+        (
+            "p.html",
+            "<app-panel title=\"Hi\">body<rx-slot name=\"foot\">bye</rx-slot></app-panel>",
+        ),
+    ])
+    .await;
+    res.assert_ok();
+    assert_eq!(
+        normalize(&res.text()),
+        "<h2>Hi</h2>body<footer>bye</footer>"
+    );
+}
+
+#[renox::test]
+async fn a_macro_file_used_as_a_component_says_what_to_do() {
+    let res = render_files(&[
+        ("components/legacy.html", "{% macro a() %}x{% endmacro %}"),
+        ("p.html", "<app-legacy/>"),
+    ])
+    .await;
+    res.assert_status(500);
+    assert!(
+        res.text()
+            .contains("components/legacy.html has no &lt;rx-props&gt;: it holds macros"),
+        "{}",
+        res.text()
+    );
+    let res = render_files(&[("p.html", "<app-absent/>")]).await;
+    assert!(
+        res.text()
+            .contains("&lt;app-absent&gt; needs resources/views/components/absent.html"),
+        "{}",
+        res.text()
+    );
+}
+
+#[renox::test]
+async fn app_components_can_use_kit_components() {
+    let res = render_files(&[
+        (
+            "components/note.html",
+            "<rx-props text>\n<rx-badge :text=\"text\"/>",
+        ),
+        ("p.html", "<app-note text=\"Hello\"/>"),
+    ])
+    .await;
+    res.assert_ok();
+    assert!(res.text().contains("Hello"), "{}", res.text());
+}
+
 #[renox::test]
 async fn rx_page_and_rx_push_match_extends_and_push() {
     let dir = tempfile::tempdir().unwrap();
@@ -463,4 +595,161 @@ async fn rx_table_holds_columns_only() {
     .await;
     let t = app.get("/r").await.text();
     assert!(t.contains("belongs inside &lt;rx-table&gt;"), "{t}");
+}
+
+#[derive(serde::Deserialize)]
+struct Fields {
+    name: String,
+    bio: Option<String>,
+    size: Option<String>,
+    agree: Option<String>,
+}
+
+impl Validate for Fields {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required().max(10);
+        v.field("bio", &self.bio).max(5);
+        v.field("size", &self.size).required();
+        let _ = &self.agree;
+    }
+}
+
+struct FormPages;
+
+impl Module for FormPages {
+    fn name(&self) -> &'static str {
+        "form-pages"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/m", || async { view("m.html", context! {}) })
+            .get("/r", || async { view("r.html", context! {}) })
+            .post("/save", |Valid(_): Valid<Fields>| async { "ok" })
+    }
+}
+
+#[renox::test]
+async fn form_fields_match_the_macros_after_a_failed_submit() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        format!(
+            "{UI}{{{{ ui.form_errors(title=\"Fix these\") }}}}\
+             {{% call ui.form_grid(columns=3) %}}\
+             {{{{ ui.input(name=\"name\", label=\"Name\", type=\"text\", hint=\"Short\", required=true, span=\"full\", attrs={{\"maxlength\": \"20\", \"data-x\": \"1\"}}) }}}}\
+             {{{{ ui.textarea(name=\"bio\", label=\"Bio\", rows=2, value=\"hi\") }}}}\
+             {{% endcall %}}\
+             {{{{ ui.select(name=\"size\", label=\"Size\", options=[[\"s\", \"Small\"], [\"m\", \"Medium\"]], required=true) }}}}\
+             {{{{ ui.checkbox(name=\"agree\", label=\"Agree\", switch=true) }}}}"
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-form-errors title=\"Fix these\"/>\
+         <rx-form-grid columns=\"3\">\
+         <rx-input name=\"name\" label=\"Name\" type=\"text\" hint=\"Short\" required span=\"full\" maxlength=\"20\" data-x=\"1\"/>\
+         <rx-textarea name=\"bio\" label=\"Bio\" rows=\"2\" value=\"hi\"/>\
+         </rx-form-grid>\
+         <rx-select name=\"size\" label=\"Size\" :options=\"[['s', 'Small'], ['m', 'Medium']]\" required/>\
+         <rx-checkbox name=\"agree\" label=\"Agree\" switch/>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(FormPages), move |c| c.views_path = path).await;
+    let bad = [
+        ("name", "Much too long a name"),
+        ("bio", "far too long"),
+        ("agree", "on"),
+    ];
+    let mut pages = Vec::new();
+    for page in ["/m", "/r"] {
+        app.request()
+            .header("referer", page)
+            .post("/save", &bad)
+            .await
+            .assert_redirect(page);
+        let r = app.get(page).await;
+        r.assert_ok();
+        pages.push(normalize(&r.text()));
+    }
+    assert!(pages[0].contains("aria-invalid=\"true\""), "{}", pages[0]);
+    assert!(pages[0].contains("value=\"Much too long a name\""));
+    assert!(pages[0].contains("data-rx-error-summary"));
+    assert_eq!(pages[0], pages[1]);
+}
+
+#[renox::test]
+async fn rx_form_writes_the_csrf_and_method_fields() {
+    let (put, get, post) = (
+        "<rx-form action=\"/items/1\" method=\"PUT\" live class=\"box\" id=\"f\" :data-n=\"1 + 1\" hx-boost=\"true\">x</rx-form>",
+        "<rx-form action=\"/search\" method=\"GET\"><input name=\"q\"></rx-form>",
+        "<rx-form route=\"home\"></rx-form><rx-form></rx-form>",
+    );
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("r.html"), format!("{put}{get}{post}")).unwrap();
+    std::fs::write(dir.path().join("m.html"), "").unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(FormPages).module(HomeName), move |c| {
+        c.views_path = path
+    })
+    .await;
+    let html = app.get("/r").await.assert_ok().text();
+    let forms: Vec<&str> = html.split("</form>").collect();
+    let first = forms[0];
+    assert!(first.starts_with(
+        "<form method=\"post\" action=\"/items/1\" data-live-validate novalidate class=\"box\" id=\"f\" data-n=\"2\" hx-boost=\"true\">"
+    ), "{first}");
+    assert!(first.contains("name=\"_token\""), "{first}");
+    assert!(first.contains("name=\"_method\" value=\"PUT\""), "{first}");
+    let second = forms[1];
+    assert!(
+        second.starts_with("<form method=\"get\" action=\"/search\">"),
+        "{second}"
+    );
+    assert!(
+        !second.contains("_token") && !second.contains("_method"),
+        "{second}"
+    );
+    assert!(
+        forms[2].starts_with("<form method=\"post\" action=\"/home\">"),
+        "{}",
+        forms[2]
+    );
+    assert!(forms[2].contains("_token") && !forms[2].contains("_method"));
+    assert!(
+        forms[3].starts_with("<form method=\"post\">"),
+        "{}",
+        forms[3]
+    );
+}
+
+struct HomeName;
+
+impl Module for HomeName {
+    fn name(&self) -> &'static str {
+        "home-name"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/home", || async { "home" }).name("home")
+    }
+}
+
+#[renox::test]
+async fn rx_form_rejects_a_bad_method() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-form method=\"PUTT\"></rx-form>",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("m.html"), "").unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(FormPages), move |c| c.views_path = path).await;
+    let r = app.get("/r").await.text();
+    assert!(r.contains("must be one of"), "{r}");
 }

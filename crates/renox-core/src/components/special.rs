@@ -9,14 +9,13 @@ use super::contracts::Module;
 use super::emit::{blank, check_attrs, emit_into, err, pad, with_row};
 use super::scan::Attr;
 use super::tree::Node;
-use std::collections::BTreeSet;
 use std::ops::Range;
 
 /// What nested code generation needs.
 pub(super) struct Ctx<'a, 'b> {
     pub src: &'a str,
     pub catalog: &'a Catalog<'a>,
-    pub used: &'b mut BTreeSet<Module>,
+    pub used: &'b mut super::emit::Used,
     pub counter: &'b mut usize,
 }
 
@@ -238,7 +237,10 @@ pub(super) fn wizard(
             }
         }
     }
-    cx.used.insert(Module::Ui);
+    cx.used.insert(super::emit::Import {
+        alias: Module::Ui.alias().to_owned(),
+        path: Module::Ui.path().to_owned(),
+    });
     let id = text_prop(attr(attrs, "id").expect("checked: required"), "rx-wizard")?;
     let list: Vec<String> = steps
         .iter()
@@ -349,8 +351,12 @@ pub(super) fn table(
     let caption = attr(attrs, "caption")
         .map(|a| text_prop(a, "rx-table"))
         .transpose()?;
-    cx.used.insert(Module::Ui);
-    cx.used.insert(Module::Pagination);
+    for m in [Module::Ui, Module::Pagination] {
+        cx.used.insert(super::emit::Import {
+            alias: m.alias().to_owned(),
+            path: m.path().to_owned(),
+        });
+    }
     *cx.counter += 1;
     let n = *cx.counter;
     let id = match attr(attrs, "id") {
@@ -530,6 +536,101 @@ pub(super) fn table(
     ));
     out.push_str(&empty);
     out.push_str("{% endif %}</div>");
+    if let Some(c) = close {
+        out.push_str(&pad(&cx.src[c.clone()]));
+    }
+    Ok(())
+}
+
+/// `<rx-form>`: a `<form>` with the CSRF field (not for GET) and the method field (PUT, PATCH,
+/// DELETE). Every other attribute passes through as written (Decision 17 of #372).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn form(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    let methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+    let mut method = "POST".to_owned();
+    if let Some(m) = attr(attrs, "method") {
+        let v = m.value.unwrap_or("");
+        if m.name.starts_with(':') || v.contains("{{") || v.contains("{%") {
+            return Err(err(
+                m.line,
+                "<rx-form> \"method\" must be plain text".to_owned(),
+            ));
+        }
+        attrs::prop_expr(m, attrs::Kind::Enum, &methods)
+            .map_err(|e| err(m.line, format!("<rx-form> {e}")))?;
+        method = v.to_owned();
+    }
+    let action = if let Some(r) = attr(attrs, "route") {
+        Some(format!("route({})", text_prop(r, "rx-form")?))
+    } else {
+        attr(attrs, "action")
+            .map(|a| text_prop(a, "rx-form"))
+            .transpose()?
+    };
+    let live = match attr(attrs, "live") {
+        Some(a) => Some(
+            attrs::prop_expr(a, attrs::Kind::Bool, &[])
+                .map_err(|m| err(a.line, format!("<rx-form> {m}")))?,
+        ),
+        None => None,
+    };
+    let get = method == "GET";
+    out.push_str(&format!(
+        "<form method=\"{}\"",
+        if get { "get" } else { "post" }
+    ));
+    if let Some(a) = action {
+        out.push_str(&format!(" action=\"{{{{ {a} }}}}\""));
+    }
+    match live.as_deref() {
+        None | Some("false") => {}
+        Some("true") => out.push_str(" data-live-validate novalidate"),
+        Some(e) => out.push_str(&format!(
+            "{{% if {e} %}} data-live-validate novalidate{{% endif %}}"
+        )),
+    }
+    for a in attrs {
+        let n = bare(a.name);
+        if matches!(n, "action" | "route" | "method" | "live") {
+            continue;
+        }
+        if let Some(name) = a.name.strip_prefix(':') {
+            let value = a.value.unwrap_or("").trim();
+            if value.is_empty() {
+                return Err(err(
+                    a.line,
+                    format!("<rx-form> \":{name}\" needs an expression"),
+                ));
+            }
+            out.push_str(&format!(
+                " {name}=\"{{{{ {} }}}}\"",
+                value.replace(['\n', '\r'], " ")
+            ));
+        } else {
+            out.push(' ');
+            out.push_str(&cx.src[a.span.clone()]);
+        }
+    }
+    out.push('>');
+    out.push_str(&pad(&cx.src[open.clone()]));
+    if !get {
+        out.push_str("{{ csrf_field() }}");
+    }
+    if matches!(method.as_str(), "PUT" | "PATCH" | "DELETE") {
+        out.push_str(&format!("{{{{ method_field(\"{method}\") }}}}"));
+    }
+    cx.nodes(children, "rx-form", out)?;
+    out.push_str("</form>");
     if let Some(c) = close {
         out.push_str(&pad(&cx.src[c.clone()]));
     }

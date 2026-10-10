@@ -177,6 +177,45 @@ const fn choice(name: &'static str, values: &'static [&'static str], doc: &'stat
     }
 }
 
+const fn data(name: &'static str, required: bool, doc: &'static str) -> Prop {
+    Prop {
+        name,
+        kind: Kind::Data,
+        required,
+        values: &[],
+        doc,
+    }
+}
+
+const fn number(name: &'static str, doc: &'static str) -> Prop {
+    Prop {
+        name,
+        kind: Kind::Number,
+        required: false,
+        values: &[],
+        doc,
+    }
+}
+
+const INPUT_TYPES: &[&str] = &[
+    "text",
+    "email",
+    "password",
+    "number",
+    "date",
+    "datetime-local",
+    "time",
+    "month",
+    "week",
+    "url",
+    "tel",
+    "search",
+    "color",
+    "range",
+];
+
+const FORM_METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE"];
+
 const BUTTON_VARIANTS: &[&str] = &["primary", "secondary", "plain", "danger", "plain-danger"];
 const ICON_BUTTON_VARIANTS: &[&str] = &["plain", "primary", "danger"];
 const BUTTON_TYPES: &[&str] = &["submit", "button", "reset"];
@@ -635,6 +674,226 @@ pub(crate) static BUILTIN: &[Contract] = &[
         slots: &[slot_into("message", "The message.")],
         events: &[],
         route_prop: Some("action-href"),
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-form",
+        doc: "A form: the CSRF field and the method field are written for you.",
+        render: Render::Special(Special::Form),
+        props: &[
+            text(
+                "action",
+                false,
+                "The address; or use route. Left out, the page's own.",
+            ),
+            choice("method", FORM_METHODS, "The HTTP method (POST by default)."),
+            flag(
+                "live",
+                "Checks the fields with the server as people leave them.",
+            ),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: Some("action"),
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-input",
+        doc: "A text field with its label, hint and errors.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "input",
+        },
+        props: &[
+            text("name", true, "The field's name."),
+            text("label", true, "The label."),
+            choice("type", INPUT_TYPES, "The input's type."),
+            text(
+                "value",
+                false,
+                "The starting value; the old input wins after a failed submit.",
+            ),
+            text("hint", false, "A line under the field."),
+            flag("required", "Marks the field as required."),
+            text("autocomplete", false, "The autocomplete word."),
+            text("placeholder", false, "Text shown while empty."),
+            text("id", false, "The element's id."),
+            text("prefix", false, "Text before the input."),
+            text("suffix", false, "Text after the input."),
+            data("datalist", false, "Suggestions."),
+            flag("disabled", "Turns the field off."),
+            flag("readonly", "The value can't be edited."),
+            text(
+                "span",
+                false,
+                "How many columns it takes in a form grid, or full.",
+            ),
+            flag("revealable", "A button shows the password."),
+            flag("copyable", "A button copies the value."),
+            flag(
+                "hide-label",
+                "Hides the label from sight, not from screen readers.",
+            ),
+            text("bag", false, "The named error bag."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-textarea",
+        doc: "A multi-line text field with its label, hint and errors.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "textarea",
+        },
+        props: &[
+            text("name", true, "The field's name."),
+            text("label", true, "The label."),
+            text(
+                "value",
+                false,
+                "The starting value; the old input wins after a failed submit.",
+            ),
+            number("rows", "The visible lines."),
+            text("hint", false, "A line under the field."),
+            flag("required", "Marks the field as required."),
+            text("placeholder", false, "Text shown while empty."),
+            text("id", false, "The element's id."),
+            flag("disabled", "Turns the field off."),
+            flag("readonly", "The value can't be edited."),
+            text(
+                "span",
+                false,
+                "How many columns it takes in a form grid, or full.",
+            ),
+            flag(
+                "hide-label",
+                "Hides the label from sight, not from screen readers.",
+            ),
+            text("bag", false, "The named error bag."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-select",
+        doc: "A choice among options, with its label, hint and errors.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "select",
+        },
+        props: &[
+            text("name", true, "The field's name."),
+            text("label", true, "The label."),
+            data("options", true, "The options: pairs of value and label."),
+            data(
+                "selected",
+                false,
+                "The chosen value, or values with multiple.",
+            ),
+            text("hint", false, "A line under the field."),
+            flag("required", "Marks the field as required."),
+            text("placeholder", false, "The empty choice's text."),
+            text("id", false, "The element's id."),
+            flag("disabled", "Turns the field off."),
+            text(
+                "span",
+                false,
+                "How many columns it takes in a form grid, or full.",
+            ),
+            flag("multiple", "Several choices."),
+            flag("searchable", "Type to filter the options."),
+            text(
+                "options-url",
+                false,
+                "Where the options come from, as people type.",
+            ),
+            flag("editable", "People can add and rename options."),
+            flag(
+                "hide-label",
+                "Hides the label from sight, not from screen readers.",
+            ),
+            text("bag", false, "The named error bag."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-checkbox",
+        doc: "A checkbox or switch with its label, hint and errors.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "checkbox",
+        },
+        props: &[
+            text("name", true, "The field's name."),
+            text("label", true, "The label."),
+            flag(
+                "checked",
+                "Starts checked; the old input wins after a failed submit.",
+            ),
+            text("hint", false, "A line under the field."),
+            text(
+                "value",
+                false,
+                "The value sent when checked (on by default).",
+            ),
+            flag("switch", "Draws a switch."),
+            text("id", false, "The element's id."),
+            flag("disabled", "Turns the field off."),
+            text(
+                "span",
+                false,
+                "How many columns it takes in a form grid, or full.",
+            ),
+            flag(
+                "hide-label",
+                "Hides the label from sight, not from screen readers.",
+            ),
+            text("bag", false, "The named error bag."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-form-errors",
+        doc: "Every error of the last submit, above the form.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "form_errors",
+        },
+        props: &[text("title", false, "The heading.")],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-form-grid",
+        doc: "Fields side by side on wide screens, one column on phones.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "form_grid",
+        },
+        props: &[number("columns", "How many columns (2 by default).")],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
         attrs: false,
         parent: None,
     },

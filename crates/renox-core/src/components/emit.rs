@@ -3,12 +3,21 @@
 //! a `{# … #}` comment, so the lines of the source stay where they were (Decision 8 of #372).
 
 use super::attrs::{self, Kind};
-use super::contracts::{Contract, Module, Render, Slot, Special};
+use super::contracts::{Contract, Render, Slot, Special};
 use super::scan::Attr;
 use super::special::{self, Ctx};
 use super::tree::{self, Node};
 use super::{Catalog, CompileError, suggest};
 use std::collections::BTreeSet;
+
+/// A template module imported at the top of the output.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Import {
+    pub alias: String,
+    pub path: String,
+}
+
+pub(super) type Used = BTreeSet<Import>;
 
 /// A comment holding as many line breaks as `span_text` has, or nothing.
 pub(super) fn pad(span_text: &str) -> String {
@@ -63,6 +72,38 @@ fn bare(name: &str) -> &str {
     name.strip_prefix(':').unwrap_or(name)
 }
 
+/// Checks the attributes against a list of prop names; `open` lets other attributes through.
+pub(super) fn check_names(
+    tag: &str,
+    names: &[&str],
+    required: &[&str],
+    open: bool,
+    attrs: &[Attr<'_>],
+    filled: &[&str],
+) -> Result<(), String> {
+    for a in attrs {
+        let n = bare(a.name);
+        if names.contains(&n) || open {
+            continue;
+        }
+        let hint = suggest::did_you_mean(n, names.iter().copied())
+            .map(|x| format!("; did you mean \"{x}\"?"))
+            .unwrap_or_else(|| ".".to_owned());
+        let takes = if names.is_empty() {
+            "It takes no attributes".to_owned()
+        } else {
+            format!("It takes: {}", names.join(", "))
+        };
+        return Err(format!("<{tag}> has no attribute \"{n}\"{hint} {takes}"));
+    }
+    for p in required {
+        if !attrs.iter().any(|a| bare(a.name) == *p) && !filled.contains(p) {
+            return Err(format!("<{tag}> needs the attribute \"{p}\""));
+        }
+    }
+    Ok(())
+}
+
 /// Checks the attributes against the contract.
 pub(super) fn check_attrs(
     contract: &Contract,
@@ -70,7 +111,10 @@ pub(super) fn check_attrs(
     filled: &[&str],
 ) -> Result<(), String> {
     let tag = contract.tag;
-    let element = matches!(contract.render, Render::Element { .. });
+    let element = matches!(
+        contract.render,
+        Render::Element { .. } | Render::Special(Special::Form)
+    );
     let route = attrs.iter().find(|a| bare(a.name) == "route");
     if route.is_some() {
         let Some(prop) = contract.route_prop else {
@@ -129,7 +173,7 @@ pub(crate) fn emit(
     catalog: &Catalog,
 ) -> Result<String, CompileError> {
     let mut out = String::with_capacity(src.len());
-    let mut used = BTreeSet::new();
+    let mut used = Used::new();
     let mut counter = 0;
     let is_page = |n: &Node<'_>| matches!(n, Node::Element { name, .. } if name == "rx-page");
     if nodes.iter().any(is_page) {
@@ -159,11 +203,9 @@ pub(crate) fn emit(
     if used.is_empty() {
         return Ok(out);
     }
-    let mut modules: Vec<Module> = used.into_iter().collect();
-    modules.sort_by_key(|m| m.alias());
     let mut head = String::new();
-    for m in modules {
-        head.push_str(&format!("{{% import \"{}\" as {} %}}", m.path(), m.alias()));
+    for m in used {
+        head.push_str(&format!("{{% import \"{}\" as {} %}}", m.path, m.alias));
     }
     head.push_str(&out);
     Ok(head)
@@ -297,7 +339,7 @@ pub(super) fn emit_into(
     nodes: &[Node<'_>],
     catalog: &Catalog,
     parent: Option<&str>,
-    used: &mut BTreeSet<Module>,
+    used: &mut Used,
     counter: &mut usize,
     out: &mut String,
 ) -> Result<(), CompileError> {
@@ -401,7 +443,7 @@ fn emit_node(
     flow: &Flow<'_>,
     catalog: &Catalog,
     parent: Option<&str>,
-    used: &mut BTreeSet<Module>,
+    used: &mut Used,
     counter: &mut usize,
     out: &mut String,
 ) -> Result<(), CompileError> {
@@ -432,6 +474,9 @@ fn emit_node(
             out.push_str(&src[c.clone()]);
         }
         return Ok(());
+    }
+    if name.starts_with("app-") {
+        return super::app::usage(src, node, attrs, catalog, used, counter, out);
     }
     let Some(contract) = catalog.contracts.iter().find(|c| c.tag == name) else {
         let hint = suggest::did_you_mean(name, catalog.contracts.iter().map(|c| c.tag))
@@ -471,6 +516,9 @@ fn emit_node(
             Special::Table => {
                 special::table(&mut cx, contract, attrs, children, open, close, *line, out)
             }
+            Special::Form => {
+                special::form(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
             _ => Err(err(*line, format!("<{name}> is not supported yet"))),
         };
     }
@@ -500,7 +548,10 @@ fn emit_node(
             }
         }
         Render::Macro { module, name: mac } => {
-            used.insert(module);
+            used.insert(Import {
+                alias: module.alias().to_owned(),
+                path: module.path().to_owned(),
+            });
             // Each argument with its place: props as written, then slots, then `attrs`.
             let mut args: Vec<(usize, String)> = Vec::new();
             let mut extra: Vec<String> = Vec::new();
@@ -595,7 +646,7 @@ fn emit_node(
 }
 
 /// Whether the children hold anything but whitespace.
-fn has_content(src: &str, children: &[Node<'_>]) -> bool {
+pub(super) fn has_content(src: &str, children: &[Node<'_>]) -> bool {
     children.iter().any(|c| match c {
         Node::Text(s) => !src[s.clone()].trim().is_empty(),
         Node::Element { .. } => true,

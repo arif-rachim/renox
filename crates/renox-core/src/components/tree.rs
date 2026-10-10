@@ -90,7 +90,7 @@ pub(crate) fn build<'a>(tokens: Vec<Token<'a>>) -> Result<Vec<Node<'a>>, Compile
                 span,
                 line,
             } => {
-                let leaf = self_closing || VOID.contains(&name.as_str());
+                let leaf = self_closing || VOID.contains(&name.as_str()) || name == "rx-props";
                 let target = match stack.last_mut() {
                     Some(f) => &mut f.children,
                     None => &mut root,
