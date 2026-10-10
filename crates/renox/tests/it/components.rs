@@ -180,3 +180,70 @@ async fn control_flow_renders_lists_and_empty_lists() {
     )
     .await;
 }
+
+#[renox::test]
+async fn rx_page_and_rx_push_match_extends_and_push() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    write(
+        "layout.html",
+        "<head>{% block seo %}<title>none</title>{% endblock %}</head><main>{% block content %}{% endblock %}</main>[{% block scripts %}{% endblock %}]{{ stack('js') }}",
+    );
+    write(
+        "m.html",
+        "{% extends \"layout.html\" %}{% block seo %}{{ seo(title=(name)) }}{% endblock %}{% block content %}<p>{{ name }}</p>\
+         {% call push(\"js\", once=\"a\") %}<i>a</i>{% endcall %}{% call push(\"js\", once=\"a\") %}<i>a</i>{% endcall %}\
+         {% endblock %}{% block scripts %}S{% endblock %}",
+    );
+    write(
+        "r.html",
+        "<rx-page layout=\"layout.html\" :title=\"name\">\n<p>{{ name }}</p>\n\
+         <rx-push stack=\"js\" once=\"a\"><i>a</i></rx-push><rx-push stack=\"js\" once=\"a\"><i>a</i></rx-push>\n\
+         <rx-slot name=\"scripts\">S</rx-slot></rx-page>",
+    );
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new().module(Pair(serde_json::json!({"name": "Items"}))),
+        move |c| c.views_path = path,
+    )
+    .await;
+    let (m, r) = (app.get("/m").await, app.get("/r").await);
+    m.assert_ok();
+    r.assert_ok();
+    let (m, r) = (normalize(&m.text()), normalize(&r.text()));
+    assert_eq!(m.replace("/m\"", "/r\""), r);
+    assert!(r.contains("<title>Items"), "{r}");
+    assert_eq!(r.matches("<i>a</i>").count(), 1, "{r}");
+    assert!(r.contains("[S]"), "{r}");
+}
+
+#[renox::test]
+async fn a_page_block_renders_as_a_fragment() {
+    struct Frag;
+    impl Module for Frag {
+        fn name(&self) -> &'static str {
+            "frag"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new().get("/f", || async {
+                view("r.html", context! {}).fragment("content")
+            })
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("layout.html"),
+        "<html>{% block content %}{% endblock %}</html>",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-page layout=\"layout.html\"><p>inner</p></rx-page>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Frag), move |c| c.views_path = path).await;
+    let res = app.htmx().get("/f").await;
+    res.assert_ok().assert_see("<p>inner</p>");
+    assert!(!res.text().contains("<html>"), "{}", res.text());
+}
