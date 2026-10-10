@@ -291,6 +291,102 @@ pub(super) fn wizard(
     Ok(())
 }
 
+/// `<rx-tabs>`: the tab list comes from the `<rx-tab>` children, and each child's content
+/// becomes its panel, built on the tabs' id (Decision 3 of #375).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn tabs(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    const HOLDS: &str = "<rx-tabs> holds only <rx-tab>";
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    let tab_contract = cx
+        .catalog
+        .contracts
+        .iter()
+        .find(|c| c.tag == "rx-tab")
+        .expect("rx-tab is built in");
+    let mut tabs: Vec<Step<'_, '_>> = Vec::new();
+    let mut gaps = String::new();
+    for child in children {
+        match child {
+            Node::Text(span) => {
+                let text = &cx.src[span.clone()];
+                if !text.trim().is_empty() {
+                    return Err(err(line, HOLDS.to_owned()));
+                }
+                gaps.push_str(&pad(text));
+            }
+            Node::Element {
+                name,
+                attrs: ta,
+                children: inner,
+                open: topen,
+                close: tclose,
+                line: at,
+            } => {
+                if name != "rx-tab" {
+                    return Err(err(*at, HOLDS.to_owned()));
+                }
+                check_attrs(tab_contract, ta, &[]).map_err(|m| err(*at, m))?;
+                let key = text_prop(attr(ta, "key").expect("checked: required"), name)?;
+                let label = text_prop(attr(ta, "label").expect("checked: required"), name)?;
+                tabs.push((key, Some(label), inner, topen, tclose.as_ref()));
+            }
+        }
+    }
+    if tabs.is_empty() {
+        return Err(err(
+            line,
+            "<rx-tabs> needs at least one <rx-tab>".to_owned(),
+        ));
+    }
+    cx.used.insert(super::emit::Import {
+        alias: Module::Ui.alias().to_owned(),
+        path: Module::Ui.path().to_owned(),
+    });
+    let id = text_prop(attr(attrs, "id").expect("checked: required"), "rx-tabs")?;
+    let selected = attr(attrs, "selected")
+        .map(|a| text_prop(a, "rx-tabs"))
+        .transpose()?;
+    let current = selected.clone().unwrap_or_else(|| tabs[0].0.clone());
+    let list: Vec<String> = tabs
+        .iter()
+        .map(|(k, l, ..)| format!("[{k}, {}]", l.as_deref().expect("checked: required")))
+        .collect();
+    let mut args = format!("id={id}, items=[{}]", list.join(", "));
+    if let Some(s) = &selected {
+        args.push_str(&format!(", selected={s}"));
+    }
+    if let Some(a) = attr(attrs, "label") {
+        args.push_str(&format!(", label={}", text_prop(a, "rx-tabs")?));
+    }
+    out.push_str(&format!("{{{{ __rx_ui.tabs({args}) }}}}"));
+    out.push_str(&pad(&cx.src[open.clone()]));
+    out.push_str(&gaps);
+    for (key, _, inner, topen, tclose) in tabs {
+        out.push_str(&format!(
+            "{{% call __rx_ui.tab_panel(id={id}, key={key}, selected=({key} == {current})) %}}"
+        ));
+        out.push_str(&pad(&cx.src[topen.clone()]));
+        cx.nodes(inner, "rx-tab", out)?;
+        out.push_str("{% endcall %}");
+        if let Some(c) = tclose {
+            out.push_str(&pad(&cx.src[c.clone()]));
+        }
+    }
+    if let Some(c) = close {
+        out.push_str(&pad(&cx.src[c.clone()]));
+    }
+    Ok(())
+}
+
 const TABLE_HOLDS: &str =
     "<rx-table> holds <rx-column>, <rx-row-actions> and <rx-slot name=\"empty\">";
 

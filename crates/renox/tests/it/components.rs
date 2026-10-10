@@ -415,6 +415,46 @@ async fn rx_wizard_holds_only_steps() {
 }
 
 #[renox::test]
+async fn rx_tabs_match_the_macros() {
+    same(
+        &format!("{UI}{{{{ ui.tabs(id=\"t\", items=[[\"a\", \"First\"], [\"b\", (second)]], selected=\"b\", label=\"Sections\") }}}}{{% call ui.tab_panel(id=\"t\", key=\"a\", selected=false) %}}<p>one</p>{{% endcall %}}{{% call ui.tab_panel(id=\"t\", key=\"b\", selected=true) %}}<p>two</p>{{% endcall %}}"),
+        "<rx-tabs id=\"t\" selected=\"b\" label=\"Sections\">\n<rx-tab key=\"a\" label=\"First\"><p>one</p></rx-tab>\n<rx-tab key=\"b\" :label=\"second\"><p>two</p></rx-tab>\n</rx-tabs>",
+        serde_json::json!({"second": "Second"}),
+    )
+    .await;
+    same(
+        &format!("{UI}{{{{ ui.tabs(id=\"t\", items=[[\"a\", \"First\"]]) }}}}{{% call ui.tab_panel(id=\"t\", key=\"a\", selected=true) %}}x{{% endcall %}}"),
+        "<rx-tabs id=\"t\"><rx-tab key=\"a\" label=\"First\">x</rx-tab></rx-tabs>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_tabs_hold_only_tabs() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        "<rx-tabs id=\"t\"><p>x</p></rx-tabs>",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-tab key=\"a\" label=\"A\">x</rx-tab>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Pair(serde_json::json!({}))), move |c| {
+        c.views_path = path
+    })
+    .await;
+    let m = app.get("/m").await.text();
+    assert!(m.contains("holds only &lt;rx-tab&gt;"), "{m}");
+    let r = app.get("/r").await.text();
+    assert!(r.contains("belongs inside &lt;rx-tabs&gt;"), "{r}");
+}
+
+#[renox::test]
 async fn rx_button_matches_the_macro_and_passes_hx_attributes() {
     same(
         &format!(
@@ -1238,4 +1278,41 @@ async fn rx_chart_needs_its_kind() {
     let (app, _dir) = tables("<rx-chart :data=\"[1]\"/>", serde_json::json!({})).await;
     let r = app.get("/r").await;
     assert_eq!(r.status.as_u16(), 500);
+}
+
+#[renox::test]
+async fn rx_menu_parts_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.menu(\"More\", variant=\"primary\") %}}\
+             {{{{ ui.menu_link(href=\"/a\", label=\"Edit\", icon=\"plus\", download=true, new_tab=true, danger=true) }}}}\
+             {{{{ ui.menu_open(id=\"s1\", label=\"Open\", danger=true) }}}}\
+             {{% call ui.menu_section(\"Export\") %}}{{{{ ui.menu_action(action=\"/x\", label=\"Delete\", method=\"DELETE\", danger=true) }}}}{{% endcall %}}\
+             {{{{ ui.menu_separator() }}}}\
+             {{{{ ui.menu_action(action=\"/y\", label=\"Post\") }}}}\
+             {{% endcall %}}"
+        ),
+        "<rx-menu label=\"More\" variant=\"primary\">\
+         <rx-menu-link href=\"/a\" icon=\"plus\" download new-tab danger>Edit</rx-menu-link>\
+         <rx-menu-open id=\"s1\" danger>Open</rx-menu-open>\
+         <rx-menu-section title=\"Export\"><rx-menu-action action=\"/x\" method=\"DELETE\" danger>Delete</rx-menu-action></rx-menu-section>\
+         <rx-menu-separator/>\
+         <rx-menu-action action=\"/y\" label=\"Post\"/>\
+         </rx-menu>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_link_tabs_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.link_tabs(items=(tabs), current=\"/b\", label=\"Views\") }}}}\
+             {{{{ ui.link_tabs(items=(tabs)) }}}}"
+        ),
+        "<rx-link-tabs :items=\"tabs\" current=\"/b\" label=\"Views\"/><rx-link-tabs :items=\"tabs\"/>",
+        serde_json::json!({"tabs": [["/a", "A"], ["/b", "B"]]}),
+    )
+    .await;
 }
