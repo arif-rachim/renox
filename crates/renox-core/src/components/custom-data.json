@@ -239,6 +239,43 @@
     {
       "attributes": [
         {
+          "description": "(required) The tabs' id; the panels build theirs from it.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "The key of the open tab; the first by default.",
+          "name": "selected",
+          "values": []
+        },
+        {
+          "description": "The tab list's accessible name.",
+          "name": "label",
+          "values": []
+        }
+      ],
+      "description": "Tabs with their panels; each `<rx-tab>` inside is one tab and its panel.",
+      "name": "rx-tabs"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The tab's key, unique in the tabs.",
+          "name": "key",
+          "values": []
+        },
+        {
+          "description": "(required) The tab's text.",
+          "name": "label",
+          "values": []
+        }
+      ],
+      "description": "One tab; its content is the panel.",
+      "name": "rx-tab"
+    },
+    {
+      "attributes": [
+        {
           "description": "(required) The rows: a list, or a page (`Paginated` / `SimplePage`).",
           "name": ":rows",
           "values": []
