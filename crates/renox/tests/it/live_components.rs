@@ -383,6 +383,7 @@ async fn the_test_helper_keeps_state_between_calls() {
     let state = c.component();
     assert_eq!(state.count, 7);
     assert_eq!(state.search, "tea");
+}
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct Todo {
