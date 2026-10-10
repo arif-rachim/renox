@@ -213,6 +213,27 @@ pattern several answers, and they're used in turn: the first request gets the fi
   so it gets slower the more rows there are:
   `let (res, queries) = capture_queries(app.get("/posts")).await; assert!(queries.len() <= 3);`
 
+### Models and the schema
+
+`app.assert_models_match_schema().await` checks every model registered with `App::model`
+against the tables your migrations built in the test's own database, and panics with the
+report (the one `rnx db:check` prints). Put it in one test per app:
+
+```rust
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+# #[derive(Model, serde::Serialize, Default)]
+# struct Product { id: i64 }
+#[renox::test]
+async fn the_models_match_the_schema() {
+    let app = TestApp::new(App::new().model::<Product>()).await;
+    app.assert_models_match_schema().await;
+}
+```
+
+See [Checking models against the tables](types.md#checking-models-against-the-tables).
+
 ### Factories
 
 Factories fill tables with made-up rows, so a test doesn't have to type every field:

@@ -17,6 +17,7 @@ mod background;
 mod background_edges;
 mod background_resilience;
 mod commands;
+mod components;
 mod dashboards;
 mod data_edges;
 mod data_layer;
