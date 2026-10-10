@@ -133,7 +133,7 @@ mod view_stack;
 pub mod webhook;
 
 pub use app::{App, Kernel};
-pub use assets::{ALPINE_VERSION, CALLY_VERSION, HTMX_VERSION};
+pub use assets::{ALPINE_VERSION, CALLY_VERSION, HTMX_VERSION, IDIOMORPH_VERSION};
 pub use auth::{AuthUser, Policy};
 pub use client_ip::{ClientIp, TrustedProxies};
 pub use config::{

@@ -16,6 +16,8 @@ pub struct Registry {
     pub(crate) schedule: Schedule,
     pub(crate) duplicate_job: Option<&'static str>,
     pub(crate) webhooks: HashMap<&'static str, crate::webhook::HandleFn>,
+    pub(crate) live_components: HashMap<&'static str, crate::live_component::LiveFn>,
+    pub(crate) duplicate_live: Option<&'static str>,
     pub(crate) commands: Vec<crate::command::Command>,
     pub(crate) templates: Vec<crate::view::TemplateHook>,
     pub(crate) shares: Vec<(String, crate::view::ShareFn)>,
@@ -67,6 +69,18 @@ impl Registry {
     pub fn job<J: Job>(&mut self) -> &mut Self {
         if self.jobs.insert(J::NAME, handler::<J>()).is_some() {
             self.duplicate_job.get_or_insert(J::NAME);
+        }
+        self
+    }
+
+    /// Registers the live component `C` (see `renox::live_component`).
+    pub fn live_component<C: crate::live_component::LiveComponent>(&mut self) -> &mut Self {
+        if self
+            .live_components
+            .insert(C::NAME, crate::live_component::handler::<C>())
+            .is_some()
+        {
+            self.duplicate_live.get_or_insert(C::NAME);
         }
         self
     }

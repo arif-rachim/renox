@@ -20,7 +20,7 @@ use crate::{AppState, Config, Error, Htmx, RouteTable, Session, assets};
 
 /// Templates that ship with Renox. An app overrides one by creating a file
 /// with the same name in its views directory.
-const BUILTIN: &[(&str, &str)] = &[
+pub(crate) const BUILTIN: &[(&str, &str)] = &[
     ("renox/error.html", include_str!("../views/error.html")),
     (
         "renox/pagination.html",
@@ -58,6 +58,7 @@ const BUILTIN: &[(&str, &str)] = &[
         "renox/mail/button.html",
         include_str!("../views/mail/button.html"),
     ),
+    ("renox/live.html", include_str!("../views/live.html")),
     ("renox/ui.html", include_str!("../views/ui.html")),
     (
         "renox/import_report.html",
@@ -119,6 +120,56 @@ pub struct Views {
     reloader: Arc<AutoReloader>,
     /// `APP_DEBUG`: also warn about values hidden by imported macros.
     debug: bool,
+    /// `VIEWS_PATH`, where the app's templates live.
+    dir: PathBuf,
+    /// Templates compiled into the binary, used instead of `dir` when given.
+    embedded: Option<&'static [(&'static str, &'static str)]>,
+}
+
+/// One template that does not compile, found by [`Views::check`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) struct ViewProblem {
+    /// The template's name, e.g. `products/index.html`.
+    pub template: String,
+    /// The line the error is on, when the compiler knows it.
+    pub line: Option<usize>,
+    /// What is wrong.
+    pub message: String,
+}
+
+impl std::fmt::Display for ViewProblem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.line {
+            Some(line) => write!(f, "{}:{line}: {}", self.template, self.message),
+            None => write!(f, "{}: {}", self.template, self.message),
+        }
+    }
+}
+
+/// Every `*.html` and `*.txt` file under `dir`, as names relative to it with
+/// `/` separators. Dotfiles and dot directories are skipped.
+fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if file_name.starts_with('.') {
+            continue;
+        }
+        let name = if prefix.is_empty() {
+            file_name
+        } else {
+            format!("{prefix}/{file_name}")
+        };
+        let path = entry.path();
+        if path.is_dir() {
+            walk(&path, &name, out);
+        } else if name.ends_with(".html") || name.ends_with(".txt") {
+            out.push(name);
+        }
+    }
 }
 
 /// What an `App::share` function knows about the request being rendered.
@@ -240,7 +291,24 @@ impl Views {
                 env.set_undefined_behavior(minijinja::UndefinedBehavior::SemiStrict);
             }
             let loader_dir = dir.clone();
-            env.set_loader(move |name| load(&loader_dir, embedded, name));
+            env.set_loader(move |name| {
+                let Some(src) = load(&loader_dir, embedded, name)? else {
+                    return Ok(None);
+                };
+                let lookup = |n: &str| load(&loader_dir, embedded, n).ok().flatten();
+                let catalog = crate::components::Catalog {
+                    contracts: crate::components::BUILTIN,
+                    lookup: &lookup,
+                };
+                crate::components::compile(name, &src, &catalog)
+                    .map(Some)
+                    .map_err(|e| {
+                        minijinja::Error::new(
+                            ErrorKind::SyntaxError,
+                            format!("{name}:{}: {}", e.line, e.message),
+                        )
+                    })
+            });
 
             let routes = routes.clone();
             env.add_function(
@@ -387,6 +455,10 @@ impl Views {
             env.add_function("renox_calendar", || {
                 Value::from_safe_string(crate::assets::calendar_tags())
             });
+            // Until the live component script ships (#435): nothing.
+            env.add_function("renox_live", || {
+                Value::from_safe_string(crate::assets::live_tags())
+            });
             // The kit's `icon(…)` macro: a Lucide icon as inline SVG.
             env.add_function(
                 "renox_icon",
@@ -428,7 +500,55 @@ impl Views {
         Self {
             reloader: Arc::new(reloader),
             debug,
+            dir: config.views_path.clone(),
+            embedded,
         }
+    }
+
+    /// The name of every template: the app's files (or the embedded ones),
+    /// the built-in ones and those added to the environment, sorted.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        match self.embedded {
+            Some(files) => names.extend(files.iter().map(|(name, _)| (*name).to_owned())),
+            None => walk(&self.dir, "", &mut names),
+        }
+        names.extend(BUILTIN.iter().map(|(name, _)| (*name).to_owned()));
+        if let Ok(env) = self.reloader.acquire_env() {
+            names.extend(env.templates().map(|(name, _)| name.to_owned()));
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Compiles every template and returns those that fail, in name order.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn check(&self, routes: &RouteTable) -> Vec<ViewProblem> {
+        let names = self.names();
+        let env = match self.reloader.acquire_env() {
+            Ok(env) => env,
+            Err(err) => {
+                return vec![ViewProblem {
+                    template: String::new(),
+                    line: None,
+                    message: err.to_string(),
+                }];
+            }
+        };
+        let mut problems = Vec::new();
+        for name in names {
+            match env.get_template(&name) {
+                Err(err) => problems.push(problem(&name, &err)),
+                // The framework's own templates show example names in their docs.
+                Ok(template) if !name.starts_with("renox/") => {
+                    check_route_names(&name, template.source(), routes, &mut problems);
+                }
+                Ok(_) => {}
+            }
+        }
+        problems
     }
 
     /// Whether a template of this name exists (the app's or a built-in).
@@ -729,6 +849,56 @@ fn load(
         .iter()
         .find(|(builtin, _)| *builtin == name)
         .map(|(_, source)| (*source).to_owned()))
+}
+
+/// Reports every literal `route('name')` in the compiled `source` that no route has.
+#[cfg_attr(not(test), allow(dead_code))]
+fn check_route_names(
+    template: &str,
+    source: &str,
+    routes: &RouteTable,
+    problems: &mut Vec<ViewProblem>,
+) {
+    static ROUTE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"\broute\(\s*["']([^"']+)["']"#).expect("valid regex")
+    });
+    for caps in ROUTE.captures_iter(source) {
+        let name = &caps[1];
+        if routes.path(name).is_some() {
+            continue;
+        }
+        let hint = crate::components::suggest::did_you_mean(name, routes.names())
+            .map(|x| format!("; did you mean \"{x}\"?"))
+            .unwrap_or_default();
+        let offset = caps.get(0).map_or(0, |m| m.start());
+        problems.push(ViewProblem {
+            template: template.to_owned(),
+            line: Some(source[..offset].matches('\n').count() + 1),
+            message: format!("unknown route \"{name}\"{hint}"),
+        });
+    }
+}
+
+/// A [`ViewProblem`] from a compile error. The component compiler's details
+/// already start with `name:line: `, which is taken out of the message.
+#[cfg_attr(not(test), allow(dead_code))]
+fn problem(name: &str, err: &minijinja::Error) -> ViewProblem {
+    let detail = err.detail().unwrap_or("could not be compiled");
+    if let Some(rest) = detail.strip_prefix(name).and_then(|r| r.strip_prefix(':'))
+        && let Some((line, message)) = rest.split_once(": ")
+        && let Ok(line) = line.parse::<usize>()
+    {
+        return ViewProblem {
+            template: name.to_owned(),
+            line: Some(line),
+            message: message.to_owned(),
+        };
+    }
+    ViewProblem {
+        template: name.to_owned(),
+        line: err.line(),
+        message: detail.to_owned(),
+    }
 }
 
 fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
@@ -1377,6 +1547,91 @@ fn globals(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn views_in(dir: &Path) -> Views {
+        let config = Config {
+            views_path: dir.to_path_buf(),
+            ..Config::default()
+        };
+        Views::new(
+            &config,
+            Arc::new(RouteTable::default()),
+            Storage::from_config(&config).unwrap(),
+            None,
+            Arc::new(Vec::new()),
+            config.timezone,
+            Arc::new(crate::embedded::AssetVersions::new(dir, None)),
+        )
+    }
+
+    #[test]
+    fn check_finds_every_broken_template_with_its_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let write = |name: &str, body: &str| {
+            let path = dir.path().join(name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, body).unwrap();
+        };
+        write("good.html", "<h1>{{ 1 + 1 }}</h1>");
+        write("sub/typo.html", "<p>x</p>\n<rx-tabel>y</rx-tabel>\n");
+        write("bad.html", "a\nb\n{% if x %}\nc\n");
+        write(".hidden.html", "{% if %}");
+        write("notes.md", "{% if %}");
+        let views = views_in(dir.path());
+
+        let names = views.names();
+        assert!(names.contains(&"good.html".to_owned()));
+        assert!(names.contains(&"sub/typo.html".to_owned()));
+        assert!(names.contains(&"renox/error.html".to_owned()));
+        assert!(
+            !names
+                .iter()
+                .any(|n| n.contains("hidden") || n.ends_with(".md"))
+        );
+        assert!(names.windows(2).all(|w| w[0] < w[1]));
+
+        let problems = views.check(&RouteTable::default());
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert_eq!(problems[0].template, "bad.html");
+        assert!(problems[0].line.is_some_and(|l| l >= 3), "{problems:?}");
+        assert_eq!(problems[1].template, "sub/typo.html");
+        assert_eq!(problems[1].line, Some(2));
+        assert!(problems[1].message.contains("rx-tabel"), "{problems:?}");
+        assert!(
+            problems[1]
+                .to_string()
+                .starts_with("sub/typo.html:2: unknown component"),
+        );
+    }
+
+    #[test]
+    fn check_reports_unknown_route_names_with_a_suggestion() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("p.html"),
+            "<a href=\"{{ route('products.index') }}\">ok</a>\n\
+             <a href=\"{{ route('products.indx') }}\">typo</a>\n\
+             <a href=\"{{ route('shop.home') }}\">domain</a>\n\
+             <a href=\"{{ route('nothing.like.it') }}\">far</a>\n",
+        )
+        .unwrap();
+        let mut routes = RouteTable::default();
+        routes
+            .insert("products.index".into(), "/products".into())
+            .unwrap();
+        // A route defined inside `Routes::domain` is in the table as well.
+        routes.insert("shop.home".into(), "/".into()).unwrap();
+        routes.set_domain("shop.home", "shop.example.com");
+        let problems = views_in(dir.path()).check(&routes);
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert_eq!(problems[0].line, Some(2));
+        assert_eq!(
+            problems[0].to_string(),
+            "p.html:2: unknown route \"products.indx\"; did you mean \"products.index\"?"
+        );
+        assert_eq!(problems[1].line, Some(4));
+        assert!(!problems[1].message.contains("did you mean"));
+    }
 
     fn env() -> Environment<'static> {
         let mut env = Environment::new();

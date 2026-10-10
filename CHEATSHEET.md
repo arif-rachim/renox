@@ -35,6 +35,7 @@ rnx make:middleware StampRequests    # on every route (App::layer)
 rnx make:component price_tag         # --ui copies the UI kit into the app
 rnx migrate                          # migrate:status, migrate:fresh --seed, db:seed
 rnx migrate:rollback --step 2        # the last 2 batches (default 1)
+rnx db:check                         # every App::model against the tables the migrations build; exits 1 on a mismatch
 rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune, session:prune
 rnx queue:work --queue mail --workers 2  # --once: run what is queued, then stop
 rnx queue:failed                     # queue:retry <id|all>, queue:forget <id>, queue:flush (deletes them)
@@ -594,6 +595,31 @@ struct SignIn {
 </form>
 ```
 
+A form that mirrors a model comes from the model: `#[model(table = "products", form)]` generates
+`ProductForm` (Deserialize + Serialize + Validate), rules in `#[form(validate(required, max = 100))]`
+on the fields, `#[form(skip)]` / `#[form(upload)]`, and `form.fill(&mut product)`:
+
+```rust
+use renox::prelude::*;
+use serde::Serialize;
+
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "gadgets", form)]
+pub struct Gadget {
+    pub id: i64,
+    #[form(validate(required, max = 100))]
+    pub name: String,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+async fn save_gadget(Valid(form): Valid<GadgetForm>) -> Result<()> {
+    let mut gadget = Gadget::default();
+    form.fill(&mut gadget);
+    Ok(())
+}
+```
+
 A form request (Laravel's `FormRequest`) adds three optional steps around the rules: tidy the
 input first (`prepare`), check the user may send it (`authorize`), and run extra checks at the
 end (`after`).
@@ -677,6 +703,12 @@ struct Product {
     created_at: Option<DateTime>,
     updated_at: Option<DateTime>,
     deleted_at: Option<DateTime>,
+}
+
+/// Register the model so `rnx db:check` (and `assert_models_match_schema` in tests)
+/// compares its fields with the table. In a module: `app.model::<Product>()` in `register`.
+fn checked() -> App {
+    App::new().model::<Product>()
 }
 
 async fn queries(db: &Db) -> Result {

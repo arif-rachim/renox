@@ -20,16 +20,12 @@ use crate::{AppState, AuthUser, Error, Result, Session, Toast, Validate};
 /// # Ok(()) }
 /// ```
 pub struct LiveContext {
-    state: AppState,
+    pub(crate) state: AppState,
     session: Option<Session>,
     user: Option<AuthUser>,
-    #[allow(dead_code)]
     pub(crate) component: &'static str,
-    #[allow(dead_code)]
     pub(crate) toast: Option<Toast>,
-    #[allow(dead_code)]
     pub(crate) redirect: Option<String>,
-    #[allow(dead_code)]
     pub(crate) events: Vec<(String, serde_json::Value)>,
 }
 
@@ -43,6 +39,29 @@ impl LiveContext {
     /// ```
     pub fn state(&self) -> &AppState {
         &self.state
+    }
+
+    /// Renders `component` for a page: its state, its data and a signed
+    /// snapshot. Pass the result to the page's template and
+    /// `{% include "renox/live.html" %}` it as `component`.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use renox::live_component::LiveContext;
+    /// # #[derive(serde::Serialize, serde::Deserialize)]
+    /// # struct Counter { count: i64 }
+    /// # impl LiveComponent for Counter {
+    /// #     const NAME: &'static str = "counter";
+    /// #     const VIEW: &'static str = "live/counter.html";
+    /// #     async fn call(&mut self, _: &str, _: Vec<serde_json::Value>, _: &mut LiveContext) -> Result { Ok(()) }
+    /// # }
+    /// # async fn demo(ctx: LiveContext) -> Result {
+    /// let mounted = ctx.mount(Counter { count: 0 }).await?;
+    /// # let _ = mounted; Ok(()) }
+    /// ```
+    pub async fn mount<C: super::LiveComponent>(&self, c: C) -> Result<super::Mounted> {
+        let id = format!("rx-live-{}", &crate::random_token()[..12]);
+        super::render(self, &c, id, false).await
     }
 
     /// The request's session, when there is one.

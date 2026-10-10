@@ -91,6 +91,7 @@ Paths are relative to this folder.
 |---|---|---|
 | Home page: the kit's `navbar`, `card_grid` + `media_card`, `Routes::etag`, `seo()`, Motion | `/` | [src/app/home/mod.rs](src/app/home/mod.rs), [resources/views/home/index.html](resources/views/home/index.html) |
 | Catalogue with filters and sorting, categories (`Found<M>`), the `range_slider` block | `/shop`, `/shop/{slug}` | [src/app/catalog/browse.rs](src/app/catalog/browse.rs), [src/app/catalog/filters.rs](src/app/catalog/filters.rs) |
+| Models checked against the migrations (`app.model::<…>()`, `rnx db:check`, `assert_models_match_schema`) | `rnx db:check` | [src/app/catalog/mod.rs](src/app/catalog/mod.rs) (`register`), [tests/catalog.rs](tests/catalog.rs) |
 | Full-text search (`#[model(search)]`: FTS5 / `tsvector`), suggestions in the navbar | `/search?q=helmet` | [src/app/catalog/model.rs](src/app/catalog/model.rs), [migrations/](migrations/) (`…_search_products.*`) |
 | Product page: `gallery` and `swatches` blocks, what fits (`Pivot`), stock per store, recently viewed (session) | `/products/{slug}` | [src/app/catalog/product.rs](src/app/catalog/product.rs), [resources/views/catalog/show.html](resources/views/catalog/show.html) |
 | Sitemap and robots.txt | `/sitemap.xml` | [src/app/catalog/mod.rs](src/app/catalog/mod.rs) |
@@ -392,6 +393,8 @@ $ cargo run -- schedule:list
 
 The Rust tests are in [tests/](tests/), one file per area; the browser tests are
 `tests/browser/bikeshop-*.test.mjs` at the repository's root.
+
+**Forms from models.** The admin's brand form is not written by hand: `Brand` in [src/app/catalog/model.rs](src/app/catalog/model.rs) is `#[model(table = "brands", form)]` with `#[form(validate(...))]` rules, which generates `BrandForm` and `fill` (docs/validation.md, "Forms from models").
 
 ## Adding a page
 
