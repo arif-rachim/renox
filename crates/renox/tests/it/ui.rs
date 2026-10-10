@@ -149,6 +149,9 @@ impl Module for Pages {
             })
             .get("/icons", || async { view("icons.html", context! {}) })
             .get("/marks", || async { view("marks.html", context! {}) })
+            .get("/passthrough", || async {
+                view("passthrough.html", context! {})
+            })
     }
 }
 
@@ -163,6 +166,10 @@ fn views() -> tempfile::TempDir {
 {{ input("name", "Name", required=true, hint="Up to 10 letters") }}
 {{ input("email", "Email", type="email", required=true) }}
 {{ input("nickname", "Nickname") }}{{ button("Sign up") }}</form>{{ toasts() }}"#,
+    );
+    write(
+        "passthrough.html",
+        r##"<rx-button class="mine" id="go" hx-target="#x" data-n="1" autofocus>Go</rx-button>"##,
     );
     write(
         "marks.html",
@@ -919,5 +926,25 @@ async fn kit_components_mark_their_root_and_take_attrs() {
         assert_eq!(tag.matches("class=").count(), 1, "{tag}");
         assert!(tag.contains(r#"class="rx-sheet extra""#), "{tag}");
         assert!(tag.contains(r#"hx-get="/x""#), "{tag}");
+    }
+}
+
+#[renox::test]
+async fn compiled_components_pass_other_attributes_to_the_root() {
+    let (app, _dir) = app().await;
+    let body = app.get("/passthrough").await.text();
+    let tag = body.split('<').find(|t| t.starts_with("button")).unwrap();
+    assert_eq!(tag.matches("class=").count(), 1, "{tag}");
+    assert!(
+        tag.contains(r#"class="rx-button rx-button--primary mine""#),
+        "{tag}"
+    );
+    for a in [
+        r##"hx-target="#x""##,
+        r#"id="go""#,
+        r#"data-n="1""#,
+        " autofocus",
+    ] {
+        assert!(tag.contains(a), "{a} in {tag}");
     }
 }

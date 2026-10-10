@@ -448,13 +448,29 @@ mod tests {
         );
         let out = compile(
             "a.html",
-            "<rx-button hx-post=\"/x\" :hx-vals=\"v\" @click=\"go\" autofocus>Save</rx-button>",
+            "<rx-button hx-post=\"/x\" hx-vals=\"{{ v }}\" @click=\"go\" autofocus>Save</rx-button>",
             &builtin(),
         )
         .unwrap();
         assert!(
             out.ends_with(
                 "label=__rx_slot_1, attrs={\"hx-post\": \"/x\", \"hx-vals\": (v), \"@click\": \"go\", \"autofocus\": true}) }}"
+            ),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn other_attributes_go_to_attrs() {
+        let out = compile(
+            "a.html",
+            "<rx-button hx-target=\"#x\" class=\"a\" @click=\"go\" id=\"i\" data-n=\"{{ n }}\">x</rx-button>",
+            &builtin(),
+        )
+        .unwrap();
+        assert!(
+            out.contains(
+                "attrs={\"hx-target\": \"#x\", \"class\": \"a\", \"@click\": \"go\", \"id\": \"i\", \"data-n\": "
             ),
             "{out}"
         );
@@ -471,8 +487,7 @@ mod tests {
             msg("<rx-link-button route=\"a\" href=\"/b\">x</rx-link-button>"),
             "<rx-link-button> takes route or \"href\", not both"
         );
-        assert!(msg("<rx-button class=\"x\">x</rx-button>").contains("#373"));
-        assert!(msg("<rx-button nope=\"x\">x</rx-button>").contains("has no attribute \"nope\""));
+        assert!(msg("<rx-button :foo=\"x\">x</rx-button>").contains("has no attribute \"foo\""),);
         assert_eq!(
             msg("<rx-link-button>x</rx-link-button>"),
             "<rx-link-button> needs the attribute \"href\""
