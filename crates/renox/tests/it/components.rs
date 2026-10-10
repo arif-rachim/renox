@@ -180,3 +180,135 @@ async fn control_flow_renders_lists_and_empty_lists() {
     )
     .await;
 }
+
+struct One;
+
+impl Module for One {
+    fn name(&self) -> &'static str {
+        "one"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/p", || async { view("p.html", context! {}) })
+    }
+}
+
+/// Writes the files (paths relative to the views directory) and gets `/p`.
+async fn render_files(files: &[(&str, &str)]) -> renox::testing::TestResponse {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, body) in files {
+        let path = dir.path().join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(One), move |c| c.views_path = path).await;
+    app.get("/p").await
+}
+
+const PRICE_TAG: (&str, &str) = (
+    "components/price_tag.html",
+    "<rx-props amount currency=\"USD\">\n<b>{{ amount }} {{ currency }}</b><rx-slot />",
+);
+
+#[renox::test]
+async fn an_app_component_renders_with_defaults_and_content() {
+    let res = render_files(&[
+        PRICE_TAG,
+        ("p.html", "<app-price-tag :amount=\"3\">!</app-price-tag>"),
+    ])
+    .await;
+    res.assert_ok();
+    assert_eq!(normalize(&res.text()), "<b>3 USD</b>!");
+    let res = render_files(&[
+        PRICE_TAG,
+        ("p.html", "<app-price-tag :amount=\"3\" currency=\"EUR\"/>"),
+    ])
+    .await;
+    assert_eq!(normalize(&res.text()), "<b>3 EUR</b>");
+}
+
+#[renox::test]
+async fn an_app_component_with_a_missing_required_prop_fails() {
+    let res = render_files(&[PRICE_TAG, ("p.html", "\n<app-price-tag/>")]).await;
+    res.assert_status(500);
+    assert!(
+        res.text()
+            .contains("p.html:2: &lt;app-price-tag&gt; needs the attribute &quot;amount&quot;"),
+        "{}",
+        res.text()
+    );
+}
+
+#[renox::test]
+async fn an_unknown_prop_of_an_app_component_gets_a_suggestion() {
+    let res = render_files(&[
+        PRICE_TAG,
+        ("p.html", "<app-price-tag :amount=\"1\" curency=\"EUR\"/>"),
+    ])
+    .await;
+    res.assert_status(500);
+    assert!(
+        res.text()
+            .contains("has no attribute &quot;curency&quot;; did you mean &quot;currency&quot;?"),
+        "{}",
+        res.text()
+    );
+}
+
+#[renox::test]
+async fn an_app_component_takes_named_slots() {
+    let res = render_files(&[
+        (
+            "components/panel.html",
+            "<rx-props title=\"T\">\n<h2>{{ title }}</h2><rx-slot /><footer><rx-slot name=\"foot\" /></footer>",
+        ),
+        (
+            "p.html",
+            "<app-panel title=\"Hi\">body<rx-slot name=\"foot\">bye</rx-slot></app-panel>",
+        ),
+    ])
+    .await;
+    res.assert_ok();
+    assert_eq!(
+        normalize(&res.text()),
+        "<h2>Hi</h2>body<footer>bye</footer>"
+    );
+}
+
+#[renox::test]
+async fn a_macro_file_used_as_a_component_says_what_to_do() {
+    let res = render_files(&[
+        ("components/legacy.html", "{% macro a() %}x{% endmacro %}"),
+        ("p.html", "<app-legacy/>"),
+    ])
+    .await;
+    res.assert_status(500);
+    assert!(
+        res.text()
+            .contains("components/legacy.html has no &lt;rx-props&gt;: it holds macros"),
+        "{}",
+        res.text()
+    );
+    let res = render_files(&[("p.html", "<app-absent/>")]).await;
+    assert!(
+        res.text()
+            .contains("&lt;app-absent&gt; needs resources/views/components/absent.html"),
+        "{}",
+        res.text()
+    );
+}
+
+#[renox::test]
+async fn app_components_can_use_kit_components() {
+    let res = render_files(&[
+        (
+            "components/note.html",
+            "<rx-props text>\n<rx-badge :text=\"text\"/>",
+        ),
+        ("p.html", "<app-note text=\"Hello\"/>"),
+    ])
+    .await;
+    res.assert_ok();
+    assert!(res.text().contains("Hello"), "{}", res.text());
+}

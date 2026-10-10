@@ -5,6 +5,7 @@
 use std::sync::LazyLock;
 
 #[allow(dead_code)]
+mod app;
 mod attrs;
 mod contracts;
 mod emit;
@@ -41,6 +42,10 @@ static NEEDS_COMPILE: LazyLock<regex::Regex> = LazyLock::new(|| {
 pub(crate) fn compile(_file: &str, src: &str, catalog: &Catalog) -> Result<String, CompileError> {
     if !NEEDS_COMPILE.is_match(src) {
         return Ok(src.to_owned());
+    }
+    if let Some((header, body)) = app::component_file(src)? {
+        let inner = compile(_file, &body, catalog)?;
+        return Ok(format!("{header}{inner}{{% endmacro %}}"));
     }
     let nodes = tree::build(scan::scan(src)?)?;
     emit::emit(src, &nodes, catalog)
