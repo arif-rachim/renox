@@ -1,6 +1,6 @@
-use heck::ToSnakeCase;
+use heck::{ToShoutySnakeCase, ToSnakeCase};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{Data, DeriveInput, Error, Fields, LitStr, Result, Type};
 
 struct Field {
@@ -23,6 +23,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let mut soft_deletes = false;
     let mut default_scope: Option<syn::Path> = None;
     let mut hooks = false;
+    let mut typed_columns = true;
     let mut search: Option<LitStr> = None;
     let mut search_language: Option<LitStr> = None;
     for attr in input.attrs.iter().filter(|a| a.path().is_ident("model")) {
@@ -32,6 +33,9 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 Ok(())
             } else if meta.path.is_ident("soft_deletes") {
                 soft_deletes = true;
+                Ok(())
+            } else if meta.path.is_ident("no_typed_columns") {
+                typed_columns = false;
                 Ok(())
             } else if meta.path.is_ident("hooks") {
                 hooks = true;
@@ -47,7 +51,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 Ok(())
             } else {
                 Err(meta.error(
-                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"`",
+                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `no_typed_columns`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"`",
                 ))
             }
         })?;
@@ -236,8 +240,18 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     });
 
     let from_row_impl = crate::from_row::from_row_impl(ident, quote! { #(#from_row),* });
+    let typed_consts = typed_columns.then(|| {
+        let consts = fields.iter().filter(|f| !f.skip).map(|f| {
+            let konst = format_ident!("{}", f.name.to_shouty_snake_case());
+            let (ty, name) = (&f.ty, &f.name);
+            let doc = format!("The `{name}` column.");
+            quote! { #[doc = #doc] pub const #konst: ::renox::db::Col<#ident, #ty> = ::renox::db::Col::new(#name); }
+        });
+        quote! { impl #ident { #(#consts)* } }
+    });
     Ok(quote! {
         #from_row_impl
+        #typed_consts
 
         impl ::renox::db::Model for #ident {
             const TABLE: &'static str = #table;

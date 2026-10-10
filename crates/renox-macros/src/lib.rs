@@ -39,6 +39,10 @@ use syn::{DeriveInput, parse_macro_input};
 /// - `search = "title, body"` names the text columns full-text search looks
 ///   in (`Model::search`, `renox::db::search`), most important first;
 ///   `search_language = "simple"` changes the language from `english`.
+/// - Every column also gets a typed constant named after the field in
+///   SHOUTY_SNAKE_CASE (`Product::PRICE: Col<Product, i64>`), for
+///   `Query::where_` and friends; `skip` fields get none. `no_typed_columns`
+///   turns them off, for a struct with its own associated items of those names.
 /// - `default_scope = "path::to::fn"` and `hooks`: see `renox::db::Model`.
 #[proc_macro_derive(Model, attributes(model))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
