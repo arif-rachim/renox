@@ -909,3 +909,101 @@ async fn rx_select_options_url_and_editable_match_the_macro() {
     );
     assert!(html.contains("data-rx-editable"), "{html}");
 }
+
+#[derive(serde::Deserialize)]
+struct OrderLine {
+    #[allow(dead_code)]
+    name: String,
+    qty: i64,
+}
+
+#[derive(serde::Deserialize)]
+struct Order {
+    lines: Vec<OrderLine>,
+}
+
+impl Validate for OrderLine {
+    fn rules(&self, v: &mut Validator) {
+        v.field("qty", &self.qty).min(1);
+    }
+}
+
+impl Validate for Order {
+    fn rules(&self, v: &mut Validator) {
+        v.nested("lines", &self.lines);
+    }
+}
+
+struct RepeaterPages;
+
+impl Module for RepeaterPages {
+    fn name(&self) -> &'static str {
+        "repeater-pages"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/m", || async {
+                view(
+                    "m.html",
+                    context! { lines => vec![context! { name => "Tea", qty => 1 }] },
+                )
+            })
+            .get("/r", || async {
+                view(
+                    "r.html",
+                    context! { lines => vec![context! { name => "Tea", qty => 1 }] },
+                )
+            })
+            .post("/save", |Valid(_): Valid<Order>| async { "ok" })
+    }
+}
+
+#[renox::test]
+async fn rx_repeater_matches_the_macro_and_shows_errors_on_nested_names() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        format!(
+            "{UI}{{% call(row, prefix) ui.repeater(name=\"lines\", label=\"Lines\", rows=(lines), min=1, max=5, item_label=\"Line\", add_label=\"More\", hint=\"Items\", reorderable=false) %}}\
+             {{{{ ui.input(name=(prefix) ~ \"[name]\", label=\"Name\", value=(row.name)) }}}}\
+             {{{{ ui.input(name=(prefix) ~ \"[qty]\", label=\"Qty\", type=\"number\", value=(row.qty)) }}}}{{% endcall %}}"
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-repeater name=\"lines\" label=\"Lines\" :rows=\"lines\" min=\"1\" max=\"5\" item-label=\"Line\" add-label=\"More\" hint=\"Items\" :reorderable=\"false\">\
+         <rx-input name=\"{{ prefix }}[name]\" label=\"Name\" :value=\"row.name\"/>\
+         <rx-input name=\"{{ prefix }}[qty]\" label=\"Qty\" type=\"number\" :value=\"row.qty\"/></rx-repeater>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(RepeaterPages), move |c| {
+        c.views_path = path
+    })
+    .await;
+    let bad = [
+        ("lines[0][name]", "Tea"),
+        ("lines[0][qty]", "1"),
+        ("lines[1][name]", "Cake"),
+        ("lines[1][qty]", "0"),
+    ];
+    let mut pages = Vec::new();
+    for page in ["/m", "/r"] {
+        let fresh = normalize(&app.get(page).await.assert_ok().text());
+        assert!(fresh.contains("name=\"lines[0][qty]\""), "{fresh}");
+        app.request()
+            .header("referer", page)
+            .post("/save", &bad)
+            .await
+            .assert_redirect(page);
+        let r = app.get(page).await;
+        r.assert_ok();
+        pages.push(normalize(&r.text()));
+    }
+    assert!(pages[0].contains("name=\"lines[1][qty]\""), "{}", pages[0]);
+    assert!(pages[0].contains("value=\"Cake\""), "{}", pages[0]);
+    assert!(pages[0].contains("aria-invalid=\"true\""), "{}", pages[0]);
+    assert_eq!(pages[0], pages[1]);
+}

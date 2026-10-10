@@ -1124,6 +1124,57 @@ pub(crate) static BUILTIN: &[Contract] = &[
         parent: None,
     },
     Contract {
+        tag: "rx-repeater",
+        doc: "Rows that people add, remove and move; the content is one row's fields.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "repeater",
+        },
+        props: &[
+            text(
+                "name",
+                true,
+                "The field's name; rows are named `name[0][field]`.",
+            ),
+            text("label", true, "The label."),
+            data(
+                "rows",
+                false,
+                "The rows to show at first; the old input wins after a failed submit.",
+            ),
+            text("add-label", false, "The text of the add button."),
+            text(
+                "item-label",
+                false,
+                "The title of each row (the label by default).",
+            ),
+            number("min", "The fewest rows."),
+            number("max", "The most rows."),
+            flag(
+                "reorderable",
+                "Whether rows can move; `:reorderable=\"false\"` fixes their order.",
+            ),
+            text("hint", false, "A line under the field."),
+            text("id", false, "The element's id."),
+            text(
+                "span",
+                false,
+                "How many columns it takes in a form grid, or full.",
+            ),
+        ],
+        slots: &[Slot {
+            name: "",
+            into: None,
+            args: &["row", "prefix"],
+            optional: false,
+            doc: "One row's fields; `row` is its data and `prefix` its name part, like `lines[0]`.",
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
         tag: "rx-key-value",
         doc: "Pairs of text, like headers or settings: a key and a value per row.",
         render: Render::Macro {

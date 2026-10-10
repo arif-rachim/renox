@@ -660,6 +660,7 @@ These macros also have tags. Each renders the same HTML as its macro (a test che
 
 | Tag | Macro |
 | --- | --- |
+| `<rx-repeater name label :rows add-label item-label min max :reorderable hint id span>` with `row` and `prefix` in its content | `{% call(row, prefix) repeater(…) %}`. `prefix` is the row's name part, like `lines[0]`, so a field is `name="{{ prefix }}[qty]"`. |
 | `<rx-key-value name label :value key-label value-label add-label hint id span>` | `key_value(…)` |
 | `<rx-fieldset legend hint columns>…</rx-fieldset>` | `{% call fieldset(…) %}` |
 | `<rx-show-when field values>…</rx-show-when>` | `{% call show_when(field, values) %}` |
