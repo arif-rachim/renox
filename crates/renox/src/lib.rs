@@ -413,5 +413,24 @@ pub struct CheatSheet;
 /// struct Product { id: i64, price: i64 }
 /// let _ = Product::PRCE;
 /// ```
+///
+/// Form misuse:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Task { id: i64, #[form(skip)] owner_id: i64 }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(form)]
+/// struct Task { id: i64, #[form(upload)] size: i64 }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(form)]
+/// struct Task { id: i64, #[form(bogus)] title: String }
+/// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;

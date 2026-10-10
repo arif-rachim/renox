@@ -71,6 +71,169 @@ pub(crate) async fn table_columns(db: &Db, table: &str) -> crate::Result<Vec<Tab
     }
 }
 
+/// One index of a table (the primary key's own index is left out).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TableIndex {
+    pub name: String,
+    pub columns: Vec<String>,
+    pub unique: bool,
+    /// The `CREATE INDEX` statement; `None` for indexes the database made for a
+    /// `UNIQUE` constraint on SQLite.
+    pub sql: Option<String>,
+}
+
+/// Reads a table's indexes, without the primary key's.
+pub(crate) async fn table_indexes(db: &Db, table: &str) -> crate::Result<Vec<TableIndex>> {
+    let mut indexes = Vec::new();
+    match db.dialect() {
+        Dialect::Sqlite => {
+            let rows = sql(r#"SELECT name, "unique", origin FROM pragma_index_list(?)"#)
+                .bind(table)
+                .fetch_all(db)
+                .await?;
+            for row in &rows {
+                if row.try_get::<String>("origin")? == "pk" {
+                    continue;
+                }
+                let name = row.try_get::<String>("name")?;
+                let columns = sql("SELECT name FROM pragma_index_info(?) ORDER BY seqno")
+                    .bind(name.as_str())
+                    .scalars::<Option<String>>(db)
+                    .await?
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                let index_sql =
+                    sql("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?")
+                        .bind(name.as_str())
+                        .scalar_optional::<Option<String>>(db)
+                        .await?
+                        .flatten();
+                indexes.push(TableIndex {
+                    unique: row.try_get::<i64>("unique")? != 0,
+                    name,
+                    columns,
+                    sql: index_sql,
+                });
+            }
+        }
+        Dialect::Postgres => {
+            let rows = sql("SELECT i.relname AS name, ix.indisunique AS uniq, \
+                 pg_get_indexdef(ix.indexrelid) AS sql, \
+                 array_to_string(ARRAY(SELECT a.attname FROM unnest(ix.indkey) \
+                 WITH ORDINALITY k(n, o) JOIN pg_attribute a ON a.attrelid = ix.indrelid \
+                 AND a.attnum = k.n ORDER BY k.o), ',') AS cols \
+                 FROM pg_index ix JOIN pg_class i ON i.oid = ix.indexrelid \
+                 JOIN pg_class t ON t.oid = ix.indrelid \
+                 JOIN pg_namespace n ON n.oid = t.relnamespace \
+                 WHERE n.nspname = current_schema() AND t.relname = ? \
+                 AND NOT ix.indisprimary ORDER BY i.relname")
+            .bind(table)
+            .fetch_all(db)
+            .await?;
+            for row in &rows {
+                let cols = row.try_get::<String>("cols")?;
+                indexes.push(TableIndex {
+                    name: row.try_get::<String>("name")?,
+                    columns: cols
+                        .split(',')
+                        .filter(|c| !c.is_empty())
+                        .map(str::to_string)
+                        .collect(),
+                    unique: row.try_get::<bool>("uniq")?,
+                    sql: Some(row.try_get::<String>("sql")?),
+                });
+            }
+        }
+    }
+    Ok(indexes)
+}
+
+/// A foreign key in another table that points at the table being checked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ForeignKey {
+    /// The table holding the key.
+    pub table: String,
+    pub column: String,
+    /// The table it points at.
+    pub references: String,
+    /// `NO ACTION`, `RESTRICT`, `CASCADE`, `SET NULL` or `SET DEFAULT`.
+    pub on_delete: String,
+}
+
+/// Lists the foreign keys of other tables that point at `table`.
+pub(crate) async fn foreign_keys_to(db: &Db, table: &str) -> crate::Result<Vec<ForeignKey>> {
+    let mut keys = Vec::new();
+    match db.dialect() {
+        Dialect::Sqlite => {
+            let tables = sql("SELECT name FROM sqlite_master WHERE type = 'table' \
+                 AND name NOT LIKE 'sqlite_%' ORDER BY name")
+            .scalars::<String>(db)
+            .await?;
+            for name in tables {
+                let rows =
+                    sql(r#"SELECT "from", "table", on_delete FROM pragma_foreign_key_list(?)"#)
+                        .bind(name.as_str())
+                        .fetch_all(db)
+                        .await?;
+                for row in &rows {
+                    if row.try_get::<String>("table")? == table {
+                        keys.push(ForeignKey {
+                            table: name.clone(),
+                            column: row.try_get::<String>("from")?,
+                            references: table.to_string(),
+                            on_delete: row.try_get::<String>("on_delete")?,
+                        });
+                    }
+                }
+            }
+        }
+        Dialect::Postgres => {
+            let rows = sql(
+                "SELECT cl.relname AS child, a.attname AS col, co.confdeltype::text AS del \
+                 FROM pg_constraint co JOIN pg_class cl ON cl.oid = co.conrelid \
+                 JOIN pg_attribute a ON a.attrelid = co.conrelid AND a.attnum = co.conkey[1] \
+                 WHERE co.contype = 'f' AND co.confrelid = (quote_ident(?))::regclass \
+                 ORDER BY cl.relname, a.attname",
+            )
+            .bind(table)
+            .fetch_all(db)
+            .await?;
+            for row in &rows {
+                let on_delete = match row.try_get::<String>("del")?.as_str() {
+                    "r" => "RESTRICT",
+                    "c" => "CASCADE",
+                    "n" => "SET NULL",
+                    "d" => "SET DEFAULT",
+                    _ => "NO ACTION",
+                };
+                keys.push(ForeignKey {
+                    table: row.try_get::<String>("child")?,
+                    column: row.try_get::<String>("col")?,
+                    references: table.to_string(),
+                    on_delete: on_delete.to_string(),
+                });
+            }
+        }
+    }
+    Ok(keys)
+}
+
+/// The `CREATE TABLE` statement SQLite keeps for a table; `None` when the table
+/// is missing (and always on PostgreSQL, which keeps no such text).
+pub(crate) async fn sqlite_table_sql(db: &Db, table: &str) -> crate::Result<Option<String>> {
+    if db.dialect() != Dialect::Sqlite {
+        return Ok(None);
+    }
+    Ok(
+        sql("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .bind(table)
+            .scalar_optional::<Option<String>>(db)
+            .await?
+            .flatten(),
+    )
+}
+
 /// SQLite's type affinity for a declared type (SQLite docs, section 3.1).
 fn sqlite_affinity(decl: &str) -> &'static str {
     let decl = decl.to_ascii_uppercase();
@@ -331,6 +494,62 @@ mod tests {
 
     const S: Dialect = Dialect::Sqlite;
     const P: Dialect = Dialect::Postgres;
+
+    #[tokio::test]
+    async fn indexes_foreign_keys_and_table_sql_are_read() {
+        let db = crate::db::connect(&crate::Config::default()).await.unwrap();
+        for stmt in [
+            "CREATE TABLE sc_parent (id BIGINT PRIMARY KEY, code TEXT NOT NULL UNIQUE, a TEXT, b TEXT)",
+            "CREATE INDEX sc_parent_a ON sc_parent (a)",
+            "CREATE INDEX sc_parent_ab ON sc_parent (a, b)",
+            "CREATE TABLE sc_child (id BIGINT PRIMARY KEY, parent_id BIGINT REFERENCES sc_parent (id) ON DELETE CASCADE)",
+        ] {
+            sql(stmt).execute(&db).await.unwrap();
+        }
+        let mut indexes = table_indexes(&db, "sc_parent").await.unwrap();
+        indexes.sort_by(|x, y| x.name.cmp(&y.name));
+        let names: Vec<_> = indexes.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(indexes.len(), 3, "{names:?}");
+        let by = |cols: &[&str]| {
+            indexes
+                .iter()
+                .find(|i| i.columns == cols)
+                .unwrap_or_else(|| panic!("no index on {cols:?}: {names:?}"))
+        };
+        let single = by(&["a"]);
+        assert_eq!(single.name, "sc_parent_a");
+        assert!(!single.unique && single.sql.as_deref().unwrap().contains("sc_parent_a"));
+        let composite = by(&["a", "b"]);
+        assert_eq!(composite.name, "sc_parent_ab");
+        assert!(!composite.unique);
+        let unique = by(&["code"]);
+        assert!(unique.unique);
+        if db.dialect() == Dialect::Sqlite {
+            assert_eq!(unique.sql, None);
+        } else {
+            assert!(unique.sql.is_some());
+        }
+
+        let keys = foreign_keys_to(&db, "sc_parent").await.unwrap();
+        assert_eq!(
+            keys,
+            vec![ForeignKey {
+                table: "sc_child".into(),
+                column: "parent_id".into(),
+                references: "sc_parent".into(),
+                on_delete: "CASCADE".into(),
+            }]
+        );
+        assert!(foreign_keys_to(&db, "sc_child").await.unwrap().is_empty());
+
+        let table_sql = sqlite_table_sql(&db, "sc_child").await.unwrap();
+        if db.dialect() == Dialect::Sqlite {
+            assert!(table_sql.unwrap().contains("ON DELETE CASCADE"));
+            assert_eq!(sqlite_table_sql(&db, "nope").await.unwrap(), None);
+        } else {
+            assert_eq!(table_sql, None);
+        }
+    }
 
     #[test]
     fn sqlite_kinds_fit_by_affinity() {
