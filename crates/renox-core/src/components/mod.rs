@@ -8,7 +8,6 @@ mod app;
 #[allow(dead_code)]
 mod attrs;
 mod contracts;
-#[allow(dead_code)]
 mod custom_data;
 mod emit;
 mod plugin;
@@ -19,6 +18,23 @@ mod tree;
 
 pub(crate) use contracts::{BUILTIN, Contract};
 pub use plugin::{Component, Prop};
+
+/// The editor data file for `contracts` and the app's component files (`(file name, source)`
+/// pairs). A file whose `<rx-props>` can't be read is left out.
+pub(crate) fn custom_data_for(
+    contracts: &[Contract],
+    files: &[(String, String)],
+) -> serde_json::Value {
+    let app: Vec<(String, app::AppContract)> = files
+        .iter()
+        .filter_map(|(file, src)| {
+            let stem = file.strip_prefix("components/")?.strip_suffix(".html")?;
+            let tag = format!("app-{}", stem.replace('_', "-"));
+            Some((tag, app::contract_of(file, src).ok()?))
+        })
+        .collect();
+    custom_data::custom_data(contracts, &app)
+}
 
 /// A mistake found while compiling a template, with the line it is on (1-based).
 #[derive(Debug, Clone, PartialEq, Eq)]
