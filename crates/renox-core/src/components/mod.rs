@@ -4,6 +4,8 @@
 
 use std::sync::LazyLock;
 
+#[allow(dead_code)]
+mod attrs;
 mod scan;
 mod suggest;
 mod tree;
