@@ -32,6 +32,11 @@ pub(crate) fn did_you_mean<'a>(
     best.map(|(_, c)| c)
 }
 
+/// Whether `word` is within two edits of one of the candidates.
+pub(crate) fn near<'a>(word: &str, candidates: impl IntoIterator<Item = &'a str>) -> bool {
+    candidates.into_iter().any(|c| distance(word, c) <= 2)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

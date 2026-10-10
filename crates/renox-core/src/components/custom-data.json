@@ -215,6 +215,11 @@
           "description": "The cancel button's text.",
           "name": "cancel-label",
           "values": []
+        },
+        {
+          "description": "Runs when the component sends changed.",
+          "name": "@changed",
+          "values": []
         }
       ],
       "description": "A form in steps; each `<rx-wizard-step>` inside is one step.",
@@ -251,6 +256,11 @@
         {
           "description": "The tab list's accessible name.",
           "name": "label",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends changed.",
+          "name": "@changed",
           "values": []
         }
       ],
@@ -746,6 +756,16 @@
               "name": "false"
             }
           ]
+        },
+        {
+          "description": "Runs when the component sends confirmed.",
+          "name": "@confirmed",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends cancelled.",
+          "name": "@cancelled",
+          "values": []
         }
       ],
       "description": "A button that asks before it acts, with its dialog.",
@@ -1603,6 +1623,11 @@
           "description": "The named error bag.",
           "name": "bag",
           "values": []
+        },
+        {
+          "description": "Runs when the component sends changed.",
+          "name": "@changed",
+          "values": []
         }
       ],
       "description": "A choice among options, with its label, hint and errors.",
@@ -2149,6 +2174,11 @@
           "description": "The named error bag.",
           "name": "bag",
           "values": []
+        },
+        {
+          "description": "Runs when the component sends changed.",
+          "name": "@changed",
+          "values": []
         }
       ],
       "description": "A date field with a calendar.",
@@ -2223,6 +2253,11 @@
         {
           "description": "The named error bag.",
           "name": "bag",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends changed.",
+          "name": "@changed",
           "values": []
         }
       ],
@@ -2313,6 +2348,16 @@
         {
           "description": "How many columns it takes in a form grid, or full.",
           "name": "span",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends added.",
+          "name": "@added",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends removed.",
+          "name": "@removed",
           "values": []
         }
       ],
@@ -2797,6 +2842,21 @@
         {
           "description": "Extra content for the grid's toolbar.",
           "name": ":tools",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends selected.",
+          "name": "@selected",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends sorted.",
+          "name": "@sorted",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends filtered.",
+          "name": "@filtered",
           "values": []
         }
       ],

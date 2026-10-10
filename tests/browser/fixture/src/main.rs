@@ -243,6 +243,15 @@ impl Module for Pages {
                 },
             )
             .get("/events", || async { view("events.html", context! {}) })
+            .get("/events-tags", || async {
+                view("events_tags.html", context! {})
+            })
+            .get("/events-tags/stamp", || async {
+                static LOADS: std::sync::atomic::AtomicUsize =
+                    std::sync::atomic::AtomicUsize::new(0);
+                let n = LOADS.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                format!("loads: {n}")
+            })
             .post("/confirm-done", || async { "done" })
             // The navbar with a phone tab bar and a search behind a button.
             .get("/tabs", || async { view("tabs.html", context! {}) })

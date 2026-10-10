@@ -6,7 +6,7 @@ use super::CompileError;
 use super::attrs;
 use super::contracts::Contract;
 use super::contracts::Module;
-use super::emit::{blank, check_attrs, emit_into, err, pad, with_row};
+use super::emit::{blank, check_attrs, emit_into, err, pad, passthrough_pairs, with_row};
 use super::scan::Attr;
 use super::tree::Node;
 use std::ops::Range;
@@ -268,6 +268,10 @@ pub(super) fn wizard(
             .map_err(|m| err(a.line, format!("<rx-wizard> {m}")))?;
         args.push_str(&format!(", cancel={e}"));
     }
+    let extra = passthrough_pairs(contract, attrs)?;
+    if !extra.is_empty() {
+        args.push_str(&format!(", attrs={{{}}}", extra.join(", ")));
+    }
     out.push_str(&format!("{{% call __rx_ui.wizard({args}) %}}"));
     out.push_str(&pad(&cx.src[open.clone()]));
     out.push_str(&gaps);
@@ -366,6 +370,10 @@ pub(super) fn tabs(
     }
     if let Some(a) = attr(attrs, "label") {
         args.push_str(&format!(", label={}", text_prop(a, "rx-tabs")?));
+    }
+    let extra = passthrough_pairs(contract, attrs)?;
+    if !extra.is_empty() {
+        args.push_str(&format!(", attrs={{{}}}", extra.join(", ")));
     }
     out.push_str(&format!("{{{{ __rx_ui.tabs({args}) }}}}"));
     out.push_str(&pad(&cx.src[open.clone()]));
