@@ -26,7 +26,14 @@ struct PostV2 {
 #[model(table = "posts")]
 struct PostRenamed {
     id: i64,
-    name: String,
+    name: Option<String>,
+}
+
+#[derive(Model, Debug, Clone, Default)]
+#[model(table = "posts")]
+struct PostOptional {
+    id: i64,
+    title: Option<String>,
 }
 
 #[derive(Model, Debug, Clone, Default)]
@@ -68,7 +75,8 @@ fn leak(s: String) -> &'static str {
 /// The migrations in `dir`, as `migrations!()` would load them.
 fn load(dir: &Path) -> Vec<Migration> {
     let mut stems: Vec<String> = fs::read_dir(dir)
-        .unwrap()
+        .into_iter()
+        .flatten()
         .flatten()
         .filter_map(|e| {
             let name = e.file_name().into_string().ok()?;
@@ -204,7 +212,7 @@ async fn a_new_field_adds_a_column() {
 async fn an_accepted_rename_renames_the_column() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("migrations");
-    diff::<PostV1>(dir.path(), &out, "create_posts", &[], &[])
+    diff::<PostOptional>(dir.path(), &out, "create_posts", &[], &[])
         .await
         .unwrap();
     diff::<PostRenamed>(dir.path(), &out, "rename_title", &[], &["yes"])
