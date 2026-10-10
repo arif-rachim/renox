@@ -1486,6 +1486,7 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
         route("GET", "/_renox/files/{*key}"),
         route("POST", "/_renox/grid/{grid}/prefs"),
         route("DELETE", "/_renox/grid/{grid}/prefs"),
+        route("POST", "/_renox/live/{component}/{action}"),
         route("GET", "/storage/{*path}"),
     ];
     if config.debug {
@@ -1737,7 +1738,8 @@ fn build_router(
     };
     let router = router
         .merge(crate::storage::router())
-        .merge(crate::grid::router());
+        .merge(crate::grid::router())
+        .merge(crate::live_component::route::router());
     let router = if state.config.debug {
         router
             .merge(crate::mail::preview_router())
