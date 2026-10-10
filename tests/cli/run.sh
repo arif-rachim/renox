@@ -135,6 +135,7 @@ step "every generator"
 "$RNX" make:rule TaxId --module catalog
 "$RNX" make:middleware StampRequests
 "$RNX" make:component price_tag
+"$RNX" make:component legacy_tag --macro
 "$RNX" make:deploy
 
 step "make:component --ui forwards to the app's ui:publish"

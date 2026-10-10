@@ -196,6 +196,10 @@ enum Command {
         /// With --ui: replace files already there.
         #[arg(long)]
         force: bool,
+        /// Write the older macro form (`{% from … import … %}`) instead of an
+        /// `<app-…>` tag.
+        #[arg(long = "macro")]
+        macro_form: bool,
     },
     /// Create an HTML and a text mail template.
     #[command(name = "make:mail")]
@@ -354,8 +358,10 @@ fn run(command: Command) -> Result<()> {
             app_command("ui:publish", &args)
         }
         Command::MakeComponent {
-            name: Some(name), ..
-        } => generate::component(&app_root()?, &name),
+            name: Some(name),
+            macro_form,
+            ..
+        } => generate::component(&app_root()?, &name, macro_form),
         Command::MakeComponent { .. } => Err(anyhow::anyhow!("give a name, or --ui")),
         Command::Migrate { args } => app_command("migrate", &args),
         Command::MigrateRollback { args } => app_command("migrate:rollback", &args),
@@ -690,7 +696,16 @@ mod tests {
             Command::MakeComponent {
                 name: None,
                 ui: true,
-                force: true
+                force: true,
+                macro_form: false
+            }
+        ));
+        assert!(matches!(
+            parse(&["make:component", "price_tag", "--macro"]),
+            Command::MakeComponent {
+                name: Some(_),
+                macro_form: true,
+                ..
             }
         ));
         // Anything else goes to the app.

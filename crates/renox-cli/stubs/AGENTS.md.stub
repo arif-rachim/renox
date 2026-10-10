@@ -50,7 +50,7 @@ rnx make:migration --auto add_stock           # SQL from the models' changes (db
 rnx make:migration add_stock_to_products               # in migrations/ (--path DIR: elsewhere)
 rnx make:factory Product --module products             # also make:seeder, make:test
 rnx make:notification OrderShipped --module orders     # also make:event, make:rule
-rnx make:middleware StampRequests                      # also make:component
+rnx make:middleware StampRequests                      # also make:component (an <app-…> tag; --macro: the older macro form)
 rnx make:component --ui                                # copy the UI kit in to change it (same as rnx ui:publish)
 rnx make:deploy                                        # Dockerfile, systemd unit + socket, Litestream
 rnx build                                              # release binary in dist/ (Tailwind CSS minified first)
