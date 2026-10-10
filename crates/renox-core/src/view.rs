@@ -119,6 +119,56 @@ pub struct Views {
     reloader: Arc<AutoReloader>,
     /// `APP_DEBUG`: also warn about values hidden by imported macros.
     debug: bool,
+    /// `VIEWS_PATH`, where the app's templates live.
+    dir: PathBuf,
+    /// Templates compiled into the binary, used instead of `dir` when given.
+    embedded: Option<&'static [(&'static str, &'static str)]>,
+}
+
+/// One template that does not compile, found by [`Views::check`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) struct ViewProblem {
+    /// The template's name, e.g. `products/index.html`.
+    pub template: String,
+    /// The line the error is on, when the compiler knows it.
+    pub line: Option<usize>,
+    /// What is wrong.
+    pub message: String,
+}
+
+impl std::fmt::Display for ViewProblem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.line {
+            Some(line) => write!(f, "{}:{line}: {}", self.template, self.message),
+            None => write!(f, "{}: {}", self.template, self.message),
+        }
+    }
+}
+
+/// Every `*.html` and `*.txt` file under `dir`, as names relative to it with
+/// `/` separators. Dotfiles and dot directories are skipped.
+fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if file_name.starts_with('.') {
+            continue;
+        }
+        let name = if prefix.is_empty() {
+            file_name
+        } else {
+            format!("{prefix}/{file_name}")
+        };
+        let path = entry.path();
+        if path.is_dir() {
+            walk(&path, &name, out);
+        } else if name.ends_with(".html") || name.ends_with(".txt") {
+            out.push(name);
+        }
+    }
 }
 
 /// What an `App::share` function knows about the request being rendered.
@@ -445,7 +495,50 @@ impl Views {
         Self {
             reloader: Arc::new(reloader),
             debug,
+            dir: config.views_path.clone(),
+            embedded,
         }
+    }
+
+    /// The name of every template: the app's files (or the embedded ones),
+    /// the built-in ones and those added to the environment, sorted.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        match self.embedded {
+            Some(files) => names.extend(files.iter().map(|(name, _)| (*name).to_owned())),
+            None => walk(&self.dir, "", &mut names),
+        }
+        names.extend(BUILTIN.iter().map(|(name, _)| (*name).to_owned()));
+        if let Ok(env) = self.reloader.acquire_env() {
+            names.extend(env.templates().map(|(name, _)| name.to_owned()));
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Compiles every template and returns those that fail, in name order.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn check(&self, _routes: &RouteTable) -> Vec<ViewProblem> {
+        let names = self.names();
+        let env = match self.reloader.acquire_env() {
+            Ok(env) => env,
+            Err(err) => {
+                return vec![ViewProblem {
+                    template: String::new(),
+                    line: None,
+                    message: err.to_string(),
+                }];
+            }
+        };
+        let mut problems = Vec::new();
+        for name in names {
+            if let Err(err) = env.get_template(&name) {
+                problems.push(problem(&name, &err));
+            }
+        }
+        problems
     }
 
     /// Whether a template of this name exists (the app's or a built-in).
@@ -746,6 +839,28 @@ fn load(
         .iter()
         .find(|(builtin, _)| *builtin == name)
         .map(|(_, source)| (*source).to_owned()))
+}
+
+/// A [`ViewProblem`] from a compile error. The component compiler's details
+/// already start with `name:line: `, which is taken out of the message.
+#[cfg_attr(not(test), allow(dead_code))]
+fn problem(name: &str, err: &minijinja::Error) -> ViewProblem {
+    let detail = err.detail().unwrap_or("could not be compiled");
+    if let Some(rest) = detail.strip_prefix(name).and_then(|r| r.strip_prefix(':'))
+        && let Some((line, message)) = rest.split_once(": ")
+        && let Ok(line) = line.parse::<usize>()
+    {
+        return ViewProblem {
+            template: name.to_owned(),
+            line: Some(line),
+            message: message.to_owned(),
+        };
+    }
+    ViewProblem {
+        template: name.to_owned(),
+        line: err.line(),
+        message: detail.to_owned(),
+    }
 }
 
 fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
@@ -1394,6 +1509,62 @@ fn globals(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn views_in(dir: &Path) -> Views {
+        let config = Config {
+            views_path: dir.to_path_buf(),
+            ..Config::default()
+        };
+        Views::new(
+            &config,
+            Arc::new(RouteTable::default()),
+            Storage::from_config(&config).unwrap(),
+            None,
+            Arc::new(Vec::new()),
+            config.timezone,
+            Arc::new(crate::embedded::AssetVersions::new(dir, None)),
+        )
+    }
+
+    #[test]
+    fn check_finds_every_broken_template_with_its_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let write = |name: &str, body: &str| {
+            let path = dir.path().join(name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, body).unwrap();
+        };
+        write("good.html", "<h1>{{ 1 + 1 }}</h1>");
+        write("sub/typo.html", "<p>x</p>\n<rx-tabel>y</rx-tabel>\n");
+        write("bad.html", "a\nb\n{% if x %}\nc\n");
+        write(".hidden.html", "{% if %}");
+        write("notes.md", "{% if %}");
+        let views = views_in(dir.path());
+
+        let names = views.names();
+        assert!(names.contains(&"good.html".to_owned()));
+        assert!(names.contains(&"sub/typo.html".to_owned()));
+        assert!(names.contains(&"renox/error.html".to_owned()));
+        assert!(
+            !names
+                .iter()
+                .any(|n| n.contains("hidden") || n.ends_with(".md"))
+        );
+        assert!(names.windows(2).all(|w| w[0] < w[1]));
+
+        let problems = views.check(&RouteTable::default());
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert_eq!(problems[0].template, "bad.html");
+        assert!(problems[0].line.is_some_and(|l| l >= 3), "{problems:?}");
+        assert_eq!(problems[1].template, "sub/typo.html");
+        assert_eq!(problems[1].line, Some(2));
+        assert!(problems[1].message.contains("rx-tabel"), "{problems:?}");
+        assert!(
+            problems[1]
+                .to_string()
+                .starts_with("sub/typo.html:2: unknown component"),
+        );
+    }
 
     fn env() -> Environment<'static> {
         let mut env = Environment::new();
