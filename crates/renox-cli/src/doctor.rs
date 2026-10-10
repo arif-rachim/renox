@@ -1,8 +1,12 @@
 //! `rnx doctor`: checks this machine and app and says how to fix what's missing.
 
-use anyhow::Result;
+use std::path::Path;
 
-use crate::tools;
+use anyhow::Result;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+
+use crate::{tailwind, tools};
 
 /// How a check came out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,9 +202,82 @@ fn sccache_check(configured: bool, on_path: bool) -> Check {
     }
 }
 
-/// The app's own checks (filled in by the next tasks of #379).
-fn project_checks(_app: &std::path::Path, _no_build: bool) -> Vec<Check> {
-    vec![]
+/// Is there a `.env` in the app?
+fn env_check(root: &Path) -> Check {
+    if root.join(".env").is_file() {
+        Check::ok(".env")
+    } else {
+        Check::fail(".env: missing", "cp .env.example .env && rnx key:generate")
+    }
+}
+
+/// Is `APP_KEY` set to something the framework accepts (32 bytes or more)?
+fn key_check(value: Option<&str>) -> Check {
+    let fix = "rnx key:generate";
+    let Some(value) = value else {
+        return Check::fail("APP_KEY: not set", fix);
+    };
+    let len = match value.strip_prefix("base64:") {
+        Some(rest) => match STANDARD.decode(rest) {
+            Ok(bytes) => bytes.len(),
+            Err(_) => return Check::fail("APP_KEY: not valid base64", fix),
+        },
+        None => value.len(),
+    };
+    if len < 32 {
+        Check::fail("APP_KEY: shorter than 32 bytes", fix)
+    } else {
+        Check::ok("APP_KEY")
+    }
+}
+
+/// Does `build.rs` rerun when migrations change?
+fn build_rs_check(text: Option<&str>) -> Check {
+    if text.is_some_and(|t| t.contains("rerun-if-changed=migrations")) {
+        Check::ok("build.rs reruns when migrations change")
+    } else {
+        Check::fail(
+            "build.rs: new migrations won't be seen",
+            "in build.rs's main: println!(\"cargo:rerun-if-changed=migrations\");",
+        )
+    }
+}
+
+/// Is a Tailwind binary available (`bin` is `TAILWIND_BIN`)?
+fn tailwind_check(bin: Option<&str>, pinned: Option<&Path>) -> Check {
+    if let Some(bin) = bin {
+        if Path::new(bin).is_file() {
+            return Check::ok("Tailwind: TAILWIND_BIN");
+        }
+        return Check::fail(
+            format!("Tailwind: TAILWIND_BIN={bin} is not a file"),
+            "unset TAILWIND_BIN, or point it at the binary",
+        );
+    }
+    if pinned.is_some_and(Path::is_file) {
+        Check::ok(format!("Tailwind {}", tailwind::VERSION))
+    } else {
+        Check::warn("Tailwind: not downloaded yet", "rnx tailwind:install")
+    }
+}
+
+/// The app's own checks.
+fn project_checks(root: &Path, _no_build: bool) -> Vec<Check> {
+    let mut checks = vec![
+        env_check(root),
+        key_check(crate::setting_in(root, "APP_KEY").as_deref()),
+        build_rs_check(
+            std::fs::read_to_string(root.join("build.rs"))
+                .ok()
+                .as_deref(),
+        ),
+    ];
+    if tailwind::enabled(root) {
+        let bin = std::env::var("TAILWIND_BIN").ok().filter(|v| !v.is_empty());
+        let pinned = tailwind::pinned_path().ok().filter(|p| p.is_file());
+        checks.push(tailwind_check(bin.as_deref(), pinned.as_deref()));
+    }
+    checks
 }
 
 /// `rnx doctor`.
@@ -238,7 +315,14 @@ pub fn run(no_build: bool) -> Result<()> {
     };
     let sections = vec![
         ("Machine".to_string(), machine),
-        ("App".to_string(), project),
+        (
+            format!(
+                "App ({})",
+                app.as_deref()
+                    .map_or_else(String::new, |a| a.display().to_string())
+            ),
+            project,
+        ),
     ];
     print!("{}", render(&sections));
     if exit_code(&sections) == 1 {
@@ -345,5 +429,70 @@ mod tests {
             ("B".to_string(), vec![Check::fail("x", "y")]),
         ];
         assert_eq!(exit_code(&fail), 1);
+    }
+
+    #[test]
+    fn env_check_both_ways() {
+        let dir = tempfile::tempdir().unwrap();
+        let c = env_check(dir.path());
+        assert_eq!(c.status, Status::Fail);
+        assert_eq!(
+            c.fix.as_deref(),
+            Some("cp .env.example .env && rnx key:generate")
+        );
+        std::fs::write(dir.path().join(".env"), "").unwrap();
+        assert_eq!(env_check(dir.path()).status, Status::Ok);
+    }
+
+    #[test]
+    fn key_check_cases() {
+        assert_eq!(key_check(None).what, "APP_KEY: not set");
+        assert_eq!(
+            key_check(Some("base64:!!")).what,
+            "APP_KEY: not valid base64"
+        );
+        let short = format!("base64:{}", STANDARD.encode([0u8; 16]));
+        assert_eq!(
+            key_check(Some(&short)).what,
+            "APP_KEY: shorter than 32 bytes"
+        );
+        assert_eq!(key_check(Some(&"a".repeat(32))).status, Status::Ok);
+        assert_eq!(key_check(Some("tiny")).status, Status::Fail);
+        assert_eq!(key_check(Some(&crate::generate_key())).status, Status::Ok);
+    }
+
+    #[test]
+    fn build_rs_check_cases() {
+        assert_eq!(
+            build_rs_check(Some(include_str!("../stubs/build.rs"))).status,
+            Status::Ok
+        );
+        assert_eq!(build_rs_check(Some("")).status, Status::Fail);
+        assert_eq!(build_rs_check(None).status, Status::Fail);
+        assert_eq!(
+            build_rs_check(Some("cargo::rerun-if-changed=migrations")).status,
+            Status::Ok
+        );
+    }
+
+    #[test]
+    fn tailwind_check_branches() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("tw");
+        std::fs::write(&file, "").unwrap();
+        let file_str = file.to_str().unwrap();
+        assert_eq!(
+            tailwind_check(Some(file_str), None).what,
+            "Tailwind: TAILWIND_BIN"
+        );
+        let c = tailwind_check(Some("/no/such/tw"), Some(&file));
+        assert_eq!(c.status, Status::Fail);
+        assert!(c.what.contains("/no/such/tw is not a file"));
+        let c = tailwind_check(None, Some(&file));
+        assert_eq!(c.status, Status::Ok);
+        assert_eq!(c.what, format!("Tailwind {}", tailwind::VERSION));
+        let c = tailwind_check(None, None);
+        assert_eq!(c.status, Status::Warn);
+        assert_eq!(c.fix.as_deref(), Some("rnx tailwind:install"));
     }
 }
