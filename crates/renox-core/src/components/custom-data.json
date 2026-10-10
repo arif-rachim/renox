@@ -754,6 +754,341 @@
     {
       "attributes": [
         {
+          "description": "(required) The dialog's id.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "(required) The dialog's heading.",
+          "name": "title",
+          "values": []
+        },
+        {
+          "description": "A line under the heading.",
+          "name": "message",
+          "values": []
+        },
+        {
+          "description": "Slides in from the side.",
+          "name": "slide-over",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "The width.",
+          "name": "width",
+          "values": [
+            {
+              "name": "sm"
+            },
+            {
+              "name": "lg"
+            },
+            {
+              "name": "xl"
+            }
+          ]
+        },
+        {
+          "description": "An icon's name.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends opened.",
+          "name": "@opened",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends closed.",
+          "name": "@closed",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends saved.",
+          "name": "@saved",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends failed.",
+          "name": "@failed",
+          "values": []
+        }
+      ],
+      "description": "A dialog; open it with an `<rx-open-button>` or any `data-rx-open=\"id\"`.",
+      "name": "rx-sheet"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The id of the sheet to open.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "(required) The label.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "The look.",
+          "name": "variant",
+          "values": [
+            {
+              "name": "primary"
+            },
+            {
+              "name": "secondary"
+            },
+            {
+              "name": "plain"
+            },
+            {
+              "name": "danger"
+            },
+            {
+              "name": "plain-danger"
+            }
+          ]
+        },
+        {
+          "description": "The size.",
+          "name": "size",
+          "values": [
+            {
+              "name": "small"
+            }
+          ]
+        },
+        {
+          "description": "An icon's name.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "A keyboard shortcut.",
+          "name": "key",
+          "values": []
+        },
+        {
+          "description": "A count shown on the button.",
+          "name": "badge",
+          "values": []
+        }
+      ],
+      "description": "A button that opens the sheet with the given id.",
+      "name": "rx-open-button"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The sheet's id.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "(required) The button's label.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "(required) The address the form is sent to; or use route.",
+          "name": "action",
+          "values": []
+        },
+        {
+          "description": "(required) The sheet's heading.",
+          "name": "title",
+          "values": []
+        },
+        {
+          "description": "A line under the heading.",
+          "name": "description",
+          "values": []
+        },
+        {
+          "description": "The submit button's text.",
+          "name": "submit-label",
+          "values": []
+        },
+        {
+          "description": "The HTTP method.",
+          "name": "method",
+          "values": [
+            {
+              "name": "POST"
+            },
+            {
+              "name": "PUT"
+            },
+            {
+              "name": "PATCH"
+            },
+            {
+              "name": "DELETE"
+            }
+          ]
+        },
+        {
+          "description": "The button's look.",
+          "name": "variant",
+          "values": [
+            {
+              "name": "primary"
+            },
+            {
+              "name": "secondary"
+            },
+            {
+              "name": "plain"
+            },
+            {
+              "name": "danger"
+            },
+            {
+              "name": "plain-danger"
+            }
+          ]
+        },
+        {
+          "description": "The button's size.",
+          "name": "size",
+          "values": [
+            {
+              "name": "small"
+            }
+          ]
+        },
+        {
+          "description": "The button's icon.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "A keyboard shortcut.",
+          "name": "key",
+          "values": []
+        },
+        {
+          "description": "Slides in from the side.",
+          "name": "slide-over",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "The width.",
+          "name": "width",
+          "values": [
+            {
+              "name": "sm"
+            },
+            {
+              "name": "lg"
+            },
+            {
+              "name": "xl"
+            }
+          ]
+        },
+        {
+          "description": "The sheet's icon.",
+          "name": "modal-icon",
+          "values": []
+        },
+        {
+          "description": "Makes the submit button red.",
+          "name": "danger",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "A selector the answer is swapped into.",
+          "name": "target",
+          "values": []
+        },
+        {
+          "description": "How the answer is swapped in.",
+          "name": "swap",
+          "values": []
+        },
+        {
+          "description": "The form's encoding, for files.",
+          "name": "enctype",
+          "values": []
+        },
+        {
+          "description": "Whether to draw the opening button.",
+          "name": "button",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "Runs when the component sends opened.",
+          "name": "@opened",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends closed.",
+          "name": "@closed",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends saved.",
+          "name": "@saved",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends failed.",
+          "name": "@failed",
+          "values": []
+        }
+      ],
+      "description": "A button that opens a sheet with a form, sent with htmx; the content is the form's fields.",
+      "name": "rx-action-sheet"
+    },
+    {
+      "attributes": [
+        {
+          "description": "The unread count to start with.",
+          "name": "count",
+          "values": []
+        },
+        {
+          "description": "The panel's id prefix.",
+          "name": "id",
+          "values": []
+        }
+      ],
+      "description": "The bell with the unread count and its panel; nothing for guests.",
+      "name": "rx-notification-bell"
+    },
+    {
+      "attributes": [
+        {
           "description": "(required) The message; or give it as content.",
           "name": "message",
           "values": []
