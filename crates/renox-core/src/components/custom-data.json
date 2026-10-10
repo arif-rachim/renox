@@ -2414,6 +2414,366 @@
       ],
       "description": "A bar showing how far along something is.",
       "name": "rx-progress"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The `GridPage` the handler built.",
+          "name": ":page",
+          "values": []
+        },
+        {
+          "description": "Extra content for the grid's toolbar.",
+          "name": ":tools",
+          "values": []
+        }
+      ],
+      "description": "The data grid of a `renox::grid` page; the content draws the `custom` columns.",
+      "name": "rx-grid"
+    },
+    {
+      "attributes": [
+        {
+          "description": "How many per row (4 by default).",
+          "name": "columns",
+          "values": []
+        }
+      ],
+      "description": "Figures side by side: two per row on phones, `columns` from tablet width.",
+      "name": "rx-stats"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) What the figure is.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "(required) The figure, already formatted.",
+          "name": "value",
+          "values": []
+        },
+        {
+          "description": "The change in percent, shown with an arrow.",
+          "name": "delta",
+          "values": []
+        },
+        {
+          "description": "What the change is against.",
+          "name": "delta-label",
+          "values": []
+        },
+        {
+          "description": "Which way is good (up by default).",
+          "name": "good",
+          "values": [
+            {
+              "name": "up"
+            },
+            {
+              "name": "down"
+            },
+            {
+              "name": "none"
+            }
+          ]
+        },
+        {
+          "description": "Numbers for a sparkline.",
+          "name": ":trend",
+          "values": []
+        },
+        {
+          "description": "Makes the figure a link.",
+          "name": "url",
+          "values": []
+        },
+        {
+          "description": "A line shown when there is no delta.",
+          "name": "hint",
+          "values": []
+        },
+        {
+          "description": "Decimals of the delta (1 by default).",
+          "name": "decimals",
+          "values": []
+        },
+        {
+          "description": "One of the kit's icons.",
+          "name": "icon",
+          "values": []
+        }
+      ],
+      "description": "One figure with an optional change, sparkline and link.",
+      "name": "rx-stat"
+    },
+    {
+      "attributes": [
+        {
+          "description": "How many columns (2 by default).",
+          "name": "columns",
+          "values": []
+        }
+      ],
+      "description": "Widgets in a grid: `columns` from tablet width up, one on phones.",
+      "name": "rx-dashboard"
+    },
+    {
+      "attributes": [
+        {
+          "description": "The heading.",
+          "name": "title",
+          "values": []
+        },
+        {
+          "description": "A line under the heading.",
+          "name": "description",
+          "values": []
+        },
+        {
+          "description": "Columns taken (2, 3 or full).",
+          "name": "span",
+          "values": []
+        },
+        {
+          "description": "A fragment loaded into the card once the page is shown.",
+          "name": "url",
+          "values": []
+        },
+        {
+          "description": "Reload the fragment every this many seconds.",
+          "name": "poll",
+          "values": []
+        },
+        {
+          "description": "The element's id.",
+          "name": "id",
+          "values": []
+        }
+      ],
+      "description": "A card on a dashboard; its content is given, or loaded from `url`.",
+      "name": "rx-widget"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The handler's `Period`.",
+          "name": ":selected",
+          "values": []
+        },
+        {
+          "description": "[key, label] pairs.",
+          "name": ":options",
+          "values": []
+        },
+        {
+          "description": "The navigation's accessible name.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "Whether a custom range is offered; `:custom=\"false\"` hides it.",
+          "name": "custom",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "Links that set `?period=` for the figures and charts below.",
+      "name": "rx-period-filter"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The kind of chart.",
+          "name": "kind",
+          "values": [
+            {
+              "name": "line"
+            },
+            {
+              "name": "area"
+            },
+            {
+              "name": "bar"
+            },
+            {
+              "name": "pie"
+            },
+            {
+              "name": "doughnut"
+            },
+            {
+              "name": "scatter"
+            },
+            {
+              "name": "bubble"
+            },
+            {
+              "name": "heatmap"
+            }
+          ]
+        },
+        {
+          "description": "A series, a list of numbers or a trend.",
+          "name": ":data",
+          "values": []
+        },
+        {
+          "description": "The labels along the x axis.",
+          "name": ":labels",
+          "values": []
+        },
+        {
+          "description": "The numbers.",
+          "name": ":values",
+          "values": []
+        },
+        {
+          "description": "Several named series.",
+          "name": ":series",
+          "values": []
+        },
+        {
+          "description": "The points of a scatter or bubble chart.",
+          "name": ":points",
+          "values": []
+        },
+        {
+          "description": "A heatmap's column labels.",
+          "name": ":columns",
+          "values": []
+        },
+        {
+          "description": "A heatmap's row labels.",
+          "name": ":rows",
+          "values": []
+        },
+        {
+          "description": "A heatmap's cells.",
+          "name": ":cells",
+          "values": []
+        },
+        {
+          "description": "The name of a single series.",
+          "name": "name",
+          "values": []
+        },
+        {
+          "description": "The chart's title.",
+          "name": "title",
+          "values": []
+        },
+        {
+          "description": "The height in pixels (240 by default).",
+          "name": "height",
+          "values": []
+        },
+        {
+          "description": "How values are shown.",
+          "name": "format",
+          "values": [
+            {
+              "name": "number"
+            },
+            {
+              "name": "money"
+            },
+            {
+              "name": "percent"
+            }
+          ]
+        },
+        {
+          "description": "Decimals shown.",
+          "name": "decimals",
+          "values": []
+        },
+        {
+          "description": "A currency code for money.",
+          "name": "currency",
+          "values": []
+        },
+        {
+          "description": "Divides money values by this.",
+          "name": "divide-by",
+          "values": []
+        },
+        {
+          "description": "Stack the series.",
+          "name": "stacked",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "Whether the legend shows.",
+          "name": "legend",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "Whether the data table is offered.",
+          "name": "table",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "How the x labels are shown.",
+          "name": "x-format",
+          "values": []
+        },
+        {
+          "description": "The x axis title.",
+          "name": "x-title",
+          "values": []
+        },
+        {
+          "description": "The y axis title.",
+          "name": "y-title",
+          "values": []
+        },
+        {
+          "description": "How bubble sizes are shown.",
+          "name": "size-format",
+          "values": []
+        },
+        {
+          "description": "The size legend title.",
+          "name": "size-title",
+          "values": []
+        },
+        {
+          "description": "The element's id.",
+          "name": "id",
+          "values": []
+        }
+      ],
+      "description": "A chart drawn as SVG with a data table; it calls the `chart(...)` function.",
+      "name": "rx-chart"
     }
   ],
   "version": 1.1
