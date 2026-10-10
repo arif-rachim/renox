@@ -98,6 +98,9 @@ RNX="$CARGO_TARGET_DIR/debug/rnx"
 step "rnx new shop --database $DATABASE"
 new_app shop --database "$DATABASE"
 use_database shop
+if [ "$(uname -m)" = x86_64 ] && command -v mold >/dev/null && command -v clang >/dev/null; then
+    grep -q 'fuse-ld=mold' .cargo/config.toml
+elif [ "$(uname -m)" = x86_64 ]; then test ! -e .cargo/config.toml; fi
 grep '^renox' Cargo.toml
 
 step "no template placeholder left in the new app"
