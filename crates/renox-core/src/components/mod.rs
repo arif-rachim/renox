@@ -408,4 +408,49 @@ mod tests {
             "{% call push(\"scripts\", once=\"chart\") %}x{% endcall %}"
         );
     }
+
+    #[test]
+    fn actions_use_route_and_pass_attributes_through() {
+        let out = compile(
+            "a.html",
+            "<rx-link-button route=\"stock.suppliers.create\" variant=\"primary\" icon=\"plus\">{{ t('n') }}</rx-link-button>",
+            &builtin(),
+        )
+        .unwrap();
+        assert_eq!(
+            out,
+            "{% import \"renox/ui.html\" as __rx_ui %}{% set __rx_slot_1 %}{{ t('n') }}{% endset %}{{ __rx_ui.link_button(href=route(\"stock.suppliers.create\"), variant=\"primary\", icon=\"plus\", label=__rx_slot_1) }}"
+        );
+        let out = compile(
+            "a.html",
+            "<rx-button hx-post=\"/x\" :hx-vals=\"v\" @click=\"go\" autofocus>Save</rx-button>",
+            &builtin(),
+        )
+        .unwrap();
+        assert!(
+            out.ends_with(
+                "label=__rx_slot_1, attrs={\"hx-post\": \"/x\", \"hx-vals\": (v), \"@click\": \"go\", \"autofocus\": true}) }}"
+            ),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn route_and_class_errors() {
+        let msg = |s: &str| compile("a.html", s, &builtin()).unwrap_err().message;
+        assert_eq!(
+            msg("<rx-card route=\"a\">x</rx-card>"),
+            "<rx-card> has no route shortcut"
+        );
+        assert_eq!(
+            msg("<rx-link-button route=\"a\" href=\"/b\">x</rx-link-button>"),
+            "<rx-link-button> takes route or \"href\", not both"
+        );
+        assert!(msg("<rx-button class=\"x\">x</rx-button>").contains("#373"));
+        assert!(msg("<rx-button nope=\"x\">x</rx-button>").contains("has no attribute \"nope\""));
+        assert_eq!(
+            msg("<rx-link-button>x</rx-link-button>"),
+            "<rx-link-button> needs the attribute \"href\""
+        );
+    }
 }

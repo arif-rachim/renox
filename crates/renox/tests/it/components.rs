@@ -281,3 +281,57 @@ async fn rx_wizard_holds_only_steps() {
     let r = app.get("/r").await.text();
     assert!(r.contains("belongs inside &lt;rx-wizard&gt;"), "{r}");
 }
+
+#[renox::test]
+async fn rx_button_matches_the_macro_and_passes_hx_attributes() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.button(label=\"Save\", variant=\"danger\", size=\"small\", icon=\"plus\", attrs={{\"hx-post\": \"/x\"}}) }}}}"
+        ),
+        "<rx-button variant=\"danger\" size=\"small\" icon=\"plus\" hx-post=\"/x\">Save</rx-button>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_link_button_and_icon_button_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.link_button(href=\"/a\", label=\"Go\", variant=\"primary\", new_tab=true) }}}}\
+             {{{{ ui.icon_button(icon=\"plus\", label=\"Add\", href=\"/b\", variant=\"primary\") }}}}\
+             {{{{ ui.icon_button(icon=\"plus\", label=\"Add\", attrs={{\"hx-get\": \"/c\"}}) }}}}"
+        ),
+        "<rx-link-button href=\"/a\" variant=\"primary\" new-tab>Go</rx-link-button>\
+         <rx-icon-button icon=\"plus\" label=\"Add\" href=\"/b\" variant=\"primary\"/>\
+         <rx-icon-button icon=\"plus\" label=\"Add\" hx-get=\"/c\"/>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_confirm_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.confirm(id=\"del\", label=\"Delete\", action=\"/x/1\", title=\"Sure?\", message=\"It goes.\", fields={{\"a\": \"b\"}}) }}}}"
+        ),
+        "<rx-confirm id=\"del\" label=\"Delete\" action=\"/x/1\" title=\"Sure?\" :fields=\"{'a': 'b'}\">It goes.</rx-confirm>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_alert_and_rx_empty_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.alert(message=\"Heads up\", kind=\"warning\", title=\"Note\") }}}}\
+             {{{{ ui.empty(title=\"Nothing\", message=\"Add one\", action_href=\"/new\", action_label=\"New\", icon=\"plus\") }}}}"
+        ),
+        "<rx-alert kind=\"warning\" title=\"Note\">Heads up</rx-alert>\
+         <rx-empty title=\"Nothing\" action-href=\"/new\" action-label=\"New\" icon=\"plus\">Add one</rx-empty>",
+        serde_json::json!({}),
+    )
+    .await;
+}
