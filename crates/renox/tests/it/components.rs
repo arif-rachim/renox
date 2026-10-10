@@ -1008,6 +1008,144 @@ async fn rx_repeater_matches_the_macro_and_shows_errors_on_nested_names() {
     assert_eq!(pages[0], pages[1]);
 }
 
+/// `<rx-grid>` over a real grid page of users, with a `custom` column drawn by the slot.
+#[renox::test]
+async fn rx_grid_matches_the_macro() {
+    use renox::grid::{Column, Grid, GridRequest};
+
+    async fn show(name: &'static str, request: GridRequest) -> Result<View> {
+        let page = Grid::new("people")
+            .column(Column::text("name", "Name"))
+            .column(Column::custom("note", "Note"))
+            .page(User::query(), &request)
+            .await?;
+        Ok(view(name, context! { page => page }))
+    }
+    struct People;
+    impl Module for People {
+        fn name(&self) -> &'static str {
+            "people"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new()
+                .get("/m", |request: GridRequest| show("m.html", request))
+                .get("/r", |request: GridRequest| show("r.html", request))
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        "{% from \"renox/grid.html\" import grid %}{% call(row, column) grid(page) %}<b>{{ column.key }}:{{ row.name }}</b>{% endcall %}",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-grid :page=\"page\"><b>{{ column.key }}:{{ row.name }}</b></rx-grid>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Auth::new()).module(People), move |c| {
+        c.views_path = path
+    })
+    .await;
+    for name in ["Ann", "Ben"] {
+        User::register(
+            app.db(),
+            name,
+            &format!("{name}@example.com"),
+            "password123",
+        )
+        .await
+        .unwrap();
+    }
+    let (m, r) = (app.get("/m").await, app.get("/r").await);
+    m.assert_ok();
+    r.assert_ok();
+    // The two pages differ only in their own URL.
+    let (m, r) = (
+        normalize(&m.text()),
+        normalize(&r.text()).replace("=\"/r\"", "=\"/m\""),
+    );
+    assert!(m.contains("note:Ann") && m.contains("data-rx-component=\"grid\""));
+    assert_eq!(m, r);
+}
+
+#[renox::test]
+async fn rx_infolist_and_entry_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.infolist(columns=2, inline=true) %}}\
+             {{{{ ui.entry(label=\"Number\", value=(order.number), copyable=true) }}}}\
+             {{{{ ui.entry(label=\"Status\", value=(order.status), badge={{\"paid\": \"success\"}}, span=\"full\") }}}}\
+             {{{{ ui.entry(label=\"Total\", value=(order.total), format=\"money\", hint=\"Tax in\", limit=5, hide_label=true) }}}}\
+             {{{{ ui.entry(label=\"Tags\", value=(order.tags), list=\"bullets\", limit_list=2, url=\"/t\", new_tab=true) }}}}\
+             {{{{ ui.entry(label=\"Empty\", value=none, placeholder=\"n/a\") }}}}\
+             {{% call ui.entry(label=\"Custom\") %}}<b>x</b>{{% endcall %}}\
+             {{% endcall %}}{{% call ui.infolist() %}}{{% endcall %}}"
+        ),
+        "<rx-infolist columns=\"2\" inline>\
+         <rx-entry label=\"Number\" :value=\"order.number\" copyable/>\
+         <rx-entry label=\"Status\" :value=\"order.status\" :badge=\"{'paid': 'success'}\" span=\"full\"/>\
+         <rx-entry label=\"Total\" :value=\"order.total\" format=\"money\" hint=\"Tax in\" limit=\"5\" hide-label/>\
+         <rx-entry label=\"Tags\" :value=\"order.tags\" list=\"bullets\" limit-list=\"2\" url=\"/t\" new-tab/>\
+         <rx-entry label=\"Empty\" :value=\"none\" placeholder=\"n/a\"/>\
+         <rx-entry label=\"Custom\"><b>x</b></rx-entry>\
+         </rx-infolist><rx-infolist></rx-infolist>",
+        serde_json::json!({"order": {"number": "A-1", "status": "paid", "total": 12345, "tags": ["a", "b", "c"]}}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_repeatable_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{% call(line) ui.repeatable(label=\"Items\", items=(lines), columns=3, hide_label=true) %}}\
+             {{{{ ui.entry(label=\"Name\", value=(line.name)) }}}}{{% endcall %}}\
+             {{% call(line) ui.repeatable(label=\"None\", items=[], placeholder=\"nothing\", span=\"2\") %}}x{{% endcall %}}"
+        ),
+        "<rx-repeatable label=\"Items\" :items=\"lines\" columns=\"3\" hide-label>\
+         <rx-entry label=\"Name\" :value=\"item.name\"/></rx-repeatable>\
+         <rx-repeatable label=\"None\" :items=\"[]\" placeholder=\"nothing\" span=\"2\">x</rx-repeatable>",
+        serde_json::json!({"lines": [{"name": "Bell"}, {"name": "Lock"}]}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_list_and_cards_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.list(id=\"l\", label=\"Rows\") %}}<li>a</li>{{% endcall %}}{{% call ui.list() %}}<li>b</li>{{% endcall %}}\
+             {{% call ui.card_grid() %}}\
+             {{{{ ui.media_card(href=\"/p/1\", title=(title), image=\"/i.png\", subtitle=\"$5\", note=\"Sold out\", dimmed=true, image_alt=\"Bell\") }}}}\
+             {{{{ ui.media_card(href=\"/p/2\", title=\"Plain\") }}}}\
+             {{% endcall %}}"
+        ),
+        "<rx-list id=\"l\" label=\"Rows\"><li>a</li></rx-list><rx-list><li>b</li></rx-list>\
+         <rx-card-grid>\
+         <rx-media-card href=\"/p/1\" title=\"{{ title }}\" image=\"/i.png\" subtitle=\"$5\" note=\"Sold out\" dimmed image-alt=\"Bell\"/>\
+         <rx-media-card href=\"/p/2\" title=\"Plain\"/>\
+         </rx-card-grid>",
+        serde_json::json!({"title": "Bell <b>"}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_progress_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.progress(value=(done), max=8, label=\"Steps\") }}}}\
+             {{{{ ui.progress(value=3, show_value=false) }}}}{{{{ ui.progress(value=0, max=0) }}}}"
+        ),
+        "<rx-progress :value=\"done\" max=\"8\" label=\"Steps\"/>\
+         <rx-progress value=\"3\" :show-value=\"false\"/><rx-progress value=\"0\" max=\"0\"/>",
+        serde_json::json!({"done": 2}),
+    )
+    .await;
+}
+
 #[renox::test]
 async fn rx_stats_and_stat_match_the_macros() {
     same(

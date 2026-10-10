@@ -16,8 +16,7 @@
 </head>
 <body class="rx-page">
   {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, link_button %}
-  {#- The kit's navigation bar (docs/ui.md "Navigation"): add sections with
-      {% call nav_links() %}{{ nav_link(route('…'), "…", active=route_is('….*')) }}{% endcall %} -#}
+  {#- The kit's navigation bar (docs/ui.md "Navigation"): add sections with nav_links and nav_link. -#}
   {% call navbar(app.name, href=route('home')) %}
     <span class="rx-spacer"></span>
     {% if auth.check %}

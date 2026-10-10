@@ -36,6 +36,15 @@ pub(crate) enum Module {
     /// `renox/pagination.html`.
     #[allow(dead_code)]
     Pagination,
+    /// `renox/grid.html`.
+    Grid,
+    /// A template a plugin registered a component for.
+    Custom {
+        /// The template name.
+        path: &'static str,
+        /// The name it is imported as.
+        alias: &'static str,
+    },
 }
 
 impl Module {
@@ -44,6 +53,8 @@ impl Module {
         match self {
             Module::Ui => "renox/ui.html",
             Module::Pagination => "renox/pagination.html",
+            Module::Grid => "renox/grid.html",
+            Module::Custom { path, .. } => path,
         }
     }
 
@@ -52,6 +63,8 @@ impl Module {
         match self {
             Module::Ui => "__rx_ui",
             Module::Pagination => "__rx_pagination",
+            Module::Grid => "__rx_grid",
+            Module::Custom { alias, .. } => alias,
         }
     }
 }
@@ -1259,6 +1272,217 @@ pub(crate) static BUILTIN: &[Contract] = &[
         events: &[],
         route_prop: None,
         attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-infolist",
+        doc: "Labelled values of a record, in columns.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "infolist",
+        },
+        props: &[
+            number(
+                "columns",
+                "How many columns the entries use (1 by default).",
+            ),
+            flag("inline", "Puts each label beside its value."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-entry",
+        doc: "One labelled value in an infolist.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "entry",
+        },
+        props: &[
+            text("label", true, "The label."),
+            data("value", false, "The value to show."),
+            text(
+                "format",
+                false,
+                "How to show it: date, datetime, money, number, since, bool, color, image, key_value, markdown...",
+            ),
+            data("badge", false, "A map from value to badge colour."),
+            data("labels", false, "A map from value to the text shown."),
+            text("url", false, "Makes the value a link."),
+            flag("new-tab", "Opens the link in a new tab."),
+            flag("copyable", "Adds a copy button."),
+            text("tooltip", false, "A title shown on hover."),
+            text("placeholder", false, "Shown when the value is empty."),
+            text("hint", false, "A line under the value."),
+            text("prefix", false, "Text before the value."),
+            text("suffix", false, "Text after the value."),
+            number("limit", "The most characters shown."),
+            number("words", "The most words shown."),
+            choice(
+                "list",
+                &["comma", "lines", "bullets"],
+                "How a list value is laid out.",
+            ),
+            number("limit-list", "The most items shown of a list."),
+            number("decimals", "Decimals of a number or money value."),
+            text("currency", false, "The currency code of a money value."),
+            number("divide-by", "Divides a money value by this."),
+            text("date-format", false, "A strftime format for dates."),
+            number("image-size", "The size of an image value, in pixels."),
+            flag("circular", "Rounds an image value."),
+            text("span", false, "How many columns it takes, or full."),
+            flag("inline", "Puts the label beside the value."),
+            flag("hide-label", "Hides the label from sight."),
+            text("id", false, "The element's id."),
+            data("prefix-actions", false, "Actions before the value."),
+            data("suffix-actions", false, "Actions after the value."),
+        ],
+        slots: &[Slot {
+            optional: true,
+            doc: "Content shown instead of the value.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-repeatable",
+        doc: "A list of records inside a record, each shown as a small infolist.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "repeatable",
+        },
+        props: &[
+            text("label", true, "The label."),
+            data("items", true, "The records to show."),
+            number("columns", "How many columns each record uses."),
+            text("placeholder", false, "Shown when there are no items."),
+            text("span", false, "How many columns it takes, or full."),
+            flag("hide-label", "Hides the label from sight."),
+        ],
+        slots: &[Slot {
+            name: "",
+            into: None,
+            args: &["item"],
+            optional: false,
+            doc: "One record's entries; `item` is its data.",
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-list",
+        doc: "A list of rows in a surface; write each row as an `li`.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "list",
+        },
+        props: &[
+            text("id", false, "The list's id."),
+            text("label", false, "The list's accessible name."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-card-grid",
+        doc: "Cards in a grid that fills the row.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "card_grid",
+        },
+        props: &[],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-media-card",
+        doc: "A card that is one link: a picture, a title and notes.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "media_card",
+        },
+        props: &[
+            text("href", true, "Where the card links."),
+            text("title", true, "The card's title."),
+            text("image", false, "The picture's URL."),
+            text(
+                "subtitle",
+                false,
+                "A line under the title, such as a price.",
+            ),
+            text("note", false, "A note, such as Sold out."),
+            flag("dimmed", "Greys the picture out."),
+            text("image-alt", false, "The picture's alt text."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-progress",
+        doc: "A bar showing how far along something is.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "progress",
+        },
+        props: &[
+            Prop {
+                name: "value",
+                kind: Kind::Number,
+                required: true,
+                values: &[],
+                doc: "How far along it is.",
+            },
+            number("max", "The value that means done (100 by default)."),
+            text("label", false, "The bar's accessible name."),
+            flag(
+                "show-value",
+                "Whether the percentage shows; `:show-value=\"false\"` hides it.",
+            ),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-grid",
+        doc: "The data grid of a `renox::grid` page; the content draws the `custom` columns.",
+        render: Render::Macro {
+            module: Module::Grid,
+            name: "grid",
+        },
+        props: &[
+            data("page", true, "The `GridPage` the handler built."),
+            data("tools", false, "Extra content for the grid's toolbar."),
+        ],
+        slots: &[Slot {
+            name: "",
+            into: None,
+            args: &["row", "column"],
+            optional: true,
+            doc: "Draws a `custom` column: it receives the row and the column.",
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: true,
         parent: None,
     },
     Contract {

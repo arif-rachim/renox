@@ -8,13 +8,17 @@ mod app;
 #[allow(dead_code)]
 mod attrs;
 mod contracts;
+#[allow(dead_code)]
+mod custom_data;
 mod emit;
+mod plugin;
 mod scan;
 mod special;
 pub(crate) mod suggest;
 mod tree;
 
 pub(crate) use contracts::{BUILTIN, Contract};
+pub use plugin::{Component, Prop};
 
 /// A mistake found while compiling a template, with the line it is on (1-based).
 #[derive(Debug, Clone, PartialEq, Eq)]

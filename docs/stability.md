@@ -167,7 +167,7 @@ field for you.
 - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
 - `auth::Can<T>` (use `Can::new`), `schedule::UpcomingRun`, `maintenance::DownOptions` (use
   `DownOptions::new()` or `Default`)
-- `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
+- `view::Component`, `view::Prop`, `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
 - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`,
   `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
   `rate_limit::LimitRequest`, `SentNotification`, `SentBroadcast`, `db::InvalidUlid`, `grid::Grid`,
