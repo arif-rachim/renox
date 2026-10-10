@@ -15,6 +15,7 @@ mod paginate;
 mod query;
 mod query_log;
 pub mod relations;
+pub mod schema;
 pub mod search;
 mod value;
 
@@ -42,6 +43,7 @@ pub use model::{Model, ModelHooks};
 pub use paginate::{CursorPage, Page, Paginated, SimplePage};
 pub use query::{Number, Query};
 pub use query_log::capture_queries;
+pub use schema::{ColumnKind, ColumnType, ModelColumn};
 /// sqlx, for what Renox's own API doesn't cover: `Db::sqlite()`, `Db::postgres()`,
 /// `Row::sqlite()`, `Row::postgres()` and `DbError::sqlx()` hand out its types.
 /// sqlx may move to a new version in a minor Renox release; see docs/stability.md.
