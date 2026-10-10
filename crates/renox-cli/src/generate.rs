@@ -361,6 +361,10 @@ pub struct {pascal} {{
         ),
     )?;
     add_mod(&dir.join("mod.rs"), &file)?;
+    register_in_module(
+        &dir.join("mod.rs"),
+        &format!("app.model::<{file}::{pascal}>();"),
+    )?;
     if migration {
         crate::make::migration_keyed(
             &format!("create_{table}_table"),
@@ -834,6 +838,11 @@ mod tests {
         let dir = app();
         module(dir.path(), "product").unwrap();
         model(dir.path(), "Product", None, true, crate::KeyType::Integer).unwrap();
+        let module_file = read(&dir, "src/app/product/mod.rs");
+        assert!(
+            module_file.contains("app.model::<model::Product>();"),
+            "{module_file}"
+        );
         let code = read(&dir, "src/app/product/model.rs");
         // Plural tables, as `--resource` and the docs have them (#127).
         assert!(

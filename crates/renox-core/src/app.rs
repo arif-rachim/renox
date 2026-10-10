@@ -356,6 +356,12 @@ impl App {
         self
     }
 
+    /// Registers the live component `C` (see `renox::live_component`).
+    pub fn live_component<C: crate::live_component::LiveComponent>(mut self) -> Self {
+        self.registry.live_component::<C>();
+        self
+    }
+
     /// Lets queue workers run jobs of type `J`.
     pub fn job<J: Job>(mut self) -> Self {
         self.registry.job::<J>();
@@ -560,6 +566,8 @@ impl App {
             schedule,
             duplicate_job,
             webhooks,
+            live_components,
+            duplicate_live,
             commands,
             templates,
             shares,
@@ -581,6 +589,9 @@ impl App {
         let static_assets: Arc<[crate::registry::StaticAsset]> = static_assets.into();
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
+        }
+        if let Some(name) = duplicate_live {
+            return Err(anyhow!("live component `{name}` is registered twice").into());
         }
         if duplicate_second_factor {
             return Err(
@@ -784,6 +795,7 @@ impl App {
         let state = AppState::new(crate::state::AppStateInner {
             security,
             webhooks: Arc::new(webhooks),
+            live_components: Arc::new(live_components),
             mailer,
             mailers: Arc::new(mailers),
             queue: Queue::new(db.clone(), key.clone()),

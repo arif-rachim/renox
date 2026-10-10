@@ -95,6 +95,7 @@ mod icons;
 pub mod import;
 mod inspector;
 mod live;
+pub mod live_component;
 pub mod mail;
 pub mod maintenance;
 mod method;

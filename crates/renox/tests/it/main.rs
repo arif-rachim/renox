@@ -38,6 +38,7 @@ mod infolist;
 mod infra;
 mod jobs;
 mod leftovers;
+mod live_components;
 mod logs;
 mod mail;
 mod method;

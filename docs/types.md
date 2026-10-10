@@ -223,6 +223,31 @@ Use `#[model(table = "products", soft_deletes)]` with a `deleted_at: Option<Date
 - `restore` clears `deleted_at`;
 - `force_delete` really removes the row.
 
+### Typed columns
+
+`#[derive(Model)]` makes a constant for every field, named in SHOUTY_SNAKE_CASE. Use them in
+queries instead of strings: a misspelt column or a value of the wrong type no longer compiles.
+`#[model(no_typed_columns)]` turns them off.
+
+```rust
+# use renox::prelude::*;
+#[derive(Model, Default)]
+struct Product {
+    id: i64,
+    name: String,
+    price: i64,
+}
+
+# async fn demo(db: &Db) -> Result {
+let cheap = Product::query()
+    .where_(Product::PRICE.lt(20_000))
+    .order_by(Product::NAME)
+    .get(db)
+    .await?;
+# Ok(())
+# }
+```
+
 ### PostgreSQL
 
 > [!WARNING]

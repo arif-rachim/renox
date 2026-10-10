@@ -207,3 +207,43 @@ mod db_check {
         assert!(text.contains("4 problems"), "{text}");
     }
 }
+
+// `index(user_id)` twice in one list is what clippy flags; the columns differ.
+#[allow(clippy::duplicated_attributes)]
+#[derive(Model, Debug, Clone, Default)]
+#[model(
+    table = "posts",
+    index(user_id),
+    unique(slug),
+    index(user_id, created_at)
+)]
+struct Post {
+    id: i64,
+    #[model(references = "users")]
+    user_id: i64,
+    slug: String,
+    #[model(default = "0")]
+    views: i64,
+    created_at: DateTime,
+}
+
+#[test]
+fn indexes_defaults_and_references_round_trip() {
+    let indexes = Post::indexes();
+    let got: Vec<_> = indexes.iter().map(|i| (i.columns, i.unique)).collect();
+    assert_eq!(
+        got,
+        [
+            (&["user_id"][..], false),
+            (&["slug"][..], true),
+            (&["user_id", "created_at"][..], false),
+        ]
+    );
+    let columns = Post::column_info();
+    let col = |n: &str| columns.iter().find(|c| c.name == n).unwrap().clone();
+    assert_eq!(col("user_id").references, Some("users"));
+    assert_eq!(col("user_id").default, None);
+    assert_eq!(col("views").default, Some("0"));
+    assert_eq!(col("views").references, None);
+    assert!(Gadget::indexes().is_empty());
+}
