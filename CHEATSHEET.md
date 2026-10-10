@@ -25,6 +25,7 @@ rnx make:module products --resource --fields "name:string price:money notes:text
                                      # runs migrate (asks outside APP_ENV=local; --no-migrate), prints the URL; --open opens it
 rnx make:model Product --module products --migration   # --key ulid|uuid|string for other ids
 rnx make:migration add_sku_to_products
+rnx make:migration --auto add_sku     # SQL from what changed in the models (db:diff); --yes skips questions
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products
 rnx make:command products:import --module products  # typed (clap); `rnx products:import --help`
@@ -705,6 +706,9 @@ struct Product {
     deleted_at: Option<DateTime>,
 }
 
+/// Optional schema hints for `rnx make:migration --auto`: `index(a, b)` / `unique(slug)` on the
+/// struct (repeatable), `default = "0"` and `references = "users"` on a field. Use them as
+/// `#[model(table = "products", index(user_id))]` and `#[model(default = "0")] price: i64`.
 /// In a test, `TestApp::new(app).await.assert_views_compile()` (or `rnx view:check`) compiles
 /// every template and checks its `route('name')` calls.
 /// Register the model so `rnx db:check` (and `assert_models_match_schema` in tests)
