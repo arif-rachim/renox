@@ -3,7 +3,7 @@
 //! a `{# … #}` comment, so the lines of the source stay where they were (Decision 8 of #372).
 
 use super::attrs::{self, Kind};
-use super::contracts::{Contract, Module, Render};
+use super::contracts::{Contract, Module, Render, Slot};
 use super::scan::Attr;
 use super::tree::{self, Node};
 use super::{Catalog, CompileError, suggest};
@@ -24,7 +24,11 @@ fn bare(name: &str) -> &str {
 }
 
 /// Checks the attributes against the contract.
-pub(super) fn check_attrs(contract: &Contract, attrs: &[Attr<'_>]) -> Result<(), String> {
+pub(super) fn check_attrs(
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    filled: &[&str],
+) -> Result<(), String> {
     let tag = contract.tag;
     for a in attrs {
         let n = bare(a.name);
@@ -46,7 +50,7 @@ pub(super) fn check_attrs(contract: &Contract, attrs: &[Attr<'_>]) -> Result<(),
         return Err(format!("<{tag}> has no attribute \"{n}\"{hint} {takes}"));
     }
     for p in contract.props.iter().filter(|p| p.required) {
-        if !attrs.iter().any(|a| bare(a.name) == p.name) {
+        if !attrs.iter().any(|a| bare(a.name) == p.name) && !filled.contains(&p.name) {
             return Err(format!("<{tag}> needs the attribute \"{}\"", p.name));
         }
     }
@@ -65,7 +69,8 @@ pub(crate) fn emit(
 ) -> Result<String, CompileError> {
     let mut out = String::with_capacity(src.len());
     let mut used = BTreeSet::new();
-    emit_into(src, nodes, catalog, None, &mut used, &mut out)?;
+    let mut counter = 0;
+    emit_into(src, nodes, catalog, None, &mut used, &mut counter, &mut out)?;
     if used.is_empty() {
         return Ok(out);
     }
@@ -85,6 +90,7 @@ fn emit_into(
     catalog: &Catalog,
     parent: Option<&str>,
     used: &mut BTreeSet<Module>,
+    counter: &mut usize,
     out: &mut String,
 ) -> Result<(), CompileError> {
     for node in nodes {
@@ -101,7 +107,7 @@ fn emit_into(
                 if !tree::is_component(name) {
                     // Control-flow elements come in a later step: copied as they are.
                     out.push_str(&src[open.clone()]);
-                    emit_into(src, children, catalog, parent, used, out)?;
+                    emit_into(src, children, catalog, parent, used, counter, out)?;
                     if let Some(c) = close {
                         out.push_str(&src[c.clone()]);
                     }
@@ -118,14 +124,26 @@ fn emit_into(
                 {
                     return Err(err(*line, format!("<{name}> belongs inside <{p}>")));
                 }
-                check_attrs(contract, attrs).map_err(|m| err(*line, m))?;
-                if contract.slots.is_empty() && has_content(src, children) {
+                let parts = split_slots(src, contract, children, *line)?;
+                let filled: Vec<&str> = parts.iter().filter_map(|(slot, _)| slot.into).collect();
+                for (slot, _) in &parts {
+                    if let Some(p) = slot.into
+                        && attrs.iter().any(|a| bare(a.name) == p)
+                    {
+                        return Err(err(
+                            *line,
+                            format!("<{name}> give \"{p}\" or content, not both"),
+                        ));
+                    }
+                }
+                check_attrs(contract, attrs, &filled).map_err(|m| err(*line, m))?;
+                if parts.is_empty() && has_content(src, children) {
                     return Err(err(*line, format!("<{name}> takes no content")));
                 }
                 match contract.render {
                     Render::Element { tag, class } => {
                         element(src, contract, tag, class, attrs, open, *line, out)?;
-                        emit_into(src, children, catalog, Some(name), used, out)?;
+                        emit_into(src, children, catalog, Some(name), used, counter, out)?;
                         out.push_str(&format!("</{tag}>"));
                         if let Some(c) = close {
                             out.push_str(&pad(&src[c.clone()]));
@@ -145,21 +163,47 @@ fn emit_into(
                                 .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
                             args.push(format!("{}={e}", attrs::snake(n)));
                         }
+                        let mut pre = String::new();
+                        let mut caller: Option<(&Slot, &[Node<'_>])> = None;
+                        let mut consumed_default = false;
+                        for (slot, nodes) in &parts {
+                            if slot.name.is_empty() && slot.into.is_none() {
+                                caller = Some((slot, nodes));
+                                continue;
+                            }
+                            *counter += 1;
+                            let n = *counter;
+                            let mut body = String::new();
+                            if slot.name.is_empty() {
+                                consumed_default = true;
+                            }
+                            emit_into(src, nodes, catalog, Some(name), used, counter, &mut body)?;
+                            pre.push_str(&format!("{{% set __rx_slot_{n} %}}{body}{{% endset %}}"));
+                            let target = slot.into.unwrap_or(slot.name);
+                            args.push(format!("{}=__rx_slot_{n}", attrs::snake(target)));
+                        }
+                        out.push_str(&pre);
                         let call = format!("{}.{mac}({})", module.alias(), args.join(", "));
-                        let optional = contract.slots.first().is_some_and(|s| s.optional);
-                        let slotted =
-                            !contract.slots.is_empty() && (!optional || has_content(src, children));
-                        if slotted {
-                            out.push_str(&format!("{{% call {call} %}}"));
+                        let caller = caller
+                            .filter(|(slot, nodes)| !slot.optional || has_content(src, nodes));
+                        if let Some((slot, nodes)) = caller {
+                            let params = slot.args.join(", ");
+                            if slot.args.is_empty() {
+                                out.push_str(&format!("{{% call {call} %}}"));
+                            } else {
+                                out.push_str(&format!("{{% call({params}) {call} %}}"));
+                            }
                             out.push_str(&pad(&src[open.clone()]));
-                            emit_into(src, children, catalog, Some(name), used, out)?;
+                            emit_into(src, nodes, catalog, Some(name), used, counter, out)?;
                             out.push_str("{% endcall %}");
                         } else {
                             out.push_str(&format!("{{{{ {call} }}}}"));
                             out.push_str(&pad(&src[open.clone()]));
-                            for c in children {
-                                if let Node::Text(span) = c {
-                                    out.push_str(&pad(&src[span.clone()]));
+                            if !consumed_default {
+                                for c in children {
+                                    if let Node::Text(span) = c {
+                                        out.push_str(&pad(&src[span.clone()]));
+                                    }
                                 }
                             }
                         }
@@ -249,4 +293,67 @@ fn element(
     out.push('>');
     out.push_str(&pad(&src[open.clone()]));
     Ok(())
+}
+
+/// The content for each slot: `<rx-slot name="x">` children for named slots, the rest for the
+/// default slot. Slots without content are left out.
+fn split_slots<'c, 'a>(
+    src: &str,
+    contract: &'c Contract,
+    children: &[Node<'a>],
+    line: usize,
+) -> Result<Vec<(&'c Slot, Vec<Node<'a>>)>, CompileError> {
+    let mut parts: Vec<(&Slot, Vec<Node<'a>>)> = Vec::new();
+    let mut rest: Vec<Node<'a>> = Vec::new();
+    for child in children {
+        let Node::Element {
+            name,
+            attrs,
+            children: inner,
+            open,
+            close,
+            line: at,
+        } = child
+        else {
+            rest.push(child.clone());
+            continue;
+        };
+        if name != "rx-slot" {
+            rest.push(child.clone());
+            continue;
+        }
+        let want = attrs
+            .iter()
+            .find(|a| a.name == "name")
+            .and_then(|a| a.value)
+            .unwrap_or("");
+        let tag = contract.tag;
+        let named: Vec<&str> = contract
+            .slots
+            .iter()
+            .map(|s| s.name)
+            .filter(|n| !n.is_empty())
+            .collect();
+        if want.is_empty() {
+            return Err(err(*at, "<rx-slot> needs a name here".to_owned()));
+        }
+        let Some(slot) = contract.slots.iter().find(|s| s.name == want) else {
+            let hint = suggest::did_you_mean(want, named.iter().copied())
+                .map(|y| format!("; did you mean \"{y}\"?"))
+                .unwrap_or_else(|| ".".to_owned());
+            return Err(err(*at, format!("<{tag}> has no slot \"{want}\"{hint}")));
+        };
+        let mut body: Vec<Node<'a>> = Vec::new();
+        let _ = (open, close);
+        body.extend(inner.iter().cloned());
+        parts.push((slot, body));
+    }
+    if let Some(slot) = contract.slots.iter().find(|s| s.name.is_empty()) {
+        if has_content(src, &rest) || (slot.into.is_none() && !slot.optional) {
+            parts.push((slot, rest));
+        }
+    } else if has_content(src, &rest) {
+        return Err(err(line, format!("<{}> takes no content", contract.tag)));
+    }
+    Ok(parts)
 }

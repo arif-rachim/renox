@@ -142,6 +142,16 @@ async fn rx_badge_matches_the_macro() {
 }
 
 #[renox::test]
+async fn rx_badge_content_matches_the_prop() {
+    same(
+        &format!("{UI}{{{{ ui.badge(text=\"New\") }}}}"),
+        "<rx-badge>New</rx-badge>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
 async fn rx_page_header_matches_the_macro_with_and_without_actions() {
     same(
         &format!(

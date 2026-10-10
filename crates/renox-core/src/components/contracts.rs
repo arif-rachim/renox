@@ -251,10 +251,14 @@ pub(crate) static BUILTIN: &[Contract] = &[
             name: "badge",
         },
         props: &[
-            text("text", true, "The label."),
+            text("text", true, "The label; or give it as content."),
             kind_prop("kind", "The colour."),
         ],
-        slots: &[],
+        slots: &[Slot {
+            into: Some("text"),
+            doc: "The label.",
+            ..DEFAULT_SLOT
+        }],
         events: &[],
         route_prop: None,
         attrs: false,

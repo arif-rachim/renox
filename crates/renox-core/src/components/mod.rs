@@ -161,6 +161,76 @@ mod tests {
     }
 
     #[test]
+    fn slots_fill_props_and_pass_arguments() {
+        use contracts::{Module, Render, Slot};
+        static T: &[Contract] = &[Contract {
+            tag: "rx-t",
+            doc: "t",
+            render: Render::Macro {
+                module: Module::Ui,
+                name: "t",
+            },
+            props: &[],
+            slots: &[
+                Slot {
+                    name: "",
+                    into: None,
+                    args: &["row", "prefix"],
+                    optional: false,
+                    doc: "x",
+                },
+                Slot {
+                    name: "footer",
+                    into: None,
+                    args: &[],
+                    optional: true,
+                    doc: "x",
+                },
+            ],
+            events: &[],
+            route_prop: None,
+            attrs: false,
+            parent: None,
+        }];
+        let all: Vec<Contract> = BUILTIN.iter().chain(T).copied().collect();
+        let c = Catalog {
+            contracts: &all,
+            lookup: &|_| None,
+        };
+        let imp = "{% import \"renox/ui.html\" as __rx_ui %}";
+        let ok = |s: &str| compile("a.html", s, &c).unwrap();
+        let msg = |s: &str| compile("a.html", s, &c).unwrap_err().message;
+        assert_eq!(
+            ok("<rx-badge kind=\"info\">New {{ n }}</rx-badge>"),
+            format!(
+                "{imp}{{% set __rx_slot_1 %}}New {{{{ n }}}}{{% endset %}}{{{{ __rx_ui.badge(kind=\"info\", text=__rx_slot_1) }}}}"
+            )
+        );
+        assert_eq!(
+            ok("<rx-t>{{ row }}<rx-slot name=\"footer\">F</rx-slot></rx-t>"),
+            format!(
+                "{imp}{{% set __rx_slot_1 %}}F{{% endset %}}{{% call(row, prefix) __rx_ui.t(footer=__rx_slot_1) %}}{{{{ row }}}}{{% endcall %}}"
+            )
+        );
+        assert_eq!(
+            msg("<rx-t><rx-slot name=\"fotter\">F</rx-slot></rx-t>"),
+            "<rx-t> has no slot \"fotter\"; did you mean \"footer\"?"
+        );
+        assert_eq!(
+            msg("<rx-badge text=\"a\">b</rx-badge>"),
+            "<rx-badge> give \"text\" or content, not both"
+        );
+        assert_eq!(
+            msg("<rx-badge><rx-slot>b</rx-slot></rx-badge>"),
+            "<rx-slot> needs a name here"
+        );
+        assert_eq!(
+            msg("<rx-badge/>"),
+            "<rx-badge> needs the attribute \"text\""
+        );
+    }
+
+    #[test]
     fn typos_get_a_suggestion() {
         let e = compile("a.html", "<rx-stak></rx-stak>", &builtin()).unwrap_err();
         assert_eq!(
