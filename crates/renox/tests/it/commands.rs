@@ -628,3 +628,27 @@ async fn app_layers_wrap_domain_routes() {
         .await
         .assert_see("admin 404");
 }
+
+#[renox::test]
+async fn view_check_passes_clean_views_and_fails_broken_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let views = dir.path().join("views");
+    std::fs::create_dir_all(&views).unwrap();
+    std::fs::write(views.join("ok.html"), "<p>{{ 1 + 1 }}</p>").unwrap();
+    let make = || {
+        let mut config = config(dir.path());
+        config.views_path = views.clone();
+        App::with_config(config)
+    };
+    make().run_args(["view:check"]).await.unwrap();
+
+    std::fs::write(views.join("broken.html"), "{% if %}").unwrap();
+    assert!(make().run_args(["view:check"]).await.is_err());
+
+    // An app command of the same name runs in place of the built-in one.
+    make()
+        .command("view:check", "Mine", |_args, _state| async move { Ok(()) })
+        .run_args(["view:check"])
+        .await
+        .unwrap();
+}

@@ -62,6 +62,7 @@ Commands:
   schedule:run <task>       Run one scheduled task now
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   route:list                List every route with its name, module and guards
+  view:check                Compile every template and check its route names
   db:shell                  Run SQL against the database (`.tables`, `.quit`)
   down [--secret S] [--retry N]
                             Maintenance mode: answer 503 (visit /S to bypass it)
@@ -978,6 +979,17 @@ impl App {
             }
             "db:check" if !kernel.commands.iter().any(|c| c.name == "db:check") => {
                 kernel.db_check().await?
+            }
+            "view:check" if !kernel.commands.iter().any(|c| c.name == "view:check") => {
+                let problems = kernel.state.views.check(&kernel.state.routes);
+                for problem in &problems {
+                    println!("{problem}");
+                }
+                let checked = kernel.state.views.names().len();
+                println!("Checked {checked} templates: {} problems.", problems.len());
+                if !problems.is_empty() {
+                    return Err(anyhow!("{} template problem(s)", problems.len()).into());
+                }
             }
             "migrate:status" => {
                 for m in kernel.migration_status().await? {
