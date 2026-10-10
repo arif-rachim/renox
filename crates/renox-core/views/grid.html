@@ -173,12 +173,13 @@
 </li>
 {%- endmacro -%}
 
-{% macro grid(page, tools=none) -%}
+{% macro grid(page, tools=none, attrs={}) -%}
+{%- from "renox/ui.html" import _root_attrs -%}
 {{ renox_grid() }}
 {%- set id = "grid-" ~ page.id -%}
 {%- set shown = page.columns | length -%}
-<form class="{{ class_names('rx-grid', {'rx-grid--cards': page.cards}) }}" id="{{ id }}"{% if page.advanced.on %} data-grid-rule-columns='{{ page.advanced.columns | tojson }}'{% endif %} data-rx-grid="{{ page.config }}" method="get" action="{{ page.path }}"
-      hx-get="{{ page.path }}" hx-target="this" hx-select="#{{ id }}" hx-swap="outerHTML" hx-push-url="true">
+<form class="{{ class_names('rx-grid', {'rx-grid--cards': page.cards}) }}{% if attrs.class %} {{ attrs.class }}{% endif %}" id="{{ id }}"{% if page.advanced.on %} data-grid-rule-columns='{{ page.advanced.columns | tojson }}'{% endif %} data-rx-grid="{{ page.config }}" method="get" action="{{ page.path }}"
+      hx-get="{{ page.path }}" hx-target="this" hx-select="#{{ id }}" hx-swap="outerHTML" hx-push-url="true" data-rx-component="grid"{{ _root_attrs(attrs) }}>
   {#- The page's other query string values stay in the grid's links. -#}
   {%- for name, value in page.keep %}<input type="hidden" name="{{ name }}" value="{{ value }}" data-grid-keep>{% endfor %}
   <input type="hidden" name="{{ page.p }}sort" value="{{ page.sort or '' }}" data-grid-state="sort">

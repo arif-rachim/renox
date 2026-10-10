@@ -248,7 +248,12 @@ pub(crate) fn crate_name(root: &Path) -> Result<String> {
 }
 
 /// `rnx make:module products --resource [--model Product] [--fields …]`.
-pub fn resource(root: &Path, name: &str, model: Option<&str>, fields: Option<&str>) -> Result<()> {
+pub fn resource(
+    root: &Path,
+    name: &str,
+    model: Option<&str>,
+    fields: Option<&str>,
+) -> Result<String> {
     check_name(name)?;
     let module = name.to_snake_case();
     let module_type = name.to_upper_camel_case();
@@ -499,10 +504,7 @@ pub fn resource(root: &Path, name: &str, model: Option<&str>, fields: Option<&st
         }),
         &format!("app::{module}::{module_type}"),
     )?;
-    println!(
-        "Next: `rnx migrate`, then open /{path}. The layout needs {{{{ renox_ui() }}}} in <head> and {{{{ toasts() }}}} in <body> (apps from `rnx new` have them)."
-    );
-    Ok(())
+    Ok(path)
 }
 
 const MODEL: &str = r#"use renox::fake::Fake;
