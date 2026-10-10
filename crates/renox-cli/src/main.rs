@@ -9,7 +9,7 @@ mod scaffold;
 mod serve;
 mod tailwind;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use base64::Engine;
@@ -327,6 +327,14 @@ fn run(command: Command) -> Result<()> {
 /// Runs a command built into the app binary (`cargo run -- <command>`), since
 /// migrations and seeders are compiled into the app.
 fn app_command(command: &str, args: &[String]) -> Result<()> {
+    if !app_command_status(command, args)? {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+/// Runs a command built into the app binary and says whether it succeeded.
+pub(crate) fn app_command_status(command: &str, args: &[String]) -> Result<bool> {
     if !std::path::Path::new("Cargo.toml").is_file() {
         anyhow::bail!("no Cargo.toml here; run `rnx {command}` from your app's directory");
     }
@@ -335,10 +343,38 @@ fn app_command(command: &str, args: &[String]) -> Result<()> {
         .args(args)
         .status()
         .context("could not run cargo")?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
+    Ok(status.success())
+}
+
+/// A setting as the app sees it: `var(name)` when not empty, else the
+/// `name=` line of the `.env` text.
+pub(crate) fn setting_with(
+    var: impl Fn(&str) -> Option<String>,
+    env_file: Option<&str>,
+    name: &str,
+) -> Option<String> {
+    if let Some(value) = var(name).filter(|v| !v.is_empty()) {
+        return Some(value);
     }
-    Ok(())
+    let prefix = format!("{name}=");
+    env_file?
+        .lines()
+        .find_map(|line| {
+            let line = line.trim();
+            let line = line.strip_prefix("export ").unwrap_or(line).trim_start();
+            line.strip_prefix(prefix.as_str())
+        })
+        .map(|v| v.trim().trim_matches(['"', '\'']).to_owned())
+        .filter(|v| !v.is_empty())
+}
+
+/// A setting of the app in `dir`: the environment, then its `.env`.
+pub(crate) fn setting_in(dir: &Path, name: &str) -> Option<String> {
+    setting_with(
+        |n| std::env::var(n).ok(),
+        std::fs::read_to_string(dir.join(".env")).ok().as_deref(),
+        name,
+    )
 }
 
 /// The current directory, if it looks like a Renox app.
@@ -387,14 +423,11 @@ impl Database {
     /// The app's engine, from `DATABASE_URL` in the environment or in `.env`
     /// in the current directory; SQLite when neither says otherwise.
     pub(crate) fn of_current_app() -> Self {
-        let url = std::env::var("DATABASE_URL").ok().or_else(|| {
-            std::fs::read_to_string(".env").ok().and_then(|env| {
-                env.lines()
-                    .find_map(|line| line.trim().strip_prefix("DATABASE_URL="))
-                    .map(|url| url.trim().trim_matches('"').to_owned())
-            })
-        });
-        Self::of_url(url.as_deref().unwrap_or_default())
+        Self::of_url(
+            setting_in(Path::new("."), "DATABASE_URL")
+                .as_deref()
+                .unwrap_or_default(),
+        )
     }
 
     pub(crate) fn of_url(url: &str) -> Self {
@@ -481,6 +514,28 @@ fn with_key(env: &str, key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn settings_come_from_the_environment_then_env() {
+        let env = |v: &'static str| move |n: &str| (n == "A").then(|| v.to_owned());
+        let file = "B=1\nexport A=\"x y\"\nA_OLD=no\nC=''\nD='q'\n";
+        assert_eq!(
+            setting_with(env("e"), Some(file), "A").as_deref(),
+            Some("e")
+        );
+        assert_eq!(
+            setting_with(env(""), Some(file), "A").as_deref(),
+            Some("x y")
+        );
+        assert_eq!(
+            setting_with(|_| None, Some(file), "D").as_deref(),
+            Some("q")
+        );
+        assert_eq!(setting_with(|_| None, Some(file), "C"), None);
+        assert_eq!(setting_with(|_| None, Some(file), "Z"), None);
+        assert_eq!(setting_with(|_| None, None, "A"), None);
+        assert_eq!(setting_with(|_| None, Some("A_OLD=no\n"), "A"), None);
+    }
+
     use super::*;
 
     fn parse(args: &[&str]) -> Command {
