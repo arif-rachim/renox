@@ -190,6 +190,9 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   policies, the `Permissions` module, roles per branch (a role in one store, with dates),
   `gate_before`, token abilities, tenants with default scopes and `renox::context`, password
   confirmation, the audit log), mapped to Laravel's.
+- [docs/live.md](docs/live.md): live components (`LiveComponent`, `#[renox::live_component]`,
+  `rx-click`/`rx-submit`/`rx-model`, the signed snapshot, `TestApp::live`); example: the bike
+  shop's `/about/htmx/live` ([live.rs](examples/bikeshop/src/app/about/live.rs)).
 - [docs/testing.md](docs/testing.md): `TestApp` requests and assertions (JSON paths, views,
   session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
   counting queries, a browser-test recipe.

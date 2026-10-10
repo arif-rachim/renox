@@ -402,7 +402,11 @@ fn htmx_live_page() -> Explanation {
                      runs the method, renders the view again and answers its HTML, which \
                      the browser morphs in. The checklist is the visitor's session list \
                      (`Checklist::of`), the same store as `/about/htmx`.",
-        docs: &["docs/ui.md#htmx-response-headers"],
+        docs: &[
+            "docs/live.md#the-attribute-macro",
+            "docs/live.md#the-snapshot-and-its-security",
+            "docs/ui.md#htmx-response-headers",
+        ],
         sources: &[
             "examples/bikeshop/src/app/about/live.rs",
             "examples/bikeshop/resources/views/about/live.html",

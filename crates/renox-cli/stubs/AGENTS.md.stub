@@ -85,6 +85,9 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `<rx-wizard id=…>` takes its steps from `<rx-wizard-step key=… title=…>` children.
   `<rx-chart kind=…>` calls the `chart(...)` function; `<rx-grid :page=…>` has `row` and `column` in its content.
   Plugin templates are compiled when added with `renox::view::add_template`; a plugin's tags come from `Registry::component`.
+- Live components (`#[renox::live_component]`, `rx-click`/`rx-model`, docs/live.md): action names
+  starting with `_` are reserved (`_refresh` is built in), and the state is signed, not
+  encrypted, so keep secrets out of the component's fields. Check the policy in each action.
 - Route parameters are `{id}` (axum 0.8), not `:id`: `.get("/products/{id}", show)`.
 - `.require_auth()` guards only the routes added before it in that `Routes`; so do
   `.require_gate`, `.require_role`, `.require_permission`, `.require_ability` and

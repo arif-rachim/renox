@@ -39,6 +39,7 @@ full reload.
   page.
 - [htmx response headers](#htmx-response-headers): telling htmx what to do next.
 - Data grids (see [docs/grid.md](grid.md)).
+- Live components, for a part of a page with state: see [live.md](live.md).
 - [Live validation](#live-validation): checking a form while people fill it in.
 - [Stacks](#stacks) (`push` / `stack`): adding scripts and styles to the layout from a page.
 - [Tailwind CSS](#tailwind-css).

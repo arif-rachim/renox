@@ -1997,6 +1997,16 @@ Notes:
   editor data and plugins can read them; errors carry `file:line` with a "did you mean"; generated
   code never adds a newline, so runtime errors keep their line; plugin templates (`add_template`)
   are not compiled yet (#376); `rx-else-if` and route arguments are left out on purpose.
+- **Live components** (#386, 2026-10, reverses "not planned" for Livewire; Inertia stays out):
+  `renox::live_component` (`LiveComponent` trait, `#[renox::live_component]` on the impl block
+  because a derive cannot see the methods, `LiveContext`), `POST /_renox/live/{component}/{action}`
+  merged next to the grid's router (session, auth, CSRF, view and maintenance layers; no
+  `App::layer` layers or throttle in v1). The state travels in a signed, not encrypted, snapshot
+  (HMAC-SHA256 keyed from `APP_KEY`, `LIVE_SNAPSHOT_MAX_SIZE`, 64 KB), so secrets stay out of
+  fields. The browser side is one classic script (`renox-live.js`) over htmx plus idiomorph 0.7.3
+  (vendored), so CSRF, toasts and `HX-*` headers work unchanged. Names starting with `_` are
+  reserved (`_refresh` is built in). Left out of v1: nested components, files, `rx-click`
+  modifiers; the `<live-…>` tag follows #372. Guide: docs/live.md.
 
 ## Not planned
 
@@ -2009,6 +2019,8 @@ Kept out on purpose, so the framework stays small; some are good candidates for 
 - Redis (queue, cache, sessions): the app's database covers them; `CACHE_STORE=database` for
   several servers.
 - WebSockets and broadcasting.
+- Inertia-style SPAs (a JSON API covers them). Livewire-style live components were here and
+  are done: see the Decisions.
 - OAuth/social login and two-factor authentication (plugin candidates).
 - A Node/Vite build pipeline: htmx and Alpine are bundled, and Tailwind runs through its
   standalone CLI (`rnx new --tailwind`, `rnx tailwind`, M21e). Other front-end tooling is the

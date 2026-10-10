@@ -115,6 +115,11 @@ pub struct MailGuide;
 #[doc = include_str!("../../../docs/scheduling.md")]
 pub struct SchedulingGuide;
 
+/// Compiles the Rust in docs/live.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/live.md")]
+pub struct LiveGuide;
+
 /// Compiles the Rust in docs/testing.md as a doctest.
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/testing.md")]

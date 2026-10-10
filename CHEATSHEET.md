@@ -1652,6 +1652,46 @@ handler. HTMX requests send the CSRF token by
 themselves. Errors of list items (`photos.1`, `tags.0`) show at the list's input and its
 `data-error-for="photos"` slot, and `{{ error('photos') }}` includes them. Boosted requests (`hx-boost`) get whole pages, so pair them with `hx-select`.
 
+## Live components (details in [docs/live.md](docs/live.md))
+
+A struct holds the state, `#[live(action)]` methods change it, and the view re-renders in place.
+`rx-click="toggle(3)"` (JSON arguments), `rx-submit="save"` and `rx-model` / `rx-model.live` /
+`rx-model.blur` call them. The state travels in a signed snapshot: no secrets in fields.
+
+```rust
+use renox::live_component::LiveContext;
+use renox::prelude::*;
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct Cart {
+    lines: Vec<i64>,
+    note: String,
+}
+
+#[renox::live_component(view = "live/cart.html", name = "cart")]
+impl Cart {
+    // The view gets `state` (the fields) and `data` (this).
+    async fn data(&self, _ctx: &LiveContext) -> Result<serde_json::Value> {
+        Ok(json!({ "count": self.lines.len() }))
+    }
+
+    #[live(action)]
+    async fn add(&mut self, ctx: &mut LiveContext, id: i64) -> Result {
+        self.lines.push(id);
+        ctx.toast(Toast::success("Added")); // also ctx.validate, ctx.redirect, ctx.dispatch
+        Ok(())
+    }
+}
+
+// App::new().live_component::<Cart>(); a page handler mounts it, and the template includes it.
+async fn cart_page(ctx: LiveContext) -> Result<View> {
+    let cart = ctx.mount(Cart::default()).await?;
+    Ok(view("cart.html", context! { cart })) // {% with component = cart %}{% include "renox/live.html" %}{% endwith %}
+}
+
+// In tests: let mut c = app.live(Cart::default()); c.call_with("add", json!([3])).await;
+```
+
 ## Raw SQL and transactions (SQLite and PostgreSQL)
 
 When the query builder isn't enough, write SQL yourself, with `?` where each value goes. A
