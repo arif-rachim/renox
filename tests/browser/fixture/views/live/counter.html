@@ -13,3 +13,9 @@
 <span id="lazy-echo">{{ state.lazy }}</span>
 <input id="nick" rx-model="nick">
 <span id="nick-echo">{{ state.nick }}</span>
+{% from "renox/ui.html" import input %}
+{{ input("title", "Title", id="title", attrs={"rx-model": "title"}) }}
+<button id="save" type="button" rx-click="save">Save</button>
+<button id="notify" type="button" rx-click="notify">Notify</button>
+<button id="go" type="button" rx-click="go">Go</button>
+<button id="ping" type="button" rx-click="ping">Ping</button>

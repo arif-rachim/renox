@@ -1,16 +1,27 @@
 // Live components in a browser (#436): rx-click and rx-submit send the
 // action, the answer is morphed in, and typed text and focus survive.
 
-import { after, before, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Browser } from './lib/cdp.mjs';
 import { fixture } from './lib/app.mjs';
 
+const count = (page) => page.eval(() => document.querySelector('#count').textContent);
+
+const countRequests = (page) =>
+  page.eval(() => {
+    window.__reqs = 0;
+    document.addEventListener('htmx:beforeRequest', () => window.__reqs++);
+  });
+
+// The whole file runs twice: with the default CSP and with CSP=strict.
+for (const [mode, env] of [['relaxed CSP', {}], ['CSP=strict', { CSP: 'strict' }]]) {
+describe(mode, () => {
 let browser;
 let app;
 
 before(async () => {
-  app = await fixture();
+  app = await fixture({ env });
   browser = await Browser.launch();
 });
 
@@ -19,14 +30,12 @@ after(async () => {
   await app?.stop();
 });
 
-const onLive = (fn) =>
+const onLive = (fn, allow = []) =>
   browser.with(async (page) => {
     await page.goto(`${app.url}/live`);
     await fn(page);
-    page.assertClean();
+    page.assertClean({ allow });
   });
-
-const count = (page) => page.eval(() => document.querySelector('#count').textContent);
 
 test('clicking rx-click twice counts to 2', () =>
   onLive(async (page) => {
@@ -70,12 +79,6 @@ test('an rx-submit form sends its fields', () =>
     await page.waitFor(() => document.querySelector('#shown-name').textContent === 'Ada');
   }));
 
-const countRequests = (page) =>
-  page.eval(() => {
-    window.__reqs = 0;
-    document.addEventListener('htmx:beforeRequest', () => window.__reqs++);
-  });
-
 test('rx-model.live debounces typing into one request and keeps focus and caret', () =>
   onLive(async (page) => {
     await countRequests(page);
@@ -113,3 +116,44 @@ test('a plain rx-model sends nothing but its value reaches the next rx-click', (
     await page.click('#inc');
     await page.waitFor(() => document.querySelector('#nick-echo').textContent === 'ada');
   }));
+
+test('an empty save shows the error under the field and does not morph', () =>
+  onLive(async (page) => {
+    await page.eval(() => document.querySelector('#count').setAttribute('data-marker', 'same'));
+    await page.click('#save');
+    await page.waitFor(() => document.querySelector('#title').getAttribute('aria-invalid') === 'true');
+    const after = await page.eval(() => ({
+      error: !!document.querySelector('#title').closest('div').querySelector('.error, [data-error-for]:not(:empty)'),
+      focused: document.activeElement && document.activeElement.id,
+      marker: document.querySelector('#count').getAttribute('data-marker'),
+    }));
+    assert.equal(after.error, true);
+    assert.equal(after.focused, 'title');
+    assert.equal(after.marker, 'same');
+  }, [/422/]));
+
+test('notify shows a toast', () =>
+  onLive(async (page) => {
+    await page.click('#notify');
+    await page.waitFor(() => document.body.textContent.includes('Saved from live.'));
+  }));
+
+test('go navigates', () =>
+  onLive(async (page) => {
+    await page.click('#go');
+    await page.waitFor(() => location.pathname === '/stock');
+  }));
+
+test('ping fires rx:counter:pinged on the wrapper and it bubbles to the document', () =>
+  onLive(async (page) => {
+    await page.eval(() => {
+      window.__pings = [];
+      document.addEventListener('rx:counter:pinged', (e) =>
+        window.__pings.push(e.target.hasAttribute('data-rx-live')));
+    });
+    await page.click('#ping');
+    await page.waitFor(() => window.__pings.length > 0);
+    assert.equal(await page.eval(() => window.__pings[0]), true);
+  }));
+});
+}
