@@ -1396,6 +1396,21 @@
           "description": "The named error bag.",
           "name": "bag",
           "values": []
+        },
+        {
+          "description": "The smallest value (number and date types).",
+          "name": "min",
+          "values": []
+        },
+        {
+          "description": "The largest value (number and date types).",
+          "name": "max",
+          "values": []
+        },
+        {
+          "description": "The step between values (number types).",
+          "name": "step",
+          "values": []
         }
       ],
       "description": "A text field with its label, hint and errors.",

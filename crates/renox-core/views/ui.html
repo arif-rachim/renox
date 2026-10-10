@@ -55,7 +55,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `revealable`: a button that shows the password; `copyable`: a button
     that copies the value. A disabled field isn't sent with the form; a
     readonly one is. -#}
-{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false, hide_label=false, bag=none) -%}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false, hide_label=false, bag=none, min=none, max=none, step=none) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name, bag=bag) %}
 {%- set affixed = prefix or suffix or revealable or copyable %}
@@ -71,6 +71,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
     {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
     {%- if datalist %} list="{{ id }}-list"{% endif %}
+    {%- if min is not none %} min="{{ min }}"{% endif %}{% if max is not none %} max="{{ max }}"{% endif %}{% if step is not none %} step="{{ step }}"{% endif %}
     {%- if disabled %} disabled{% endif %}
     {%- if readonly %} readonly{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}

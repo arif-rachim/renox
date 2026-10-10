@@ -235,9 +235,9 @@ async fn a_wizard_action_is_a_wizard_in_a_sheet_sent_with_htmx() {
     app.get("/items")
         .await
         .assert_see(r#"<button class="rx-button rx-button--primary" type="button" data-rx-open="new-item" aria-haspopup="dialog"><span class="rx-button__label">New item</span></button>"#)
-        .assert_see(r#"<dialog class="rx-sheet rx-sheet--wizard rx-sheet--lg" id="new-item" aria-labelledby="new-item-title">"#)
+        .assert_see(r#"<dialog class="rx-sheet rx-sheet--wizard rx-sheet--lg" id="new-item" aria-labelledby="new-item-title" data-rx-component="wizard-action">"#)
         .assert_see(r#"<form class="rx-sheet__inner" method="post" action="/items" hx-post="/items" hx-swap="none" data-live-validate data-rx-action novalidate>"#)
-        .assert_see(r#"<div class="rx-wizard" id="new-item-wizard" data-rx-wizard>"#)
+        .assert_see(r#"<div class="rx-wizard" id="new-item-wizard" data-rx-wizard data-rx-component="wizard">"#)
         .assert_see(r#"<section class="rx-wizard__panel" id="new-item-step-stock" data-rx-step="stock">"#)
         // Cancel closes the sheet; the last step's button sends the form.
         .assert_see(r#"<button class="rx-button rx-button--plain" type="button" data-rx-close><span class="rx-button__label">Cancel</span></button>"#)
