@@ -240,6 +240,7 @@ const BUTTON_VARIANTS: &[&str] = &["primary", "secondary", "plain", "danger", "p
 const ICON_BUTTON_VARIANTS: &[&str] = &["plain", "primary", "danger"];
 const BUTTON_TYPES: &[&str] = &["submit", "button", "reset"];
 const SIZES: &[&str] = &["small"];
+const SHEET_EVENTS: &[&str] = &["opened", "closed", "saved", "failed"];
 
 /// The default slot, filling the prop `into`.
 const fn slot_into(into: &'static str, doc: &'static str) -> Slot {
@@ -680,6 +681,108 @@ pub(crate) static BUILTIN: &[Contract] = &[
         slots: &[slot_into("message", "The question.")],
         events: &[],
         route_prop: Some("action"),
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-sheet",
+        doc: "A dialog; open it with an `<rx-open-button>` or any `data-rx-open=\"id\"`.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "sheet",
+        },
+        props: &[
+            text("id", true, "The dialog's id."),
+            text("title", true, "The dialog's heading."),
+            text("message", false, "A line under the heading."),
+            flag("slide-over", "Slides in from the side."),
+            choice("width", &["sm", "lg", "xl"], "The width."),
+            text("icon", false, "An icon's name."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: SHEET_EVENTS,
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-open-button",
+        doc: "A button that opens the sheet with the given id.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "open_button",
+        },
+        props: &[
+            text("id", true, "The id of the sheet to open."),
+            text("label", true, "The label."),
+            choice("variant", BUTTON_VARIANTS, "The look."),
+            choice("size", SIZES, "The size."),
+            text("icon", false, "An icon's name."),
+            text("key", false, "A keyboard shortcut."),
+            text("badge", false, "A count shown on the button."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-action-sheet",
+        doc: "A button that opens a sheet with a form, sent with htmx; the content is the form's fields.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "action_sheet",
+        },
+        props: &[
+            text("id", true, "The sheet's id."),
+            text("label", true, "The button's label."),
+            text(
+                "action",
+                true,
+                "The address the form is sent to; or use route.",
+            ),
+            text("title", true, "The sheet's heading."),
+            text("description", false, "A line under the heading."),
+            text("submit-label", false, "The submit button's text."),
+            choice(
+                "method",
+                &["POST", "PUT", "PATCH", "DELETE"],
+                "The HTTP method.",
+            ),
+            choice("variant", BUTTON_VARIANTS, "The button's look."),
+            choice("size", SIZES, "The button's size."),
+            text("icon", false, "The button's icon."),
+            text("key", false, "A keyboard shortcut."),
+            flag("slide-over", "Slides in from the side."),
+            choice("width", &["sm", "lg", "xl"], "The width."),
+            text("modal-icon", false, "The sheet's icon."),
+            flag("danger", "Makes the submit button red."),
+            text("target", false, "A selector the answer is swapped into."),
+            text("swap", false, "How the answer is swapped in."),
+            text("enctype", false, "The form's encoding, for files."),
+            flag("button", "Whether to draw the opening button."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: SHEET_EVENTS,
+        route_prop: Some("action"),
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-notification-bell",
+        doc: "The bell with the unread count and its panel; nothing for guests.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "notification_bell",
+        },
+        props: &[
+            number("count", "The unread count to start with."),
+            text("id", false, "The panel's id prefix."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
         attrs: false,
         parent: None,
     },

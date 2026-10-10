@@ -495,6 +495,42 @@ async fn rx_confirm_matches_the_macro() {
 }
 
 #[renox::test]
+async fn rx_sheet_and_rx_open_button_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.open_button(\"s1\", \"Filters\", variant=\"primary\", icon=\"plus\") }}}}\
+             {{% call ui.sheet(\"s1\", \"Filters\", message=\"Narrow it\", slide_over=true, width=\"lg\") %}}<p>body</p>{{% endcall %}}"
+        ),
+        "<rx-open-button id=\"s1\" label=\"Filters\" variant=\"primary\" icon=\"plus\" />\
+         <rx-sheet id=\"s1\" title=\"Filters\" message=\"Narrow it\" slide-over width=\"lg\"><p>body</p></rx-sheet>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_action_sheet_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{% call ui.action_sheet(\"as1\", \"Restock\", \"/stock/7\", \"Restock Coffee\", method=\"PUT\", danger=true) %}}<input name=\"q\">{{% endcall %}}"
+        ),
+        "<rx-action-sheet id=\"as1\" label=\"Restock\" action=\"/stock/7\" title=\"Restock Coffee\" method=\"PUT\" danger><input name=\"q\"></rx-action-sheet>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_notification_bell_matches_the_macro() {
+    same(
+        &format!("{UI}{{{{ ui.notification_bell(count=3) }}}}x"),
+        "<rx-notification-bell :count=\"3\" />x",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
 async fn rx_alert_and_rx_empty_match_the_macros() {
     same(
         &format!(
