@@ -88,6 +88,10 @@ Import the macros and use them like the kit's fields:
 </form>
 ```
 
+The fields are also tags (the plugin registers them): `<rx-rich-editor name="body" label="Body" :value="post.body" required/>`,
+`<rx-markdown-editor …/>`, `<rx-code-editor … language="json"/>`, and `<rx-code-entry label="Settings" :value="post.settings" language="json"/>`
+for an infolist. They take the same arguments as the macros.
+
 Each one sends a plain form field named like its first argument:
 
 | Field | What it sends | Without JavaScript |
