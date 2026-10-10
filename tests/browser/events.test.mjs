@@ -8,15 +8,18 @@ import { fixture } from './lib/app.mjs';
 
 let browser;
 let app;
+let strict;
 
 before(async () => {
   app = await fixture();
+  strict = await fixture({ env: { CSP: 'strict' } });
   browser = await Browser.launch();
 });
 
 after(async () => {
   await browser?.close();
   await app?.stop();
+  await strict?.stop();
 });
 
 const NAMES = ['opened', 'closed', 'saved', 'failed'].map((n) => `rx:action-sheet:${n}`)
@@ -199,4 +202,52 @@ test('a repeater says added then removed with the row index', () =>
       ['rx:repeater:removed', 'rx-lines', { index: 0 }],
     ]);
     page.assertClean({ allow: [/422/] });
+  }));
+
+// #427: `@event` on a tag becomes `x-on:rx:<component>:<event>.self`, under CSP=strict.
+
+test('@saved on an action sheet and @changed on tabs reach an Alpine.data component', () =>
+  browser.with(async (page) => {
+    await page.goto(`${strict.url}/events-tags`);
+    await page.waitFor(() => document.querySelector('#saved'));
+    assert.equal(await page.eval(() => document.querySelector('#saved').textContent), 'false');
+
+    await page.click('[data-rx-open="tag-trip"]');
+    await page.waitFor(() => document.querySelector('#tag-trip').open);
+    await page.type('#rx-from', 'Bandung');
+    await page.type('#rx-to', 'Jakarta');
+    await page.click('#tag-trip button[type=submit]');
+    await page.waitFor(() => document.querySelector('#saved').textContent === 'true');
+
+    await page.click('#tag-tabs-tab-b');
+    await page.waitFor(() => document.querySelector('#tab').textContent === 'b');
+    page.assertClean();
+  }));
+
+test('a nested component\'s event does not fire the outer handler', () =>
+  browser.with(async (page) => {
+    await page.goto(`${strict.url}/events-tags`);
+    await page.waitFor(() => document.querySelector('#inner-tabs-tab-y'));
+    await page.eval(() => {
+      window.__inner = 0;
+      document.addEventListener('rx:tabs:changed', (e) => { if (e.target.querySelector('#inner-tabs-tab-y')) window.__inner++; });
+    });
+    await page.click('#inner-tabs-tab-y');
+    await page.waitFor(() => window.__inner > 0);
+    assert.equal(await page.eval(() => document.querySelector('#outer').textContent), '0');
+    page.assertClean();
+  }));
+
+test('hx-trigger can listen for rx:action-sheet:saved from the body', () =>
+  browser.with(async (page) => {
+    await page.goto(`${strict.url}/events-tags`);
+    await page.waitFor(() => /loads: \d+/.test(document.querySelector('#stamp').textContent));
+    const first = await page.eval(() => document.querySelector('#stamp').textContent);
+    await page.click('[data-rx-open="tag-trip"]');
+    await page.waitFor(() => document.querySelector('#tag-trip').open);
+    await page.type('#rx-from', 'Bandung');
+    await page.type('#rx-to', 'Jakarta');
+    await page.click('#tag-trip button[type=submit]');
+    await page.waitFor((was) => document.querySelector('#stamp').textContent !== was, {}, first);
+    page.assertClean();
   }));

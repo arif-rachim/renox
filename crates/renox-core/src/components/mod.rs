@@ -478,6 +478,56 @@ mod tests {
     }
 
     #[test]
+    fn declared_events_become_alpine_listeners() {
+        let c = |s: &str| compile("a.html", s, &builtin()).unwrap();
+        let out = c(
+            "<rx-action-sheet id=\"s\" label=\"L\" action=\"/a\" title=\"T\" @saved=\"mark\">x</rx-action-sheet>",
+        );
+        assert!(
+            out.contains("\"x-on:rx:action-sheet:saved.self\": \"mark\""),
+            "{out}"
+        );
+        // Modifiers are kept after .self.
+        let out = c(
+            "<rx-action-sheet id=\"s\" label=\"L\" action=\"/a\" title=\"T\" @closed.once.window=\"m\">x</rx-action-sheet>",
+        );
+        assert!(
+            out.contains("\"x-on:rx:action-sheet:closed.self.once.window\": \"m\""),
+            "{out}"
+        );
+        // Tabs and wizards pass them to their macro.
+        let out = c(
+            "<rx-tabs id=\"t\" @changed=\"go\"><rx-tab key=\"a\" label=\"A\">x</rx-tab></rx-tabs>",
+        );
+        assert!(
+            out.contains("attrs={\"x-on:rx:tabs:changed.self\": \"go\"}"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn dom_events_pass_through_and_typos_fail() {
+        let c = |s: &str| compile("a.html", s, &builtin());
+        let out = c("<rx-action-sheet id=\"s\" label=\"L\" action=\"/a\" title=\"T\" @click=\"go\">x</rx-action-sheet>").unwrap();
+        assert!(out.contains("\"@click\": \"go\""), "{out}");
+        let out = c("<rx-button @clsoed=\"go\">x</rx-button>").unwrap();
+        assert!(
+            out.contains("\"@clsoed\": \"go\""),
+            "no events declared: {out}"
+        );
+        let msg = c("<rx-action-sheet id=\"s\" label=\"L\" action=\"/a\" title=\"T\" @clsoed=\"go\">x</rx-action-sheet>")
+            .unwrap_err()
+            .message;
+        assert_eq!(
+            msg,
+            "<rx-action-sheet> has no event \"clsoed\"; did you mean \"@closed\"? It sends: opened, closed, saved, failed"
+        );
+        // Far from every declared event: passed through.
+        let out = c("<rx-action-sheet id=\"s\" label=\"L\" action=\"/a\" title=\"T\" @whatever=\"go\">x</rx-action-sheet>").unwrap();
+        assert!(out.contains("\"@whatever\""), "{out}");
+    }
+
+    #[test]
     fn route_and_class_errors() {
         let msg = |s: &str| compile("a.html", s, &builtin()).unwrap_err().message;
         assert_eq!(

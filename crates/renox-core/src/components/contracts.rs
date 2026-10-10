@@ -240,6 +240,8 @@ const BUTTON_VARIANTS: &[&str] = &["primary", "secondary", "plain", "danger", "p
 const ICON_BUTTON_VARIANTS: &[&str] = &["plain", "primary", "danger"];
 const BUTTON_TYPES: &[&str] = &["submit", "button", "reset"];
 const SIZES: &[&str] = &["small"];
+const CHANGED: &[&str] = &["changed"];
+
 const SHEET_EVENTS: &[&str] = &["opened", "closed", "saved", "failed"];
 
 /// The default slot, filling the prop `into`.
@@ -428,9 +430,9 @@ pub(crate) static BUILTIN: &[Contract] = &[
             doc: "Only `<rx-wizard-step>` elements.",
             ..DEFAULT_SLOT
         }],
-        events: &[],
+        events: CHANGED,
         route_prop: None,
-        attrs: false,
+        attrs: true,
         parent: None,
     },
     Contract {
@@ -464,9 +466,9 @@ pub(crate) static BUILTIN: &[Contract] = &[
             doc: "Only `<rx-tab>` elements.",
             ..DEFAULT_SLOT
         }],
-        events: &[],
+        events: CHANGED,
         route_prop: None,
-        attrs: false,
+        attrs: true,
         parent: None,
     },
     Contract {
@@ -679,9 +681,9 @@ pub(crate) static BUILTIN: &[Contract] = &[
             flag("button", "Whether to draw the opening button."),
         ],
         slots: &[slot_into("message", "The question.")],
-        events: &[],
+        events: &["confirmed", "cancelled"],
         route_prop: Some("action"),
-        attrs: false,
+        attrs: true,
         parent: None,
     },
     Contract {
@@ -983,7 +985,7 @@ pub(crate) static BUILTIN: &[Contract] = &[
             text("bag", false, "The named error bag."),
         ],
         slots: &[],
-        events: &[],
+        events: CHANGED,
         route_prop: None,
         attrs: true,
         parent: None,
@@ -1215,7 +1217,7 @@ pub(crate) static BUILTIN: &[Contract] = &[
             text("bag", false, "The named error bag."),
         ],
         slots: &[],
-        events: &[],
+        events: CHANGED,
         route_prop: None,
         attrs: true,
         parent: None,
@@ -1249,7 +1251,7 @@ pub(crate) static BUILTIN: &[Contract] = &[
             text("bag", false, "The named error bag."),
         ],
         slots: &[],
-        events: &[],
+        events: CHANGED,
         route_prop: None,
         attrs: true,
         parent: None,
@@ -1328,7 +1330,7 @@ pub(crate) static BUILTIN: &[Contract] = &[
             optional: false,
             doc: "One row's fields; `row` is its data and `prefix` its name part, like `lines[0]`.",
         }],
-        events: &[],
+        events: &["added", "removed"],
         route_prop: None,
         attrs: true,
         parent: None,
@@ -1623,7 +1625,7 @@ pub(crate) static BUILTIN: &[Contract] = &[
             optional: true,
             doc: "Draws a `custom` column: it receives the row and the column.",
         }],
-        events: &[],
+        events: &["selected", "sorted", "filtered"],
         route_prop: None,
         attrs: true,
         parent: None,

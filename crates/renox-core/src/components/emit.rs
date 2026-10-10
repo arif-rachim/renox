@@ -83,6 +83,99 @@ pub(super) fn check_names(
     Ok(())
 }
 
+/// The DOM events `@name` passes through even when a declared event is spelt almost the same.
+const DOM_EVENTS: &[&str] = &[
+    "click",
+    "dblclick",
+    "keydown",
+    "keyup",
+    "input",
+    "change",
+    "submit",
+    "focus",
+    "blur",
+    "focusin",
+    "focusout",
+    "mouseenter",
+    "mouseleave",
+    "mouseover",
+    "mouseout",
+    "pointerdown",
+    "pointerup",
+    "scroll",
+    "load",
+    "toggle",
+    "close",
+    "cancel",
+];
+
+/// The event name of `@name.mod1.mod2`.
+fn event_name(spec: &str) -> &str {
+    spec.split('.').next().unwrap_or("")
+}
+
+/// The Alpine key of `@name[.mods]` when `name` is an event the component declares:
+/// `x-on:rx:<component>:<name>.self[.mods]`.
+fn event_key(contract: &Contract, spec: &str) -> Option<String> {
+    let name = event_name(spec);
+    if !contract.events.contains(&name) {
+        return None;
+    }
+    let component = contract.tag.strip_prefix("rx-").unwrap_or(contract.tag);
+    let mods = &spec[name.len()..];
+    Some(format!("x-on:rx:{component}:{name}.self{mods}"))
+}
+
+/// Decision 7 of #373: `@x` on a component is a mistake when `x` is neither a declared event nor
+/// a DOM event, but is close to a declared one.
+fn check_event(contract: &Contract, spec: &str) -> Result<(), String> {
+    let name = event_name(spec);
+    if contract.events.is_empty()
+        || contract.events.contains(&name)
+        || DOM_EVENTS.contains(&name)
+        || !suggest::near(name, contract.events.iter().copied())
+    {
+        return Ok(());
+    }
+    let hint = suggest::did_you_mean(name, contract.events.iter().copied())
+        .map(|x| format!("; did you mean \"@{x}\"?"))
+        .unwrap_or_else(|| ".".to_owned());
+    Err(format!(
+        "<{}> has no event \"{name}\"{hint} It sends: {}",
+        contract.tag,
+        contract.events.join(", ")
+    ))
+}
+
+/// The `attrs` pairs for the attributes that are not props (`"key": value`), in order. A declared
+/// `@event` gets its Alpine key; everything else keeps its name.
+pub(super) fn passthrough_pairs(
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+) -> Result<Vec<String>, CompileError> {
+    let mut pairs = Vec::new();
+    for a in attrs {
+        let n = bare(a.name);
+        if n == "route" || contract.props.iter().any(|p| p.name == n) {
+            continue;
+        }
+        if let Some(spec) = a.name.strip_prefix('@')
+            && let Some(key) = event_key(contract, spec)
+        {
+            pairs.push(format!(
+                "{}: {}",
+                attrs::literal(&key),
+                attrs::literal(a.value.unwrap_or(""))
+            ));
+            continue;
+        }
+        let e = attrs::prop_expr(a, Kind::Text, &[])
+            .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
+        pairs.push(format!("{}: {e}", attrs::literal(n)));
+    }
+    Ok(pairs)
+}
+
 /// Checks the attributes against the contract.
 pub(super) fn check_attrs(
     contract: &Contract,
@@ -107,6 +200,15 @@ pub(super) fn check_attrs(
         let n = bare(a.name);
         if n == "route" {
             continue;
+        }
+        if let Some(spec) = a.name.strip_prefix('@') {
+            if event_name(spec).is_empty() {
+                return Err(format!("<{tag}> has an \"@\" without a name"));
+            }
+            check_event(contract, spec)?;
+            if event_key(contract, spec).is_some() || contract.attrs {
+                continue;
+            }
         }
         if contract.props.iter().any(|p| p.name == n)
             || (contract.attrs && (element || !a.name.starts_with(':')))
@@ -531,7 +633,7 @@ fn emit_node(
             });
             // Each argument with its place: props as written, then slots, then `attrs`.
             let mut args: Vec<(usize, String)> = Vec::new();
-            let mut extra: Vec<String> = Vec::new();
+            let extra = passthrough_pairs(contract, attrs)?;
             for (order, a) in attrs.iter().enumerate() {
                 let n = bare(a.name);
                 if n == "route" {
@@ -551,9 +653,6 @@ fn emit_node(
                     continue;
                 }
                 let Some(p) = contract.props.iter().find(|p| p.name == n) else {
-                    let e = attrs::prop_expr(a, Kind::Text, &[])
-                        .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
-                    extra.push(format!("{}: {e}", attrs::literal(n)));
                     continue;
                 };
                 let e = attrs::prop_expr(a, p.kind, p.values)

@@ -480,6 +480,17 @@ classes keep working next to the utilities.
 {# value forms: x="text"  x="{{ expr }}"  x="a {{ b }}"  :x="expr"  bare = true. Errors show file:line. #}
 ```
 
+### Component events (details in docs/ui.md "Components and the page: three directions")
+
+```html
+{# kit components send bubbling rx:<component>:<event> events: sheet/action-sheet opened closed saved failed,
+   confirm confirmed cancelled, tabs/wizard/select/tags-input/date-picker changed, repeater added removed,
+   grid selected sorted filtered. Extra attributes go to the root (class is merged; use x-bind:name, not :name). #}
+<rx-action-sheet id="new-item" title="New item" action="{{ route('items.store') }}" @saved="reload = true">…</rx-action-sheet>
+<div x-data="{ tab: '' }" @rx:tabs:changed.window="tab = $event.detail.name">…</div>
+<div hx-get="/cart/summary" hx-trigger="rx:select:changed from:body">…</div>
+```
+
 ## Your own shared values and middleware
 
 Give every handler the same service (here, a payment client), and run your own code around

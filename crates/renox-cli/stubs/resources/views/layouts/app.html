@@ -15,23 +15,22 @@
   {{ stack('head') }}
 </head>
 <body class="rx-page">
-  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, link_button %}
-  {#- The kit's navigation bar (docs/ui.md "Navigation"): add sections with nav_links and nav_link. -#}
-  {% call navbar(app.name, href=route('home')) %}
+  {#- The kit's navigation bar (docs/ui.md "Navigation"): add sections with rx-nav-links and rx-nav-link. -#}
+  <rx-navbar brand="{{ app.name }}" href="{{ route('home') }}">
     <span class="rx-spacer"></span>
     {% if auth.check %}
-      {% call menu(auth.user.name, id="account-menu", variant="plain") %}
-        {{ menu_link(route('account.show'), "Account") }}
-        {{ menu_separator() }}
-        {{ menu_action(route('logout'), "Log out") }}
-      {% endcall %}
+      <rx-menu label="{{ auth.user.name }}" id="account-menu" variant="plain">
+        <rx-menu-link route="account.show" label="Account"/>
+        <rx-menu-separator/>
+        <rx-menu-action route="logout" label="Log out"/>
+      </rx-menu>
     {% else %}
-      {{ link_button(route('login'), "Log in", variant="plain", size="small") }}
-      {{ link_button(route('register'), "Register", variant="primary", size="small") }}
+      <rx-link-button route="login" label="Log in" variant="plain" size="small"/>
+      <rx-link-button route="register" label="Register" variant="primary" size="small"/>
     {% endif %}
-  {% endcall %}
+  </rx-navbar>
   <main class="rx-container" id="main">
-    {% if flash.status %}{% from "renox/ui.html" import alert %}{{ alert(flash.status, kind="success") }}{% endif %}
+    <rx-alert rx-if="flash.status" kind="success">{{ flash.status }}</rx-alert>
     {% block content %}{% endblock %}
   </main>
   {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}
