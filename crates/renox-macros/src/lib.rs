@@ -6,6 +6,7 @@
 mod db_enum;
 mod embedded;
 mod from_row;
+mod live;
 mod migrations;
 mod model;
 mod validate;
@@ -170,6 +171,41 @@ pub fn derive_db_enum(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn migrations(input: TokenStream) -> TokenStream {
     migrations::expand(input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Turns an `impl` block into a live component: the methods marked
+/// `#[live(action)]` become the actions the browser can call, and the
+/// `LiveComponent` trait is implemented for you.
+///
+/// `view = "…"` names the template (required); `name = "…"` the component
+/// (default: the type's name in kebab-case). An action is
+/// `async fn x(&mut self, ctx: &mut LiveContext, a: A, …) -> Result`, its
+/// arguments read from the call's JSON list. An inherent
+/// `async fn data(&self, ctx: &LiveContext) -> Result<impl Serialize>` gives
+/// the view its extra values.
+///
+/// ```
+/// # use renox::prelude::*;
+/// # use renox::live_component::LiveContext;
+/// #[derive(serde::Serialize, serde::Deserialize)]
+/// struct Todo {
+///     done: Vec<i64>,
+/// }
+///
+/// #[renox::live_component(view = "live/todo.html")]
+/// impl Todo {
+///     #[live(action)]
+///     async fn toggle(&mut self, _ctx: &mut LiveContext, id: i64) -> Result {
+///         self.done.push(id);
+///         Ok(())
+///     }
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn live_component(attr: TokenStream, item: TokenStream) -> TokenStream {
+    live::expand(attr.into(), item.into())
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

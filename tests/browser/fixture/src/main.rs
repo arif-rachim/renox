@@ -141,6 +141,45 @@ async fn rename_category(
     Json(renox::select::SelectOption::new(id, form.label))
 }
 
+/// A live component (`rx-click`, `rx-submit`, morphing): tests/browser/live.test.mjs.
+#[derive(Default, Serialize, Deserialize)]
+struct Counter {
+    count: i64,
+    name: String,
+    search: String,
+    nick: String,
+    lazy: String,
+}
+
+impl LiveComponent for Counter {
+    const NAME: &'static str = "counter";
+    const VIEW: &'static str = "live/counter.html";
+
+    async fn data(
+        &self,
+        _ctx: &renox::live_component::LiveContext,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(json!({ "label": "clicks" }))
+    }
+
+    async fn call(
+        &mut self,
+        action: &str,
+        args: Vec<renox::serde_json::Value>,
+        _ctx: &mut renox::live_component::LiveContext,
+    ) -> Result {
+        match action {
+            "increment" => self.count += 1,
+            "add" => {
+                self.count += args.first().and_then(|n| n.as_i64()).unwrap_or(0);
+            }
+            "rename" => {}
+            _ => return Err(Error::NotFound),
+        }
+        Ok(())
+    }
+}
+
 struct Pages;
 
 impl Module for Pages {
@@ -185,6 +224,13 @@ impl Module for Pages {
                 Redirect::to("/widgets")
             })
             .get("/overlays", || async { view("overlays.html", context! {}) })
+            .get(
+                "/live",
+                |ctx: renox::live_component::LiveContext| async move {
+                    let counter = ctx.mount(Counter::default()).await?;
+                    Ok::<_, Error>(view("live.html", context! { counter }))
+                },
+            )
             .get("/events", || async { view("events.html", context! {}) })
             .post("/confirm-done", || async { "done" })
             // The navbar with a phone tab bar and a search behind a button.
@@ -321,6 +367,7 @@ fn main() -> Result {
         .module(grid::Orders)
         .seeder(grid::seed)
         .module(Pages)
+        .live_component::<Counter>()
         .job::<Touch>()
         .job::<Nap>()
         // `jobs:nap`: queues one Nap job.
