@@ -9,8 +9,8 @@ use super::attrs::Kind;
 pub(crate) enum Render {
     /// A call to a macro of a template module.
     Macro {
-        /// The template the macro is imported from.
-        module: &'static str,
+        /// The template module the macro is imported from.
+        module: Module,
         /// The macro's name.
         name: &'static str,
     },
@@ -23,6 +23,34 @@ pub(crate) enum Render {
     },
     /// Code generation of its own.
     Special(Special),
+}
+
+/// A built-in template module whose macros components call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Module {
+    /// `renox/ui.html`.
+    Ui,
+    /// `renox/pagination.html`.
+    #[allow(dead_code)]
+    Pagination,
+}
+
+impl Module {
+    /// The template name.
+    pub(crate) fn path(self) -> &'static str {
+        match self {
+            Module::Ui => "renox/ui.html",
+            Module::Pagination => "renox/pagination.html",
+        }
+    }
+
+    /// The name the module is imported as.
+    pub(crate) fn alias(self) -> &'static str {
+        match self {
+            Module::Ui => "__rx_ui",
+            Module::Pagination => "__rx_pagination",
+        }
+    }
 }
 
 /// The components with code generation of their own.
@@ -65,6 +93,8 @@ pub(crate) struct Slot {
     pub into: Option<&'static str>,
     /// The names the content receives (`{% call(row, prefix) %}`).
     pub args: &'static [&'static str],
+    /// Whether the macro works without content (it checks `caller is defined`).
+    pub optional: bool,
     /// One line about it.
     pub doc: &'static str,
 }
@@ -97,8 +127,29 @@ const DEFAULT_SLOT: Slot = Slot {
     name: "",
     into: None,
     args: &[],
+    optional: false,
     doc: "The content.",
 };
+
+const fn text(name: &'static str, required: bool, doc: &'static str) -> Prop {
+    Prop {
+        name,
+        kind: Kind::Text,
+        required,
+        values: &[],
+        doc,
+    }
+}
+
+const fn kind_prop(name: &'static str, doc: &'static str) -> Prop {
+    Prop {
+        name,
+        kind: Kind::Enum,
+        required: false,
+        values: &["info", "success", "warning", "error"],
+        doc,
+    }
+}
 
 /// The components Renox ships.
 pub(crate) static BUILTIN: &[Contract] = &[
@@ -134,6 +185,79 @@ pub(crate) static BUILTIN: &[Contract] = &[
         events: &[],
         route_prop: None,
         attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-page-header",
+        doc: "The page's title, with an optional subtitle, back link, badge and actions.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "page_header",
+        },
+        props: &[
+            text("title", true, "The page title."),
+            text("subtitle", false, "A line under the title."),
+            text("back", false, "The URL of a back link."),
+            text("back-label", false, "The back link's text."),
+            text("badge", false, "A badge next to the title."),
+            kind_prop("badge-kind", "The badge's colour."),
+        ],
+        slots: &[Slot {
+            optional: true,
+            doc: "The page's actions.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-card",
+        doc: "A titled section on the page.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "card",
+        },
+        props: &[
+            text("title", false, "The card's heading."),
+            text("subtitle", false, "A line under the heading."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-toolbar",
+        doc: "A row of buttons and filters above a list.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "toolbar",
+        },
+        props: &[],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-badge",
+        doc: "A small coloured label.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "badge",
+        },
+        props: &[
+            text("text", true, "The label."),
+            kind_prop("kind", "The colour."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
         parent: None,
     },
 ];

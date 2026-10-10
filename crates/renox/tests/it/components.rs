@@ -62,3 +62,95 @@ async fn rx_stack_renders_a_div() {
         .assert_ok()
         .assert_see("<div class=\"rx-stack\">\n<p>in</p>\n</div>");
 }
+
+/// Routes `/m` and `/r` render the two templates with the same data.
+struct Pair(serde_json::Value);
+
+impl Module for Pair {
+    fn name(&self) -> &'static str {
+        "pair"
+    }
+
+    fn routes(&self) -> Routes {
+        let (a, b) = (self.0.clone(), self.0.clone());
+        Routes::new()
+            .get("/m", move || {
+                let ctx = a.clone();
+                async move { view("m.html", ctx) }
+            })
+            .get("/r", move || {
+                let ctx = b.clone();
+                async move { view("r.html", ctx) }
+            })
+    }
+}
+
+/// Collapses whitespace runs and drops whitespace between tags.
+fn normalize(html: &str) -> String {
+    let collapsed = html.split_whitespace().collect::<Vec<_>>().join(" ");
+    collapsed.replace("> <", "><")
+}
+
+/// A component page renders the same HTML as the macro calls it stands for.
+async fn same(macro_src: &str, rx_src: &str, ctx: serde_json::Value) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("m.html"), macro_src).unwrap();
+    std::fs::write(dir.path().join("r.html"), rx_src).unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(Pair(ctx)), move |c| c.views_path = path).await;
+    let (m, r) = (app.get("/m").await, app.get("/r").await);
+    m.assert_ok();
+    r.assert_ok();
+    let (m, r) = (normalize(&m.text()), normalize(&r.text()));
+    assert!(!m.is_empty());
+    assert_eq!(m, r);
+}
+
+const UI: &str = "{% import \"renox/ui.html\" as ui %}";
+
+#[renox::test]
+async fn rx_card_matches_the_macro() {
+    same(
+        &format!("{UI}{{% call ui.card(title=\"Contact\", subtitle=(sub)) %}}<p>body</p>{{% endcall %}}{{% call ui.card() %}}bare{{% endcall %}}"),
+        "<rx-card title=\"Contact\" subtitle=\"{{ sub }}\"><p>body</p></rx-card><rx-card>bare</rx-card>",
+        serde_json::json!({"sub": "Reach us"}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_toolbar_matches_the_macro() {
+    same(
+        &format!("{UI}{{% call ui.toolbar() %}}<a href=\"/x\">x</a>{{% endcall %}}"),
+        "<rx-toolbar><a href=\"/x\">x</a></rx-toolbar>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_badge_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.badge(text=\"New\") }}}}{{{{ ui.badge(text=(label), kind=\"success\") }}}}"
+        ),
+        "<rx-badge text=\"New\"/><rx-badge text=\"{{ label }}\" kind=\"success\"/>",
+        serde_json::json!({"label": "Paid"}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_page_header_matches_the_macro_with_and_without_actions() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.page_header(title=\"Orders\", subtitle=\"All\", back=\"/\", badge=\"3\", badge_kind=\"info\") }}}}\
+             {{% call ui.page_header(title=(name)) %}}<a href=\"/new\">New</a>{{% endcall %}}"
+        ),
+        "<rx-page-header title=\"Orders\" subtitle=\"All\" back=\"/\" badge=\"3\" badge-kind=\"info\"> </rx-page-header>\
+         <rx-page-header title=\"{{ name }}\"><a href=\"/new\">New</a></rx-page-header>",
+        serde_json::json!({"name": "Items"}),
+    )
+    .await;
+}

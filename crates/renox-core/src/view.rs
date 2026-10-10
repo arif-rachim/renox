@@ -128,7 +128,6 @@ pub struct Views {
 
 /// One template that does not compile, found by [`Views::check`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct ViewProblem {
     /// The template's name, e.g. `products/index.html`.
     pub template: String,
@@ -507,7 +506,6 @@ impl Views {
 
     /// The name of every template: the app's files (or the embedded ones),
     /// the built-in ones and those added to the environment, sorted.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn names(&self) -> Vec<String> {
         let mut names = Vec::new();
         match self.embedded {
@@ -524,7 +522,6 @@ impl Views {
     }
 
     /// Compiles every template and returns those that fail, in name order.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn check(&self, routes: &RouteTable) -> Vec<ViewProblem> {
         let names = self.names();
         let env = match self.reloader.acquire_env() {
@@ -852,7 +849,6 @@ fn load(
 }
 
 /// Reports every literal `route('name')` in the compiled `source` that no route has.
-#[cfg_attr(not(test), allow(dead_code))]
 fn check_route_names(
     template: &str,
     source: &str,
@@ -881,7 +877,6 @@ fn check_route_names(
 
 /// A [`ViewProblem`] from a compile error. The component compiler's details
 /// already start with `name:line: `, which is taken out of the message.
-#[cfg_attr(not(test), allow(dead_code))]
 fn problem(name: &str, err: &minijinja::Error) -> ViewProblem {
     let detail = err.detail().unwrap_or("could not be compiled");
     if let Some(rest) = detail.strip_prefix(name).and_then(|r| r.strip_prefix(':'))
