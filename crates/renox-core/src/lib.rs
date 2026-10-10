@@ -73,6 +73,7 @@ pub mod chart;
 mod client_ip;
 mod clock;
 pub mod command;
+mod components;
 mod config;
 pub mod context;
 mod cookies;
