@@ -33,6 +33,13 @@ pub(crate) enum Module {
     /// `renox/pagination.html`.
     #[allow(dead_code)]
     Pagination,
+    /// A template a plugin registered a component for.
+    Custom {
+        /// The template name.
+        path: &'static str,
+        /// The name it is imported as.
+        alias: &'static str,
+    },
 }
 
 impl Module {
@@ -41,6 +48,7 @@ impl Module {
         match self {
             Module::Ui => "renox/ui.html",
             Module::Pagination => "renox/pagination.html",
+            Module::Custom { path, .. } => path,
         }
     }
 
@@ -49,6 +57,7 @@ impl Module {
         match self {
             Module::Ui => "__rx_ui",
             Module::Pagination => "__rx_pagination",
+            Module::Custom { alias, .. } => alias,
         }
     }
 }
