@@ -259,6 +259,29 @@ test('a toast sent with HxRedirect or HxRefresh shows on the next page', () =>
     });
   }));
 
+test('a sheet written as rx-* tags opens from its button and closes', () =>
+  onOverlays(async (page) => {
+    await page.click('[data-rx-open="tag-sheet"]');
+    await page.waitFor(() => document.querySelector('#tag-sheet').open, { message: 'the tag sheet opens' });
+    const info = await page.eval(() => {
+      const d = document.querySelector('#tag-sheet');
+      return {
+        classes: d.className,
+        title: d.querySelector('.rx-sheet__title').textContent,
+        body: d.querySelector('#tag-sheet-body').textContent,
+      };
+    });
+    assert.match(info.classes, /rx-sheet--sm/);
+    assert.equal(info.title, 'From tags');
+    assert.equal(info.body, 'Inside the tag sheet');
+    await page.click('#tag-sheet [data-rx-close]');
+    await page.waitFor(() => !document.querySelector('#tag-sheet').open, { message: 'the tag sheet closes' });
+    await page.click('[data-rx-open="tag-sheet"]');
+    await page.waitFor(() => document.querySelector('#tag-sheet').open);
+    await page.press('Escape');
+    await page.waitFor(() => !document.querySelector('#tag-sheet').open, { message: 'closed by Escape' });
+  }));
+
 test('a side sheet keeps focus inside, closes on its backdrop and gives focus back', () =>
   onOverlays(async (page) => {
     await page.click('[data-rx-open="side-sheet"]');
