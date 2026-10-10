@@ -149,6 +149,13 @@ struct Counter {
     search: String,
     nick: String,
     lazy: String,
+    title: String,
+}
+
+impl Validate for Counter {
+    fn rules(&self, v: &mut Validator) {
+        v.field("title", &self.title).required();
+    }
 }
 
 impl LiveComponent for Counter {
@@ -166,7 +173,7 @@ impl LiveComponent for Counter {
         &mut self,
         action: &str,
         args: Vec<renox::serde_json::Value>,
-        _ctx: &mut renox::live_component::LiveContext,
+        ctx: &mut renox::live_component::LiveContext,
     ) -> Result {
         match action {
             "increment" => self.count += 1,
@@ -174,6 +181,10 @@ impl LiveComponent for Counter {
                 self.count += args.first().and_then(|n| n.as_i64()).unwrap_or(0);
             }
             "rename" => {}
+            "save" => ctx.validate(&*self).await?,
+            "notify" => ctx.toast(Toast::success("Saved from live.")),
+            "go" => ctx.redirect("/stock"),
+            "ping" => ctx.dispatch("pinged", json!({ "n": 1 })),
             _ => return Err(Error::NotFound),
         }
         Ok(())
