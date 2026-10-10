@@ -67,7 +67,8 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `DATABASE_URL` (`.env`). Never edit a migration that has run; add a new one.
 - `tests/`: integration tests; `tests/home.rs` is the pattern.
 - After changing a model or a migration, run `rnx db:check` (it compares every `app.model::<…>()`
-  with the tables the migrations build).
+  with the tables the migrations build). After editing templates, run `rnx view:check` (it
+  compiles every template and checks each `route('name')`); `tests/home.rs` runs it too.
 
 ## Things that trip agents up
 
