@@ -294,7 +294,13 @@ pub fn resource(
     let uses_date = fields.iter().any(|f| f.kind == Kind::Date);
     let model_fields: String = fields
         .iter()
-        .map(|f| format!("    pub {}: {},\n", f.name, f.rust_type()))
+        .map(|f| {
+            let rules = f
+                .rules()
+                .map(|rules| format!("    #[form(validate({rules}))]\n"))
+                .unwrap_or_default();
+            format!("{rules}    pub {}: {},\n", f.name, f.rust_type())
+        })
         .collect();
     let fakes: String = fields
         .iter()
@@ -328,36 +334,7 @@ pub fn resource(
     write_new(&dir.join("model.rs"), &model_rs)?;
 
     // The module: routes, form, handlers.
-    let form_fields: String = fields
-        .iter()
-        .map(|f| {
-            let default = if f.kind == Kind::Bool {
-                "    /// An unchecked box sends nothing: false.\n    #[serde(default)]\n"
-            } else {
-                ""
-            };
-            let rules = f
-                .rules()
-                .map(|rules| format!("    #[validate({rules})]\n"))
-                .unwrap_or_default();
-            format!("{default}{rules}    {}: {},\n", f.name, f.rust_type())
-        })
-        .collect();
-    let assign: String = fields
-        .iter()
-        .map(|f| format!("        record.{0} = self.{0};\n", f.name))
-        .collect();
-    let mod_rs = replace(MODULE)
-        .replace("__form_fields__", &form_fields)
-        .replace("__assign__", &assign)
-        .replace(
-            "__date_use__",
-            if uses_date {
-                "use renox::chrono::NaiveDate;\n"
-            } else {
-                ""
-            },
-        );
+    let mod_rs = replace(MODULE);
     write_new(&dir.join("mod.rs"), &mod_rs)?;
 
     // Views.
@@ -536,8 +513,10 @@ const MODEL: &str = r#"use renox::fake::Fake;
 __faker_use__use renox::prelude::*;
 __date_use__use serde::{Deserialize, Serialize};
 
+// `#[model(form)]` makes `__Model__Form` (the create/edit form) from the fields;
+// rules go in `#[form(validate(…))]`.
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
-#[model(table = "__table__")]
+#[model(table = "__table__", form)]
 pub struct __Model__ {
     pub id: i64,
 __fields__    pub created_at: Option<DateTime>,
@@ -560,9 +539,7 @@ const MODULE: &str = r#"//! Made with `rnx make:module __module__ --resource`: l
 pub mod model;
 
 use renox::prelude::*;
-__date_use__use serde::Deserialize;
-
-use model::__Model__;
+use model::{__Model__, __Model__Form};
 
 pub struct __Module__;
 
@@ -594,19 +571,6 @@ impl Module for __Module__ {
             )
             .require_auth()
     }
-}
-
-/// What the create and edit forms send, and its rules (each `#[validate(…)]`
-/// item is a rule: `required`, `max = 255`, `unique("table", "column")`…).
-/// For `prepare`, `authorize` or `after`, add `#[validate(hooks)]` and
-/// `impl renox::validation::ValidateHooks`.
-#[derive(Deserialize, Validate)]
-struct __Model__Form {
-__form_fields__}
-
-impl __Model__Form {
-    fn fill(self, record: &mut __Model__) {
-__assign__    }
 }
 
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
@@ -917,6 +881,12 @@ mod tests {
         let module = read(&dir, "src/app/products/mod.rs");
         assert!(module.contains("pub struct Products;"));
         assert!(!module.contains("__"), "every placeholder is filled");
+        assert!(model.contains("form)]"), "{model}");
+        assert!(
+            model.contains("#[form(validate(required, max = 255))]"),
+            "{model}"
+        );
+        assert!(!module.contains("struct ProductForm"), "{module}");
         for view in ["index", "form", "show"] {
             let html = read(&dir, &format!("resources/views/products/{view}.html"));
             assert!(!html.contains("__Model__") && !html.contains("__path__"));
@@ -964,7 +934,10 @@ mod tests {
         let model = read(&dir, "src/app/news/model.rs");
         assert!(model.contains("pub struct Article"));
         // The model's table, not the module's (#127).
-        assert!(model.contains(r#"#[model(table = "articles")]"#), "{model}");
+        assert!(
+            model.contains(r#"#[model(table = "articles", form)]"#),
+            "{model}"
+        );
         let migrations: Vec<String> = fs::read_dir(dir.path().join("migrations"))
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
@@ -1019,8 +992,8 @@ mod tests {
         );
         let tests = read(&dir, "tests/readings.rs");
         assert!(!tests.contains("__"), "{tests}");
-        let module = read(&dir, "src/app/readings/mod.rs");
-        assert!(module.contains("NaiveDate"), "{module}");
+        let model = read(&dir, "src/app/readings/model.rs");
+        assert!(model.contains("NaiveDate"), "{model}");
         // Every generated file together: the fake values and the test's
         // sample values for each kind, the float column, and the heading
         // that falls back to the id when the first field isn't text.
