@@ -1,14 +1,11 @@
-{% extends "layouts/app.html" %}
 {#- `about.fields.edit`: the form of /about/fields with the stored values, each
-    in the format its input expects (about/_fields_form.html). -#}
-{% from "renox/ui.html" import page_header, card %}
-{% block seo %}{{ seo(title=t('fields.edit_title', name=sample.name)) }}{% endblock %}
-
-{% block content %}
-<div class="rx-stack" data-bs-reveal>
-  {{ page_header(t('fields.edit_title', name=sample.name), subtitle=t('fields.edit_lead'), back=route('about.fields.show', sample.id), back_label=sample.name) }}
-  {% call card() %}
-    {% include "about/_fields_form.html" %}
-  {% endcall %}
-</div>
-{% endblock %}
+    in the format its input expects (about/_fields_form.html). The include is the
+    one `{% %}` left: it has no tag yet (#374). -#}
+<rx-page layout="layouts/app.html" title="{{ t('fields.edit_title', name=sample.name) }}">
+  <rx-stack data-bs-reveal>
+    <rx-page-header title="{{ t('fields.edit_title', name=sample.name) }}" subtitle="{{ t('fields.edit_lead') }}" back="{{ route('about.fields.show', sample.id) }}" back-label="{{ sample.name }}"/>
+    <rx-card>
+      {% include "about/_fields_form.html" %}
+    </rx-card>
+  </rx-stack>
+</rx-page>

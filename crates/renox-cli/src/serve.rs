@@ -47,7 +47,7 @@ pub fn run(cargo_args: &[String]) -> Result<()> {
     let mut app: Option<Child> = None;
     loop {
         match build(cargo_args)? {
-            Some(exe) if migrate(&exe)? => {
+            Some(exe) if view_data(&exe) && migrate(&exe)? => {
                 if let Some(mut old) = app.take() {
                     stop(&mut old);
                 }
@@ -90,6 +90,21 @@ pub(crate) fn build(cargo_args: &[String]) -> Result<Option<PathBuf>> {
         Some(exe) => Ok(Some(exe)),
         None => bail!("the build produced no binary; is this a Renox app?"),
     }
+}
+
+/// Refreshes `.vscode/renox-components.json` (editor autocomplete) with the
+/// new binary. A failure only prints a warning; always returns true so the
+/// build carries on to the migrations.
+fn view_data(exe: &Path) -> bool {
+    match Command::new(exe).arg("view:data").output() {
+        Ok(out) if out.status.success() => {}
+        Ok(out) => eprintln!(
+            "rnx: warning: view:data failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ),
+        Err(e) => eprintln!("rnx: warning: could not run view:data: {e}"),
+    }
+    true
 }
 
 /// Runs pending migrations with the new binary. Prints its output unless

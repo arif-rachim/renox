@@ -64,6 +64,7 @@ Commands:
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   route:list                List every route with its name, module and guards
   view:check                Compile every template and check its route names
+  view:data [--out P]       Write .vscode/renox-components.json for editor autocomplete
   db:shell                  Run SQL against the database (`.tables`, `.quit`)
   down [--secret S] [--retry N]
                             Maintenance mode: answer 503 (visit /S to bypass it)
@@ -572,6 +573,7 @@ impl App {
             duplicate_live,
             commands,
             templates,
+            components,
             shares,
             channels,
             reporters,
@@ -773,6 +775,7 @@ impl App {
             storage.clone(),
             embedded.map(|e| e.views),
             Arc::new(templates),
+            Arc::new(components.iter().map(|c| c.contract()).collect()),
             zone,
             versions,
         );
@@ -994,6 +997,19 @@ impl App {
                 if !problems.is_empty() {
                     return Err(anyhow!("{} template problem(s)", problems.len()).into());
                 }
+            }
+            "view:data" if !kernel.commands.iter().any(|c| c.name == "view:data") => {
+                let path = std::path::Path::new(
+                    flag_text(args, "--out").unwrap_or(".vscode/renox-components.json"),
+                );
+                if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+                    std::fs::create_dir_all(dir)?;
+                }
+                let mut text = serde_json::to_string_pretty(&kernel.state.views.custom_data())
+                    .map_err(|e| anyhow!(e))?;
+                text.push('\n');
+                std::fs::write(path, text)?;
+                println!("Wrote {}.", path.display());
             }
             "migrate:status" => {
                 for m in kernel.migration_status().await? {

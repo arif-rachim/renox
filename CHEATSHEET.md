@@ -453,6 +453,25 @@ Tailwind: `rnx new shop --tailwind` (or create `resources/css/app.css` with
 change, `rnx build` minifies it; link it with `{{ asset('css/app.css') }}`. The kit's `rx-*`
 classes keep working next to the utilities.
 
+### Components as tags (details in docs/ui.md "Components as tags")
+
+```html
+{# <rx-…> and <app-…> tags are rewritten to MiniJinja when a template loads (not compiled: the file is html) #}
+<rx-page layout="layouts/app.html" title="{{ t('products.title') }}">
+  <rx-page-header title="Products"><rx-link-button route="products.create" label="New" variant="primary"/></rx-page-header>
+  <rx-table :rows="products" caption="Products">                  {# list or page; pagination is added #}
+    <rx-column label="Name">{{ row.name }}</rx-column>
+    <rx-column label="Price" align="num">{{ row.price | money }}</rx-column>
+    <rx-row-actions><rx-icon-button can="update" route="products.edit" icon="pencil" label="Edit"/></rx-row-actions>
+    <rx-slot name="empty"><rx-empty title="No products"/></rx-slot>
+  </rx-table>
+  <rx-form action="{{ route('products.store') }}"><rx-input name="name" label="Name" required/><rx-button>Save</rx-button></rx-form>
+  <li rx-for="p in products" rx-if="p.active">{{ p.name }}</li>   {# rx-else on the next sibling #}
+  <app-price-tag :amount="p.price"/>                              {# components/price_tag.html, starts with <rx-props amount> #}
+</rx-page>
+{# value forms: x="text"  x="{{ expr }}"  x="a {{ b }}"  :x="expr"  bare = true. Errors show file:line. #}
+```
+
 ## Your own shared values and middleware
 
 Give every handler the same service (here, a payment client), and run your own code around
@@ -711,6 +730,8 @@ struct Product {
 /// `#[model(table = "products", index(user_id))]` and `#[model(default = "0")] price: i64`.
 /// In a test, `TestApp::new(app).await.assert_views_compile()` (or `rnx view:check`) compiles
 /// every template and checks its `route('name')` calls.
+/// `rnx view:data` writes `.vscode/renox-components.json` (VS Code tag autocomplete; `rnx serve`
+/// refreshes it, `rnx new` sets `html.customData`). JetBrains isn't covered.
 /// Register the model so `rnx db:check` (and `assert_models_match_schema` in tests)
 /// compares its fields with the table. In a module: `app.model::<Product>()` in `register`.
 fn checked() -> App {

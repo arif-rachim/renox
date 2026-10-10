@@ -16,6 +16,7 @@ quicker.
 - [Fewer dependencies](#fewer-dependencies): build less code by turning off parts you don't use.
 - [Sharing compiled dependencies](#sharing-compiled-dependencies): reuse work between apps.
 - [Docker](#docker): keep Docker builds quick.
+- [Editor autocomplete](#editor-autocomplete): tag and attribute suggestions for templates.
 
 ### Words you'll meet
 
@@ -142,3 +143,12 @@ code, only your own crate is compiled, not every dependency again.
 > [!IMPORTANT]
 > Commit `Cargo.lock` to your repository. It records the exact version of every dependency,
 > so the dependency layer is built from the same versions each time.
+
+## Editor autocomplete
+
+New apps get suggestions for the kit's `<rx-…>` tags in VS Code. `rnx serve` writes
+`.vscode/renox-components.json` after each build (the same as running `rnx view:data`), and
+`.vscode/settings.json` points `html.customData` at it. The file is git-ignored. If a build
+can't write it, `rnx serve` warns and keeps running. See
+[the UI guide](ui.md#editor-autocomplete). JetBrains IDEs aren't covered: they read Web Types,
+not this format.

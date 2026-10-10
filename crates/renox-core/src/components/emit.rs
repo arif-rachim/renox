@@ -638,6 +638,32 @@ fn emit_node(
                 out.push_str(&pad(&src[c.clone()]));
             }
         }
+        Render::Function(function) => {
+            let mut positional: Vec<(usize, String)> = Vec::new();
+            let mut named: Vec<String> = Vec::new();
+            for a in attrs {
+                let n = bare(a.name);
+                let Some((at, p)) = contract.props.iter().enumerate().find(|(_, p)| p.name == n)
+                else {
+                    return Err(err(a.line, format!("<{}> has no \"{n}\"", contract.tag)));
+                };
+                let e = attrs::prop_expr(a, p.kind, p.values)
+                    .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
+                if p.required {
+                    positional.push((at, e));
+                } else {
+                    named.push(format!("{}={e}", attrs::snake(n)));
+                }
+            }
+            positional.sort_by_key(|(at, _)| *at);
+            let mut args: Vec<String> = positional.into_iter().map(|(_, e)| e).collect();
+            args.extend(named);
+            out.push_str(&format!("{{{{ {function}({}) }}}}", args.join(", ")));
+            out.push_str(&pad(&src[open.clone()]));
+            if let Some(c) = close {
+                out.push_str(&pad(&src[c.clone()]));
+            }
+        }
         _ => {
             return Err(err(*line, format!("<{name}> is not supported yet")));
         }

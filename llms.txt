@@ -184,6 +184,8 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   (`index_brands_name` migration).
 - Check templates (`rnx view:check`, `TestApp::assert_views_compile`: syntax errors and unknown
   `route('name')`s): [docs/testing.md](docs/testing.md#templates).
+- Editor autocomplete for templates (`rnx view:data` writes `.vscode/renox-components.json`, VS Code
+  `html.customData`; JetBrains not covered): [docs/ui.md](docs/ui.md#editor-autocomplete).
 - [docs/authorization.md](docs/authorization.md): which tool answers which question (gates,
   policies, the `Permissions` module, roles per branch (a role in one store, with dates),
   `gate_before`, token abilities, tenants with default scopes and `renox::context`, password
@@ -191,7 +193,9 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
 - [docs/testing.md](docs/testing.md): `TestApp` requests and assertions (JSON paths, views,
   session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
   counting queries, a browser-test recipe.
-- [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
+- [docs/ui.md](docs/ui.md): components that see the request, components as tags (`<rx-card>`,
+  `<app-price-tag>`, `rx-if`/`rx-for`, `rx-page`, `rx-table`; compiled in
+  `crates/renox-core/src/components/`; bikeshop's supplier pages show them), the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`,
   buttons beside an entry's value with `prefix_actions`/`suffix_actions`;
   actions: `action_sheet`, `confirm`, `action_group` + `menu_open`, `wizard_action`,
