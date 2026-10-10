@@ -52,7 +52,10 @@ pub(super) fn check_attrs(
     filled: &[&str],
 ) -> Result<(), String> {
     let tag = contract.tag;
-    let element = matches!(contract.render, Render::Element { .. });
+    let element = matches!(
+        contract.render,
+        Render::Element { .. } | Render::Special(Special::Form)
+    );
     let route = attrs.iter().find(|a| bare(a.name) == "route");
     if route.is_some() {
         let Some(prop) = contract.route_prop else {
@@ -446,6 +449,9 @@ fn emit_node(
             }
             Special::Wizard => {
                 special::wizard(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::Form => {
+                special::form(&mut cx, contract, attrs, children, open, close, *line, out)
             }
             _ => Err(err(*line, format!("<{name}> is not supported yet"))),
         };

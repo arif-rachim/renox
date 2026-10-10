@@ -335,3 +335,160 @@ async fn rx_alert_and_rx_empty_match_the_macros() {
     )
     .await;
 }
+
+#[derive(serde::Deserialize)]
+struct Fields {
+    name: String,
+    bio: Option<String>,
+    size: Option<String>,
+    agree: Option<String>,
+}
+
+impl Validate for Fields {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required().max(10);
+        v.field("bio", &self.bio).max(5);
+        v.field("size", &self.size).required();
+        let _ = &self.agree;
+    }
+}
+
+struct FormPages;
+
+impl Module for FormPages {
+    fn name(&self) -> &'static str {
+        "form-pages"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/m", || async { view("m.html", context! {}) })
+            .get("/r", || async { view("r.html", context! {}) })
+            .post("/save", |Valid(_): Valid<Fields>| async { "ok" })
+    }
+}
+
+#[renox::test]
+async fn form_fields_match_the_macros_after_a_failed_submit() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        format!(
+            "{UI}{{{{ ui.form_errors(title=\"Fix these\") }}}}\
+             {{% call ui.form_grid(columns=3) %}}\
+             {{{{ ui.input(name=\"name\", label=\"Name\", type=\"text\", hint=\"Short\", required=true, span=\"full\", attrs={{\"maxlength\": \"20\", \"data-x\": \"1\"}}) }}}}\
+             {{{{ ui.textarea(name=\"bio\", label=\"Bio\", rows=2, value=\"hi\") }}}}\
+             {{% endcall %}}\
+             {{{{ ui.select(name=\"size\", label=\"Size\", options=[[\"s\", \"Small\"], [\"m\", \"Medium\"]], required=true) }}}}\
+             {{{{ ui.checkbox(name=\"agree\", label=\"Agree\", switch=true) }}}}"
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-form-errors title=\"Fix these\"/>\
+         <rx-form-grid columns=\"3\">\
+         <rx-input name=\"name\" label=\"Name\" type=\"text\" hint=\"Short\" required span=\"full\" maxlength=\"20\" data-x=\"1\"/>\
+         <rx-textarea name=\"bio\" label=\"Bio\" rows=\"2\" value=\"hi\"/>\
+         </rx-form-grid>\
+         <rx-select name=\"size\" label=\"Size\" :options=\"[['s', 'Small'], ['m', 'Medium']]\" required/>\
+         <rx-checkbox name=\"agree\" label=\"Agree\" switch/>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(FormPages), move |c| c.views_path = path).await;
+    let bad = [
+        ("name", "Much too long a name"),
+        ("bio", "far too long"),
+        ("agree", "on"),
+    ];
+    let mut pages = Vec::new();
+    for page in ["/m", "/r"] {
+        app.request()
+            .header("referer", page)
+            .post("/save", &bad)
+            .await
+            .assert_redirect(page);
+        let r = app.get(page).await;
+        r.assert_ok();
+        pages.push(normalize(&r.text()));
+    }
+    assert!(pages[0].contains("aria-invalid=\"true\""), "{}", pages[0]);
+    assert!(pages[0].contains("value=\"Much too long a name\""));
+    assert!(pages[0].contains("data-rx-error-summary"));
+    assert_eq!(pages[0], pages[1]);
+}
+
+#[renox::test]
+async fn rx_form_writes_the_csrf_and_method_fields() {
+    let (put, get, post) = (
+        "<rx-form action=\"/items/1\" method=\"PUT\" live class=\"box\" id=\"f\" :data-n=\"1 + 1\" hx-boost=\"true\">x</rx-form>",
+        "<rx-form action=\"/search\" method=\"GET\"><input name=\"q\"></rx-form>",
+        "<rx-form route=\"home\"></rx-form><rx-form></rx-form>",
+    );
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("r.html"), format!("{put}{get}{post}")).unwrap();
+    std::fs::write(dir.path().join("m.html"), "").unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(FormPages).module(HomeName), move |c| {
+        c.views_path = path
+    })
+    .await;
+    let html = app.get("/r").await.assert_ok().text();
+    let forms: Vec<&str> = html.split("</form>").collect();
+    let first = forms[0];
+    assert!(first.starts_with(
+        "<form method=\"post\" action=\"/items/1\" data-live-validate novalidate class=\"box\" id=\"f\" data-n=\"2\" hx-boost=\"true\">"
+    ), "{first}");
+    assert!(first.contains("name=\"_token\""), "{first}");
+    assert!(first.contains("name=\"_method\" value=\"PUT\""), "{first}");
+    let second = forms[1];
+    assert!(
+        second.starts_with("<form method=\"get\" action=\"/search\">"),
+        "{second}"
+    );
+    assert!(
+        !second.contains("_token") && !second.contains("_method"),
+        "{second}"
+    );
+    assert!(
+        forms[2].starts_with("<form method=\"post\" action=\"/home\">"),
+        "{}",
+        forms[2]
+    );
+    assert!(forms[2].contains("_token") && !forms[2].contains("_method"));
+    assert!(
+        forms[3].starts_with("<form method=\"post\">"),
+        "{}",
+        forms[3]
+    );
+}
+
+struct HomeName;
+
+impl Module for HomeName {
+    fn name(&self) -> &'static str {
+        "home-name"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/home", || async { "home" }).name("home")
+    }
+}
+
+#[renox::test]
+async fn rx_form_rejects_a_bad_method() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-form method=\"PUTT\"></rx-form>",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("m.html"), "").unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(FormPages), move |c| c.views_path = path).await;
+    let r = app.get("/r").await.text();
+    assert!(r.contains("must be one of"), "{r}");
+}
