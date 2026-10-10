@@ -101,6 +101,12 @@ use_database shop
 if [ "$(uname -m)" = x86_64 ] && command -v mold >/dev/null && command -v clang >/dev/null; then
     grep -q 'fuse-ld=mold' .cargo/config.toml
 elif [ "$(uname -m)" = x86_64 ]; then test ! -e .cargo/config.toml; fi
+
+step "rnx doctor (no build), and outside an app"
+"$RNX" doctor --no-build | tee "$WORK/doctor.txt"
+grep -q '✓ APP_KEY' "$WORK/doctor.txt"
+if APP_KEY=short "$RNX" doctor --no-build >/dev/null; then echo "FAIL: a short APP_KEY passed"; exit 1; fi
+(cd "$WORK" && "$RNX" doctor --no-build | grep -q 'not in an app directory')
 grep '^renox' Cargo.toml
 
 step "no template placeholder left in the new app"
@@ -170,6 +176,7 @@ if runs; then
     cargo test
     step "the app's own commands"
     cargo run -q -- migrate
+    "$RNX" doctor | grep -q 'Migrations: all ran'
     cargo run -q -- migrate:status
     cargo run -q -- db:check
     cargo run -q -- migrate:status | grep -q 'ran.*create_products_table'

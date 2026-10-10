@@ -38,6 +38,7 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
 Prefer them over writing boilerplate by hand:
 
 ```bash
+rnx doctor   # what's missing on this machine or in this app, with the fix
 rnx make:module products                               # src/app/products + view + registration
 rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD, with tests; runs migrate (asks outside APP_ENV=local; --no-migrate), prints the URL; --open opens it
 rnx make:model Product --module products --migration   # model + migrations/*.sql
