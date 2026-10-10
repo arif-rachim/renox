@@ -87,6 +87,10 @@ pub(crate) enum Special {
     Wizard,
     /// `rx-wizard-step`, made by its parent.
     WizardStep,
+    /// `rx-tabs`.
+    Tabs,
+    /// `rx-tab`, made by its parent.
+    Tab,
 }
 
 /// One attribute a component takes.
@@ -441,6 +445,42 @@ pub(crate) static BUILTIN: &[Contract] = &[
         route_prop: None,
         attrs: false,
         parent: Some("rx-wizard"),
+    },
+    Contract {
+        tag: "rx-tabs",
+        doc: "Tabs with their panels; each `<rx-tab>` inside is one tab and its panel.",
+        render: Render::Special(Special::Tabs),
+        props: &[
+            text("id", true, "The tabs' id; the panels build theirs from it."),
+            text(
+                "selected",
+                false,
+                "The key of the open tab; the first by default.",
+            ),
+            text("label", false, "The tab list's accessible name."),
+        ],
+        slots: &[Slot {
+            doc: "Only `<rx-tab>` elements.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-tab",
+        doc: "One tab; its content is the panel.",
+        render: Render::Special(Special::Tab),
+        props: &[
+            text("key", true, "The tab's key, unique in the tabs."),
+            text("label", true, "The tab's text."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: Some("rx-tabs"),
     },
     Contract {
         tag: "rx-table",
