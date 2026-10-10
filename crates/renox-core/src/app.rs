@@ -41,6 +41,8 @@ Commands:
                             Undo the last N batches of migrations (default 1)
   migrate:fresh [--seed]    Drop all tables, run every migration, optionally seed
   migrate:status            List migrations and whether they have run
+  db:check                  Compare the registered models with the tables the migrations build
+  db:diff [name] [--yes]    Write a migration for what changed in the registered models
   db:seed                   Run the seeders
   queue:work [--queue a,b] [--workers N] [--once]
                             Run queued jobs (until stopped, or --once for what's there)
@@ -61,6 +63,8 @@ Commands:
   schedule:run <task>       Run one scheduled task now
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   route:list                List every route with its name, module and guards
+  view:check                Compile every template and check its route names
+  view:data [--out P]       Write .vscode/renox-components.json for editor autocomplete
   db:shell                  Run SQL against the database (`.tables`, `.quit`)
   down [--secret S] [--retry N]
                             Maintenance mode: answer 503 (visit /S to bypass it)
@@ -342,6 +346,25 @@ impl App {
         self
     }
 
+    /// Registers a model for `db:check`, which compares its fields with the
+    /// table. Registering it twice keeps one.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64 }
+    /// let app = App::new().model::<Product>();
+    /// ```
+    pub fn model<M: crate::db::Model>(mut self) -> Self {
+        self.registry.model::<M>();
+        self
+    }
+
+    /// Registers the live component `C` (see `renox::live_component`).
+    pub fn live_component<C: crate::live_component::LiveComponent>(mut self) -> Self {
+        self.registry.live_component::<C>();
+        self
+    }
+
     /// Lets queue workers run jobs of type `J`.
     pub fn job<J: Job>(mut self) -> Self {
         self.registry.job::<J>();
@@ -546,8 +569,11 @@ impl App {
             schedule,
             duplicate_job,
             webhooks,
+            live_components,
+            duplicate_live,
             commands,
             templates,
+            components,
             shares,
             channels,
             reporters,
@@ -559,6 +585,7 @@ impl App {
             assets: static_assets,
             provided: mut module_provided,
             seeders,
+            models,
         } = self.registry;
         // The app's own `App::provide` values win over the modules'.
         module_provided.extend(self.provided);
@@ -566,6 +593,9 @@ impl App {
         let static_assets: Arc<[crate::registry::StaticAsset]> = static_assets.into();
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
+        }
+        if let Some(name) = duplicate_live {
+            return Err(anyhow!("live component `{name}` is registered twice").into());
         }
         if duplicate_second_factor {
             return Err(
@@ -745,6 +775,7 @@ impl App {
             storage.clone(),
             embedded.map(|e| e.views),
             Arc::new(templates),
+            Arc::new(components.iter().map(|c| c.contract()).collect()),
             zone,
             versions,
         );
@@ -769,6 +800,7 @@ impl App {
         let state = AppState::new(crate::state::AppStateInner {
             security,
             webhooks: Arc::new(webhooks),
+            live_components: Arc::new(live_components),
             mailer,
             mailers: Arc::new(mailers),
             queue: Queue::new(db.clone(), key.clone()),
@@ -858,6 +890,7 @@ impl App {
             state,
             migrator,
             seeders,
+            models,
             handlers: Arc::new(jobs),
             schedule,
             zone,
@@ -947,6 +980,36 @@ impl App {
                     kernel.seed().await?;
                     println!("Seeded.");
                 }
+            }
+            "db:diff" if !kernel.commands.iter().any(|c| c.name == "db:diff") => {
+                crate::db::auto_migration::run(&kernel, &args[1..]).await?
+            }
+            "db:check" if !kernel.commands.iter().any(|c| c.name == "db:check") => {
+                kernel.db_check().await?
+            }
+            "view:check" if !kernel.commands.iter().any(|c| c.name == "view:check") => {
+                let problems = kernel.state.views.check(&kernel.state.routes);
+                for problem in &problems {
+                    println!("{problem}");
+                }
+                let checked = kernel.state.views.names().len();
+                println!("Checked {checked} templates: {} problems.", problems.len());
+                if !problems.is_empty() {
+                    return Err(anyhow!("{} template problem(s)", problems.len()).into());
+                }
+            }
+            "view:data" if !kernel.commands.iter().any(|c| c.name == "view:data") => {
+                let path = std::path::Path::new(
+                    flag_text(args, "--out").unwrap_or(".vscode/renox-components.json"),
+                );
+                if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+                    std::fs::create_dir_all(dir)?;
+                }
+                let mut text = serde_json::to_string_pretty(&kernel.state.views.custom_data())
+                    .map_err(|e| anyhow!(e))?;
+                text.push('\n');
+                std::fs::write(path, text)?;
+                println!("Wrote {}.", path.display());
             }
             "migrate:status" => {
                 for m in kernel.migration_status().await? {
@@ -1246,6 +1309,7 @@ pub struct Kernel {
     state: AppState,
     migrator: Migrator,
     seeders: Vec<crate::registry::Seeder>,
+    models: Vec<crate::db::schema::ModelInfo>,
     handlers: Handlers,
     schedule: Schedule,
     zone: Zone,
@@ -1253,6 +1317,31 @@ pub struct Kernel {
 }
 
 impl Kernel {
+    /// A scratch database with every migration run (reused by #371).
+    pub(crate) async fn scratch_db(&self) -> Result<Db> {
+        let db = crate::db::connect_scratch(&self.state.config).await?;
+        self.migrator.run(&db).await?;
+        Ok(db)
+    }
+
+    /// `db:check`: compares the models with what the migrations build.
+    async fn db_check(&self) -> Result {
+        let db = self.scratch_db().await?;
+        let reports = crate::db::schema_check::check(&db, &self.models).await;
+        crate::db::drop_scratch(&db).await;
+        let (text, problems) = crate::db::schema_check::render(&reports?);
+        print!("{text}");
+        if problems > 0 {
+            return Err(anyhow::anyhow!("{problems} problem(s) in the models").into());
+        }
+        Ok(())
+    }
+
+    /// The models registered with `App::model`, once each.
+    pub(crate) fn models(&self) -> &[crate::db::schema::ModelInfo] {
+        &self.models
+    }
+
     /// Runs the app command `name` (see [`App::command`]), e.g. from a test.
     pub async fn call(
         &self,
@@ -1429,6 +1518,7 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
         route("GET", "/_renox/files/{*key}"),
         route("POST", "/_renox/grid/{grid}/prefs"),
         route("DELETE", "/_renox/grid/{grid}/prefs"),
+        route("POST", "/_renox/live/{component}/{action}"),
         route("GET", "/storage/{*path}"),
     ];
     if config.debug {
@@ -1680,7 +1770,8 @@ fn build_router(
     };
     let router = router
         .merge(crate::storage::router())
-        .merge(crate::grid::router());
+        .merge(crate::grid::router())
+        .merge(crate::live_component::route::router());
     let router = if state.config.debug {
         router
             .merge(crate::mail::preview_router())
@@ -2005,5 +2096,56 @@ mod tests {
             table.contains("active scope (permissions::set_scope)"),
             "{table}"
         );
+    }
+
+    struct Note;
+    impl crate::db::FromRow for Note {
+        fn from_row(_: &crate::db::Row) -> Result<Self, crate::db::DbError> {
+            Ok(Note)
+        }
+    }
+    impl crate::db::Model for Note {
+        const TABLE: &'static str = "notes";
+        const COLUMNS: &'static [&'static str] = &["id"];
+        type Key = i64;
+        fn id(&self) -> i64 {
+            0
+        }
+        fn set_id(&mut self, _: i64) {}
+        fn values(&self) -> Vec<crate::db::DbValue> {
+            Vec::new()
+        }
+    }
+
+    struct Registers;
+    impl Module for Registers {
+        fn name(&self) -> &'static str {
+            "registers"
+        }
+        fn register(&self, app: &mut Registry) {
+            app.model::<crate::auth::User>();
+        }
+    }
+
+    #[tokio::test]
+    async fn models_are_kept_once_from_the_app_and_modules() {
+        let boot = |app: App| async move { app.config(Config::default()).boot().await.unwrap() };
+        let one = boot(
+            App::new()
+                .model::<crate::auth::User>()
+                .model::<crate::auth::User>()
+                .module(Registers),
+        )
+        .await;
+        assert_eq!(one.models().len(), 1);
+        assert_eq!(one.models()[0].table, "users");
+        let two = boot(
+            App::new()
+                .model::<crate::auth::User>()
+                .model::<Note>()
+                .module(Registers),
+        )
+        .await;
+        assert_eq!(two.models().len(), 2);
     }
 }

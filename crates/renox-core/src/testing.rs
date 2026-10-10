@@ -587,6 +587,47 @@ impl TestApp {
         }
     }
 
+    /// Fails unless every model registered with `App::model` matches the
+    /// table the migrations built for it.
+    ///
+    /// ```no_run
+    /// # async fn demo(app: renox::testing::TestApp) {
+    /// app.assert_models_match_schema().await;
+    /// # }
+    /// ```
+    pub async fn assert_models_match_schema(&self) {
+        let reports = crate::db::schema_check::check(self.db(), self.kernel.models())
+            .await
+            .expect("the schema can be read");
+        let (text, problems) = crate::db::schema_check::render(&reports);
+        if problems > 0 {
+            panic!("the models do not match the schema:\n{text}");
+        }
+    }
+
+    /// Fails unless every template compiles and every literal `route('name')` in them names
+    /// a route (the check `rnx view:check` runs). Panics with one line per problem,
+    /// `template:line: message`.
+    ///
+    /// ```no_run
+    /// # async fn demo(app: renox::testing::TestApp) {
+    /// app.assert_views_compile();
+    /// # }
+    /// ```
+    pub fn assert_views_compile(&self) -> &Self {
+        let state = self.state();
+        let problems = state.views.check(&state.routes);
+        if !problems.is_empty() {
+            let list: Vec<String> = problems.iter().map(|p| p.to_string()).collect();
+            panic!(
+                "{} template problem(s):\n{}",
+                problems.len(),
+                list.join("\n")
+            );
+        }
+        self
+    }
+
     /// Fails if a row of `table` has all these column values.
     pub async fn assert_database_missing(
         &self,

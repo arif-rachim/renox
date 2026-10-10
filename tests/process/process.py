@@ -575,6 +575,8 @@ def rnx_serve():
         ran = db.execute("SELECT COUNT(*) FROM renox_migrations").fetchone()[0]
         db.close()
         assert ran > 0, "no migrations ran before the start"
+        # view:data ran after the build: the editor's component data exists.
+        assert os.path.exists(os.path.join(app_dir, ".vscode", "renox-components.json")), "view:data wrote no file"
         # Reading files (an OPEN event) restarts nothing.
         with open(os.path.join(app_dir, "src", "lib.rs")) as f:
             f.read()

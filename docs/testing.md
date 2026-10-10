@@ -213,6 +213,44 @@ pattern several answers, and they're used in turn: the first request gets the fi
   so it gets slower the more rows there are:
   `let (res, queries) = capture_queries(app.get("/posts")).await; assert!(queries.len() <= 3);`
 
+### Models and the schema
+
+`app.assert_models_match_schema().await` checks every model registered with `App::model`
+against the tables your migrations built in the test's own database, and panics with the
+report (the one `rnx db:check` prints). Put it in one test per app:
+
+```rust
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+# #[derive(Model, serde::Serialize, Default)]
+# struct Product { id: i64 }
+#[renox::test]
+async fn the_models_match_the_schema() {
+    let app = TestApp::new(App::new().model::<Product>()).await;
+    app.assert_models_match_schema().await;
+}
+```
+
+See [Checking models against the tables](types.md#checking-models-against-the-tables).
+
+### Templates
+
+`app.assert_views_compile()` compiles every template (the app's, the built-in ones and the
+plugins') and checks each literal `route('name')` against the route table. It panics with one
+`template:line: message` line per problem, the same list `rnx view:check` prints. `rnx new`
+apps have this test already:
+
+```rust
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+#[renox::test]
+async fn every_view_compiles() {
+    TestApp::new(App::new()).await.assert_views_compile();
+}
+```
+
 ### Factories
 
 Factories fill tables with made-up rows, so a test doesn't have to type every field:

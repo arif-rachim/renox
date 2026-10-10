@@ -1990,6 +1990,14 @@ Notes:
   doctests and tested in `crates/renox/tests/it`. The milestone notes above keep the old
   examples' names: they are history.
 
+- **Components as tags** (#372, 2026-10): a small compiler in renox-core (`components/`) rewrites
+  `<rx-…>`/`<app-…>` tags and `rx-if`/`rx-else`/`rx-for` to MiniJinja in the loader (MiniJinja
+  has no source hook); a hand-written scanner, no new dependency (html5ever would rebuild the
+  document, quick-xml fails on plain HTML); contracts are a static Rust table so `view:check`,
+  editor data and plugins can read them; errors carry `file:line` with a "did you mean"; generated
+  code never adds a newline, so runtime errors keep their line; plugin templates (`add_template`)
+  are not compiled yet (#376); `rx-else-if` and route arguments are left out on purpose.
+
 ## Not planned
 
 Kept out on purpose, so the framework stays small; some are good candidates for separate crates:

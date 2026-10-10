@@ -25,6 +25,7 @@ rnx make:module products --resource --fields "name:string price:money notes:text
                                      # runs migrate (asks outside APP_ENV=local; --no-migrate), prints the URL; --open opens it
 rnx make:model Product --module products --migration   # --key ulid|uuid|string for other ids
 rnx make:migration add_sku_to_products
+rnx make:migration --auto add_sku     # SQL from what changed in the models (db:diff); --yes skips questions
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products
 rnx make:command products:import --module products  # typed (clap); `rnx products:import --help`
@@ -35,6 +36,7 @@ rnx make:middleware StampRequests    # on every route (App::layer)
 rnx make:component price_tag         # --ui copies the UI kit into the app
 rnx migrate                          # migrate:status, migrate:fresh --seed, db:seed
 rnx migrate:rollback --step 2        # the last 2 batches (default 1)
+rnx db:check                         # every App::model against the tables the migrations build; exits 1 on a mismatch
 rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune, session:prune
 rnx queue:work --queue mail --workers 2  # --once: run what is queued, then stop
 rnx queue:failed                     # queue:retry <id|all>, queue:forget <id>, queue:flush (deletes them)
@@ -451,6 +453,29 @@ Tailwind: `rnx new shop --tailwind` (or create `resources/css/app.css` with
 change, `rnx build` minifies it; link it with `{{ asset('css/app.css') }}`. The kit's `rx-*`
 classes keep working next to the utilities.
 
+### Components as tags (details in docs/ui.md "Components as tags")
+
+```html
+{# <rx-…> and <app-…> tags are rewritten to MiniJinja when a template loads (not compiled: the file is html) #}
+<rx-page layout="layouts/app.html" title="{{ t('products.title') }}">
+  <rx-page-header title="Products"><rx-link-button route="products.create" label="New" variant="primary"/></rx-page-header>
+  <rx-table :rows="products" caption="Products">                  {# list or page; pagination is added #}
+    <rx-column label="Name">{{ row.name }}</rx-column>
+    <rx-column label="Price" align="num">{{ row.price | money }}</rx-column>
+    <rx-row-actions><rx-icon-button can="update" route="products.edit" icon="pencil" label="Edit"/></rx-row-actions>
+    <rx-slot name="empty"><rx-empty title="No products"/></rx-slot>
+  </rx-table>
+  <rx-form action="{{ route('products.store') }}"><rx-input name="name" label="Name" required/><rx-button>Save</rx-button></rx-form>
+  <rx-repeater name="hours" label="Hours" :rows="hours" max="7">  {# row and prefix in the content #}
+    <rx-input name="{{ prefix }}[opens]" label="Opens" type="time" :value="row.opens"/>
+  </rx-repeater>
+  <rx-wizard id="signup" submit-label="Create"><rx-wizard-step key="a" title="Name"><rx-input name="name" label="Name"/></rx-wizard-step></rx-wizard>
+  <li rx-for="p in products" rx-if="p.active">{{ p.name }}</li>   {# rx-else on the next sibling #}
+  <app-price-tag :amount="p.price"/>                              {# components/price_tag.html, starts with <rx-props amount> #}
+</rx-page>
+{# value forms: x="text"  x="{{ expr }}"  x="a {{ b }}"  :x="expr"  bare = true. Errors show file:line. #}
+```
+
 ## Your own shared values and middleware
 
 Give every handler the same service (here, a payment client), and run your own code around
@@ -594,6 +619,31 @@ struct SignIn {
 </form>
 ```
 
+A form that mirrors a model comes from the model: `#[model(table = "products", form)]` generates
+`ProductForm` (Deserialize + Serialize + Validate), rules in `#[form(validate(required, max = 100))]`
+on the fields, `#[form(skip)]` / `#[form(upload)]`, and `form.fill(&mut product)`:
+
+```rust
+use renox::prelude::*;
+use serde::Serialize;
+
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "gadgets", form)]
+pub struct Gadget {
+    pub id: i64,
+    #[form(validate(required, max = 100))]
+    pub name: String,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+async fn save_gadget(Valid(form): Valid<GadgetForm>) -> Result<()> {
+    let mut gadget = Gadget::default();
+    form.fill(&mut gadget);
+    Ok(())
+}
+```
+
 A form request (Laravel's `FormRequest`) adds three optional steps around the rules: tidy the
 input first (`prepare`), check the user may send it (`authorize`), and run extra checks at the
 end (`after`).
@@ -679,6 +729,19 @@ struct Product {
     deleted_at: Option<DateTime>,
 }
 
+/// Optional schema hints for `rnx make:migration --auto`: `index(a, b)` / `unique(slug)` on the
+/// struct (repeatable), `default = "0"` and `references = "users"` on a field. Use them as
+/// `#[model(table = "products", index(user_id))]` and `#[model(default = "0")] price: i64`.
+/// In a test, `TestApp::new(app).await.assert_views_compile()` (or `rnx view:check`) compiles
+/// every template and checks its `route('name')` calls.
+/// `rnx view:data` writes `.vscode/renox-components.json` (VS Code tag autocomplete; `rnx serve`
+/// refreshes it, `rnx new` sets `html.customData`). JetBrains isn't covered.
+/// Register the model so `rnx db:check` (and `assert_models_match_schema` in tests)
+/// compares its fields with the table. In a module: `app.model::<Product>()` in `register`.
+fn checked() -> App {
+    App::new().model::<Product>()
+}
+
 async fn queries(db: &Db) -> Result {
     // Insert a row; `create` returns it with its new id.
     let mut tea = Product::create(db, Product { name: "Tea".into(), price: 9_000, ..Default::default() }).await?;
@@ -690,6 +753,12 @@ async fn queries(db: &Db) -> Result {
         .where_like("name", "%tea%") // ignores case
         .order_by("name")
         .limit(10)
+        .get(db)
+        .await?;
+    // The same with typed columns: a misspelt field is a compile error, and the value's type is checked.
+    let cheap_typed = Product::query()
+        .where_(Product::PRICE.lt(20_000))
+        .order_by(Product::NAME)
         .get(db)
         .await?;
     let one = Product::find_or_404(db, tea.id).await?; // missing row -> 404 page
@@ -778,6 +847,10 @@ async fn even_more_queries(db: &Db) -> Result {
     Ok(())
 }
 ```
+
+Prefer the typed columns (`Product::PRICE.lt(20_000)`, `order_by(Product::NAME)`): the derive makes
+one constant per field, in SHOUTY_SNAKE_CASE. `#[model(no_typed_columns)]` turns them off for a struct
+that has its own items of those names; the string forms keep working.
 
 The query builder checks every column name against the model's fields, and `where_op` takes only
 `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `like` and `not like`. Anything else (and an `update` that

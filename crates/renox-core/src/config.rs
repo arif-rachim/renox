@@ -170,6 +170,8 @@ pub struct Config {
     pub storage: StorageConfig,
     /// Largest request body in bytes, from `UPLOAD_MAX_SIZE` in megabytes (default 10).
     pub upload_max_size: usize,
+    /// Largest live component snapshot in bytes, from `LIVE_SNAPSHOT_MAX_SIZE` in kilobytes (default 64).
+    pub live_snapshot_max: usize,
     /// The Content-Security-Policy, from `CSP` (`relaxed`, `strict` or `off`).
     pub csp: CspMode,
     /// Values `var()` returns before looking at the environment, e.g. a
@@ -224,6 +226,7 @@ impl std::fmt::Debug for Config {
             .field("storage_path", &self.storage_path)
             .field("storage", &self.storage)
             .field("upload_max_size", &self.upload_max_size)
+            .field("live_snapshot_max", &self.live_snapshot_max)
             .field("csp", &self.csp)
             .field(
                 "vars",
@@ -407,6 +410,12 @@ impl Config {
                 .ok()
                 .and_then(|mb| mb.checked_mul(1024 * 1024))
                 .context("UPLOAD_MAX_SIZE must be a number of megabytes")?,
+            live_snapshot_max: v
+                .or("LIVE_SNAPSHOT_MAX_SIZE", "64")
+                .parse::<usize>()
+                .ok()
+                .and_then(|kb| kb.checked_mul(1024))
+                .context("LIVE_SNAPSHOT_MAX_SIZE must be a number of kilobytes")?,
             csp: CspMode::parse(&v.or("CSP", "relaxed"))?,
             trusted_proxies: crate::TrustedProxies::read(&v.or("TRUSTED_PROXIES", ""))?,
             trusted_hosts: v
@@ -481,6 +490,7 @@ impl Default for Config {
             storage_path: "storage".into(),
             storage: StorageConfig::default(),
             upload_max_size: 10 * 1024 * 1024,
+            live_snapshot_max: 64 * 1024,
             csp: CspMode::Relaxed,
             vars: Default::default(),
             analytics: AnalyticsConfig::default(),
@@ -624,6 +634,7 @@ mod tests {
             ("REQUEST_TIMEOUT", "0"),
             ("DATABASE_STATEMENT_TIMEOUT", "5"),
             ("UPLOAD_MAX_SIZE", "2"),
+            ("LIVE_SNAPSHOT_MAX_SIZE", "2"),
             ("MAIL_PORT", "2525"),
             ("MAIL_USERNAME", ""),
             ("MAIL_FAILOVER", "backup, log"),
@@ -639,6 +650,7 @@ mod tests {
         assert_eq!(c.request_timeout, None, "0 means no limit");
         assert_eq!(c.database_statement_timeout, Some(Duration::from_secs(5)));
         assert_eq!(c.upload_max_size, 2 * 1024 * 1024);
+        assert_eq!(c.live_snapshot_max, 2048);
         assert_eq!(c.mail.port, Some(2525));
         assert_eq!(c.mail.username, None, "empty means unset");
         assert_eq!(c.mail.failover, ["backup", "log"]);

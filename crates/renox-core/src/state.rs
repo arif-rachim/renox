@@ -89,6 +89,9 @@ pub struct AppStateInner {
     pub(crate) detect_locale: bool,
     pub(crate) security: Arc<crate::security::Security>,
     pub(crate) webhooks: crate::webhook::Handlers,
+    /// Read by the live component route (#433).
+    #[allow(dead_code)]
+    pub(crate) live_components: crate::live_component::LiveMap,
     /// Values every view gets (`App::share`).
     pub(crate) shares: Arc<Vec<(String, crate::view::ShareFn)>>,
     /// The app's notification channels (`App::channel`).

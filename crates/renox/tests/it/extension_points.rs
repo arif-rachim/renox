@@ -441,3 +441,75 @@ async fn modules_provide_values_and_the_app_overrides_them() {
     let app = TestApp::new(App::new().module(Billing).provide(Plans(vec!["team"]))).await;
     app.get("/plans").await.assert_see("team");
 }
+
+/// A module with its own component and a template of its own that uses it.
+struct Greeter;
+
+impl Module for Greeter {
+    fn name(&self) -> &'static str {
+        "greeter"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/greet", || async { view("greet.html", context! {}) })
+            .get("/greet-typo", || async {
+                view("greet_typo.html", context! {})
+            })
+            .get("/greet-plugin", || async {
+                view("greeter/page.html", context! {})
+            })
+    }
+
+    fn register(&self, app: &mut Registry) {
+        use renox::view::{Component, Prop, add_template};
+        app.templates(|env| {
+            add_template(
+                env,
+                "greeter/ui.html",
+                "{% macro hello(name, loud=false) %}<b>Hello {{ name }}{{ '!' if loud }}</b>{% endmacro %}",
+            )
+            .unwrap();
+            add_template(
+                env,
+                "greeter/page.html",
+                "<p><rx-hello name=\"Plugin\" loud /></p>",
+            )
+            .unwrap();
+            let bad = add_template(env, "greeter/bad.html", "<rx-hello nme=\"x\" />");
+            assert!(bad.unwrap_err().to_string().contains("greeter/bad.html:1"));
+        });
+        app.component(
+            Component::macro_call("rx-hello", "greeter/ui.html", "hello")
+                .doc("Greets someone.")
+                .prop(Prop::text("name").required())
+                .prop(Prop::bool("loud"))
+                .content(false),
+        );
+    }
+}
+
+#[renox::test]
+async fn modules_register_components_and_compile_their_templates() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    write("greet.html", "<rx-hello name=\"{{ 'Ana' }}\" loud />");
+    write("greet_typo.html", "<rx-hello name=\"Ana\" volume=\"3\" />");
+    let views = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Greeter), move |c| {
+        c.views_path = views;
+        c.debug = true;
+    })
+    .await;
+    app.get("/greet")
+        .await
+        .assert_ok()
+        .assert_see("<b>Hello Ana!</b>");
+    app.get("/greet-plugin")
+        .await
+        .assert_ok()
+        .assert_see("<p><b>Hello Plugin!</b></p>");
+    let res = app.get("/greet-typo").await;
+    res.assert_status(500);
+    assert!(res.text().contains("volume"), "{}", res.text());
+}

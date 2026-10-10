@@ -73,6 +73,7 @@ pub mod chart;
 mod client_ip;
 mod clock;
 pub mod command;
+mod components;
 mod config;
 pub mod context;
 mod cookies;
@@ -94,6 +95,7 @@ mod icons;
 pub mod import;
 mod inspector;
 mod live;
+pub mod live_component;
 pub mod mail;
 pub mod maintenance;
 mod method;
@@ -131,7 +133,7 @@ mod view_stack;
 pub mod webhook;
 
 pub use app::{App, Kernel};
-pub use assets::{ALPINE_VERSION, CALLY_VERSION, HTMX_VERSION};
+pub use assets::{ALPINE_VERSION, CALLY_VERSION, HTMX_VERSION, IDIOMORPH_VERSION};
 pub use auth::{AuthUser, Policy};
 pub use client_ip::{ClientIp, TrustedProxies};
 pub use config::{

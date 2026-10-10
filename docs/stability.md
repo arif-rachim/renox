@@ -167,16 +167,16 @@ field for you.
 - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
 - `auth::Can<T>` (use `Can::new`), `schedule::UpcomingRun`, `maintenance::DownOptions` (use
   `DownOptions::new()` or `Default`)
-- `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
+- `view::Component`, `view::Prop`, `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
 - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`,
   `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
   `rate_limit::LimitRequest`, `SentNotification`, `SentBroadcast`, `db::InvalidUlid`, `grid::Grid`,
-  `grid::Column`, `db::ModelColumn`, `grid::GridPrefs`, `grid::RowOrder`, `grid::Workbook`,
+  `grid::Column`, `db::ModelColumn`, `db::ModelIndex`, `grid::GridPrefs`, `grid::RowOrder`, `grid::Workbook`,
   `grid::Action` (`Action::sheet`), `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
   `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
   `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use
   `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`),
-  `import::ImportReport`, `import::FailedRow`, `auth::permissions::Assignment`
+  `live_component::Mounted`, `import::ImportReport`, `import::FailedRow`, `auth::permissions::Assignment`
   (`auth::permissions::Scope` has private fields: make one with `Scope::of`, `of_id`, `new`
   or `global`; `Scopes` stays `All` / `Only`, so a `match` on it needs no `_` arm)
 - `AppStateInner`: what an `AppState` holds, read as the state's fields

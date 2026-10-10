@@ -125,31 +125,31 @@ impl Field {
         }
     }
 
-    /// The form field in the create and edit views (UI kit components).
+    /// The form field in the create and edit views (UI kit tags).
     fn input(&self) -> String {
         let (name, label) = (&self.name, self.label());
-        let value = format!("record.{name} if record else none");
+        let value = format!(":value=\"record.{name} if record else none\"");
         match self.kind {
             Kind::String => {
-                format!("{{{{ input(\"{name}\", \"{label}\", value={value}, required=true) }}}}")
+                format!("<rx-input name=\"{name}\" label=\"{label}\" {value} required/>")
             }
             Kind::Text => {
-                format!("{{{{ textarea(\"{name}\", \"{label}\", value={value}, required=true) }}}}")
+                format!("<rx-textarea name=\"{name}\" label=\"{label}\" {value} required/>")
             }
             Kind::Int => format!(
-                "{{{{ input(\"{name}\", \"{label}\", type=\"number\", value={value}, required=true) }}}}"
+                "<rx-input name=\"{name}\" label=\"{label}\" type=\"number\" {value} required/>"
             ),
             Kind::Money => format!(
-                "{{{{ input(\"{name}\", \"{label}\", value={value}, required=true, hint=\"In cents (the smallest unit), without dots.\", attrs={{\"inputmode\": \"numeric\"}}) }}}}"
+                "<rx-input name=\"{name}\" label=\"{label}\" {value} required hint=\"In cents (the smallest unit), without dots.\" inputmode=\"numeric\"/>"
             ),
             Kind::Float => format!(
-                "{{{{ input(\"{name}\", \"{label}\", type=\"number\", value={value}, required=true, attrs={{\"step\": \"any\"}}) }}}}"
+                "<rx-input name=\"{name}\" label=\"{label}\" type=\"number\" {value} required step=\"any\"/>"
             ),
             Kind::Bool => format!(
-                "{{{{ checkbox(\"{name}\", \"{label}\", checked=(record.{name} if record else false), switch=true) }}}}"
+                "<rx-checkbox name=\"{name}\" label=\"{label}\" :checked=\"record.{name} if record else false\" switch/>"
             ),
             Kind::Date => format!(
-                "{{{{ input(\"{name}\", \"{label}\", type=\"date\", value={value}, required=true) }}}}"
+                "<rx-input name=\"{name}\" label=\"{label}\" type=\"date\" {value} required/>"
             ),
         }
     }
@@ -159,9 +159,9 @@ impl Field {
         let value = format!("{var}.{}", self.name);
         match self.kind {
             Kind::Money => format!("{{{{ {value} | number }}}}"),
-            Kind::Bool => {
-                format!("{{{{ badge(\"Yes\", kind=\"success\") if {value} else badge(\"No\") }}}}")
-            }
+            Kind::Bool => format!(
+                "<rx-badge rx-if=\"{value}\" kind=\"success\">Yes</rx-badge><rx-badge rx-else>No</rx-badge>"
+            ),
             _ => format!("{{{{ {value} }}}}"),
         }
     }
@@ -294,7 +294,13 @@ pub fn resource(
     let uses_date = fields.iter().any(|f| f.kind == Kind::Date);
     let model_fields: String = fields
         .iter()
-        .map(|f| format!("    pub {}: {},\n", f.name, f.rust_type()))
+        .map(|f| {
+            let rules = f
+                .rules()
+                .map(|rules| format!("    #[form(validate({rules}))]\n"))
+                .unwrap_or_default();
+            format!("{rules}    pub {}: {},\n", f.name, f.rust_type())
+        })
         .collect();
     let fakes: String = fields
         .iter()
@@ -328,61 +334,22 @@ pub fn resource(
     write_new(&dir.join("model.rs"), &model_rs)?;
 
     // The module: routes, form, handlers.
-    let form_fields: String = fields
-        .iter()
-        .map(|f| {
-            let default = if f.kind == Kind::Bool {
-                "    /// An unchecked box sends nothing: false.\n    #[serde(default)]\n"
-            } else {
-                ""
-            };
-            let rules = f
-                .rules()
-                .map(|rules| format!("    #[validate({rules})]\n"))
-                .unwrap_or_default();
-            format!("{default}{rules}    {}: {},\n", f.name, f.rust_type())
-        })
-        .collect();
-    let assign: String = fields
-        .iter()
-        .map(|f| format!("        record.{0} = self.{0};\n", f.name))
-        .collect();
-    let mod_rs = replace(MODULE)
-        .replace("__form_fields__", &form_fields)
-        .replace("__assign__", &assign)
-        .replace(
-            "__date_use__",
-            if uses_date {
-                "use renox::chrono::NaiveDate;\n"
-            } else {
-                ""
-            },
-        );
+    let mod_rs = replace(MODULE);
     write_new(&dir.join("mod.rs"), &mod_rs)?;
 
     // Views.
     let listed: Vec<&Field> = fields.iter().take(3).collect();
-    let head: Vec<String> = listed
-        .iter()
-        .map(|f| {
-            if f.numeric() {
-                format!("[\"{}\", \"num\"]", f.label())
-            } else {
-                format!("\"{}\"", f.label())
-            }
-        })
-        .chain(std::iter::once("[\"\", \"num\"]".to_owned()))
-        .collect();
     let cells: String = listed
         .iter()
         .enumerate()
         .map(|(i, f)| {
-            let class = if f.numeric() { " class=\"rx-num\"" } else { "" };
+            let align = if f.numeric() { " align=\"num\"" } else { "" };
             let value = f.display("record");
+            let label = f.label();
             if i == 0 {
-                format!("        <td{class}><a class=\"rx-link\" href=\"{{{{ route('__module__.show', record.id) }}}}\"><strong>{value}</strong></a></td>\n")
+                format!("      <rx-column label=\"{label}\"{align}><a class=\"rx-link\" href=\"{{{{ route('__module__.show', record.id) }}}}\"><strong>{value}</strong></a></rx-column>\n")
             } else {
-                format!("        <td{class}>{value}</td>\n")
+                format!("      <rx-column label=\"{label}\"{align}>{value}</rx-column>\n")
             }
         })
         .collect();
@@ -393,13 +360,13 @@ pub fn resource(
     };
     let inputs: String = fields
         .iter()
-        .map(|f| format!("      {}\n", f.input()))
+        .map(|f| format!("        {}\n", f.input()))
         .collect();
     let details: String = fields
         .iter()
         .map(|f| {
             format!(
-                "      <div class=\"rx-row\"><span class=\"rx-subtitle\">{}</span><span class=\"rx-spacer\"></span><span>{}</span></div>\n",
+                "        <div class=\"rx-row\"><span class=\"rx-subtitle\">{}</span><span class=\"rx-spacer\"></span><span>{}</span></div>\n",
                 f.label(),
                 f.display("record")
             )
@@ -408,9 +375,7 @@ pub fn resource(
     let views = root.join("resources/views").join(&module);
     write_new(
         &views.join("index.html"),
-        &replace(INDEX_VIEW)
-            .replace("__head__", &head.join(", "))
-            .replace("__cells__", &replace(&cells)),
+        &replace(INDEX_VIEW).replace("__cells__", &replace(&cells)),
     )?;
     write_new(
         &views.join("form.html"),
@@ -511,8 +476,10 @@ const MODEL: &str = r#"use renox::fake::Fake;
 __faker_use__use renox::prelude::*;
 __date_use__use serde::{Deserialize, Serialize};
 
+// `#[model(form)]` makes `__Model__Form` (the create/edit form) from the fields;
+// rules go in `#[form(validate(…))]`.
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
-#[model(table = "__table__")]
+#[model(table = "__table__", form)]
 pub struct __Model__ {
     pub id: i64,
 __fields__    pub created_at: Option<DateTime>,
@@ -535,15 +502,17 @@ const MODULE: &str = r#"//! Made with `rnx make:module __module__ --resource`: l
 pub mod model;
 
 use renox::prelude::*;
-__date_use__use serde::Deserialize;
-
-use model::__Model__;
+use model::{__Model__, __Model__Form};
 
 pub struct __Module__;
 
 impl Module for __Module__ {
     fn name(&self) -> &'static str {
         "__module__"
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.model::<__Model__>();
     }
 
     fn routes(&self) -> Routes {
@@ -565,19 +534,6 @@ impl Module for __Module__ {
             )
             .require_auth()
     }
-}
-
-/// What the create and edit forms send, and its rules (each `#[validate(…)]`
-/// item is a rule: `required`, `max = 255`, `unique("table", "column")`…).
-/// For `prepare`, `authorize` or `after`, add `#[validate(hooks)]` and
-/// `impl renox::validation::ValidateHooks`.
-#[derive(Deserialize, Validate)]
-struct __Model__Form {
-__form_fields__}
-
-impl __Model__Form {
-    fn fill(self, record: &mut __Model__) {
-__assign__    }
 }
 
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
@@ -624,84 +580,50 @@ async fn destroy(State(db): State<Db>, Path(id): Path<i64>) -> Result<(Toast, Re
 }
 "#;
 
-const INDEX_VIEW: &str = r#"{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import table, link_button, confirm, badge, empty %}
-{% from "renox/pagination.html" import pagination %}
-
-{% block content %}
-<div class="rx-stack">
-  <div class="rx-row">
-    <h1 class="rx-title">__title__</h1>
-    <span class="rx-spacer"></span>
-    {{ link_button(route('__module__.create'), "New", variant="primary") }}
-  </div>
-  {% if records.items %}
-    {% call table([__head__], caption="__title__") %}
-      {% for record in records.items %}
-      <tr>
-__cells__        <td class="rx-num">
-          <div class="rx-row rx-row--end">
-            {{ link_button(route('__module__.edit', record.id), "Edit", variant="plain", size="small") }}
-            {{ confirm("delete-" ~ record.id, "Delete", route('__module__.destroy', record.id),
-                       "Delete this?", "This can't be undone.", size="small") }}
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    {% endcall %}
-    {{ pagination(records) }}
-  {% else %}
-    {{ empty("Nothing here yet", "What you add shows up in this list.", route('__module__.create'), "Add the first") }}
-  {% endif %}
-</div>
-{% endblock %}
+const INDEX_VIEW: &str = r#"<rx-page layout="layouts/app.html" title="__title__">
+  <rx-stack>
+    <rx-page-header title="__title__">
+      <rx-link-button route="__module__.create" label="New" variant="primary"/>
+    </rx-page-header>
+    <rx-table :rows="records" as="record" :key="record.id" caption="__title__">
+__cells__      <rx-row-actions>
+        <rx-link-button route="__module__.edit" label="Edit" variant="plain" size="small"/>
+        <rx-confirm id="delete-{{ record.id }}" route="__module__.destroy" label="Delete" title="Delete this?" size="small">This can't be undone.</rx-confirm>
+      </rx-row-actions>
+      <rx-slot name="empty"><rx-empty title="Nothing here yet" message="What you add shows up in this list." route="__module__.create" action-label="Add the first"/></rx-slot>
+    </rx-table>
+  </rx-stack>
+</rx-page>
 "#;
 
-const FORM_VIEW: &str = r#"{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import card, input, textarea, checkbox, button, link_button, form_errors %}
-
-{# One form for both: `record` is only set when editing. #}
-{% block content %}
-<div class="rx-stack">
-  <div>
-    <a class="rx-link" href="{{ route('__module__.index') }}">‹ __title__</a>
-    <h1 class="rx-title">{{ "Edit" if record else "New" }}</h1>
-  </div>
-  <form method="post" data-live-validate novalidate
-        action="{{ route('__module__.update', record.id) if record else route('__module__.store') }}">
-    {{ csrf_field() }}
-    {% if record %}{{ method_field('PUT') }}{% endif %}
-    {% call card() %}
-      {{ form_errors() }}
-__inputs__      <div class="rx-card__footer">
-        {{ link_button(route('__module__.index'), "Cancel", variant="plain") }}
-        {{ button("Save changes" if record else "Create") }}
-      </div>
-    {% endcall %}
-  </form>
-</div>
-{% endblock %}
+// One form for both: `record` is only set when editing.
+const FORM_VIEW: &str = r#"<rx-page layout="layouts/app.html" :title="'Edit' if record else 'New'">
+  <rx-stack>
+    <rx-page-header :title="'Edit' if record else 'New'" back="{{ route('__module__.index') }}" back-label="__title__"/>
+    <rx-form :action="route('__module__.update', record.id) if record else route('__module__.store')" live>
+      <input type="hidden" name="_method" value="PUT" rx-if="record">
+      <rx-card>
+        <rx-form-errors/>
+__inputs__        <div class="rx-card__footer">
+          <rx-link-button route="__module__.index" label="Cancel" variant="plain"/>
+          <rx-button :label="'Save changes' if record else 'Create'"/>
+        </div>
+      </rx-card>
+    </rx-form>
+  </rx-stack>
+</rx-page>
 "#;
 
-const SHOW_VIEW: &str = r#"{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import group, link_button, confirm, badge %}
-
-{% block content %}
-<div class="rx-stack">
-  <div>
-    <a class="rx-link" href="{{ route('__module__.index') }}">‹ __title__</a>
-    <div class="rx-row">
-      <h1 class="rx-title">__heading__</h1>
-      <span class="rx-spacer"></span>
-      {{ link_button(route('__module__.edit', record.id), "Edit", variant="secondary", size="small") }}
-      {{ confirm("delete-" ~ record.id, "Delete", route('__module__.destroy', record.id),
-                 "Delete this?", "This can't be undone.", size="small") }}
-    </div>
-  </div>
-  {% call group() %}
-__details__  {% endcall %}
-</div>
-{% endblock %}
+const SHOW_VIEW: &str = r#"<rx-page layout="layouts/app.html" title="__title__">
+  <rx-stack>
+    <rx-page-header title="__heading__" back="{{ route('__module__.index') }}" back-label="__title__">
+      <rx-link-button href="{{ route('__module__.edit', record.id) }}" label="Edit" variant="secondary" size="small"/>
+      <rx-confirm id="delete-{{ record.id }}" action="{{ route('__module__.destroy', record.id) }}" label="Delete" title="Delete this?" size="small">This can't be undone.</rx-confirm>
+    </rx-page-header>
+    <rx-card>
+__details__    </rx-card>
+  </rx-stack>
+</rx-page>
 "#;
 
 const TESTS: &str = r#"//! Made with `rnx make:module __module__ --resource`.
@@ -743,7 +665,20 @@ async fn __module___are_created_listed_changed_and_deleted() {
     app.delete("/__path__/1").await.assert_redirect("/__path__");
     app.assert_database_count("__table__", 0).await;
     app.get("/__path__/1").await.assert_not_found();
-}__invalid__"#;
+}__invalid__
+
+#[renox::test]
+async fn __module___match_their_table() {
+    let app = TestApp::new(__crate__::app()).await;
+    app.assert_models_match_schema().await;
+}
+
+#[renox::test]
+async fn __module___views_compile() {
+    let app = TestApp::new(__crate__::app()).await;
+    app.assert_views_compile();
+}
+"#;
 
 #[cfg(test)]
 mod tests {
@@ -888,6 +823,12 @@ mod tests {
         let module = read(&dir, "src/app/products/mod.rs");
         assert!(module.contains("pub struct Products;"));
         assert!(!module.contains("__"), "every placeholder is filled");
+        assert!(model.contains("form)]"), "{model}");
+        assert!(
+            model.contains("#[form(validate(required, max = 255))]"),
+            "{model}"
+        );
+        assert!(!module.contains("struct ProductForm"), "{module}");
         for view in ["index", "form", "show"] {
             let html = read(&dir, &format!("resources/views/products/{view}.html"));
             assert!(!html.contains("__Model__") && !html.contains("__path__"));
@@ -895,6 +836,21 @@ mod tests {
         let tests = read(&dir, "tests/products.rs");
         assert!(tests.contains("my_shop::app()"));
         assert!(!tests.contains("__"));
+        assert!(
+            module.contains("fn register(&self, app: &mut Registry)")
+                && module.contains("app.model::<Product>();"),
+            "{module}"
+        );
+        assert!(tests.contains("assert_models_match_schema"));
+        assert!(tests.contains("async fn products_match_their_table()"));
+        assert!(tests.contains("app.assert_views_compile();"));
+        // Every resource carries both checks.
+        resource(dir.path(), "orders", None, Some("note")).unwrap();
+        let orders = read(&dir, "tests/orders.rs");
+        assert!(
+            orders.contains("orders_match_their_table") && orders.contains("orders_views_compile")
+        );
+        assert!(!orders.contains("__"));
 
         let migrations: Vec<_> = fs::read_dir(dir.path().join("migrations"))
             .unwrap()
@@ -925,7 +881,10 @@ mod tests {
         let model = read(&dir, "src/app/news/model.rs");
         assert!(model.contains("pub struct Article"));
         // The model's table, not the module's (#127).
-        assert!(model.contains(r#"#[model(table = "articles")]"#), "{model}");
+        assert!(
+            model.contains(r#"#[model(table = "articles", form)]"#),
+            "{model}"
+        );
         let migrations: Vec<String> = fs::read_dir(dir.path().join("migrations"))
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
@@ -978,10 +937,15 @@ mod tests {
             form.contains(r#"type="number""#) && form.contains(r#"type="date""#),
             "{form}"
         );
+        for view in ["index", "form", "show"] {
+            let text = read(&dir, &format!("resources/views/readings/{view}.html"));
+            assert!(text.contains("<rx-page"), "{view}: {text}");
+            assert!(!text.contains("{%"), "{view}: {text}");
+        }
         let tests = read(&dir, "tests/readings.rs");
         assert!(!tests.contains("__"), "{tests}");
-        let module = read(&dir, "src/app/readings/mod.rs");
-        assert!(module.contains("NaiveDate"), "{module}");
+        let model = read(&dir, "src/app/readings/model.rs");
+        assert!(model.contains("NaiveDate"), "{model}");
         // Every generated file together: the fake values and the test's
         // sample values for each kind, the float column, and the heading
         // that falls back to the id when the first field isn't text.

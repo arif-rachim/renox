@@ -2,6 +2,7 @@
 //! connection pool, raw SQL, models, queries, pagination, migrations and
 //! factories.
 
+pub(crate) mod auto_migration;
 mod column;
 mod conn;
 mod encrypted;
@@ -17,6 +18,10 @@ mod query;
 mod query_log;
 pub mod relations;
 pub mod schema;
+#[allow(dead_code)] // used by `db:check` (370.5)
+pub(crate) mod schema_check;
+pub(crate) mod schema_diff;
+pub(crate) mod schema_sql;
 pub mod search;
 mod value;
 
@@ -27,7 +32,7 @@ use anyhow::Context;
 use axum::extract::FromRef;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 
-pub use column::{Col, Comparable, Condition};
+pub use column::{Col, Comparable, Condition, IntoColumn};
 pub use conn::Conn;
 #[doc(hidden)]
 pub use conn::bounds;
@@ -45,7 +50,7 @@ pub use model::{Model, ModelHooks};
 pub use paginate::{CursorPage, Page, Paginated, SimplePage};
 pub use query::{Number, Query};
 pub use query_log::capture_queries;
-pub use schema::{ColumnKind, ColumnType, ModelColumn};
+pub use schema::{ColumnKind, ColumnType, ModelColumn, ModelIndex};
 /// sqlx, for what Renox's own API doesn't cover: `Db::sqlite()`, `Db::postgres()`,
 /// `Row::sqlite()`, `Row::postgres()` and `DbError::sqlx()` hand out its types.
 /// sqlx may move to a new version in a minor Renox release; see docs/stability.md.
@@ -134,6 +139,32 @@ fn is_postgres(url: &str) -> bool {
 
 fn is_memory(url: &str) -> bool {
     url.contains(":memory:") || url.contains("mode=memory")
+}
+
+/// A throwaway database for checks that run migrations: a fresh schema on
+/// PostgreSQL, an in-memory database on SQLite.
+pub(crate) async fn connect_scratch(config: &Config) -> anyhow::Result<Db> {
+    if is_postgres(&config.database_url) {
+        return connect_postgres(&config.database_url, config, true).await;
+    }
+    let mut scratch = config.clone();
+    scratch.database_url = "sqlite::memory:".into();
+    connect(&scratch).await
+}
+
+/// Drops the schema of a database made by [`connect_scratch`] (PostgreSQL only).
+pub(crate) async fn drop_scratch(db: &Db) {
+    if db.dialect() != Dialect::Postgres {
+        return;
+    }
+    let Ok(schema) = sql("SELECT current_schema()").scalar::<String>(db).await else {
+        return;
+    };
+    if schema.starts_with("renox_test_") {
+        let _ = sql(format!("DROP SCHEMA {} CASCADE", quote(&schema)))
+            .execute(db)
+            .await;
+    }
 }
 
 /// Connects to PostgreSQL; with `fresh_schema`, in a new, empty schema of its

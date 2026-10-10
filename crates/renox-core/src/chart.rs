@@ -834,6 +834,11 @@ pub(crate) fn chart(
 + Sync
 + 'static {
     move |state: &State, kind: String, data: Option<Value>, kwargs: Kwargs| {
+        // `data=` is the same as the second positional argument (`<rx-chart :data="…">`).
+        let data = match data {
+            Some(d) => Some(d),
+            None => kwargs.get::<Option<Value>>("data")?,
+        };
         let title: Option<String> = kwargs.get("title")?;
         let height: Option<u32> = kwargs.get("height")?;
         let format: Option<String> = kwargs.get("format")?;

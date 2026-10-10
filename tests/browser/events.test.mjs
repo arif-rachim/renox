@@ -121,3 +121,82 @@ test('a wizard says changed on Next, not when its sheet opens', () =>
     assert.deepEqual(await changes(page), [['rx:wizard:changed', { name: 'end', index: 1 }]]);
     page.assertClean({ allow: [/422/] });
   }));
+
+// #424: fields say `changed` with their value; repeaters say added/removed.
+const FIELD_EVENTS = ['select', 'tags-input', 'date-picker'].map((c) => `rx:${c}:changed`)
+  .concat(['added', 'removed'].map((n) => `rx:repeater:${n}`));
+const listenFields = (page) =>
+  page.eval((names) => {
+    window.__fe = [];
+    for (const n of names) document.addEventListener(n, (e) => window.__fe.push([n, e.target.id, e.detail]));
+  }, FIELD_EVENTS);
+const fieldEvents = (page) => page.eval(() => window.__fe);
+
+test('a searchable select says changed with its value', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/events`);
+    await listenFields(page);
+    await page.waitFor(() => document.querySelector('#rx-flavour-search'));
+    await page.type('#rx-flavour-search', 'min');
+    await page.press('Enter');
+    await page.waitFor(() => window.__fe.length > 0);
+    assert.deepEqual(await fieldEvents(page), [['rx:select:changed', 'rx-flavour', { value: 'mint' }]]);
+    page.assertClean({ allow: [/422/] });
+  }));
+
+test('a plain select says changed with its value', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/events`);
+    await listenFields(page);
+    await page.eval(() => {
+      const s = document.querySelector('#rx-size');
+      s.value = 'm';
+      s.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert.deepEqual(await fieldEvents(page), [['rx:select:changed', 'rx-size', { value: 'm' }]]);
+  }));
+
+test('tags say changed once with the array; a blur with an empty box adds nothing', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/events`);
+    await listenFields(page);
+    await page.click('#rx-labels');
+    await page.type('#rx-labels', 'sale');
+    await page.press('Enter');
+    await page.waitFor(() => window.__fe.length > 0);
+    await page.eval(() => document.querySelector('#rx-labels').blur());
+    assert.deepEqual(await fieldEvents(page), [['rx:tags-input:changed', 'rx-labels', { value: ['new', 'sale'] }]]);
+    page.assertClean({ allow: [/422/] });
+  }));
+
+test('a date picker says changed when a day is picked', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/events`);
+    await listenFields(page);
+    await page.click('[popovertarget="rx-on-calendar"]');
+    await page.waitFor(() => document.querySelector('#rx-on-calendar').matches(':popover-open'));
+    await page.waitFor(() => !!document.querySelector('calendar-date'));
+    await new Promise((r) => setTimeout(r, 200));
+    await page.eval(() => document.querySelector('calendar-date').focus());
+    await page.press('PageDown');
+    await page.press('Enter');
+    await page.waitFor(() => window.__fe.length > 0);
+    assert.deepEqual(await fieldEvents(page), [['rx:date-picker:changed', 'rx-on', { value: '2026-11-02' }]]);
+    page.assertClean({ allow: [/422/] });
+  }));
+
+test('a repeater says added then removed with the row index', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/events`);
+    await listenFields(page);
+    await page.waitFor(() => document.querySelector('#rx-lines [data-rx-row-add]'));
+    await page.click('#rx-lines [data-rx-row-add]');
+    await page.waitFor(() => document.querySelector('#rx-lines [data-rx-row]'));
+    await page.click('#rx-lines [data-rx-row-remove]');
+    await page.waitFor(() => window.__fe.length > 1);
+    assert.deepEqual(await fieldEvents(page), [
+      ['rx:repeater:added', 'rx-lines', { index: 0 }],
+      ['rx:repeater:removed', 'rx-lines', { index: 0 }],
+    ]);
+    page.assertClean({ allow: [/422/] });
+  }));
