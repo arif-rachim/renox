@@ -54,11 +54,14 @@ pub struct Category {
 
 /// A brand (Trek, Shimano, Abus…).
 #[derive(Model, Serialize, Default, Debug, Clone)]
-#[model(table = "brands")]
+#[model(table = "brands", form)]
 pub struct Brand {
     pub id: i64,
+    #[form(validate(required, max = 100))]
     pub name: String,
+    #[form(validate(required, max = 100, alpha_dash))]
     pub slug: String,
+    #[form(validate(url, max = 255))]
     pub website: Option<String>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,

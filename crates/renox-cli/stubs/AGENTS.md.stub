@@ -66,6 +66,8 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 - `migrations/`: `TIMESTAMP_name.up.sql` / `.down.sql`, written for the database in
   `DATABASE_URL` (`.env`). Never edit a migration that has run; add a new one.
 - `tests/`: integration tests; `tests/home.rs` is the pattern.
+- After changing a model or a migration, run `rnx db:check` (it compares every `app.model::<…>()`
+  with the tables the migrations build).
 
 ## Things that trip agents up
 
@@ -197,6 +199,8 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   plain rules (each item is a rule method; `each(…)`, `distinct`, `rename`), `impl Validate`
   by hand when rules depend on each other. `App::detect_locale()` follows the browser's
   language.
+- Forms that mirror a model: `#[model(table = "…", form)]` generates `<Model>Form` with
+  `#[form(validate(…))]` rules and `fill(&mut record)`; hand-write the form when it needs hooks.
 - Forms: prefer `impl Validate` hooks to code in the handler: `prepare` (tidy input),
   `authorize` (403 before the rules), `after` (database checks, errors shown on the field).
   Rules include `alpha_dash`, `uuid`, `ip`, `size`, `starts_with`, `required_without`,

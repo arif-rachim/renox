@@ -1,0 +1,4 @@
+{%- if not component.answer and once('rx-live') %}{{ renox_live() }}{% endif -%}
+<div id="{{ component.id }}" data-rx-live="{{ component.name }}" data-rx-snapshot="{{ component.snapshot }}">
+{%- with state = component.state, data = component.data %}{% include component.view %}{% endwith -%}
+</div>

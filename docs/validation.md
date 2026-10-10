@@ -693,6 +693,55 @@ A rule may depend on another field, since the arguments can use `self`:
 `confirmed(&self.password_confirmation)`, `required_if(self.kind == "company")`. What the
 attributes can't say is `nested` or a loop. For those, write `impl Validate` by hand.
 
+## Forms from models
+
+When a form mirrors a model field for field, let the model make it. `#[model(form)]` on a
+`#[derive(Model)]` struct generates `<Model>Form` (with the model's visibility): it derives
+`Deserialize`, `Serialize` and `Validate`, so it also works as a renox-admin `Form`. Adding a
+column then means editing the model only.
+
+- Every field is included except `id`, `created_at`, `updated_at` and `deleted_at`; fields keep
+  their type. `#[form(skip)]` leaves one out.
+- `#[form(validate(required, max = 100))]` copies its items as `#[validate(...)]`. Nothing is
+  guessed from the types. `bool` fields get `#[serde(default)]`.
+- `#[form(upload)]` on a `String` or `Option<String>` column makes the form field an
+  `Option<Upload>`, left out of `fill`: the handler stores the file and sets the column.
+- `form.fill(&mut record)` assigns every non-upload field.
+- Nested names (`lines[0][qty]`) work through the field types, such as `Json<Vec<Line>>` and
+  `KeyValues`.
+- `#[form(...)]` without `#[model(form)]` is a compile error.
+
+```rust
+use renox::prelude::*;
+use serde::Serialize;
+
+/// A brand. `BrandForm` is generated from it.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "brands", form)]
+pub struct Brand {
+    pub id: i64,
+    #[form(validate(required, max = 100))]
+    pub name: String,
+    #[form(validate(url, max = 255))]
+    pub website: Option<String>,
+    #[form(upload)]
+    pub logo: Option<String>,
+    #[form(skip)]
+    pub internal_note: String,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+async fn update(Valid(form): Valid<BrandForm>) -> Result<()> {
+    let mut brand = Brand::default();
+    form.fill(&mut brand);
+    Ok(())
+}
+```
+
+Write the form by hand (`#[derive(Validate)]` or `impl Validate`) when it needs hooks
+(`prepare`, `authorize`, `after`) or differs from the model.
+
 ## Hooks: `prepare`, `authorize`, `after`
 
 A form can have three optional methods around its rules. They run at fixed moments:

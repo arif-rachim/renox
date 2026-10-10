@@ -58,6 +58,7 @@ pub(crate) const BUILTIN: &[(&str, &str)] = &[
         "renox/mail/button.html",
         include_str!("../views/mail/button.html"),
     ),
+    ("renox/live.html", include_str!("../views/live.html")),
     ("renox/ui.html", include_str!("../views/ui.html")),
     (
         "renox/import_report.html",
@@ -404,6 +405,8 @@ impl Views {
             env.add_function("renox_calendar", || {
                 Value::from_safe_string(crate::assets::calendar_tags())
             });
+            // Until the live component script ships (#435): nothing.
+            env.add_function("renox_live", || Value::from_safe_string(String::new()));
             // The kit's `icon(…)` macro: a Lucide icon as inline SVG.
             env.add_function(
                 "renox_icon",

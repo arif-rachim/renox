@@ -670,6 +670,29 @@ async fn search(State(db): State<Db>) -> Result<String> {
     Ok(format!("{} {} {in_tx}", found.len(), page.total))
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct Counter {
+    count: i64,
+}
+
+impl LiveComponent for Counter {
+    const NAME: &'static str = "counter";
+    const VIEW: &'static str = "live/counter.html";
+
+    async fn call(
+        &mut self,
+        _action: &str,
+        _args: Vec<serde_json::Value>,
+        _ctx: &mut renox::live_component::LiveContext,
+    ) -> Result {
+        Ok(())
+    }
+}
+
+async fn live(ctx: renox::live_component::LiveContext) -> Result<String> {
+    Ok(ctx.mount(Counter::default()).await?.snapshot)
+}
+
 struct Handlers;
 
 /// M27a: a data grid's page and its filtered query.
@@ -710,6 +733,7 @@ impl Module for Handlers {
             .get("/grid", grid)
             .get("/imports", imports)
             .get("/search", search)
+            .get("/live", live)
     }
 }
 
@@ -739,6 +763,7 @@ async fn data_apis_work_in_routed_handlers() {
     ] {
         renox::db::sql(statement).execute(app.db()).await.unwrap();
     }
+    app.get("/live").await.assert_ok();
     app.get("/relations")
         .await
         .assert_ok()
