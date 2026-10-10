@@ -1381,6 +1381,80 @@ The details:
 Toasts go away. For notifications that stay (a bell in the navigation bar, with new ones
 arriving live), see [mail.md](mail.md#the-bell).
 
+## Components and the page: three directions
+
+A kit component talks to the page it sits in, and the page talks back, in three directions.
+
+### Page → component: `attrs`
+
+Every macro takes `attrs={…}`: attributes that are not props go on the component's root element
+(for a field, the control itself). With tags you just write them:
+
+```html
+<rx-input name="qty" label="Quantity" class="wide" x-bind:disabled="busy" data-test="qty"/>
+```
+
+- They are printed **after** the component's own attributes. For a duplicate the browser keeps
+  the first one, so the component's value wins.
+- `class` is the exception: it is appended to the root's class list.
+- On a component tag `:name` is always a prop (`:value="row.qty"`). To bind an Alpine value to
+  an attribute, write `x-bind:name`.
+
+### Component → page: events
+
+Components with behaviour in the browser send a bubbling `CustomEvent` named
+`rx:<component>:<event>` from one root element, which carries `data-rx-component="<name>"`.
+
+| Component | Event | `detail` | Fires on |
+|---|---|---|---|
+| `sheet`, `action-sheet`, `wizard-action` | `opened` | `{id}` | the `<dialog>` |
+| | `closed` | `{id}` | the `<dialog>` |
+| `action-sheet`, `wizard-action` (the form inside) | `saved` | `{id, status}` | the `<dialog>` |
+| | `failed` (any non-2xx answer) | `{id, status}` | the `<dialog>` |
+| `confirm` | `confirmed` | `{id}` | the `<dialog>` |
+| | `cancelled` (closed without confirming; `closed` follows) | `{id}` | the `<dialog>` |
+| `tabs` | `changed` | `{name}` | the `[role=tablist]` element |
+| `wizard` | `changed` | `{name, index}` | `.rx-wizard` |
+| `select` | `changed` | `{value}` (an array when `multiple`) | the `<select>` |
+| `tags-input` | `changed` | `{value}` (an array of tags) | the tags entry input |
+| `date-picker` | `changed` | `{value}` | the `data-rx-date` input |
+| `repeater` | `added` | `{index}` | the `<fieldset>` |
+| | `removed` | `{index}` | the `<fieldset>` |
+| `grid` | `selected` | `{ids, all}` | `form.rx-grid` |
+| | `sorted` | `{sort}` | `form.rx-grid` |
+| | `filtered` | `{query}` (the form as a query string) | `form.rx-grid` |
+
+`changed` fires only when the value really changed, and never on first setup (tabs and wizard
+compare with the previous selection; tags with the last list sent).
+
+Listen on the component with Alpine, or from anywhere with `.window`:
+
+```html
+{# on the component itself: the shorthand compiles to x-on:rx:sheet:closed.self #}
+<rx-action-sheet id="new-item" title="New item" action="{{ route('items.store') }}" @saved="reload = true">…</rx-action-sheet>
+
+{# anywhere on the page #}
+<div x-data="{ tab: '' }" @rx:tabs:changed.window="tab = $event.detail.name">…</div>
+
+{# htmx: refresh a part when a component says so #}
+<div hx-get="/cart/summary" hx-trigger="rx:select:changed from:body">…</div>
+```
+
+`@name` on an `<rx-…>` tag works for the events the component declares (a misspelt one is a
+load error that lists them). Because the events bubble, `hx-trigger="… from:body"` sees every
+one on the page.
+
+### Server → browser
+
+The server reaches the page with the tools described elsewhere in this guide:
+
+- `HxTrigger` sends your own event with an htmx response (see
+  [htmx response headers](#htmx-response-headers)); listen with `@my-event.window` or
+  `hx-trigger="my-event from:body"`.
+- [Toasts](#toasts) show a message, and can carry an action that dispatches an event.
+- `event_stream()` (see the `Auth` notes above) opens the live stream, so `state.broadcast(…)`
+  events arrive as DOM events.
+
 ## Fragments and out-of-band swaps
 
 When htmx asks for a page, it often needs only one part of it: the new rows of a table, say.
