@@ -1,0 +1,9 @@
+<p>Count: <b id="count">{{ state.count }}</b> {{ data.label }}</p>
+<button id="inc" type="button" rx-click="increment">+1</button>
+<button id="add5" type="button" rx-click="add(5)">+5</button>
+<input id="note" type="text" placeholder="Note">
+<form id="rename" rx-submit="rename">
+  <input id="name" name="name" type="text" value="{{ state.name }}">
+  <button id="rename-go" type="submit">Rename</button>
+</form>
+<p>Name: <span id="shown-name">{{ state.name }}</span></p>
