@@ -60,6 +60,13 @@ pub(crate) const GRID_JS: &str = include_str!("../assets/renox-grid.js");
 pub const CALLY_VERSION: &str = "0.9.2";
 const CALLY: &str = include_str!("../assets/cally.js");
 
+/// The version of the bundled Idiomorph (DOM morphing, 0BSD), used by live
+/// components.
+pub const IDIOMORPH_VERSION: &str = "0.7.3";
+const IDIOMORPH: &str = include_str!("../assets/idiomorph-0.7.3.min.js");
+/// The live components' script (renox-live.js).
+pub(crate) const LIVE_JS: &str = include_str!("../assets/renox-live.js");
+
 /// The kit's fonts (SIL Open Font License 1.1; assets/fonts has the
 /// licences): Inter for text, Poppins for titles and figures, Latin subsets.
 /// Their names carry the font's version, so they are cached for good.
@@ -104,6 +111,20 @@ pub(crate) fn grid_tags() -> String {
 pub(crate) fn calendar_tags() -> String {
     let [_, _, cally] = &*GRID_URLS;
     format!("<script type=\"module\" src=\"{cally}\"></script>")
+}
+
+static LIVE_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
+    [
+        format!("/_renox/idiomorph-{IDIOMORPH_VERSION}.min.js"),
+        format!("/_renox/live-{:016x}.js", fnv1a(LIVE_JS)),
+    ]
+});
+
+/// `{{ renox_live() }}` (once per page, from renox/live.html): Idiomorph,
+/// then the live components' script.
+pub(crate) fn live_tags() -> String {
+    let [idiomorph, live] = &*LIVE_URLS;
+    format!("<script src=\"{idiomorph}\" defer></script>\n<script src=\"{live}\" defer></script>")
 }
 
 static UI_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
@@ -320,6 +341,8 @@ pub(crate) fn router() -> Router<AppState> {
         )
         .route(&GRID_URLS[1], get(|| async { js(GRID_JS) }))
         .route(&GRID_URLS[2], get(|| async { js(CALLY) }))
+        .route(&LIVE_URLS[0], get(|| async { js(IDIOMORPH) }))
+        .route(&LIVE_URLS[1], get(|| async { js(LIVE_JS) }))
         .route(htmx, get(|| async { js(HTMX) }))
         .route(alpine, get(|| async { js(ALPINE) }))
         .route(renox, get(|| async { js(RENOX) }))
@@ -515,6 +538,32 @@ mod ui_tests {
             ] {
                 assert!(around.contains(needle), "{needle} near {opened}");
             }
+        }
+    }
+
+    /// Idiomorph and the live script are served under their own names, cached for good.
+    #[tokio::test]
+    async fn the_live_scripts_are_served_immutable() {
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+
+        let kernel = crate::App::with_config(crate::Config::default())
+            .boot()
+            .await
+            .unwrap();
+        let tags = super::live_tags();
+        assert!(tags.find("idiomorph").unwrap() < tags.find("/_renox/live-").unwrap());
+        for url in super::LIVE_URLS.iter() {
+            assert!(tags.contains(url.as_str()), "{url}");
+            let res = kernel
+                .router()
+                .oneshot(Request::get(url.as_str()).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(res.status(), StatusCode::OK, "{url}");
+            let cache = res.headers()[super::CACHE_CONTROL].to_str().unwrap();
+            assert!(cache.contains("immutable"), "{url}: {cache}");
         }
     }
 }
