@@ -26,6 +26,8 @@ full reload.
 
 - [Components](#components-see-the-request): your own reusable pieces, which can see the
   request (old input, errors, translations).
+- [Components as tags](#components-as-tags): the kit written as `<rx-…>` HTML tags.
+  Includes [editor autocomplete](#editor-autocomplete) for VS Code.
 - [The UI kit](#the-ui-kit) that ships with Renox (`renox/ui.html`):
   - form fields;
   - the page's frame (navigation bar, sidebar, page headers);
@@ -106,6 +108,12 @@ The first line imports the macro. The second calls it, with the field's name and
 > name (`history` next to `import history`) is hidden by the macro. While debugging Renox logs
 > a warning naming both, and a page that then fails says why. Rename the value, or import the
 > macro under another name (`import history as history_list`).
+
+### Checking templates
+
+`rnx view:check` (or `app.assert_views_compile()` in a test) compiles every template and checks
+each literal `route('name')` against the route table, printing `template:line: message` per
+problem. See [the testing guide](testing.md#templates).
 
 ### Only once per page
 
@@ -249,6 +257,22 @@ Price and weight sit next to each other. City takes the whole row (`span="full"`
 suggests three cities. Below, a "Delivery" group asks for a speed (one choice) and extras
 (any number).
 
+The same fields as tags, for pages that use components (`name` and `label` are required;
+names with an underscore use a dash, so `current_name` is `current-name`; lists and other values
+are given with a colon, `:options="…"`):
+
+| Tag | Macro |
+|---|---|
+| `<rx-radio>` | `radio(name, label, options, selected, hint, required, inline, columns, …)` |
+| `<rx-checkbox-list>` | `checkbox_list(name, label, options, selected, hint, required, inline, columns, …)` |
+| `<rx-toggle-buttons>` | `toggle_buttons(name, label, options, selected, multiple, …)` |
+| `<rx-file>` | `file(name, label, accept, multiple, current, current_name, preview, …)` |
+| `<rx-date-picker>` | `date_picker(name, label, value, min, max, placeholder, readonly, disabled_dates, closed_weekdays, …)` |
+| `<rx-tags-input>` | `tags_input(name, label, value, suggestions, placeholder, …)` |
+
+Each also takes `hint`, `required`, `id`, `disabled`, `span` and `bag`, and passes any other
+attribute to the field.
+
 ### Rows of fields
 
 Some forms have a list inside them: the people to invite to a team, the lines of an order.
@@ -267,6 +291,23 @@ them into a `Vec`.
     {% endcall %}
   {% endcall %}
 {% endcall %}
+```
+
+The same form as tags. `<rx-wizard>` takes the steps from its `<rx-wizard-step>` children
+(`key` is required, `title` is the name in the progress list) and gives its `id` to each step,
+so you do not repeat it. `<rx-repeater>` hands `row` and `prefix` to its content:
+
+```html
+<rx-wizard id="new-team" submit-label="Create team">
+  <rx-wizard-step key="name" title="Name">
+    <rx-input name="name" label="Name" required/>
+  </rx-wizard-step>
+  <rx-wizard-step key="members" title="Members">
+    <rx-repeater name="invites" label="Members" item-label="Member" max="10">
+      <rx-input name="{{ prefix }}[email]" label="Email" type="email" :value="row.email" required/>
+    </rx-repeater>
+  </rx-wizard-step>
+</rx-wizard>
 ```
 
 The wizard has two steps: first the team's name, then its members. In the second step, the
@@ -632,6 +673,32 @@ top holds the notification bell, and the page's content goes under it.
 | `progress(value, max=100, label=…, show_value=true)` | A progress bar (the browser's `<progress>`) in the kit's colours, with the percentage next to it. |
 | `menu_button(label, attrs={…}, danger=…)` | A menu item that is a plain button. `attrs` say what it does, usually with htmx (`hx-get`, `hx-delete`…). |
 
+### Layout fields as tags
+
+These macros also have tags. Each renders the same HTML as its macro (a test checks it).
+
+| Tag | Macro |
+| --- | --- |
+| `<rx-repeater name label :rows add-label item-label min max :reorderable hint id span>` with `row` and `prefix` in its content | `{% call(row, prefix) repeater(…) %}`. `prefix` is the row's name part, like `lines[0]`, so a field is `name="{{ prefix }}[qty]"`. |
+| `<rx-key-value name label :value key-label value-label add-label hint id span>` | `key_value(…)` |
+| `<rx-fieldset legend hint columns>…</rx-fieldset>` | `{% call fieldset(…) %}` |
+| `<rx-show-when field values>…</rx-show-when>` | `{% call show_when(field, values) %}` |
+| `<rx-hide-when field values>…</rx-hide-when>` | `{% call hide_when(field, values) %}` |
+| `<rx-wizard id submit-label back-label next-label cancel cancel-label>` with `<rx-wizard-step key title>` children | `{% call wizard(id, steps, submit_label, …) %}` + `{% call wizard_step(id, key, title=…) %}`. The steps list and each step's `id` come from the children. |
+
+`values` is one word (`values="courier"`) or a list (`:values="['courier', 'post']"`).
+A field that shows only when another has a value:
+
+```html
+<rx-radio name="delivery" label="Delivery" :options="[['post', 'Post'], ['courier', 'Courier']]" selected="post"/>
+<rx-show-when field="delivery" values="courier">
+  <rx-input name="address" label="Courier address"/>
+</rx-show-when>
+```
+
+`<rx-select>` takes `options-url` (where the server answers searches) and `editable` (people can add
+and rename options), like `select(…, options_url=…, editable=true)`.
+
 ### More classes and options
 
 Some things are classes or options, not macros:
@@ -945,6 +1012,193 @@ kit's `empty` component and a link home, so a 404 or a 403 keeps the navigation 
 - The page gets `status`, `reason` and `detail`, besides the usual globals. With `APP_DEBUG`
   on, it also gets `request_line` and `template`.
 - Renox's own error page (used when an app has none) is built on the kit too.
+
+## Components as tags
+
+The macros of the UI kit are also written as HTML tags. Write `<rx-card>` instead of
+`{% call card() %}`. A small compiler in Renox rewrites the tags into plain MiniJinja when a
+template loads, so there is nothing to install and nothing to run at build time. The macros keep
+working: the tags are a way to write them, and you can mix both in one file.
+
+A template with no `<rx-…>` or `<app-…>` tag, and no `rx-if`, `rx-else` or `rx-for` attribute, is
+not touched at all.
+
+```html
+<rx-page layout="layouts/app.html" title="Products">
+  <rx-stack>
+    <rx-page-header title="Products" subtitle="All items">
+      <rx-link-button route="products.create" label="New product" variant="primary" icon="plus"/>
+    </rx-page-header>
+    <rx-table :rows="products" caption="Products">
+      <rx-column label="Name"><a href="{{ route('products.show', row.id) }}">{{ row.name }}</a></rx-column>
+      <rx-column label="Price" align="num">{{ row.price | money }}</rx-column>
+      <rx-row-actions>
+        <rx-icon-button can="update" route="products.edit" icon="pencil" label="Edit"/>
+      </rx-row-actions>
+      <rx-slot name="empty"><rx-empty title="No products yet"/></rx-slot>
+    </rx-table>
+  </rx-stack>
+</rx-page>
+```
+
+### Attribute values
+
+| You write | It means |
+|---|---|
+| `title="Products"` | The text `Products`. |
+| `title="{{ t('products.title') }}"` | The value of the expression, as it is (not escaped twice). |
+| `title="Page {{ n }} of {{ last }}"` | Text mixed with expressions: the pieces are joined. |
+| `:rows="products"` | A MiniJinja expression, with no `{{ }}`. Use it for lists, numbers, objects and tests. |
+| `required` (no value) | `true`. |
+
+More rules:
+
+- `kebab-case` names become `snake_case` parameters: `hide-label` is `hide_label`.
+- A yes/no prop takes a bare attribute, `"true"`, `"false"` or a `:` expression. A number prop
+  takes a number or a `:` expression. A prop that takes a list or an object takes a `:` expression
+  only. A prop with a fixed set of words (`variant="primary"`) checks the word.
+- `{% %}` inside an attribute is an error. Use `{{ }}` or `:`, or put the condition in
+  `rx-if`.
+- Components made from a macro accept extra attributes whose name has a `-` or starts with `@`
+  (`hx-post`, `data-id`, `@click`), plus a few plain ones (`min`, `max`, `step`, `pattern`,
+  `minlength`, `maxlength`, `inputmode`, `autofocus`, `tabindex`, `title`, `form`, `accept`).
+  They go to the element as HTML attributes. `class` is not allowed on them. `rx-stack`, `rx-row`
+  and `rx-form` are plain elements: every extra attribute is passed on, and `class` is merged.
+
+### Content and slots
+
+What you write between the tags is the component's content. Where a component has more than one
+place for content, name it with `<rx-slot name="…">`. `rx-table` has one for what shows when there
+are no rows:
+
+```html
+<rx-card title="Orders">
+  <rx-table :rows="orders">
+    <rx-column label="Number">{{ row.number }}</rx-column>
+    <rx-slot name="empty">No orders yet.</rx-slot>
+  </rx-table>
+</rx-card>
+```
+
+A button's content is its label: `<rx-button>Save</rx-button>` is `label="Save"`. A component
+whose content is a list of rows (such as `rx-repeater`) gives the content its row variables;
+they are named in the component's entry in the reference.
+
+### Control flow
+
+Three attributes work on any element, a component or plain HTML:
+
+```html
+<li rx-for="p in products">{{ p.name }}</li>
+
+<rx-alert rx-if="product.stock == 0" kind="warning">Out of stock.</rx-alert>
+
+<rx-badge rx-if="p.stock > 0">In stock</rx-badge>
+<rx-badge rx-else>Sold out</rx-badge>
+```
+
+- `rx-else` goes on the very next sibling element (only spaces or comments between).
+- With `rx-for` and `rx-if` together, the loop is outside: the test runs for each item.
+- `rx-else` after an `rx-for` element is an error, and there is no `rx-else-if`: nest an
+  `rx-if` instead.
+- `can="update"` on a component shows it only if the user may do that. `can="update"` inside an
+  `rx-table` asks about the row: `can('update', row)`.
+- `route="products.edit"` fills the component's link prop with `route("products.edit")`. Inside an
+  `rx-table` it adds the row's key: `route("products.edit", row.id)`. It works on components
+  that have a link (`rx-link-button`, `rx-icon-button`, `rx-empty`'s action, `rx-form`'s `action`).
+  To pass other arguments, write `href="{{ route(…) }}"`.
+
+### Pages, forms and tables
+
+- **`rx-page`** must be the root element. It is `{% extends %}` plus the blocks: `layout`,
+  `title` and `description` (the page's SEO tags). Each `<rx-slot name="X">` inside it becomes the
+  layout's `{% block X %}`. Give `title` or a `seo` slot, not both.
+- **`rx-push`** adds its content to a stack (`stack="head"`, with `once="key"` to add it once).
+- **`rx-form`** writes the `<form>`, the CSRF field, and `_method` for `PUT`, `PATCH` and `DELETE`.
+  A `GET` form gets neither. `live` turns on live validation. Its fields are `rx-input`,
+  `rx-textarea`, `rx-select`, `rx-checkbox`, `rx-radio` and the others in the table below;
+  `rx-form-errors` shows the form's error summary, and `rx-form-grid` lays fields in
+  columns.
+- **`rx-table`** loops the rows for you. `rows` takes a list or a page (`Paginated`,
+  `SimplePage`): for a page, the links are added under the table and they swap only the table
+  (htmx), so the rows' own links are not boosted. `as` names the row (`row` by default), `key`
+  is what `route` and `can` use (`row.id` by default), and `card` puts the table in a card. The
+  children are `rx-column` (`label`, `align="start|num"`, `hide-narrow`), `rx-row-actions` and
+  `<rx-slot name="empty">`.
+
+### Your own components
+
+A file in `resources/views/components/` is a tag. `components/price_tag.html` is
+`<app-price-tag>`. Make one with `rnx make:component price_tag`. The file starts with
+`<rx-props>`, which lists its parameters:
+
+```html
+<rx-props amount currency="USD" :muted="false">
+<span class="price">{{ amount | money }} {{ currency }}</span>
+<rx-slot />
+```
+
+A bare name is required, `name="text"` has a text default and `:name="expression"` has an
+expression default. `<rx-slot />` is where the tag's content goes; `<rx-slot name="x" />`
+is where the slot `x` goes. Using it: `<app-price-tag :amount="p.price" currency="EUR"/>`.
+The compiler checks the attributes against `<rx-props>`, like it does for the kit. Older
+macro files (no `<rx-props>`) are not tags: import them with `{% from %}` as before, or
+`rnx make:component --macro` to write one.
+
+### When something is wrong
+
+Mistakes stop at load time, with the file and the line, and a suggestion when a name is close:
+
+```text
+resources/views/products/index.html:3: unknown component <rx-stak>; did you mean <rx-stack>?
+resources/views/products/index.html:7: <rx-button> has no attribute "varient"; did you mean "variant"? It takes: label, variant, type, ...
+resources/views/products/index.html:9: <rx-button> "variant" must be one of: primary, secondary, plain, danger, plain-danger; did you mean "danger"?
+```
+
+Line numbers are kept, so MiniJinja's own errors point at the line you wrote.
+
+### Tags and macros
+
+| Tag | Macro it calls |
+|---|---|
+| `rx-card`, `rx-toolbar`, `rx-page-header`, `rx-badge` | `card`, `toolbar`, `page_header`, `badge` |
+| `rx-button`, `rx-link-button`, `rx-icon-button` | `button`, `link_button`, `icon_button` |
+| `rx-confirm`, `rx-alert`, `rx-empty` | `confirm`, `alert`, `empty` |
+| `rx-input`, `rx-textarea`, `rx-select`, `rx-checkbox`, `rx-radio`, `rx-checkbox-list`, `rx-toggle-buttons`, `rx-file`, `rx-date-picker`, `rx-tags-input` | the macro of the same name (`input`, `textarea`, `select`, ...) |
+| `rx-repeater`, `rx-key-value`, `rx-fieldset`, `rx-show-when`, `rx-hide-when`, `rx-form-errors`, `rx-form-grid` | `repeater`, `key_value`, `fieldset`, `show_when`, `hide_when`, `form_errors`, `form_grid` |
+| `rx-wizard`, `rx-wizard-step` | the `wizard` macros (a special tag) |
+| `rx-stack`, `rx-row` | none: a `div` with the kit's class |
+| `rx-page`, `rx-push`, `rx-form`, `rx-table` | `{% extends %}`/`{% block %}`, `push`, a `<form>`, a loop with `table` markup |
+
+The macros stay the lower level. The kit's other parts (menus, sheets, tabs, dashboards, the
+navbar) have no tag yet; call their macros as shown above.
+
+> [!NOTE]
+> **Not compiled yet:** the templates of the plugins (renox-2fa, oauth, admin, billing,
+> editors) are added with `add_template`, not loaded from files, so tags in them are not
+> rewritten. Write plugin templates with macros.
+
+### Editor autocomplete
+
+VS Code can suggest the kit's tags and their attributes while you type a template. Renox writes
+the list for it: `<app> view:data` (or `rnx view:data`) writes `.vscode/renox-components.json`,
+built from the components your app has, the kit's and your own. `rnx new` already points
+VS Code at that file (`.vscode/settings.json` sets `html.customData`), keeps the file out of
+git, and `rnx serve` refreshes it after every successful build, so a new component shows up
+without any step from you. If a refresh fails, `rnx serve` prints a warning and carries on.
+
+To set it up in an older app, run `rnx view:data` once and add this to `.vscode/settings.json`:
+
+```json
+{ "html.customData": ["./.vscode/renox-components.json"] }
+```
+
+An app command named `view:data` replaces the built-in one. `--out PATH` writes the file
+somewhere else.
+
+> [!NOTE]
+> JetBrains IDEs don't read this file: they use their own format (Web Types), which Renox
+> doesn't write yet.
 
 ## Toasts
 

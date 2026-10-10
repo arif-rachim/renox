@@ -70,11 +70,17 @@ enum Command {
     /// Create a migration in `migrations/`, e.g. `create_products_table`.
     #[command(name = "make:migration")]
     MakeMigration {
-        /// Snake-case description, e.g. `create_products_table`.
-        name: String,
+        /// Snake-case description, e.g. `create_products_table`. Optional with `--auto`.
+        name: Option<String>,
         /// Directory for the migration files.
         #[arg(long, default_value = "migrations")]
         path: PathBuf,
+        /// Write the migration from what changed in the models (`db:diff`).
+        #[arg(long)]
+        auto: bool,
+        /// With `--auto`: accept ambiguous changes without asking.
+        #[arg(long)]
+        yes: bool,
     },
     /// Create a module: routes, an index view, and its registration.
     #[command(name = "make:module")]
@@ -190,6 +196,10 @@ enum Command {
         /// With --ui: replace files already there.
         #[arg(long)]
         force: bool,
+        /// Write the older macro form (`{% from … import … %}`) instead of an
+        /// `<app-…>` tag.
+        #[arg(long = "macro")]
+        macro_form: bool,
     },
     /// Create an HTML and a text mail template.
     #[command(name = "make:mail")]
@@ -290,7 +300,21 @@ fn run(command: Command) -> Result<()> {
         Command::KeyGenerate { show } => key_generate(show),
         Command::Build => deploy::build(&app_root()?),
         Command::MakeDeploy => deploy::make_deploy(&app_root()?),
-        Command::MakeMigration { name, path } => make::migration(&name, &path),
+        Command::MakeMigration {
+            name,
+            path,
+            auto,
+            yes,
+        } => {
+            if auto {
+                app_command("db:diff", &diff_args(name, &path, yes))
+            } else if yes {
+                anyhow::bail!("--yes only works with --auto")
+            } else {
+                let name = name.context("give a name, or --auto")?;
+                make::migration(&name, &path)
+            }
+        }
         Command::MakeModule {
             name,
             resource: true,
@@ -334,8 +358,10 @@ fn run(command: Command) -> Result<()> {
             app_command("ui:publish", &args)
         }
         Command::MakeComponent {
-            name: Some(name), ..
-        } => generate::component(&app_root()?, &name),
+            name: Some(name),
+            macro_form,
+            ..
+        } => generate::component(&app_root()?, &name, macro_form),
         Command::MakeComponent { .. } => Err(anyhow::anyhow!("give a name, or --ui")),
         Command::Migrate { args } => app_command("migrate", &args),
         Command::MigrateRollback { args } => app_command("migrate:rollback", &args),
@@ -348,6 +374,19 @@ fn run(command: Command) -> Result<()> {
             None => Ok(()),
         },
     }
+}
+
+/// The arguments `rnx make:migration --auto` passes to the app's `db:diff`.
+fn diff_args(name: Option<String>, path: &Path, yes: bool) -> Vec<String> {
+    let mut args: Vec<String> = name.into_iter().collect();
+    if path != Path::new("migrations") {
+        args.push("--path".into());
+        args.push(path.display().to_string());
+    }
+    if yes {
+        args.push("--yes".into());
+    }
+    args
 }
 
 /// Runs a command built into the app binary (`cargo run -- <command>`), since
@@ -541,6 +580,19 @@ fn with_key(env: &str, key: &str) -> String {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn diff_args_are_built_in_order() {
+        use super::diff_args;
+        use std::path::Path;
+        let p = Path::new("migrations");
+        assert!(diff_args(None, p, false).is_empty());
+        assert_eq!(diff_args(Some("x".into()), p, true), ["x", "--yes"]);
+        assert_eq!(
+            diff_args(Some("x".into()), Path::new("m2"), true),
+            ["x", "--path", "m2", "--yes"]
+        );
+    }
+
+    #[test]
     fn settings_come_from_the_environment_then_env() {
         let env = |v: &'static str| move |n: &str| (n == "A").then(|| v.to_owned());
         let file = "B=1\nexport A=\"x y\"\nA_OLD=no\nC=''\nD='q'\n";
@@ -644,7 +696,16 @@ mod tests {
             Command::MakeComponent {
                 name: None,
                 ui: true,
-                force: true
+                force: true,
+                macro_form: false
+            }
+        ));
+        assert!(matches!(
+            parse(&["make:component", "price_tag", "--macro"]),
+            Command::MakeComponent {
+                name: Some(_),
+                macro_form: true,
+                ..
             }
         ));
         // Anything else goes to the app.

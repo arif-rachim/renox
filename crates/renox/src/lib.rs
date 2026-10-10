@@ -27,7 +27,9 @@
 #![warn(missing_docs)]
 
 pub use renox_core::*;
-pub use renox_macros::{DbEnum, FromRow, Model, Validate, embedded, migrations, test};
+pub use renox_macros::{
+    DbEnum, FromRow, Model, Validate, embedded, live_component, migrations, test,
+};
 
 pub use axum;
 pub use tokio;
@@ -445,6 +447,41 @@ pub struct CheatSheet;
 /// #[derive(Model, Default)]
 /// #[model(form)]
 /// struct Task { id: i64, #[form(bogus)] title: String }
+/// ```
+///
+/// `#[live_component]` misuse:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// # use renox::live_component::LiveContext;
+/// # #[derive(serde::Serialize, serde::Deserialize)]
+/// # struct Todo {}
+/// #[renox::live_component(name = "todo")]
+/// impl Todo {
+///     #[live(action)]
+///     async fn toggle(&mut self, _ctx: &mut LiveContext) -> Result { Ok(()) }
+/// }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// # use renox::live_component::LiveContext;
+/// # #[derive(serde::Serialize, serde::Deserialize)]
+/// # struct Todo {}
+/// #[renox::live_component(view = "todo.html")]
+/// impl Todo {
+///     #[live(action)]
+///     async fn toggle(&self, _ctx: &mut LiveContext) -> Result { Ok(()) }
+/// }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// # use renox::live_component::LiveContext;
+/// # #[derive(serde::Serialize, serde::Deserialize)]
+/// # struct Todo {}
+/// #[renox::live_component(view = "todo.html")]
+/// impl Todo {
+///     #[live(action)]
+///     async fn _toggle(&mut self, _ctx: &mut LiveContext) -> Result { Ok(()) }
+/// }
 /// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;

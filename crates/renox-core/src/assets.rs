@@ -186,7 +186,7 @@ const RENOX: &str = r#"(function () {
   });
 
   function formOf(elt) {
-    return (elt && elt.closest && elt.closest("form")) || elt;
+    return (elt && elt.closest && (elt.closest("[data-rx-live]") || elt.closest("form"))) || elt;
   }
 
   function clearErrors(form) {

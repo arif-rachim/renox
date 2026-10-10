@@ -2,6 +2,7 @@
 //! connection pool, raw SQL, models, queries, pagination, migrations and
 //! factories.
 
+pub(crate) mod auto_migration;
 mod column;
 mod conn;
 mod encrypted;
@@ -19,8 +20,8 @@ pub mod relations;
 pub mod schema;
 #[allow(dead_code)] // used by `db:check` (370.5)
 pub(crate) mod schema_check;
-#[allow(dead_code)] // used by `db:diff` (371.6)
 pub(crate) mod schema_diff;
+pub(crate) mod schema_sql;
 pub mod search;
 mod value;
 

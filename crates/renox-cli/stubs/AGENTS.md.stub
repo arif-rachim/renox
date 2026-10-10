@@ -46,10 +46,11 @@ rnx make:policy Product --module products
 rnx make:job SendReceipt --module products             # registered in the module's register()
 rnx make:command products:import --module products     # typed (clap); rnx products:import --help
 rnx make:mail order_shipped
+rnx make:migration --auto add_stock           # SQL from the models' changes (db:diff); review it, `--yes` never drops
 rnx make:migration add_stock_to_products               # in migrations/ (--path DIR: elsewhere)
 rnx make:factory Product --module products             # also make:seeder, make:test
 rnx make:notification OrderShipped --module orders     # also make:event, make:rule
-rnx make:middleware StampRequests                      # also make:component
+rnx make:middleware StampRequests                      # also make:component (an <app-…> tag; --macro: the older macro form)
 rnx make:component --ui                                # copy the UI kit in to change it (same as rnx ui:publish)
 rnx make:deploy                                        # Dockerfile, systemd unit + socket, Litestream
 rnx build                                              # release binary in dist/ (Tailwind CSS minified first)
@@ -67,10 +68,21 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `DATABASE_URL` (`.env`). Never edit a migration that has run; add a new one.
 - `tests/`: integration tests; `tests/home.rs` is the pattern.
 - After changing a model or a migration, run `rnx db:check` (it compares every `app.model::<…>()`
-  with the tables the migrations build).
+  with the tables the migrations build). After editing templates, run `rnx view:check` (it
+  compiles every template and checks each `route('name')`); `tests/home.rs` runs it too.
+- `rnx view:data` writes `.vscode/renox-components.json` (VS Code autocomplete for the kit's tags;
+  git-ignored, refreshed by `rnx serve`). Don't edit it by hand.
 
 ## Things that trip agents up
 
+- Component tags (`<rx-card>`, `<app-price-tag>`, `rx-if`/`rx-for`, docs/ui.md "Components as
+  tags") are rewritten when a template loads. In an attribute, `title="{{ x }}"` is the value of
+  `x` and `:title="x"` is an expression (no `{{ }}` after the colon); `{% %}` there is an error.
+  `rx-else` goes on the very next sibling of its `rx-if` element, and never follows `rx-for`.
+  `class` is not allowed on kit tags (only on `rx-stack`, `rx-row`, `rx-form`). The templates of
+  plugins are not compiled: write macros in them. An `<app-…>` file needs `<rx-props>` first.
+  Form tags: `<rx-repeater>` gives its content `row` and `prefix` (`name="{{ prefix }}[qty]"`);
+  `<rx-wizard id=…>` takes its steps from `<rx-wizard-step key=… title=…>` children.
 - Route parameters are `{id}` (axum 0.8), not `:id`: `.get("/products/{id}", show)`.
 - `.require_auth()` guards only the routes added before it in that `Routes`; so do
   `.require_gate`, `.require_role`, `.require_permission`, `.require_ability` and

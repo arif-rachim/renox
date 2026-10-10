@@ -42,6 +42,7 @@ Commands:
   migrate:fresh [--seed]    Drop all tables, run every migration, optionally seed
   migrate:status            List migrations and whether they have run
   db:check                  Compare the registered models with the tables the migrations build
+  db:diff [name] [--yes]    Write a migration for what changed in the registered models
   db:seed                   Run the seeders
   queue:work [--queue a,b] [--workers N] [--once]
                             Run queued jobs (until stopped, or --once for what's there)
@@ -62,6 +63,8 @@ Commands:
   schedule:run <task>       Run one scheduled task now
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   route:list                List every route with its name, module and guards
+  view:check                Compile every template and check its route names
+  view:data [--out P]       Write .vscode/renox-components.json for editor autocomplete
   db:shell                  Run SQL against the database (`.tables`, `.quit`)
   down [--secret S] [--retry N]
                             Maintenance mode: answer 503 (visit /S to bypass it)
@@ -570,6 +573,7 @@ impl App {
             duplicate_live,
             commands,
             templates,
+            components,
             shares,
             channels,
             reporters,
@@ -771,6 +775,7 @@ impl App {
             storage.clone(),
             embedded.map(|e| e.views),
             Arc::new(templates),
+            Arc::new(components.iter().map(|c| c.contract()).collect()),
             zone,
             versions,
         );
@@ -976,8 +981,35 @@ impl App {
                     println!("Seeded.");
                 }
             }
+            "db:diff" if !kernel.commands.iter().any(|c| c.name == "db:diff") => {
+                crate::db::auto_migration::run(&kernel, &args[1..]).await?
+            }
             "db:check" if !kernel.commands.iter().any(|c| c.name == "db:check") => {
                 kernel.db_check().await?
+            }
+            "view:check" if !kernel.commands.iter().any(|c| c.name == "view:check") => {
+                let problems = kernel.state.views.check(&kernel.state.routes);
+                for problem in &problems {
+                    println!("{problem}");
+                }
+                let checked = kernel.state.views.names().len();
+                println!("Checked {checked} templates: {} problems.", problems.len());
+                if !problems.is_empty() {
+                    return Err(anyhow!("{} template problem(s)", problems.len()).into());
+                }
+            }
+            "view:data" if !kernel.commands.iter().any(|c| c.name == "view:data") => {
+                let path = std::path::Path::new(
+                    flag_text(args, "--out").unwrap_or(".vscode/renox-components.json"),
+                );
+                if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+                    std::fs::create_dir_all(dir)?;
+                }
+                let mut text = serde_json::to_string_pretty(&kernel.state.views.custom_data())
+                    .map_err(|e| anyhow!(e))?;
+                text.push('\n');
+                std::fs::write(path, text)?;
+                println!("Wrote {}.", path.display());
             }
             "migrate:status" => {
                 for m in kernel.migration_status().await? {

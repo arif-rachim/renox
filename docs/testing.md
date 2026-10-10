@@ -234,6 +234,23 @@ async fn the_models_match_the_schema() {
 
 See [Checking models against the tables](types.md#checking-models-against-the-tables).
 
+### Templates
+
+`app.assert_views_compile()` compiles every template (the app's, the built-in ones and the
+plugins') and checks each literal `route('name')` against the route table. It panics with one
+`template:line: message` line per problem, the same list `rnx view:check` prints. `rnx new`
+apps have this test already:
+
+```rust
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+#[renox::test]
+async fn every_view_compiles() {
+    TestApp::new(App::new()).await.assert_views_compile();
+}
+```
+
 ### Factories
 
 Factories fill tables with made-up rows, so a test doesn't have to type every field:

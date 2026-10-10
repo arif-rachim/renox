@@ -383,4 +383,103 @@ async fn the_test_helper_keeps_state_between_calls() {
     let state = c.component();
     assert_eq!(state.count, 7);
     assert_eq!(state.search, "tea");
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct Todo {
+    done: Vec<i64>,
+    title: String,
+}
+
+#[renox::live_component(view = "live/todo.html")]
+impl Todo {
+    async fn data(&self, _ctx: &LiveContext) -> Result<Vec<String>> {
+        Ok(vec!["milk".to_string(), "tea".to_string()])
+    }
+
+    #[live(action)]
+    async fn toggle(&mut self, _ctx: &mut LiveContext, id: i64) -> Result {
+        self.done.push(id);
+        Ok(())
+    }
+
+    #[live(action)]
+    async fn rename(&mut self, _ctx: &mut LiveContext, id: i64, title: String) -> Result {
+        self.title = format!("{id}:{title}");
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    async fn hidden(&mut self, _ctx: &mut LiveContext) -> Result {
+        Ok(())
+    }
+}
+
+async fn todo(ctx: LiveContext) -> Result<View> {
+    let list = ctx.mount(Todo::default()).await?;
+    Ok(view("page.html", context! { list }))
+}
+
+struct TodoPages;
+
+impl Module for TodoPages {
+    fn name(&self) -> &'static str {
+        "todo-pages"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/todo", todo)
+    }
+}
+
+#[renox::test]
+async fn a_macro_made_component_runs_its_marked_actions() {
+    assert_eq!(<Todo as LiveComponent>::NAME, "todo");
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("live")).unwrap();
+    std::fs::write(
+        dir.path().join("page.html"),
+        r#"{% set component = list %}{% include "renox/live.html" %}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("live/todo.html"),
+        "<i>{{ state.done|join(',') }}</i><u>{{ state.title }}</u>{{ data|join('+') }}",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new()
+            .module(Auth::new())
+            .module(TodoPages)
+            .live_component::<Todo>(),
+        move |c| c.views_path = path,
+    )
+    .await;
+    let s = snapshot_of(&app, "/todo").await;
+    let post = |action: &'static str, args: &'static str| {
+        let s = s.clone();
+        let app = &app;
+        async move {
+            app.htmx()
+                .post(
+                    &format!("/_renox/live/todo/{action}"),
+                    &[("_snapshot", &s), ("_args", args)],
+                )
+                .await
+        }
+    };
+    post("toggle", "[3]")
+        .await
+        .assert_ok()
+        .assert_see("<i>3</i>")
+        .assert_see("milk+tea");
+    post("rename", r#"[4, "x"]"#)
+        .await
+        .assert_ok()
+        .assert_see("<u>4:x</u>");
+    post("toggle", "[]").await.assert_status(400);
+    post("toggle", "[1, 2]").await.assert_status(400);
+    post("toggle", r#"["a"]"#).await.assert_status(400);
+    post("hidden", "[]").await.assert_status(404);
+    post("data", "[]").await.assert_status(404);
 }

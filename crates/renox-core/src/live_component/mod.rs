@@ -42,6 +42,45 @@ pub struct Mounted {
     pub answer: bool,
 }
 
+/// Checks that an action got exactly `n` arguments (a 400 otherwise).
+///
+/// ```
+/// # use renox::prelude::*;
+/// let args = vec![serde_json::json!(1)];
+/// assert!(renox::live_component::arity(&args, 1).is_ok());
+/// assert!(renox::live_component::arity(&args, 2).is_err());
+/// ```
+pub fn arity(args: &[serde_json::Value], n: usize) -> Result {
+    if args.len() == n {
+        Ok(())
+    } else {
+        Err(Error::BadRequest(format!(
+            "expected {n} argument(s), got {}",
+            args.len()
+        )))
+    }
+}
+
+/// Reads argument `i` of an action as a `T` (a 400 when it is missing or
+/// has the wrong type).
+///
+/// ```
+/// # use renox::prelude::*;
+/// let args = vec![serde_json::json!(7), serde_json::json!("a")];
+/// let n: i64 = renox::live_component::arg(&args, 0)?;
+/// assert_eq!(n, 7);
+/// assert!(renox::live_component::arg::<i64>(&args, 1).is_err());
+/// assert!(renox::live_component::arg::<i64>(&args, 2).is_err());
+/// # Ok::<(), Error>(())
+/// ```
+pub fn arg<T: DeserializeOwned>(args: &[serde_json::Value], i: usize) -> Result<T> {
+    let value = args
+        .get(i)
+        .ok_or_else(|| Error::BadRequest(format!("missing argument {i}")))?;
+    serde_json::from_value(value.clone())
+        .map_err(|e| Error::BadRequest(format!("argument {i}: {e}")))
+}
+
 /// Renders `c` into a [`Mounted`].
 pub(crate) async fn render<C: LiveComponent>(
     ctx: &LiveContext,

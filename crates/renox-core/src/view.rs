@@ -1,4 +1,4 @@
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component as PathPart, Path, PathBuf};
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -124,11 +124,12 @@ pub struct Views {
     dir: PathBuf,
     /// Templates compiled into the binary, used instead of `dir` when given.
     embedded: Option<&'static [(&'static str, &'static str)]>,
+    /// The plugins' components, next to the built-in ones.
+    plugin_components: Arc<Vec<crate::components::Contract>>,
 }
 
 /// One template that does not compile, found by [`Views::check`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct ViewProblem {
     /// The template's name, e.g. `products/index.html`.
     pub template: String,
@@ -266,18 +267,80 @@ fn hidden_by_imports(source: &str, values: &[&Value]) -> Vec<String> {
 /// `App::templates`.
 pub(crate) type TemplateHook = Arc<dyn Fn(&mut Environment<'static>) + Send + Sync>;
 
+thread_local! {
+    /// The components known while template hooks run, for [`add_template`].
+    static HOOK_COMPONENTS: std::cell::RefCell<Option<Arc<Vec<crate::components::Contract>>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Makes the registered components visible to [`add_template`] until dropped.
+struct HookScope(Option<Arc<Vec<crate::components::Contract>>>);
+
+impl HookScope {
+    fn enter(contracts: Arc<Vec<crate::components::Contract>>) -> Self {
+        Self(HOOK_COMPONENTS.with(|c| c.borrow_mut().replace(contracts)))
+    }
+}
+
+impl Drop for HookScope {
+    fn drop(&mut self) {
+        let previous = self.0.take();
+        HOOK_COMPONENTS.with(|c| *c.borrow_mut() = previous);
+    }
+}
+
+pub use crate::components::{Component, Prop};
+
+/// Adds the template `name` to `env` after compiling its component tags
+/// (`<rx-…>`, `rx-if`, `rx-for`), as the app's own views are. For modules and
+/// plugins, inside [`Registry::templates`](crate::Registry::templates), where
+/// the components other modules registered are known too. A mistake in the
+/// source is an error naming the template and line.
+///
+/// ```
+/// use renox::view::add_template;
+///
+/// let mut env = minijinja::Environment::new();
+/// add_template(&mut env, "hi.html", "<p>{{ name }}</p>").unwrap();
+/// ```
+pub fn add_template(
+    env: &mut Environment<'static>,
+    name: impl Into<String>,
+    source: impl Into<String>,
+) -> Result<(), minijinja::Error> {
+    let name = name.into();
+    let source = source.into();
+    let contracts = HOOK_COMPONENTS
+        .with(|c| c.borrow().clone())
+        .unwrap_or_else(|| Arc::new(crate::components::BUILTIN.to_vec()));
+    let catalog = crate::components::Catalog {
+        contracts: &contracts,
+        lookup: &|_| None,
+    };
+    let compiled = crate::components::compile(&name, &source, &catalog).map_err(|e| {
+        minijinja::Error::new(
+            ErrorKind::SyntaxError,
+            format!("{name}:{}: {}", e.line, e.message),
+        )
+    })?;
+    env.add_template_owned(name, compiled)
+}
+
 impl Views {
     /// `embedded`: templates compiled into the binary, used instead of
     /// `VIEWS_PATH` when given.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         config: &Config,
         routes: Arc<RouteTable>,
         storage: Storage,
         embedded: Option<&'static [(&'static str, &'static str)]>,
         hooks: Arc<Vec<TemplateHook>>,
+        components: Arc<Vec<crate::components::Contract>>,
         zone: crate::timezone::Zone,
         versions: Arc<crate::embedded::AssetVersions>,
     ) -> Self {
+        let plugin_components = components.clone();
         let dir = config.views_path.clone();
         let watch = config.debug && embedded.is_none() && dir.is_dir();
         let debug = config.debug;
@@ -291,13 +354,21 @@ impl Views {
                 env.set_undefined_behavior(minijinja::UndefinedBehavior::SemiStrict);
             }
             let loader_dir = dir.clone();
+            let contracts: Arc<Vec<crate::components::Contract>> = Arc::new(
+                crate::components::BUILTIN
+                    .iter()
+                    .chain(components.iter())
+                    .copied()
+                    .collect(),
+            );
+            let loader_contracts = contracts.clone();
             env.set_loader(move |name| {
                 let Some(src) = load(&loader_dir, embedded, name)? else {
                     return Ok(None);
                 };
                 let lookup = |n: &str| load(&loader_dir, embedded, n).ok().flatten();
                 let catalog = crate::components::Catalog {
-                    contracts: crate::components::BUILTIN,
+                    contracts: &loader_contracts,
                     lookup: &lookup,
                 };
                 crate::components::compile(name, &src, &catalog)
@@ -488,6 +559,7 @@ impl Views {
             env.add_function("chart", crate::chart::chart(currency.clone()));
             env.add_function("class_names", crate::view_filters::class_names);
             // The app's own functions and filters (`App::templates`).
+            let _scope = HookScope::enter(contracts.clone());
             for hook in hooks.iter() {
                 hook(&mut env);
             }
@@ -502,12 +574,12 @@ impl Views {
             debug,
             dir: config.views_path.clone(),
             embedded,
+            plugin_components,
         }
     }
 
     /// The name of every template: the app's files (or the embedded ones),
     /// the built-in ones and those added to the environment, sorted.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn names(&self) -> Vec<String> {
         let mut names = Vec::new();
         match self.embedded {
@@ -523,9 +595,28 @@ impl Views {
         names
     }
 
+    /// The editor data file (VS Code's `html.customData`): the built-in and plugin components
+    /// and the app's own (`components/*.html` files that declare `<rx-props>`).
+    pub(crate) fn custom_data(&self) -> serde_json::Value {
+        let contracts: Vec<crate::components::Contract> = crate::components::BUILTIN
+            .iter()
+            .chain(self.plugin_components.iter())
+            .copied()
+            .collect();
+        let sources: Vec<(String, String)> = self
+            .names()
+            .into_iter()
+            .filter(|n| n.starts_with("components/") && n.ends_with(".html"))
+            .filter_map(|n| {
+                let src = load(&self.dir, self.embedded, &n).ok().flatten()?;
+                src.contains("<rx-props").then_some((n, src))
+            })
+            .collect();
+        crate::components::custom_data_for(&contracts, &sources)
+    }
+
     /// Compiles every template and returns those that fail, in name order.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn check(&self, _routes: &RouteTable) -> Vec<ViewProblem> {
+    pub(crate) fn check(&self, routes: &RouteTable) -> Vec<ViewProblem> {
         let names = self.names();
         let env = match self.reloader.acquire_env() {
             Ok(env) => env,
@@ -539,8 +630,13 @@ impl Views {
         };
         let mut problems = Vec::new();
         for name in names {
-            if let Err(err) = env.get_template(&name) {
-                problems.push(problem(&name, &err));
+            match env.get_template(&name) {
+                Err(err) => problems.push(problem(&name, &err)),
+                // The framework's own templates show example names in their docs.
+                Ok(template) if !name.starts_with("renox/") => {
+                    check_route_names(&name, template.source(), routes, &mut problems);
+                }
+                Ok(_) => {}
             }
         }
         problems
@@ -846,9 +942,35 @@ fn load(
         .map(|(_, source)| (*source).to_owned()))
 }
 
+/// Reports every literal `route('name')` in the compiled `source` that no route has.
+fn check_route_names(
+    template: &str,
+    source: &str,
+    routes: &RouteTable,
+    problems: &mut Vec<ViewProblem>,
+) {
+    static ROUTE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"\broute\(\s*["']([^"']+)["']"#).expect("valid regex")
+    });
+    for caps in ROUTE.captures_iter(source) {
+        let name = &caps[1];
+        if routes.path(name).is_some() {
+            continue;
+        }
+        let hint = crate::components::suggest::did_you_mean(name, routes.names())
+            .map(|x| format!("; did you mean \"{x}\"?"))
+            .unwrap_or_default();
+        let offset = caps.get(0).map_or(0, |m| m.start());
+        problems.push(ViewProblem {
+            template: template.to_owned(),
+            line: Some(source[..offset].matches('\n').count() + 1),
+            message: format!("unknown route \"{name}\"{hint}"),
+        });
+    }
+}
+
 /// A [`ViewProblem`] from a compile error. The component compiler's details
 /// already start with `name:line: `, which is taken out of the message.
-#[cfg_attr(not(test), allow(dead_code))]
 fn problem(name: &str, err: &minijinja::Error) -> ViewProblem {
     let detail = err.detail().unwrap_or("could not be compiled");
     if let Some(rest) = detail.strip_prefix(name).and_then(|r| r.strip_prefix(':'))
@@ -872,7 +994,7 @@ fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
     let mut path = dir.to_path_buf();
     for component in Path::new(name).components() {
         match component {
-            Component::Normal(part) => path.push(part),
+            PathPart::Normal(part) => path.push(part),
             _ => return None,
         }
     }
@@ -1526,6 +1648,7 @@ mod tests {
             Storage::from_config(&config).unwrap(),
             None,
             Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
             config.timezone,
             Arc::new(crate::embedded::AssetVersions::new(dir, None)),
         )
@@ -1569,6 +1692,35 @@ mod tests {
                 .to_string()
                 .starts_with("sub/typo.html:2: unknown component"),
         );
+    }
+
+    #[test]
+    fn check_reports_unknown_route_names_with_a_suggestion() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("p.html"),
+            "<a href=\"{{ route('products.index') }}\">ok</a>\n\
+             <a href=\"{{ route('products.indx') }}\">typo</a>\n\
+             <a href=\"{{ route('shop.home') }}\">domain</a>\n\
+             <a href=\"{{ route('nothing.like.it') }}\">far</a>\n",
+        )
+        .unwrap();
+        let mut routes = RouteTable::default();
+        routes
+            .insert("products.index".into(), "/products".into())
+            .unwrap();
+        // A route defined inside `Routes::domain` is in the table as well.
+        routes.insert("shop.home".into(), "/".into()).unwrap();
+        routes.set_domain("shop.home", "shop.example.com");
+        let problems = views_in(dir.path()).check(&routes);
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert_eq!(problems[0].line, Some(2));
+        assert_eq!(
+            problems[0].to_string(),
+            "p.html:2: unknown route \"products.indx\"; did you mean \"products.index\"?"
+        );
+        assert_eq!(problems[1].line, Some(4));
+        assert!(!problems[1].message.contains("did you mean"));
     }
 
     fn env() -> Environment<'static> {

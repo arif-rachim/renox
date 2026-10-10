@@ -14,6 +14,10 @@ const STUBS: &[(&str, &str)] = &[
     (".env", include_str!("../stubs/env.stub")),
     (".env.example", include_str!("../stubs/env.stub")),
     (".gitignore", include_str!("../stubs/gitignore.stub")),
+    (
+        ".vscode/settings.json",
+        include_str!("../stubs/vscode-settings.json.stub"),
+    ),
     ("build.rs", include_str!("../stubs/build.rs")),
     ("migrations/.gitkeep", ""),
     ("src/lib.rs", include_str!("../stubs/src/lib.rs")),
@@ -709,6 +713,15 @@ mod tests {
         assert!(cargo.contains("renox = { path = "), "{cargo}");
         let ignore = fs::read_to_string(root.join(".gitignore")).unwrap();
         assert!(ignore.contains("/.cargo/config.toml"), "{ignore}");
+        assert!(
+            ignore.contains("/.vscode/renox-components.json"),
+            "{ignore}"
+        );
+        let vscode = fs::read_to_string(root.join(".vscode/settings.json")).unwrap();
+        assert!(
+            vscode.contains("./.vscode/renox-components.json"),
+            "{vscode}"
+        );
         // The real .env has a key; the example doesn't.
         let env = read_lf(root.join(".env"));
         assert!(env.contains("APP_KEY=base64:"), "{env}");
@@ -776,6 +789,7 @@ mod tests {
         let tests = fs::read_to_string(root.join("tests/home.rs")).unwrap();
         assert!(tests.contains("use desk::roles"), "{tests}");
         assert!(tests.contains("assert_models_match_schema"), "{tests}");
+        assert!(tests.contains("assert_views_compile"), "{tests}");
         // AGENTS.md says where the page patterns live, once, before the traps.
         let agents = read_lf(root.join("AGENTS.md"));
         let notes = agents
