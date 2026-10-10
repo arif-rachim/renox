@@ -415,6 +415,46 @@ async fn rx_wizard_holds_only_steps() {
 }
 
 #[renox::test]
+async fn rx_tabs_match_the_macros() {
+    same(
+        &format!("{UI}{{{{ ui.tabs(id=\"t\", items=[[\"a\", \"First\"], [\"b\", (second)]], selected=\"b\", label=\"Sections\") }}}}{{% call ui.tab_panel(id=\"t\", key=\"a\", selected=false) %}}<p>one</p>{{% endcall %}}{{% call ui.tab_panel(id=\"t\", key=\"b\", selected=true) %}}<p>two</p>{{% endcall %}}"),
+        "<rx-tabs id=\"t\" selected=\"b\" label=\"Sections\">\n<rx-tab key=\"a\" label=\"First\"><p>one</p></rx-tab>\n<rx-tab key=\"b\" :label=\"second\"><p>two</p></rx-tab>\n</rx-tabs>",
+        serde_json::json!({"second": "Second"}),
+    )
+    .await;
+    same(
+        &format!("{UI}{{{{ ui.tabs(id=\"t\", items=[[\"a\", \"First\"]]) }}}}{{% call ui.tab_panel(id=\"t\", key=\"a\", selected=true) %}}x{{% endcall %}}"),
+        "<rx-tabs id=\"t\"><rx-tab key=\"a\" label=\"First\">x</rx-tab></rx-tabs>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_tabs_hold_only_tabs() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("m.html"),
+        "<rx-tabs id=\"t\"><p>x</p></rx-tabs>",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-tab key=\"a\" label=\"A\">x</rx-tab>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Pair(serde_json::json!({}))), move |c| {
+        c.views_path = path
+    })
+    .await;
+    let m = app.get("/m").await.text();
+    assert!(m.contains("holds only &lt;rx-tab&gt;"), "{m}");
+    let r = app.get("/r").await.text();
+    assert!(r.contains("belongs inside &lt;rx-tabs&gt;"), "{r}");
+}
+
+#[renox::test]
 async fn rx_button_matches_the_macro_and_passes_hx_attributes() {
     same(
         &format!(

@@ -487,6 +487,9 @@ fn emit_node(
             Special::Wizard => {
                 special::wizard(&mut cx, contract, attrs, children, open, close, *line, out)
             }
+            Special::Tabs => {
+                special::tabs(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
             Special::Table => {
                 special::table(&mut cx, contract, attrs, children, open, close, *line, out)
             }
