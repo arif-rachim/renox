@@ -20,6 +20,24 @@ pub(super) fn pad(span_text: &str) -> String {
     }
 }
 
+thread_local! {
+    /// The row variable and key expression while a table's cells are emitted (Decision 18).
+    static ROW: std::cell::RefCell<Option<(String, String)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `f` with `var` as the row variable and `key` as the row's key: `route="n"` becomes
+/// `route("n", key)` and `can="a"` becomes `can("a", var)`.
+pub(super) fn with_row<T>(var: &str, key: &str, f: impl FnOnce() -> T) -> T {
+    let before = ROW.with(|r| r.replace(Some((var.to_owned(), key.to_owned()))));
+    let result = f();
+    ROW.with(|r| *r.borrow_mut() = before);
+    result
+}
+
+fn row() -> Option<(String, String)> {
+    ROW.with(|r| r.borrow().clone())
+}
+
 /// Whether a macro component hands the attribute on in `attrs` (Decision 12 of #372).
 fn passes_through(name: &str) -> bool {
     name.contains('-')
@@ -166,7 +184,10 @@ struct Flow<'a> {
 impl Flow<'_> {
     /// The condition of the `{% if %}`, from `rx-if` and `can`.
     fn condition(&self) -> Option<String> {
-        let can = self.can.as_ref().map(|a| format!("can({a:?})"));
+        let can = self.can.as_ref().map(|a| match row() {
+            Some((var, _)) => format!("can({a:?}, {var})"),
+            None => format!("can({a:?})"),
+        });
         match (&self.cond, can) {
             (Some(c), Some(can)) if c.contains(" or ") => Some(format!("({c}) and {can}")),
             (Some(c), Some(can)) => Some(format!("{c} and {can}")),
@@ -245,7 +266,7 @@ fn flow_of<'a>(
 }
 
 /// Whether the text holds only whitespace and comments.
-fn blank(text: &str) -> bool {
+pub(super) fn blank(text: &str) -> bool {
     let mut t = text.trim_start();
     loop {
         if let Some(r) = t.strip_prefix("<!--") {
@@ -447,6 +468,9 @@ fn emit_node(
             Special::Wizard => {
                 special::wizard(&mut cx, contract, attrs, children, open, close, *line, out)
             }
+            Special::Table => {
+                special::table(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
             _ => Err(err(*line, format!("<{name}> is not supported yet"))),
         };
     }
@@ -491,7 +515,11 @@ fn emit_node(
                         .iter()
                         .position(|p| p.name == prop)
                         .unwrap_or(0);
-                    args.push((at, format!("{}=route({e})", attrs::snake(prop))));
+                    let call = match row() {
+                        Some((_, key)) => format!("route({e}, {key})"),
+                        None => format!("route({e})"),
+                    };
+                    args.push((at, format!("{}={call}", attrs::snake(prop))));
                     continue;
                 }
                 let Some(p) = contract.props.iter().find(|p| p.name == n) else {

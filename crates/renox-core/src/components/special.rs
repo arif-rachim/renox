@@ -6,7 +6,7 @@ use super::CompileError;
 use super::attrs;
 use super::contracts::Contract;
 use super::contracts::Module;
-use super::emit::{check_attrs, emit_into, err, pad};
+use super::emit::{blank, check_attrs, emit_into, err, pad, with_row};
 use super::scan::Attr;
 use super::tree::Node;
 use std::collections::BTreeSet;
@@ -283,6 +283,253 @@ pub(super) fn wizard(
         }
     }
     out.push_str("{% endcall %}");
+    if let Some(c) = close {
+        out.push_str(&pad(&cx.src[c.clone()]));
+    }
+    Ok(())
+}
+
+const TABLE_HOLDS: &str =
+    "<rx-table> holds <rx-column>, <rx-row-actions> and <rx-slot name=\"empty\">";
+
+fn plain_name(v: &str) -> bool {
+    let mut chars = v.chars();
+    chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// `<rx-table>`: the columns become a `table(...)` call, a loop over the rows and, for a page of
+/// rows, its pagination (Decision 18 of #372).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn table(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    let find = |tag: &str| {
+        cx.catalog
+            .contracts
+            .iter()
+            .find(|c| c.tag == tag)
+            .copied()
+            .unwrap_or_else(|| panic!("{tag} is built in"))
+    };
+    let (column, actions) = (find("rx-column"), find("rx-row-actions"));
+    let data = |name: &str| -> Result<Option<String>, CompileError> {
+        attr(attrs, name)
+            .map(|a| {
+                attrs::prop_expr(a, attrs::Kind::Data, &[])
+                    .map_err(|m| err(a.line, format!("<rx-table> {m}")))
+            })
+            .transpose()
+    };
+    let rows = data("rows")?.expect("checked: required");
+    let var = match attr(attrs, "as") {
+        Some(a) => {
+            let v = a.value.unwrap_or("").trim();
+            if a.name.starts_with(':') || !plain_name(v) {
+                return Err(err(
+                    a.line,
+                    "<rx-table> \"as\" must be a plain name, such as product".to_owned(),
+                ));
+            }
+            v.to_owned()
+        }
+        None => "row".to_owned(),
+    };
+    let key = data("key")?.unwrap_or_else(|| format!("{var}.id"));
+    let caption = attr(attrs, "caption")
+        .map(|a| text_prop(a, "rx-table"))
+        .transpose()?;
+    cx.used.insert(Module::Ui);
+    cx.used.insert(Module::Pagination);
+    *cx.counter += 1;
+    let n = *cx.counter;
+    let id = match attr(attrs, "id") {
+        Some(a)
+            if !a.name.starts_with(':')
+                && a.value.is_some_and(|v| {
+                    !v.is_empty()
+                        && v.chars()
+                            .all(|c| c.is_ascii_alphanumeric() || "_-.:".contains(c))
+                }) =>
+        {
+            a.value.unwrap_or("").to_owned()
+        }
+        Some(a) => format!("{{{{ {} }}}}", text_prop(a, "rx-table")?),
+        None => format!("rx-table-{n}"),
+    };
+    let card = match attr(attrs, "card") {
+        Some(a) => Some(
+            attrs::prop_expr(a, attrs::Kind::Bool, &[])
+                .map_err(|m| err(a.line, format!("<rx-table> {m}")))?,
+        ),
+        None => None,
+    };
+
+    let mut head: Vec<String> = Vec::new();
+    let mut cells = String::new();
+    let mut empty = String::new();
+    let mut seen_empty = false;
+    for child in children {
+        match child {
+            Node::Text(span) => {
+                let text = &cx.src[span.clone()];
+                if !blank(text) {
+                    return Err(err(line, TABLE_HOLDS.to_owned()));
+                }
+                cells.push_str(&pad(text));
+            }
+            Node::Element {
+                name,
+                attrs: ca,
+                children: inner,
+                open: copen,
+                close: cclose,
+                line: at,
+            } => match name.as_str() {
+                "rx-column" => {
+                    check_attrs(&column, ca, &[]).map_err(|m| err(*at, m))?;
+                    let label = text_prop(attr(ca, "label").expect("checked: required"), name)?;
+                    let (mut num, mut narrow) = (false, false);
+                    if let Some(a) = attr(ca, "align") {
+                        match (a.name.starts_with(':'), a.value) {
+                            (false, Some("num")) => num = true,
+                            (false, Some("start")) => {}
+                            _ => {
+                                return Err(err(
+                                    a.line,
+                                    "<rx-column> \"align\" is start or num".to_owned(),
+                                ));
+                            }
+                        }
+                    }
+                    if let Some(a) = attr(ca, "hide-narrow") {
+                        match (a.name.starts_with(':'), a.value) {
+                            (false, None | Some("true")) => narrow = true,
+                            (false, Some("false")) => {}
+                            _ => {
+                                return Err(err(
+                                    a.line,
+                                    "<rx-column> \"hide-narrow\" is true or false: write hide-narrow"
+                                        .to_owned(),
+                                ));
+                            }
+                        }
+                    }
+                    let td = match (num, narrow) {
+                        (false, false) => {
+                            head.push(label);
+                            "<td>"
+                        }
+                        (true, false) => {
+                            head.push(format!("[{label}, \"num\"]"));
+                            "<td class=\"rx-num\">"
+                        }
+                        (false, true) => {
+                            head.push(format!("[{label}, \"hide-narrow\"]"));
+                            "<td class=\"rx-hide-narrow\">"
+                        }
+                        (true, true) => {
+                            head.push(format!("[{label}, \"num rx-hide-narrow\"]"));
+                            "<td class=\"rx-num rx-hide-narrow\">"
+                        }
+                    };
+                    cells.push_str(td);
+                    cells.push_str(&pad(&cx.src[copen.clone()]));
+                    with_row(&var, &key, || cx.nodes(inner, "rx-column", &mut cells))?;
+                    cells.push_str("</td>");
+                    if let Some(c) = cclose {
+                        cells.push_str(&pad(&cx.src[c.clone()]));
+                    }
+                }
+                "rx-row-actions" => {
+                    check_attrs(&actions, ca, &[]).map_err(|m| err(*at, m))?;
+                    head.push("[\"\", \"num\"]".to_owned());
+                    cells.push_str("<td class=\"rx-num\">{% call __rx_ui.row_actions() %}");
+                    cells.push_str(&pad(&cx.src[copen.clone()]));
+                    with_row(&var, &key, || cx.nodes(inner, "rx-row-actions", &mut cells))?;
+                    cells.push_str("{% endcall %}</td>");
+                    if let Some(c) = cclose {
+                        cells.push_str(&pad(&cx.src[c.clone()]));
+                    }
+                }
+                "rx-slot" => {
+                    let want = ca
+                        .iter()
+                        .find(|a| a.name == "name")
+                        .and_then(|a| a.value)
+                        .unwrap_or("");
+                    if want != "empty" {
+                        return Err(err(*at, TABLE_HOLDS.to_owned()));
+                    }
+                    if seen_empty {
+                        return Err(err(
+                            *at,
+                            "<rx-table> has the slot \"empty\" twice".to_owned(),
+                        ));
+                    }
+                    seen_empty = true;
+                    empty.push_str(&pad(&cx.src[copen.clone()]));
+                    cx.nodes(inner, "rx-table", &mut empty)?;
+                    if let Some(c) = cclose {
+                        empty.push_str(&pad(&cx.src[c.clone()]));
+                    }
+                }
+                _ => return Err(err(*at, TABLE_HOLDS.to_owned())),
+            },
+        }
+    }
+    if head.is_empty() {
+        return Err(err(
+            line,
+            "<rx-table> needs at least one <rx-column>".to_owned(),
+        ));
+    }
+
+    let r = &rows;
+    let hx = format!(
+        "<div hx-boost=\"true\" hx-target=\"#{id}\" hx-select=\"#{id}\" hx-swap=\"outerHTML\">"
+    );
+    out.push_str(&format!(
+        "{{% set __rx_rows_{n} = ({r}.items if {r}.items is defined else {r}) %}}<div class=\"rx-stack\" id=\"{id}\">{{% if __rx_rows_{n} %}}"
+    ));
+    let card_open = match &card {
+        None => String::new(),
+        Some(c) if c == "true" => "<div class=\"rx-card\">".to_owned(),
+        Some(c) if c == "false" => String::new(),
+        Some(c) => format!("{{% if {c} %}}<div class=\"rx-card\">{{% endif %}}"),
+    };
+    let card_close = match &card {
+        None => String::new(),
+        Some(c) if c == "true" => "</div>".to_owned(),
+        Some(c) if c == "false" => String::new(),
+        Some(c) => format!("{{% if {c} %}}</div>{{% endif %}}"),
+    };
+    out.push_str(&card_open);
+    let mut args = format!("head=[{}]", head.join(", "));
+    if let Some(c) = caption {
+        args.push_str(&format!(", caption={c}"));
+    }
+    out.push_str(&format!("{{% call __rx_ui.table({args}) %}}"));
+    out.push_str(&pad(&cx.src[open.clone()]));
+    out.push_str(&format!("{{% for {var} in __rx_rows_{n} %}}<tr>"));
+    out.push_str(&cells);
+    out.push_str("</tr>{% endfor %}{% endcall %}");
+    out.push_str(&card_close);
+    out.push_str(&format!(
+        "{{% if {r}.last_page is defined %}}{hx}{{{{ __rx_pagination.pagination({r}) }}}}</div>{{% elif {r}.has_next is defined %}}{hx}{{{{ __rx_pagination.simple_pagination({r}) }}}}</div>{{% endif %}}{{% else %}}"
+    ));
+    out.push_str(&empty);
+    out.push_str("{% endif %}</div>");
     if let Some(c) = close {
         out.push_str(&pad(&cx.src[c.clone()]));
     }
