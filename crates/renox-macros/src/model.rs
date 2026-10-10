@@ -8,6 +8,18 @@ struct Field {
     name: String,
     ty: Type,
     skip: bool,
+    vis: syn::Visibility,
+    form: FormField,
+}
+
+/// What `#[form(...)]` says about a field.
+#[derive(Default)]
+struct FormField {
+    skip: bool,
+    upload: bool,
+    rules: Vec<TokenStream>,
+    /// The first `#[form]` attribute, for the error when `#[model(form)]` is off.
+    attr: Option<syn::Attribute>,
 }
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
@@ -26,6 +38,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let mut typed_columns = true;
     let mut search: Option<LitStr> = None;
     let mut search_language: Option<LitStr> = None;
+    let mut form = false;
     for attr in input.attrs.iter().filter(|a| a.path().is_ident("model")) {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("table") {
@@ -36,6 +49,9 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 Ok(())
             } else if meta.path.is_ident("no_typed_columns") {
                 typed_columns = false;
+                Ok(())
+            } else if meta.path.is_ident("form") {
+                form = true;
                 Ok(())
             } else if meta.path.is_ident("hooks") {
                 hooks = true;
@@ -51,7 +67,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 Ok(())
             } else {
                 Err(meta.error(
-                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `no_typed_columns`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"`",
+                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `no_typed_columns`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"` or `form`",
                 ))
             }
         })?;
@@ -83,12 +99,40 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 }
             })?;
         }
+        let mut form_field = FormField::default();
+        for attr in field.attrs.iter().filter(|a| a.path().is_ident("form")) {
+            form_field.attr.get_or_insert_with(|| attr.clone());
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("skip") {
+                    form_field.skip = true;
+                    Ok(())
+                } else if meta.path.is_ident("upload") {
+                    form_field.upload = true;
+                    Ok(())
+                } else if meta.path.is_ident("validate") {
+                    let content;
+                    syn::parenthesized!(content in meta.input);
+                    form_field.rules.push(content.parse::<TokenStream>()?);
+                    Ok(())
+                } else {
+                    Err(meta.error("expected `skip`, `upload` or `validate(...)`"))
+                }
+            })?;
+        }
+        if !form && let Some(attr) = &form_field.attr {
+            return Err(Error::new_spanned(
+                attr,
+                "#[form(…)] needs #[model(form)] on the struct",
+            ));
+        }
         let field_ident = field.ident.clone().expect("named fields have identifiers");
         fields.push(Field {
             name: field_ident.to_string().trim_start_matches("r#").to_owned(),
             ident: field_ident,
             ty: field.ty.clone(),
             skip,
+            vis: field.vis.clone(),
+            form: form_field,
         });
     }
 
@@ -262,9 +306,11 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         });
         quote! { impl #ident { #(#consts)* } }
     });
+    let form_struct = form.then(|| form_tokens(&input, &fields));
     Ok(quote! {
         #from_row_impl
         #typed_consts
+        #form_struct
 
         impl ::renox::db::Model for #ident {
             const TABLE: &'static str = #table;
@@ -314,4 +360,49 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
 
 fn is_option(ty: &Type) -> bool {
     matches!(ty, Type::Path(path) if path.path.segments.last().is_some_and(|s| s.ident == "Option"))
+}
+
+/// `<Model>Form` and its `fill`, for `#[model(form)]`.
+fn form_tokens(input: &DeriveInput, fields: &[Field]) -> TokenStream {
+    let ident = &input.ident;
+    let vis = &input.vis;
+    let form_ident = format_ident!("{}Form", ident);
+    let included: Vec<&Field> = fields
+        .iter()
+        .filter(|f| {
+            !f.skip
+                && !f.form.skip
+                && !matches!(
+                    f.name.as_str(),
+                    "id" | "created_at" | "updated_at" | "deleted_at"
+                )
+        })
+        .collect();
+    let members = included.iter().map(|f| {
+        let (field_vis, name, ty) = (&f.vis, &f.ident, &f.ty);
+        let rules = f.form.rules.iter().map(|r| quote! { #[validate(#r)] });
+        let default = matches!(ty, Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
+            .then(|| quote! { #[serde(default)] });
+        quote! { #(#rules)* #default #field_vis #name: #ty }
+    });
+    let assigns = included.iter().filter(|f| !f.form.upload).map(|f| {
+        let name = &f.ident;
+        quote! { record.#name = self.#name; }
+    });
+    let doc = format!("The form for [`{ident}`], made by `#[model(form)]`.");
+    quote! {
+        #[doc = #doc]
+        #[derive(::renox::serde::Deserialize, ::renox::serde::Serialize, ::renox::Validate)]
+        #[serde(crate = "::renox::serde")]
+        #vis struct #form_ident {
+            #(#members,)*
+        }
+
+        impl #form_ident {
+            /// Copies the form's values onto `record`.
+            pub fn fill(self, record: &mut #ident) {
+                #(#assigns)*
+            }
+        }
+    }
 }
