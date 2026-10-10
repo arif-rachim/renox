@@ -572,6 +572,7 @@ impl App {
             duplicate_live,
             commands,
             templates,
+            components,
             shares,
             channels,
             reporters,
@@ -773,6 +774,7 @@ impl App {
             storage.clone(),
             embedded.map(|e| e.views),
             Arc::new(templates),
+            Arc::new(components.iter().map(|c| c.contract()).collect()),
             zone,
             versions,
         );

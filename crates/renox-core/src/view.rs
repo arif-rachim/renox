@@ -1,4 +1,4 @@
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component as PathPart, Path, PathBuf};
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -265,15 +265,76 @@ fn hidden_by_imports(source: &str, values: &[&Value]) -> Vec<String> {
 /// `App::templates`.
 pub(crate) type TemplateHook = Arc<dyn Fn(&mut Environment<'static>) + Send + Sync>;
 
+thread_local! {
+    /// The components known while template hooks run, for [`add_template`].
+    static HOOK_COMPONENTS: std::cell::RefCell<Option<Arc<Vec<crate::components::Contract>>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Makes the registered components visible to [`add_template`] until dropped.
+struct HookScope(Option<Arc<Vec<crate::components::Contract>>>);
+
+impl HookScope {
+    fn enter(contracts: Arc<Vec<crate::components::Contract>>) -> Self {
+        Self(HOOK_COMPONENTS.with(|c| c.borrow_mut().replace(contracts)))
+    }
+}
+
+impl Drop for HookScope {
+    fn drop(&mut self) {
+        let previous = self.0.take();
+        HOOK_COMPONENTS.with(|c| *c.borrow_mut() = previous);
+    }
+}
+
+pub use crate::components::{Component, Prop};
+
+/// Adds the template `name` to `env` after compiling its component tags
+/// (`<rx-…>`, `rx-if`, `rx-for`), as the app's own views are. For modules and
+/// plugins, inside [`Registry::templates`](crate::Registry::templates), where
+/// the components other modules registered are known too. A mistake in the
+/// source is an error naming the template and line.
+///
+/// ```
+/// use renox::view::add_template;
+///
+/// let mut env = minijinja::Environment::new();
+/// add_template(&mut env, "hi.html", "<p>{{ name }}</p>").unwrap();
+/// ```
+pub fn add_template(
+    env: &mut Environment<'static>,
+    name: impl Into<String>,
+    source: impl Into<String>,
+) -> Result<(), minijinja::Error> {
+    let name = name.into();
+    let source = source.into();
+    let contracts = HOOK_COMPONENTS
+        .with(|c| c.borrow().clone())
+        .unwrap_or_else(|| Arc::new(crate::components::BUILTIN.to_vec()));
+    let catalog = crate::components::Catalog {
+        contracts: &contracts,
+        lookup: &|_| None,
+    };
+    let compiled = crate::components::compile(&name, &source, &catalog).map_err(|e| {
+        minijinja::Error::new(
+            ErrorKind::SyntaxError,
+            format!("{name}:{}: {}", e.line, e.message),
+        )
+    })?;
+    env.add_template_owned(name, compiled)
+}
+
 impl Views {
     /// `embedded`: templates compiled into the binary, used instead of
     /// `VIEWS_PATH` when given.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         config: &Config,
         routes: Arc<RouteTable>,
         storage: Storage,
         embedded: Option<&'static [(&'static str, &'static str)]>,
         hooks: Arc<Vec<TemplateHook>>,
+        components: Arc<Vec<crate::components::Contract>>,
         zone: crate::timezone::Zone,
         versions: Arc<crate::embedded::AssetVersions>,
     ) -> Self {
@@ -290,13 +351,21 @@ impl Views {
                 env.set_undefined_behavior(minijinja::UndefinedBehavior::SemiStrict);
             }
             let loader_dir = dir.clone();
+            let contracts: Arc<Vec<crate::components::Contract>> = Arc::new(
+                crate::components::BUILTIN
+                    .iter()
+                    .chain(components.iter())
+                    .copied()
+                    .collect(),
+            );
+            let loader_contracts = contracts.clone();
             env.set_loader(move |name| {
                 let Some(src) = load(&loader_dir, embedded, name)? else {
                     return Ok(None);
                 };
                 let lookup = |n: &str| load(&loader_dir, embedded, n).ok().flatten();
                 let catalog = crate::components::Catalog {
-                    contracts: crate::components::BUILTIN,
+                    contracts: &loader_contracts,
                     lookup: &lookup,
                 };
                 crate::components::compile(name, &src, &catalog)
@@ -487,6 +556,7 @@ impl Views {
             env.add_function("chart", crate::chart::chart(currency.clone()));
             env.add_function("class_names", crate::view_filters::class_names);
             // The app's own functions and filters (`App::templates`).
+            let _scope = HookScope::enter(contracts.clone());
             for hook in hooks.iter() {
                 hook(&mut env);
             }
@@ -900,7 +970,7 @@ fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
     let mut path = dir.to_path_buf();
     for component in Path::new(name).components() {
         match component {
-            Component::Normal(part) => path.push(part),
+            PathPart::Normal(part) => path.push(part),
             _ => return None,
         }
     }
@@ -1553,6 +1623,7 @@ mod tests {
             Arc::new(RouteTable::default()),
             Storage::from_config(&config).unwrap(),
             None,
+            Arc::new(Vec::new()),
             Arc::new(Vec::new()),
             config.timezone,
             Arc::new(crate::embedded::AssetVersions::new(dir, None)),
