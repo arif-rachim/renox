@@ -19,6 +19,55 @@ pub use context::LiveContext;
 
 use crate::{Error, Result};
 
+/// A component rendered for a page: give it to the template as `component`
+/// and include `renox/live.html`.
+#[derive(Serialize)]
+#[non_exhaustive]
+pub struct Mounted {
+    /// The component's name.
+    pub name: &'static str,
+    /// The element id of its wrapper.
+    pub id: String,
+    /// The template that renders it.
+    pub view: &'static str,
+    /// The signed snapshot of its state.
+    pub snapshot: String,
+    /// The state, for the view.
+    pub state: serde_json::Value,
+    /// The extra values from [`LiveComponent::data`], for the view.
+    pub data: serde_json::Value,
+    /// True when an action's answer renders it (no scripts, no wrapper setup).
+    pub answer: bool,
+}
+
+/// Renders `c` into a [`Mounted`].
+#[allow(dead_code)]
+pub(crate) async fn render<C: LiveComponent>(
+    ctx: &LiveContext,
+    c: &C,
+    id: String,
+    answer: bool,
+) -> Result<Mounted> {
+    let state = serde_json::to_value(c).map_err(|e| Error::Internal(e.into()))?;
+    let data = c.data(ctx).await?;
+    let snapshot = snapshot::seal(
+        ctx.state.key.signing(),
+        ctx.state.config.live_snapshot_max,
+        C::NAME,
+        &id,
+        &state,
+    )?;
+    Ok(Mounted {
+        name: C::NAME,
+        id,
+        view: C::VIEW,
+        snapshot,
+        state,
+        data,
+        answer,
+    })
+}
+
 /// A registered component's entry point: context, action name and the raw
 /// request fields in, a response out.
 pub(crate) type LiveFn = Arc<
