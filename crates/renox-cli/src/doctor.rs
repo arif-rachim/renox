@@ -262,7 +262,7 @@ fn tailwind_check(bin: Option<&str>, pinned: Option<&Path>) -> Check {
 }
 
 /// The app's own checks.
-fn project_checks(root: &Path, _no_build: bool) -> Vec<Check> {
+fn project_checks(root: &Path, no_build: bool) -> Vec<Check> {
     let mut checks = vec![
         env_check(root),
         key_check(crate::setting_in(root, "APP_KEY").as_deref()),
@@ -277,7 +277,74 @@ fn project_checks(root: &Path, _no_build: bool) -> Vec<Check> {
         let pinned = tailwind::pinned_path().ok().filter(|p| p.is_file());
         checks.push(tailwind_check(bin.as_deref(), pinned.as_deref()));
     }
+    if no_build {
+        checks.push(Check::skip("Database and migrations: skipped (--no-build)"));
+    } else {
+        eprintln!("Building the app to ask it about its database (skip with --no-build)…");
+        // `serve::build` runs cargo in the current directory.
+        let built = std::env::set_current_dir(root)
+            .map_err(anyhow::Error::from)
+            .and_then(|()| crate::serve::build(&[]));
+        match built {
+            Ok(Some(exe)) => match std::process::Command::new(&exe)
+                .arg("migrate:status")
+                .current_dir(root)
+                .output()
+            {
+                Ok(out) => checks.extend(status_checks(
+                    out.status.success(),
+                    &String::from_utf8_lossy(&out.stdout),
+                    &String::from_utf8_lossy(&out.stderr),
+                    scheme(crate::setting_in(root, "DATABASE_URL").as_deref()),
+                )),
+                Err(e) => checks.push(Check::fail(
+                    format!("Database: couldn't run the app ({e})"),
+                    "cargo build",
+                )),
+            },
+            Ok(None) | Err(_) => {
+                checks.push(Check::fail("The app doesn't build", "cargo build"));
+            }
+        }
+    }
     checks
+}
+
+/// What `<app> migrate:status` says about the database and the migrations.
+fn status_checks(success: bool, stdout: &str, stderr: &str, scheme: &str) -> Vec<Check> {
+    if !success {
+        let mut lines: Vec<&str> = stderr
+            .lines()
+            .map(str::trim_end)
+            .filter(|l| !l.trim().is_empty())
+            .take(5)
+            .collect();
+        lines.push("check DATABASE_URL in .env (PostgreSQL: is the server running, and the database created?)");
+        return vec![Check::fail(
+            "Database: the app couldn't start",
+            lines.join("\n"),
+        )];
+    }
+    let pending = stdout
+        .lines()
+        .filter(|l| l.trim_start().starts_with("pending"))
+        .count();
+    let mut checks = vec![Check::ok(format!("Database: reachable ({scheme})"))];
+    checks.push(if pending == 0 {
+        Check::ok("Migrations: all ran")
+    } else {
+        Check::warn(format!("Migrations: {pending} pending"), "rnx migrate")
+    });
+    checks
+}
+
+/// The kind of database a `DATABASE_URL` points at.
+fn scheme(url: Option<&str>) -> &'static str {
+    match url {
+        Some(u) if u.starts_with("postgres://") || u.starts_with("postgresql://") => "postgres",
+        Some(u) if !u.starts_with("sqlite:") => "other",
+        _ => "sqlite",
+    }
 }
 
 /// `rnx doctor`.
@@ -494,5 +561,33 @@ mod tests {
         let c = tailwind_check(None, None);
         assert_eq!(c.status, Status::Warn);
         assert_eq!(c.fix.as_deref(), Some("rnx tailwind:install"));
+    }
+
+    #[test]
+    fn status_checks_cases() {
+        let c = status_checks(true, "  ran (batch 1)  a\n", "", "sqlite");
+        assert_eq!(c[0].what, "Database: reachable (sqlite)");
+        assert_eq!(c[1].what, "Migrations: all ran");
+        let out = "  ran (batch 1)  a\n  pending          b\n  pending          c\n";
+        let c = status_checks(true, out, "", "postgres");
+        assert_eq!(c[1].status, Status::Warn);
+        assert_eq!(c[1].what, "Migrations: 2 pending");
+        assert_eq!(c[1].fix.as_deref(), Some("rnx migrate"));
+        let err = (1..=7).map(|n| format!("e{n}\n")).collect::<String>();
+        let c = status_checks(false, "", &err, "sqlite");
+        assert_eq!(c.len(), 1);
+        assert_eq!(c[0].status, Status::Fail);
+        let fix = c[0].fix.as_deref().unwrap();
+        assert!(fix.contains("e5") && !fix.contains("e6"));
+        assert!(fix.ends_with("the database created?)"));
+    }
+
+    #[test]
+    fn scheme_cases() {
+        assert_eq!(scheme(Some("postgres://x")), "postgres");
+        assert_eq!(scheme(Some("postgresql://x")), "postgres");
+        assert_eq!(scheme(Some("sqlite://a.db")), "sqlite");
+        assert_eq!(scheme(None), "sqlite");
+        assert_eq!(scheme(Some("mysql://x")), "other");
     }
 }

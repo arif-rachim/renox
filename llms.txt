@@ -172,7 +172,7 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   `/health`, what happens when the database or SMTP fails, recovering failed jobs and webhook
   calls, backups (and what `APP_KEY` protects), migrations at deploy, the scheduler's time zone,
   tables to prune, maintenance mode.
-- [docs/development.md](docs/development.md): faster builds (profiles, linker, features to drop,
+- [docs/development.md](docs/development.md): faster builds, and `rnx doctor` (profiles, linker, features to drop,
   sccache, the cargo-chef Dockerfile).
 - [docs/types.md](docs/types.md): every Rust field type with its form input and its SQLite and
   PostgreSQL column (`DbEnum`, `Json<T>`, dates and times, money, UUID).
