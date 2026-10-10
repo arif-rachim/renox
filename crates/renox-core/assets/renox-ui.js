@@ -487,6 +487,7 @@
   function selectTab(tab, focus) {
     var list = tab.closest('[role="tablist"]');
     if (!list) return;
+    var was = tab.getAttribute("aria-selected") === "true";
     list.querySelectorAll('[role="tab"]').forEach(function (other) {
       var selected = other === tab;
       other.setAttribute("aria-selected", selected ? "true" : "false");
@@ -494,6 +495,7 @@
       var panel = document.getElementById(other.getAttribute("aria-controls"));
       if (panel) panel.hidden = !selected;
     });
+    if (!was) emit(list, "changed", { name: tab.getAttribute("data-rx-tab") });
     if (focus) tab.focus();
   }
 
