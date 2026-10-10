@@ -484,3 +484,74 @@ async fn a_macro_made_component_runs_its_marked_actions() {
     post("hidden", "[]").await.assert_status(404);
     post("data", "[]").await.assert_status(404);
 }
+
+/// The page with ids and snapshots blanked, which differ per mount.
+fn blanked(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    while let Some(i) = rest
+        .find(" id=\"")
+        .or_else(|| rest.find("data-rx-snapshot=\""))
+    {
+        let quote = rest[i..].find('"').unwrap() + i + 1;
+        let end = rest[quote..].find('"').unwrap() + quote;
+        out.push_str(&rest[..quote]);
+        out.push_str("...");
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+#[renox::test]
+async fn the_live_tag_renders_like_the_include() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("live")).unwrap();
+    std::fs::write(
+        dir.path().join("tag.html"),
+        r#"<live-counter :component="list" @saved="open = false" class="box" data-x="1" />"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("include.html"),
+        r#"{% with component = list, live_attrs = {"x-on:rx:counter:saved.self": "open = false", "class": "box", "data-x": "1"} %}{% include "renox/live.html" %}{% endwith %}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("live/counter.html"),
+        r#"<button rx-click="increment">{{ state.count }}</button>"#,
+    )
+    .unwrap();
+    async fn page(ctx: LiveContext, name: &'static str) -> Result<View> {
+        let list = ctx.mount(Counter::default()).await?;
+        Ok(view(name, context! { list }))
+    }
+    struct Both;
+    impl Module for Both {
+        fn name(&self) -> &'static str {
+            "both"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new()
+                .get("/tag", |ctx: LiveContext| page(ctx, "tag.html"))
+                .get("/include", |ctx: LiveContext| page(ctx, "include.html"))
+        }
+    }
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new()
+            .module(Auth::new())
+            .module(Both)
+            .live_component::<Counter>(),
+        move |c| c.views_path = path,
+    )
+    .await;
+    let tag = app.get("/tag").await;
+    let include = app.get("/include").await;
+    tag.assert_ok()
+        .assert_see(r#"class="box""#)
+        .assert_see(r#"x-on:rx:counter:saved.self="open = false""#)
+        .assert_see(r#"data-x="1""#)
+        .assert_see(r#"rx-click="increment""#);
+    assert_eq!(blanked(&tag.text()), blanked(&include.text()));
+}

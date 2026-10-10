@@ -117,7 +117,13 @@
       Idiomorph.morph(w, event.detail.xhr.responseText, {
         morphStyle: "outerHTML",
         // Without it Idiomorph resets the focused field to the new HTML's value.
-        ignoreActiveValue: true
+        ignoreActiveValue: true,
+        // The answer has no `live_attrs`: keep the attributes the page's tag put on the wrapper.
+        callbacks: {
+          beforeAttributeUpdated: function (name, node, type) {
+            if (node === w && type === "remove") return false;
+          }
+        }
       });
       htmx.process(w);
       nameModels(w);

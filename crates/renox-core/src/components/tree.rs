@@ -35,9 +35,9 @@ pub(crate) enum Node<'a> {
     },
 }
 
-/// Whether the name is a component's (`rx-…` or `app-…`).
+/// Whether the name is a component's (`rx-…`, `app-…` or `live-…`).
 pub(crate) fn is_component(name: &str) -> bool {
-    name.starts_with("rx-") || name.starts_with("app-")
+    name.starts_with("rx-") || name.starts_with("app-") || name.starts_with("live-")
 }
 
 fn has_flow(attrs: &[Attr<'_>]) -> bool {

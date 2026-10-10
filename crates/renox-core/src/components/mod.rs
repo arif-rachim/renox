@@ -10,6 +10,7 @@ mod attrs;
 mod contracts;
 mod custom_data;
 mod emit;
+mod live;
 mod plugin;
 mod scan;
 mod special;
@@ -56,7 +57,7 @@ pub(crate) struct Catalog<'a> {
 
 /// Templates that need no compiling: no component tag and no `rx-if` / `rx-else` / `rx-for`.
 static NEEDS_COMPILE: LazyLock<regex::Regex> = LazyLock::new(|| {
-    regex::Regex::new(r"</?(?:rx|app)-|\srx-(?:if|else|for)\b").expect("a valid pattern")
+    regex::Regex::new(r"</?(?:rx|app|live)-|\srx-(?:if|else|for)\b").expect("a valid pattern")
 });
 
 /// Compiles the template `file` (its source is `src`) to plain MiniJinja.

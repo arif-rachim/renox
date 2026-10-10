@@ -449,6 +449,9 @@ fn emit_node(
     if name.starts_with("app-") {
         return super::app::usage(src, node, attrs, catalog, used, counter, out);
     }
+    if name.starts_with("live-") {
+        return super::live::usage(src, node, attrs, out);
+    }
     let Some(contract) = catalog.contracts.iter().find(|c| c.tag == name) else {
         let hint = suggest::did_you_mean(name, catalog.contracts.iter().map(|c| c.tag))
             .map(|x| format!("; did you mean <{x}>?"))
