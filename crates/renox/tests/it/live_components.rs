@@ -101,3 +101,32 @@ async fn a_page_mounts_a_component() {
         .assert_see(r#"name="_token""#)
         .assert_see("data-rx-snapshot=");
 }
+
+#[renox::test]
+async fn a_page_with_two_components_loads_idiomorph_once() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("live")).unwrap();
+    std::fs::write(
+        dir.path().join("page.html"),
+        r#"{% set component = list %}{% include "renox/live.html" %}{% set component = list %}{% include "renox/live.html" %}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("live/counter.html"),
+        "<b>{{ state.count }}</b>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new()
+            .module(Auth::new())
+            .module(Pages)
+            .live_component::<Counter>(),
+        move |c| c.views_path = path,
+    )
+    .await;
+    let body = app.get("/counter").await.text();
+    assert_eq!(body.matches(r#"data-rx-live="counter""#).count(), 2);
+    assert_eq!(body.matches("idiomorph-0.7.3.min.js").count(), 1);
+    assert_eq!(body.matches("/_renox/live-").count(), 1);
+}
