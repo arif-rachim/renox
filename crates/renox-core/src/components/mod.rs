@@ -161,6 +161,76 @@ mod tests {
     }
 
     #[test]
+    fn slots_fill_props_and_pass_arguments() {
+        use contracts::{Module, Render, Slot};
+        static T: &[Contract] = &[Contract {
+            tag: "rx-t",
+            doc: "t",
+            render: Render::Macro {
+                module: Module::Ui,
+                name: "t",
+            },
+            props: &[],
+            slots: &[
+                Slot {
+                    name: "",
+                    into: None,
+                    args: &["row", "prefix"],
+                    optional: false,
+                    doc: "x",
+                },
+                Slot {
+                    name: "footer",
+                    into: None,
+                    args: &[],
+                    optional: true,
+                    doc: "x",
+                },
+            ],
+            events: &[],
+            route_prop: None,
+            attrs: false,
+            parent: None,
+        }];
+        let all: Vec<Contract> = BUILTIN.iter().chain(T).copied().collect();
+        let c = Catalog {
+            contracts: &all,
+            lookup: &|_| None,
+        };
+        let imp = "{% import \"renox/ui.html\" as __rx_ui %}";
+        let ok = |s: &str| compile("a.html", s, &c).unwrap();
+        let msg = |s: &str| compile("a.html", s, &c).unwrap_err().message;
+        assert_eq!(
+            ok("<rx-badge kind=\"info\">New {{ n }}</rx-badge>"),
+            format!(
+                "{imp}{{% set __rx_slot_1 %}}New {{{{ n }}}}{{% endset %}}{{{{ __rx_ui.badge(kind=\"info\", text=__rx_slot_1) }}}}"
+            )
+        );
+        assert_eq!(
+            ok("<rx-t>{{ row }}<rx-slot name=\"footer\">F</rx-slot></rx-t>"),
+            format!(
+                "{imp}{{% set __rx_slot_1 %}}F{{% endset %}}{{% call(row, prefix) __rx_ui.t(footer=__rx_slot_1) %}}{{{{ row }}}}{{% endcall %}}"
+            )
+        );
+        assert_eq!(
+            msg("<rx-t><rx-slot name=\"fotter\">F</rx-slot></rx-t>"),
+            "<rx-t> has no slot \"fotter\"; did you mean \"footer\"?"
+        );
+        assert_eq!(
+            msg("<rx-badge text=\"a\">b</rx-badge>"),
+            "<rx-badge> give \"text\" or content, not both"
+        );
+        assert_eq!(
+            msg("<rx-badge><rx-slot>b</rx-slot></rx-badge>"),
+            "<rx-slot> needs a name here"
+        );
+        assert_eq!(
+            msg("<rx-badge/>"),
+            "<rx-badge> needs the attribute \"text\""
+        );
+    }
+
+    #[test]
     fn typos_get_a_suggestion() {
         let e = compile("a.html", "<rx-stak></rx-stak>", &builtin()).unwrap_err();
         assert_eq!(
@@ -176,6 +246,52 @@ mod tests {
         assert_eq!(src.lines().count(), out.lines().count());
         assert_eq!(emit::pad("a\nb\n"), "{#\n\n#}");
         assert_eq!(emit::pad("ab"), "");
+    }
+
+    #[test]
+    fn control_flow_wraps_elements_and_components() {
+        let c = |s: &str| compile("a.html", s, &builtin()).unwrap();
+        assert_eq!(
+            c("<tr class=\"a\" rx-for=\"s in xs\">x</tr>"),
+            "{% for s in xs %}<tr class=\"a\">x</tr>{% endfor %}"
+        );
+        assert_eq!(
+            c("<p rx-if=\"a\">A</p>\n<p rx-else>B</p>"),
+            "{% if a %}<p>A</p>\n{% else %}<p>B</p>{% endif %}"
+        );
+        assert_eq!(
+            c("<rx-badge can=\"update\" text=\"x\"/>"),
+            "{% import \"renox/ui.html\" as __rx_ui %}{% if can(\"update\") %}{{ __rx_ui.badge(text=\"x\") }}{% endif %}"
+        );
+        assert_eq!(
+            c("<rx-badge rx-for=\"s in xs\" rx-if=\"s.ok\" can=\"a\" text=\"x\"/>"),
+            "{% import \"renox/ui.html\" as __rx_ui %}{% for s in xs %}{% if s.ok and can(\"a\") %}{{ __rx_ui.badge(text=\"x\") }}{% endif %}{% endfor %}"
+        );
+    }
+
+    #[test]
+    fn control_flow_keeps_the_line_count() {
+        let src = "<p\n  class=\"a\"\n  rx-if=\"a\"\n>A</p>\n<!-- c -->\n<p rx-else>B</p>\n<tr\n rx-for=\"s in xs\">x</tr>";
+        let out = compile("a.html", src, &builtin()).unwrap();
+        assert_eq!(src.lines().count(), out.lines().count(), "{out}");
+    }
+
+    #[test]
+    fn control_flow_errors() {
+        let msg = |s: &str| compile("a.html", s, &builtin()).unwrap_err().message;
+        assert_eq!(
+            msg("<p rx-else>B</p>"),
+            "rx-else must follow an element with rx-if"
+        );
+        assert_eq!(
+            msg("<p rx-for=\"a in b\" rx-if=\"a\">A</p><p rx-else>B</p>"),
+            "rx-else can't follow an element with rx-for"
+        );
+        assert_eq!(msg("<p rx-if>A</p>"), "rx-if needs a condition");
+        assert_eq!(
+            msg("<p rx-for=\"xs\">A</p>"),
+            "rx-for needs \"item in list\""
+        );
     }
 
     #[test]

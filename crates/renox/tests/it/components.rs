@@ -142,6 +142,16 @@ async fn rx_badge_matches_the_macro() {
 }
 
 #[renox::test]
+async fn rx_badge_content_matches_the_prop() {
+    same(
+        &format!("{UI}{{{{ ui.badge(text=\"New\") }}}}"),
+        "<rx-badge>New</rx-badge>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
 async fn rx_page_header_matches_the_macro_with_and_without_actions() {
     same(
         &format!(
@@ -151,6 +161,22 @@ async fn rx_page_header_matches_the_macro_with_and_without_actions() {
         "<rx-page-header title=\"Orders\" subtitle=\"All\" back=\"/\" badge=\"3\" badge-kind=\"info\"> </rx-page-header>\
          <rx-page-header title=\"{{ name }}\"><a href=\"/new\">New</a></rx-page-header>",
         serde_json::json!({"name": "Items"}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn control_flow_renders_lists_and_empty_lists() {
+    let src =
+        "<ul><li rx-for=\"x in xs\">{{ x }}</li></ul><p rx-if=\"xs\">some</p><p rx-else>none</p>";
+    let mac = "<ul>{% for x in xs %}<li>{{ x }}</li>{% endfor %}</ul>{% if xs %}<p>some</p>{% else %}<p>none</p>{% endif %}";
+    same(mac, src, serde_json::json!({"xs": ["a", "b"]})).await;
+    same(mac, src, serde_json::json!({"xs": []})).await;
+    let badge = "{% for x in xs %}{{ ui.badge(text=(x)) }}{% endfor %}";
+    same(
+        &format!("{UI}{badge}"),
+        "<rx-badge rx-for=\"x in xs\" :text=\"x\"/>",
+        serde_json::json!({"xs": ["a", "b"]}),
     )
     .await;
 }
