@@ -587,6 +587,24 @@ impl TestApp {
         }
     }
 
+    /// Fails unless every model registered with `App::model` matches the
+    /// table the migrations built for it.
+    ///
+    /// ```no_run
+    /// # async fn demo(app: renox::testing::TestApp) {
+    /// app.assert_models_match_schema().await;
+    /// # }
+    /// ```
+    pub async fn assert_models_match_schema(&self) {
+        let reports = crate::db::schema_check::check(self.db(), self.kernel.models())
+            .await
+            .expect("the schema can be read");
+        let (text, problems) = crate::db::schema_check::render(&reports);
+        if problems > 0 {
+            panic!("the models do not match the schema:\n{text}");
+        }
+    }
+
     /// Fails if a row of `table` has all these column values.
     pub async fn assert_database_missing(
         &self,

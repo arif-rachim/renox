@@ -138,6 +138,32 @@ fn is_memory(url: &str) -> bool {
     url.contains(":memory:") || url.contains("mode=memory")
 }
 
+/// A throwaway database for checks that run migrations: a fresh schema on
+/// PostgreSQL, an in-memory database on SQLite.
+pub(crate) async fn connect_scratch(config: &Config) -> anyhow::Result<Db> {
+    if is_postgres(&config.database_url) {
+        return connect_postgres(&config.database_url, config, true).await;
+    }
+    let mut scratch = config.clone();
+    scratch.database_url = "sqlite::memory:".into();
+    connect(&scratch).await
+}
+
+/// Drops the schema of a database made by [`connect_scratch`] (PostgreSQL only).
+pub(crate) async fn drop_scratch(db: &Db) {
+    if db.dialect() != Dialect::Postgres {
+        return;
+    }
+    let Ok(schema) = sql("SELECT current_schema()").scalar::<String>(db).await else {
+        return;
+    };
+    if schema.starts_with("renox_test_") {
+        let _ = sql(format!("DROP SCHEMA {} CASCADE", quote(&schema)))
+            .execute(db)
+            .await;
+    }
+}
+
 /// Connects to PostgreSQL; with `fresh_schema`, in a new, empty schema of its
 /// own (named `renox_test_…`, left behind for inspection).
 #[cfg(feature = "postgres")]

@@ -41,6 +41,7 @@ Commands:
                             Undo the last N batches of migrations (default 1)
   migrate:fresh [--seed]    Drop all tables, run every migration, optionally seed
   migrate:status            List migrations and whether they have run
+  db:check                  Compare the registered models with the tables the migrations build
   db:seed                   Run the seeders
   queue:work [--queue a,b] [--workers N] [--once]
                             Run queued jobs (until stopped, or --once for what's there)
@@ -963,6 +964,9 @@ impl App {
                     println!("Seeded.");
                 }
             }
+            "db:check" if !kernel.commands.iter().any(|c| c.name == "db:check") => {
+                kernel.db_check().await?
+            }
             "migrate:status" => {
                 for m in kernel.migration_status().await? {
                     let note = if m.missing {
@@ -1269,8 +1273,27 @@ pub struct Kernel {
 }
 
 impl Kernel {
+    /// A scratch database with every migration run (reused by #371).
+    pub(crate) async fn scratch_db(&self) -> Result<Db> {
+        let db = crate::db::connect_scratch(&self.state.config).await?;
+        self.migrator.run(&db).await?;
+        Ok(db)
+    }
+
+    /// `db:check`: compares the models with what the migrations build.
+    async fn db_check(&self) -> Result {
+        let db = self.scratch_db().await?;
+        let reports = crate::db::schema_check::check(&db, &self.models).await;
+        crate::db::drop_scratch(&db).await;
+        let (text, problems) = crate::db::schema_check::render(&reports?);
+        print!("{text}");
+        if problems > 0 {
+            return Err(anyhow::anyhow!("{problems} problem(s) in the models").into());
+        }
+        Ok(())
+    }
+
     /// The models registered with `App::model`, once each.
-    #[allow(dead_code)] // read by `db:check` (370.5)
     pub(crate) fn models(&self) -> &[crate::db::schema::ModelInfo] {
         &self.models
     }
