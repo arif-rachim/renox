@@ -78,6 +78,8 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 - `auth::logout` ends this device only (`logout_other_devices` for the rest).
   `User::set_password` ends every session, this one too: in a handler use
   `auth::change_password`, which keeps the user logged in.
+- Prefer typed columns in queries (`.where_(Product::PRICE.lt(20_000)).order_by(Product::NAME)`):
+  a misspelt field then fails to compile instead of when the query runs.
 - A model with `#[model(default_scope = "…")]` (e.g. the current team) filters every query,
   including `find`; use `Model::unscoped()` in admin code and commands that must see all rows.
 - A model's key is its `id` field's type: `i64`, `renox::db::Ulid`, `renox::uuid::Uuid` (the

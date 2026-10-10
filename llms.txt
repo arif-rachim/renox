@@ -13,7 +13,7 @@
   `rnx` commands; modules, routes, path parameters, route groups and guards (auth, verified,
   guest, throttle); views, template globals and overriding built-in pages; `App::share` and
   `App::templates`; `App::provide` and `App::layer`; forms and validation (`unique`/`exists`);
-  models, migrations and queries (raw fragments, grouping, locks, update_or_create, simple and
+  models, migrations and queries (prefer typed columns: `Product::PRICE.lt(1)`, `order_by(Product::NAME)`; raw fragments, grouping, locks, update_or_create, simple and
   cursor pagination, transactions with retries); model keys other than integers (`Ulid`,
   `Uuid`, `String`, `rnx make:model --key`); every field type; pagination; data grids; seeders and factories; auth,
   policies, gates, API tokens and your own login; tenants (`renox::context`, default scopes),

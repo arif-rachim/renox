@@ -699,6 +699,12 @@ async fn queries(db: &Db) -> Result {
         .limit(10)
         .get(db)
         .await?;
+    // The same with typed columns: a misspelt field is a compile error, and the value's type is checked.
+    let cheap_typed = Product::query()
+        .where_(Product::PRICE.lt(20_000))
+        .order_by(Product::NAME)
+        .get(db)
+        .await?;
     let one = Product::find_or_404(db, tea.id).await?; // missing row -> 404 page
     let total = Product::query().count(db).await?;
     let q = "coffee";
@@ -785,6 +791,10 @@ async fn even_more_queries(db: &Db) -> Result {
     Ok(())
 }
 ```
+
+Prefer the typed columns (`Product::PRICE.lt(20_000)`, `order_by(Product::NAME)`): the derive makes
+one constant per field, in SHOUTY_SNAKE_CASE. `#[model(no_typed_columns)]` turns them off for a struct
+that has its own items of those names; the string forms keep working.
 
 The query builder checks every column name against the model's fields, and `where_op` takes only
 `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `like` and `not like`. Anything else (and an `update` that
