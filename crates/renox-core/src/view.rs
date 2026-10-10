@@ -124,6 +124,8 @@ pub struct Views {
     dir: PathBuf,
     /// Templates compiled into the binary, used instead of `dir` when given.
     embedded: Option<&'static [(&'static str, &'static str)]>,
+    /// The plugins' components, next to the built-in ones.
+    plugin_components: Arc<Vec<crate::components::Contract>>,
 }
 
 /// One template that does not compile, found by [`Views::check`].
@@ -338,6 +340,7 @@ impl Views {
         zone: crate::timezone::Zone,
         versions: Arc<crate::embedded::AssetVersions>,
     ) -> Self {
+        let plugin_components = components.clone();
         let dir = config.views_path.clone();
         let watch = config.debug && embedded.is_none() && dir.is_dir();
         let debug = config.debug;
@@ -571,6 +574,7 @@ impl Views {
             debug,
             dir: config.views_path.clone(),
             embedded,
+            plugin_components,
         }
     }
 
@@ -589,6 +593,26 @@ impl Views {
         names.sort();
         names.dedup();
         names
+    }
+
+    /// The editor data file (VS Code's `html.customData`): the built-in and plugin components
+    /// and the app's own (`components/*.html` files that declare `<rx-props>`).
+    pub(crate) fn custom_data(&self) -> serde_json::Value {
+        let contracts: Vec<crate::components::Contract> = crate::components::BUILTIN
+            .iter()
+            .chain(self.plugin_components.iter())
+            .copied()
+            .collect();
+        let sources: Vec<(String, String)> = self
+            .names()
+            .into_iter()
+            .filter(|n| n.starts_with("components/") && n.ends_with(".html"))
+            .filter_map(|n| {
+                let src = load(&self.dir, self.embedded, &n).ok().flatten()?;
+                src.contains("<rx-props").then_some((n, src))
+            })
+            .collect();
+        crate::components::custom_data_for(&contracts, &sources)
     }
 
     /// Compiles every template and returns those that fail, in name order.

@@ -652,3 +652,40 @@ async fn view_check_passes_clean_views_and_fails_broken_ones() {
         .await
         .unwrap();
 }
+
+#[renox::test]
+async fn view_data_writes_the_editor_file_with_the_apps_components() {
+    let dir = tempfile::tempdir().unwrap();
+    let components = dir.path().join("views/components");
+    std::fs::create_dir_all(&components).unwrap();
+    std::fs::write(
+        components.join("price_tag.html"),
+        "<rx-props amount currency=\"USD\" />\n<b>{{ amount }}</b>",
+    )
+    .unwrap();
+    std::fs::write(
+        components.join("macros.html"),
+        "{% macro x() %}{% endmacro %}",
+    )
+    .unwrap();
+    let mut config = config(dir.path());
+    config.views_path = dir.path().join("views");
+    let out = dir.path().join(".vscode/renox-components.json");
+    App::with_config(config)
+        .run_args(["view:data", "--out", out.to_str().unwrap()])
+        .await
+        .unwrap();
+    let data: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
+    let tags = data["tags"].as_array().unwrap();
+    let tag = tags.iter().find(|t| t["name"] == "app-price-tag").unwrap();
+    let attrs: Vec<&str> = tag["attributes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(attrs, ["amount", "currency"]);
+    assert!(tags.iter().any(|t| t["name"] == "rx-table"));
+    assert!(!tags.iter().any(|t| t["name"] == "app-macros"));
+}
