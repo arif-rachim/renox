@@ -4,6 +4,7 @@
 
 var kit = window.Renox._kit;
 var validate = kit.validate;
+var emit = kit.emit;
 var firstField = kit.firstField;
 
 // ---------- Wizard ----------
@@ -16,6 +17,7 @@ function wizardParts(wizard) {
 }
 
 function showStep(wizard, index, focus) {
+  var prev = wizard.getAttribute("data-rx-step-index");
   var parts = wizardParts(wizard);
   var last = parts.panels.length - 1;
   parts.panels.forEach(function (panel, i) {
@@ -28,6 +30,7 @@ function showStep(wizard, index, focus) {
     if (i < index) tab.setAttribute("data-done", ""); else tab.removeAttribute("data-done");
   });
   wizard.setAttribute("data-rx-step-index", String(index));
+  if (prev !== null && prev !== String(index)) emit(wizard, "changed", { name: parts.tabs[index] && parts.tabs[index].getAttribute("data-rx-step-tab"), index: index });
   var back = wizard.querySelector("[data-rx-wizard-back]");
   var next = wizard.querySelector("[data-rx-wizard-next]");
   var submit = wizard.querySelector("[data-rx-wizard-submit]");

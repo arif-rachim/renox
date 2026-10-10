@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% from "renox/ui.html" import input, action_sheet, confirm, tabs, tab_panel, wizard, wizard_step %}
+{% block content %}
+{% call action_sheet("ev-sheet", "Plan", "/sheet", "Plan") %}
+  {{ input("from", "From", required=true) }}
+  {{ input("to", "To", required=true) }}
+{% endcall %}
+
+{{ confirm("ev-confirm", "Delete", "/confirm-done", "Delete?", "Sure?", method="POST") }}
+
+{{ tabs("evt", [["a", "A"], ["b", "B"]]) }}
+{% call tab_panel("evt", "a", selected=true) %}<p>Panel A</p>{% endcall %}
+{% call tab_panel("evt", "b") %}<p>Panel B</p>{% endcall %}
+
+{% call action_sheet("wizard-sheet", "Book a trip", "/sheet", "Book a trip") %}
+  {% call wizard("ws", [["start", "Start"], ["end", "End"]], submit_label="Book") %}
+    {% call wizard_step("ws", "start") %}{{ input("from", "From", id="ws-from") }}{% endcall %}
+    {% call wizard_step("ws", "end") %}{{ input("to", "To", id="ws-to") }}{% endcall %}
+  {% endcall %}
+{% endcall %}
+{% endblock %}
