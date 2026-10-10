@@ -10,6 +10,7 @@
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('htmx.title'), subtitle=t('htmx.lead')) }}
+  <div class="rx-row">{{ link_button(route('about.htmx_live'), t('htmx.live.see_live'), variant="secondary") }}</div>
 
   {#- One Alpine component for the checklist: the active tab. Its logic is in
       `Alpine.data` below, so the page also works under CSP=strict. -#}

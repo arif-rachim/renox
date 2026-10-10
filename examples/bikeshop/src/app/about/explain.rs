@@ -245,6 +245,7 @@ pub fn entries() -> Vec<Explanation> {
         field_sample_page(),
         field_sample_edit_page(),
         htmx_page(),
+        htmx_live_page(),
     ]
 }
 
@@ -351,6 +352,72 @@ fn htmx_page() -> Explanation {
             Code {
                 title: "Row: toggle, inline edit, a menu that asks",
                 region: "about.htmx.row",
+            },
+        ],
+    }
+}
+
+/// `/about/htmx/live`: the checklist of `/about/htmx` as a live component.
+fn htmx_live_page() -> Explanation {
+    Explanation {
+        route: "about.htmx_live",
+        path: "/about/htmx/live",
+        title: "htmx recipes, as a live component",
+        purpose: "The pre-ride checklist of the htmx page again, written as a live \
+                  component: add, tick, rename inline, delete, filter by tab and clear the \
+                  done items. It is the same session list, so both pages show the same \
+                  items, but here there are no routes, fragments or out-of-band swaps: one \
+                  struct and a method per action. The infinite scroll, the duplicate that \
+                  is retargeted, Clear's reload, Ready's redirect and the delete \
+                  confirmation are left out; the htmx page has them.",
+        who: "Developers comparing the two ways to build the same interaction.",
+        audience: &[Audience::Developer],
+        flow: Flow::Learn,
+        features: &[
+            Feature {
+                api: "LiveComponent",
+                why: "`#[renox::live_component]` turns the marked methods of an `impl` into \
+                      the component's actions. The struct is its state; `data` adds what \
+                      the view shows (the items, filtered), and the page only mounts it \
+                      with `ctx.mount(…)`.",
+            },
+            Feature {
+                api: "rx-click / rx-model",
+                why: "`rx-click=\"toggle(3)\"` calls an action with its arguments, \
+                      `rx-model=\"title\"` keeps the typed text in the state, and \
+                      `rx-submit` calls an action on Enter. The answer is the component's \
+                      HTML again, morphed into the page, so the count, the empty note and \
+                      the rows stay right with no out-of-band parts.",
+            },
+            Feature {
+                api: "Signed snapshot",
+                why: "The state travels in the page as a signed snapshot, checked on every \
+                      call, so the browser can't forge it. The items themselves stay in \
+                      the session, as on the htmx page; a failed `ctx.validate(…)` is a \
+                      422 whose errors land under the field.",
+            },
+        ],
+        under_hood: "Each click posts the snapshot, the arguments and the model fields to \
+                     `/_renox/live/checklist/{action}`. The server checks the signature, \
+                     runs the method, renders the view again and answers its HTML, which \
+                     the browser morphs in. The checklist is the visitor's session list \
+                     (`Checklist::of`), the same store as `/about/htmx`.",
+        docs: &["docs/ui.md#htmx-response-headers"],
+        sources: &[
+            "examples/bikeshop/src/app/about/live.rs",
+            "examples/bikeshop/resources/views/about/live.html",
+            "examples/bikeshop/resources/views/about/live/_checklist.html",
+            "examples/bikeshop/tests/htmx.rs",
+            "tests/browser/bikeshop-htmx.test.mjs",
+        ],
+        code: &[
+            Code {
+                title: "Component: the state and its actions",
+                region: "about.htmx_live.component",
+            },
+            Code {
+                title: "Template: rx-click and rx-model",
+                region: "about.htmx_live.view",
             },
         ],
     }

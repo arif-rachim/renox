@@ -5674,6 +5674,18 @@
   "htmx": {
     "title": "Recetas de htmx",
     "lead": "Las interacciones para las que se suele recurrir a un framework de JavaScript, cada una con unos pocos atributos de htmx en los componentes del kit y un handler que responde con un fragmento. Pruébalas en una lista de antes de salir y en las bicis del catálogo.",
+    "live": {
+      "title": "Recetas de htmx, como componente en vivo",
+      "lead": "La lista de comprobación de la página de htmx, escrita como componente en vivo: una estructura de Rust para el estado, un método por acción, y rx-click / rx-model en la plantilla.",
+      "card": "Los mismos elementos que la página de htmx, guardados en tu sesión.",
+      "cancel": "Cancelar",
+      "see_htmx": "La versión con htmx",
+      "see_live": "La versión con componente en vivo",
+      "left_out": {
+        "title": "Lo que esta versión omite",
+        "body": "El desplazamiento infinito de bicicletas, el duplicado redirigido a su fila, la recarga y la redirección de Limpiar y Listo, el doble clic y Escape de la edición en línea y hx-confirm al borrar. La página de htmx los muestra."
+      }
+    },
     "checklist": {
       "title": "Lista de antes de salir",
       "lead": "Guardada en tu sesión: añade, marca, haz doble clic para renombrar, elimina desde el menú de la fila."
