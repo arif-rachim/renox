@@ -3,10 +3,11 @@
 //! a `{# … #}` comment, so the lines of the source stay where they were (Decision 8 of #372).
 
 use super::attrs::{self, Kind};
-use super::contracts::{Contract, Render};
+use super::contracts::{Contract, Module, Render};
 use super::scan::Attr;
 use super::tree::{self, Node};
 use super::{Catalog, CompileError, suggest};
+use std::collections::BTreeSet;
 
 /// A comment holding as many line breaks as `span_text` has, or nothing.
 pub(super) fn pad(span_text: &str) -> String {
@@ -63,8 +64,19 @@ pub(crate) fn emit(
     catalog: &Catalog,
 ) -> Result<String, CompileError> {
     let mut out = String::with_capacity(src.len());
-    emit_into(src, nodes, catalog, None, &mut out)?;
-    Ok(out)
+    let mut used = BTreeSet::new();
+    emit_into(src, nodes, catalog, None, &mut used, &mut out)?;
+    if used.is_empty() {
+        return Ok(out);
+    }
+    let mut modules: Vec<Module> = used.into_iter().collect();
+    modules.sort_by_key(|m| m.alias());
+    let mut head = String::new();
+    for m in modules {
+        head.push_str(&format!("{{% import \"{}\" as {} %}}", m.path(), m.alias()));
+    }
+    head.push_str(&out);
+    Ok(head)
 }
 
 fn emit_into(
@@ -72,6 +84,7 @@ fn emit_into(
     nodes: &[Node<'_>],
     catalog: &Catalog,
     parent: Option<&str>,
+    used: &mut BTreeSet<Module>,
     out: &mut String,
 ) -> Result<(), CompileError> {
     for node in nodes {
@@ -88,7 +101,7 @@ fn emit_into(
                 if !tree::is_component(name) {
                     // Control-flow elements come in a later step: copied as they are.
                     out.push_str(&src[open.clone()]);
-                    emit_into(src, children, catalog, parent, out)?;
+                    emit_into(src, children, catalog, parent, used, out)?;
                     if let Some(c) = close {
                         out.push_str(&src[c.clone()]);
                     }
@@ -112,8 +125,44 @@ fn emit_into(
                 match contract.render {
                     Render::Element { tag, class } => {
                         element(src, contract, tag, class, attrs, open, *line, out)?;
-                        emit_into(src, children, catalog, Some(name), out)?;
+                        emit_into(src, children, catalog, Some(name), used, out)?;
                         out.push_str(&format!("</{tag}>"));
+                        if let Some(c) = close {
+                            out.push_str(&pad(&src[c.clone()]));
+                        }
+                    }
+                    Render::Macro { module, name: mac } => {
+                        used.insert(module);
+                        let mut args = Vec::new();
+                        for a in attrs {
+                            let n = bare(a.name);
+                            let p = contract
+                                .props
+                                .iter()
+                                .find(|p| p.name == n)
+                                .expect("checked against the contract");
+                            let e = attrs::prop_expr(a, p.kind, p.values)
+                                .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
+                            args.push(format!("{}={e}", attrs::snake(n)));
+                        }
+                        let call = format!("{}.{mac}({})", module.alias(), args.join(", "));
+                        let optional = contract.slots.first().is_some_and(|s| s.optional);
+                        let slotted =
+                            !contract.slots.is_empty() && (!optional || has_content(src, children));
+                        if slotted {
+                            out.push_str(&format!("{{% call {call} %}}"));
+                            out.push_str(&pad(&src[open.clone()]));
+                            emit_into(src, children, catalog, Some(name), used, out)?;
+                            out.push_str("{% endcall %}");
+                        } else {
+                            out.push_str(&format!("{{{{ {call} }}}}"));
+                            out.push_str(&pad(&src[open.clone()]));
+                            for c in children {
+                                if let Node::Text(span) = c {
+                                    out.push_str(&pad(&src[span.clone()]));
+                                }
+                            }
+                        }
                         if let Some(c) = close {
                             out.push_str(&pad(&src[c.clone()]));
                         }
