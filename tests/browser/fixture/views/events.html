@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% from "renox/ui.html" import input, action_sheet, confirm %}
+{% block content %}
+{% call action_sheet("ev-sheet", "Plan", "/sheet", "Plan") %}
+  {{ input("from", "From", required=true) }}
+  {{ input("to", "To", required=true) }}
+{% endcall %}
+
+{{ confirm("ev-confirm", "Delete", "/confirm-done", "Delete?", "Sure?", method="POST") }}
+{% endblock %}

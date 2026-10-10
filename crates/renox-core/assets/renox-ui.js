@@ -10,6 +10,10 @@
     return meta ? meta.content : "";
   }
 
+  // A component announces what happened to it as `rx:<component>:<event>`,
+  // bubbling from its root element (`data-rx-component`).
+  function emit(el, name, detail) { var c = el && el.getAttribute && el.getAttribute("data-rx-component"); if (!c) return; el.dispatchEvent(new CustomEvent("rx:" + c + ":" + name, { bubbles: true, detail: detail || {} })); }
+
   // ---------- Toasts ----------
 
   var ICONS = {
@@ -377,6 +381,8 @@
     if (!dialog || typeof dialog.showModal !== "function" || dialog.open) return;
     dialog._opener = opener;
     dialog.showModal();
+    dialog._rxConfirmed = false;
+    emit(dialog, "opened", { id: dialog.id });
     var first = dialog.querySelector("[autofocus]") || dialog.querySelector("[data-rx-initial-focus]") ||
       dialog.querySelector("form[data-rx-action] .rx-sheet__body :is(input:not([type=hidden]), select, textarea, button):not([disabled])");
     if (first) first.focus();
@@ -399,10 +405,11 @@
   document.addEventListener("htmx:afterRequest", function (event) {
     var form = event.target;
     if (!form.matches || !form.matches("form[data-rx-action]")) return;
-    if (!event.detail.successful) return;
+    var dialog = form.closest("dialog");
+    if (!event.detail.successful) { emit(dialog, "failed", { id: dialog && dialog.id, status: event.detail.xhr.status }); return; }
+    emit(dialog, "saved", { id: dialog && dialog.id, status: event.detail.xhr.status });
     // An answer that asks to stay (an import's report of refused rows).
     if (form.querySelector("[data-rx-keep-open]")) return;
-    var dialog = form.closest("dialog");
     if (dialog && dialog.open) dialog.close();
     else clearActionForm(form);
   });
@@ -418,6 +425,18 @@
   document.addEventListener("close", function (event) {
     var dialog = event.target;
     if (dialog && dialog._opener && dialog._opener.focus) dialog._opener.focus();
+    if (dialog && dialog.matches && dialog.matches("dialog[data-rx-component]")) {
+      if (dialog.getAttribute("data-rx-component") === "confirm" && !dialog._rxConfirmed) emit(dialog, "cancelled", { id: dialog.id });
+      emit(dialog, "closed", { id: dialog.id });
+    }
+  }, true);
+
+  // A confirm's form is a plain POST: this fires just before the navigation.
+  document.addEventListener("submit", function (event) {
+    var dialog = event.target.closest && event.target.closest('dialog[data-rx-component="confirm"]');
+    if (!dialog) return;
+    dialog._rxConfirmed = true;
+    emit(dialog, "confirmed", { id: dialog.id });
   }, true);
 
   // A click on the backdrop (outside the sheet's box) closes it.
@@ -1675,6 +1694,7 @@
     validate: validate,
     errorKey: errorKey,
     firstField: firstField,
+    emit: emit,
     onClear: function (hook) { clearHooks.push(hook); },
     CLOSE: CLOSE
   };

@@ -2,6 +2,7 @@
 
 mod deploy;
 mod doctor;
+mod finish;
 mod format;
 mod generate;
 mod make;
@@ -93,6 +94,12 @@ enum Command {
         /// singular, `products` → `Product`).
         #[arg(long)]
         model: Option<String>,
+        /// With --resource: don't run migrate afterwards.
+        #[arg(long)]
+        no_migrate: bool,
+        /// With --resource: open the new page in the browser.
+        #[arg(long)]
+        open: bool,
     },
     /// Fake records for a model (`impl Factory`).
     #[command(name = "make:factory")]
@@ -286,7 +293,13 @@ fn run(command: Command) -> Result<()> {
             resource: true,
             fields,
             model,
-        } => scaffold::resource(&app_root()?, &name, model.as_deref(), fields.as_deref()),
+            no_migrate,
+            open,
+        } => {
+            let root = app_root()?;
+            let path = scaffold::resource(&root, &name, model.as_deref(), fields.as_deref())?;
+            finish::after_resource(&root, &path, !no_migrate, open)
+        }
         Command::MakeModule { name, .. } => generate::module(&app_root()?, &name),
         Command::MakeFactory { model, module } => generate::factory(&app_root()?, &model, &module),
         Command::MakeSeeder { name } => generate::seeder(&app_root()?, &name),
@@ -598,6 +611,21 @@ mod tests {
         assert!(matches!(
             parse(&["doctor", "--no-build"]),
             Command::Doctor { no_build: true }
+        ));
+        assert!(matches!(
+            parse(&[
+                "make:module",
+                "products",
+                "--resource",
+                "--no-migrate",
+                "--open"
+            ]),
+            Command::MakeModule {
+                resource: true,
+                no_migrate: true,
+                open: true,
+                ..
+            }
         ));
         assert!(matches!(
             parse(&["serve", "--release"]),
