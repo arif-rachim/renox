@@ -345,14 +345,14 @@ async fn facets(
 ) -> Result<Facets> {
     let brands = Brand::query()
         .where_in_query("id", scope.clone(), "brand_id")
-        .order_by("name")
+        .order_by(Brand::NAME)
         .get(db)
         .await?;
     let variants_in_scope =
         || ProductVariant::query().where_in_query("product_id", scope.clone(), "id");
     let sizes: BTreeSet<String> = variants_in_scope()
-        .where_not_null("size")
-        .pluck::<String, _>(db, "size")
+        .where_(ProductVariant::SIZE.is_not_null())
+        .pluck::<String, _>(db, ProductVariant::SIZE)
         .await?
         .into_iter()
         .collect();

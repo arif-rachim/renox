@@ -582,6 +582,7 @@ async fn queries(db: &Db) -> Result {
     let latest = Post::published().latest().limit(10).get(db).await?; // ->latest()->take(10)->get()
     let post = Post::find_or_404(db, 1).await?;                        // findOrFail → 404 page
     let popular = Post::where_eq("user_id", 7).where_op("views", ">", 100).count(db).await?;
+    let popular = Post::query().where_(Post::USER_ID.eq(7)).where_(Post::VIEWS.gt(100)).count(db).await?; // typed columns: checked at compile time
     let titles: Vec<String> = Post::published().pluck(db, "title").await?;
     let page = Post::published().paginate(db, 1, 20).await?;          // ->paginate(20)
     Post::where_eq("user_id", 7).update(db, &[("status", &Status::Draft)]).await?; // mass update
