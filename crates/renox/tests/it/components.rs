@@ -1203,3 +1203,40 @@ async fn rx_chart_needs_its_kind() {
     let r = app.get("/r").await;
     assert_eq!(r.status.as_u16(), 500);
 }
+
+#[renox::test]
+async fn rx_menu_parts_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.menu(\"More\", variant=\"primary\") %}}\
+             {{{{ ui.menu_link(href=\"/a\", label=\"Edit\", icon=\"plus\", download=true, new_tab=true, danger=true) }}}}\
+             {{{{ ui.menu_open(id=\"s1\", label=\"Open\", danger=true) }}}}\
+             {{% call ui.menu_section(\"Export\") %}}{{{{ ui.menu_action(action=\"/x\", label=\"Delete\", method=\"DELETE\", danger=true) }}}}{{% endcall %}}\
+             {{{{ ui.menu_separator() }}}}\
+             {{{{ ui.menu_action(action=\"/y\", label=\"Post\") }}}}\
+             {{% endcall %}}"
+        ),
+        "<rx-menu label=\"More\" variant=\"primary\">\
+         <rx-menu-link href=\"/a\" icon=\"plus\" download new-tab danger>Edit</rx-menu-link>\
+         <rx-menu-open id=\"s1\" danger>Open</rx-menu-open>\
+         <rx-menu-section title=\"Export\"><rx-menu-action action=\"/x\" method=\"DELETE\" danger>Delete</rx-menu-action></rx-menu-section>\
+         <rx-menu-separator/>\
+         <rx-menu-action action=\"/y\" label=\"Post\"/>\
+         </rx-menu>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_link_tabs_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.link_tabs(items=(tabs), current=\"/b\", label=\"Views\") }}}}\
+             {{{{ ui.link_tabs(items=(tabs)) }}}}"
+        ),
+        "<rx-link-tabs :items=\"tabs\" current=\"/b\" label=\"Views\"/><rx-link-tabs :items=\"tabs\"/>",
+        serde_json::json!({"tabs": [["/a", "A"], ["/b", "B"]]}),
+    )
+    .await;
+}
