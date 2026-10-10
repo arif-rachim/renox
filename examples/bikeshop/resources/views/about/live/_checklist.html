@@ -1,0 +1,41 @@
+{#- The live checklist (src/app/about/live.rs). `state` is the component's
+    struct, `data` what its `data` returned. rx-click calls an action,
+    rx-model keeps a field in step, rx-submit calls one on Enter. -#}
+{% from "renox/ui.html" import input, checkbox, button %}
+{# [explain:about.htmx_live.view] #}
+<div class="bs-checklist__bar">
+  <span class="rx-badge rx-badge--info" id="open-count">{{ t('htmx.open', count=data.open) }}</span>
+  <div class="rx-segmented" role="tablist" aria-label="{{ t('htmx.show') }}">
+    {%- for tab in ["all", "open", "done"] %}
+    <button class="rx-segmented__item" type="button" role="tab" id="tab-{{ tab }}" aria-selected="{{ 'true' if (state.filter or 'all') == tab else 'false' }}" rx-click='show("{{ tab }}")'>{{ t('htmx.tabs.' ~ tab) }}</button>
+    {%- endfor %}
+  </div>
+</div>
+<form rx-submit="add" novalidate>
+  {{ input("title", t('htmx.item'), value=state.title, placeholder=t('htmx.placeholder'), autocomplete="off", id="new-title", attrs={"rx-model": "title", "maxlength": 60}) }}
+  {{ button(t('htmx.add')) }}
+</form>
+<ul class="rx-list" id="checklist" aria-label="{{ t('htmx.checklist.title') }}">
+  {%- for item in data["items"] %}
+  <li id="item-{{ item.id }}">
+    {%- if state.editing == item.id %}
+    <form class="bs-checklist__edit" rx-submit="save_edit" novalidate>
+      {{ input("edit_title", t('htmx.item'), value=state.edit_title, hide_label=true, id="edit-title", attrs={"rx-model": "edit_title", "maxlength": 60}) }}
+      {{ button(t('htmx.save'), size="small") }}
+      {{ button(t('htmx.live.cancel'), variant="secondary", size="small", type="button", attrs={"rx-click": "cancel_edit"}) }}
+    </form>
+    {%- else %}
+    {{ checkbox("done", t('htmx.done_label', title=item.title), checked=item.done, hide_label=true, id="done-" ~ item.id,
+                attrs={"rx-click": "toggle(" ~ item.id ~ ")"}) }}
+    <span class="{{ class_names('rx-list__main', {'bs-checklist__done': item.done}) }}">{{ item.title }}</span>
+    {{ button(t('htmx.edit'), variant="plain", size="small", type="button", attrs={"rx-click": "edit(" ~ item.id ~ ")"}) }}
+    {{ button(t('htmx.delete'), variant="plain", size="small", type="button", attrs={"rx-click": "delete(" ~ item.id ~ ")"}) }}
+    {%- endif %}
+  </li>
+  {%- endfor %}
+</ul>
+{% if not data.total %}<p class="rx-subtitle" id="checklist-empty">{{ t('htmx.empty') }}</p>{% endif %}
+<div class="rx-row">
+  {{ button(t('htmx.clear'), variant="secondary", type="button", attrs={"rx-click": "clear_done"}) }}
+</div>
+{# [/explain:about.htmx_live.view] #}

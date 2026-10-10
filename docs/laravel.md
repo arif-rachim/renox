@@ -102,8 +102,10 @@ default database; PostgreSQL is a feature flag away.
 
 ### htmx and Alpine.js for the front end
 
-**htmx and Alpine.js instead of Livewire or Inertia.** Pages are rendered on the server. htmx
-swaps parts of them, and handlers return just a block of a template (`.fragment("list")`).
+**htmx and Alpine.js, and live components, instead of Livewire.** Pages are rendered on the
+server. htmx swaps parts of them, and handlers return just a block of a template
+(`.fragment("list")`). For a part of a page with state and several actions, a live component is
+a Rust struct with a method per action (see [live.md](live.md)). Inertia has no counterpart.
 
 Validation errors land next to the right inputs, with no JavaScript to write per form.
 
@@ -582,6 +584,7 @@ async fn queries(db: &Db) -> Result {
     let latest = Post::published().latest().limit(10).get(db).await?; // ->latest()->take(10)->get()
     let post = Post::find_or_404(db, 1).await?;                        // findOrFail → 404 page
     let popular = Post::where_eq("user_id", 7).where_op("views", ">", 100).count(db).await?;
+    let popular = Post::query().where_(Post::USER_ID.eq(7)).where_(Post::VIEWS.gt(100)).count(db).await?; // typed columns: checked at compile time
     let titles: Vec<String> = Post::published().pluck(db, "title").await?;
     let page = Post::published().paginate(db, 1, 20).await?;          // ->paginate(20)
     Post::where_eq("user_id", 7).update(db, &[("status", &Status::Draft)]).await?; // mass update
@@ -831,7 +834,29 @@ Views get the data you pass with `context! { … }`.
 
 Details: [ui.md](ui.md).
 
-### Livewire and Inertia → htmx
+### Livewire → live components
+
+A Livewire component is a class with public properties and methods, and a view. A Renox live
+component is a struct with serde fields (the state), methods marked `#[live(action)]`, and a
+view. The browser holds a signed snapshot of the state and morphs the answer into the page.
+
+| Livewire | Renox |
+|---|---|
+| `wire:click="toggle(3)"` | `rx-click="toggle(3)"` |
+| `wire:submit="save"` | `rx-submit="save"` |
+| `wire:model`, `.live`, `.blur` | `rx-model`, `rx-model.live`, `rx-model.blur` |
+| `$this->validate()` | `ctx.validate(&value).await?` |
+| `$this->dispatch('saved')` | `ctx.dispatch("saved", json!({}))` |
+| `$this->redirect('/x')` | `ctx.redirect("/x")` |
+| `Livewire::test(Counter::class)` | `app.live(Counter::default())` |
+
+Differences to know: the snapshot is signed, not encrypted (no secrets in fields); there is no
+nesting of components; a call without JavaScript does nothing. The guide:
+[live.md](live.md). The bike shop's checklist is written both ways:
+[`/about/htmx`](../examples/bikeshop/src/app/about/htmx.rs) and
+[`/about/htmx/live`](../examples/bikeshop/src/app/about/live.rs).
+
+### Inertia → htmx
 
 The handler that renders a page can also answer an htmx request with just one block of it:
 
@@ -1370,7 +1395,8 @@ list.
 | Schema builder (`Blueprint`) | not planned | SQL migrations; a `.postgres.up.sql` file when the two databases differ |
 | Tinker | not planned | `db:shell` for SQL, and your own commands (`App::command`, `typed_command`) for code |
 | MySQL, several connections, read/write split | SQLite and PostgreSQL, one `Db` per app | `renox::db::sql` for reports; a second sqlx pool by hand if you must |
-| Livewire, Inertia | not planned | htmx + Alpine; for a SPA, a JSON API with tokens (the bike shop's `/api/v1`, [src/app/api/mod.rs](../examples/bikeshop/src/app/api/mod.rs)) |
+| Livewire | live components | `#[renox::live_component]`, `rx-click`, `rx-model` ([live.md](live.md)) |
+| Inertia | not planned | htmx + Alpine; for a SPA, a JSON API with tokens (the bike shop's `/api/v1`, [src/app/api/mod.rs](../examples/bikeshop/src/app/api/mod.rs)) |
 | Fortify 2FA, Socialite | `renox-2fa` and `renox-oauth` (optional plugin crates) | `renox-2fa`: TOTP turned on from `/account`, the code after the password, recovery codes ([two-factor.md](two-factor.md)); `renox-oauth`: Google and GitHub (another provider is one `Provider` impl), PKCE, linking by verified email, link and unlink from `/account` ([oauth.md](oauth.md)) |
 | Scout | the database engine, built in | `#[model(search = "title, body")]`, `renox::db::search::migration`, `Post::search(&q)`: SQLite FTS5 or PostgreSQL `tsvector`, kept current by the database, ranked, also behind the grid's search box ([search.md](search.md)); no Algolia/Meilisearch engines |
 | Cashier | the `renox-billing` crate (an optional plugin) | `Billing::new().plan(…).stripe().xendit()`: plans declared in code, trials (also without a payment method), `swap`, `cancel` with a grace period, `resume`, `require_subscription`, the gateways' webhooks verified and applied once; Stripe and Xendit (another gateway is one `Gateway` impl) ([billing.md](billing.md); the bike shop's service plans, [src/app/plans/billing.rs](../examples/bikeshop/src/app/plans/billing.rs)). One-off payment pages and webhooks by hand: the bike shop's checkout ([src/app/sales/gateway.rs](../examples/bikeshop/src/app/sales/gateway.rs)) |

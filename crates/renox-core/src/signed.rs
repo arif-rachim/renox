@@ -19,8 +19,13 @@ fn now() -> u64 {
 }
 
 pub(crate) fn signature(state: &AppState, payload: &str) -> String {
-    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(state.key.signing())
-        .expect("HMAC accepts keys of any length");
+    hmac_hex(state.key.signing(), payload)
+}
+
+/// HMAC-SHA256 of `payload` under `key`, as lowercase hex.
+pub(crate) fn hmac_hex(key: &[u8], payload: &str) -> String {
+    let mut mac =
+        <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("HMAC accepts keys of any length");
     mac.update(payload.as_bytes());
     mac.finalize()
         .into_bytes()

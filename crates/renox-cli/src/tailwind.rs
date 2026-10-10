@@ -125,12 +125,16 @@ pub fn binary() -> Result<PathBuf> {
     if let Some(bin) = env::var_os("TAILWIND_BIN").filter(|v| !v.is_empty()) {
         return Ok(PathBuf::from(bin));
     }
-    let asset = asset()?;
-    let path = cache_dir()?.join(format!("{VERSION}-{asset}"));
+    let path = pinned_path()?;
     if !path.is_file() {
-        download(asset, &path)?;
+        download(asset()?, &path)?;
     }
     Ok(path)
+}
+
+/// Where the pinned Tailwind binary is (or will be) kept.
+pub fn pinned_path() -> Result<PathBuf> {
+    Ok(cache_dir()?.join(format!("{VERSION}-{}", asset()?)))
 }
 
 /// The pinned SHA-256 of `asset`.

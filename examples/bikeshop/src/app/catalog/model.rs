@@ -39,7 +39,7 @@ pub enum CategoryKind {
 
 /// A category of the catalogue, in a tree (`parent_id`).
 #[derive(Model, Serialize, Default, Debug, Clone)]
-#[model(table = "categories")]
+#[model(table = "categories", index(parent_id))]
 pub struct Category {
     pub id: i64,
     pub parent_id: Option<i64>,
@@ -54,11 +54,14 @@ pub struct Category {
 
 /// A brand (Trek, Shimano, Abus…).
 #[derive(Model, Serialize, Default, Debug, Clone)]
-#[model(table = "brands")]
+#[model(table = "brands", form, index(name))]
 pub struct Brand {
     pub id: i64,
+    #[form(validate(required, max = 100))]
     pub name: String,
+    #[form(validate(required, max = 100, alpha_dash))]
     pub slug: String,
+    #[form(validate(url, max = 255))]
     pub website: Option<String>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
@@ -69,6 +72,8 @@ pub struct Brand {
 #[derive(Model, Serialize, Default, Debug, Clone)]
 #[model(
     table = "products",
+    index(category_id),
+    index(brand_id),
     soft_deletes,
     search = "name, keywords, description"
 )]

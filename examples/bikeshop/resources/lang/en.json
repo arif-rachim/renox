@@ -3034,6 +3034,18 @@
   "htmx": {
     "title": "htmx recipes",
     "lead": "The interactions people reach for a JavaScript framework for, each a few htmx attributes on the kit's components and a handler that answers with a fragment. Try them on a pre-ride checklist and the catalogue's bikes.",
+    "live": {
+      "title": "htmx recipes, as a live component",
+      "lead": "The checklist of the htmx page again, written as a live component: a Rust struct for the state, a method for each action, and rx-click / rx-model in the template. No routes, fragments or out-of-band swaps.",
+      "card": "The same items as the htmx page, kept in your session: add, tick, rename and delete.",
+      "cancel": "Cancel",
+      "see_htmx": "The htmx version",
+      "see_live": "The live component version",
+      "left_out": {
+        "title": "What this version leaves out",
+        "body": "The bikes' infinite scroll, the duplicate that the server retargets onto its row (HxRetarget/HxReswap), the reload and redirect of Clear and Ready (HxRefresh/HX-Redirect), the double-click and Escape of the inline edit, and hx-confirm on delete. The page about htmx shows them."
+      }
+    },
     "checklist": {
       "title": "Pre-ride checklist",
       "lead": "Kept in your session: add, tick, double-click to rename, delete from the row's menu."

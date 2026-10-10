@@ -1,6 +1,8 @@
 //! `rnx`: the command-line tool for the Renox web framework.
 
 mod deploy;
+mod doctor;
+mod finish;
 mod format;
 mod generate;
 mod make;
@@ -8,8 +10,9 @@ mod new;
 mod scaffold;
 mod serve;
 mod tailwind;
+mod tools;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use base64::Engine;
@@ -52,6 +55,12 @@ enum Command {
         #[arg(long)]
         notifications: bool,
     },
+    /// Check this machine and app, and say how to fix what's missing.
+    Doctor {
+        /// Skip building the app (no database or migrations check).
+        #[arg(long)]
+        no_build: bool,
+    },
     /// Run the app, rebuilding and restarting it when source files change.
     Serve {
         /// Extra arguments for `cargo build`, e.g. `--release`.
@@ -61,11 +70,17 @@ enum Command {
     /// Create a migration in `migrations/`, e.g. `create_products_table`.
     #[command(name = "make:migration")]
     MakeMigration {
-        /// Snake-case description, e.g. `create_products_table`.
-        name: String,
+        /// Snake-case description, e.g. `create_products_table`. Optional with `--auto`.
+        name: Option<String>,
         /// Directory for the migration files.
         #[arg(long, default_value = "migrations")]
         path: PathBuf,
+        /// Write the migration from what changed in the models (`db:diff`).
+        #[arg(long)]
+        auto: bool,
+        /// With `--auto`: accept ambiguous changes without asking.
+        #[arg(long)]
+        yes: bool,
     },
     /// Create a module: routes, an index view, and its registration.
     #[command(name = "make:module")]
@@ -85,6 +100,12 @@ enum Command {
         /// singular, `products` → `Product`).
         #[arg(long)]
         model: Option<String>,
+        /// With --resource: don't run migrate afterwards.
+        #[arg(long)]
+        no_migrate: bool,
+        /// With --resource: open the new page in the browser.
+        #[arg(long)]
+        open: bool,
     },
     /// Fake records for a model (`impl Factory`).
     #[command(name = "make:factory")]
@@ -175,6 +196,10 @@ enum Command {
         /// With --ui: replace files already there.
         #[arg(long)]
         force: bool,
+        /// Write the older macro form (`{% from … import … %}`) instead of an
+        /// `<app-…>` tag.
+        #[arg(long = "macro")]
+        macro_form: bool,
     },
     /// Create an HTML and a text mail template.
     #[command(name = "make:mail")]
@@ -202,6 +227,9 @@ enum Command {
     /// List migrations and whether they have run.
     #[command(name = "migrate:status")]
     MigrateStatus,
+    /// Compare the registered models with the tables the migrations build.
+    #[command(name = "db:check")]
+    DbCheck,
     /// Run the app's seeders.
     #[command(name = "db:seed")]
     DbSeed,
@@ -267,17 +295,38 @@ fn run(command: Command) -> Result<()> {
             println!("{}", tailwind::binary()?.display());
             Ok(())
         }
+        Command::Doctor { no_build } => doctor::run(no_build),
         Command::Serve { cargo_args } => serve::run(&cargo_args),
         Command::KeyGenerate { show } => key_generate(show),
         Command::Build => deploy::build(&app_root()?),
         Command::MakeDeploy => deploy::make_deploy(&app_root()?),
-        Command::MakeMigration { name, path } => make::migration(&name, &path),
+        Command::MakeMigration {
+            name,
+            path,
+            auto,
+            yes,
+        } => {
+            if auto {
+                app_command("db:diff", &diff_args(name, &path, yes))
+            } else if yes {
+                anyhow::bail!("--yes only works with --auto")
+            } else {
+                let name = name.context("give a name, or --auto")?;
+                make::migration(&name, &path)
+            }
+        }
         Command::MakeModule {
             name,
             resource: true,
             fields,
             model,
-        } => scaffold::resource(&app_root()?, &name, model.as_deref(), fields.as_deref()),
+            no_migrate,
+            open,
+        } => {
+            let root = app_root()?;
+            let path = scaffold::resource(&root, &name, model.as_deref(), fields.as_deref())?;
+            finish::after_resource(&root, &path, !no_migrate, open)
+        }
         Command::MakeModule { name, .. } => generate::module(&app_root()?, &name),
         Command::MakeFactory { model, module } => generate::factory(&app_root()?, &model, &module),
         Command::MakeSeeder { name } => generate::seeder(&app_root()?, &name),
@@ -309,13 +358,16 @@ fn run(command: Command) -> Result<()> {
             app_command("ui:publish", &args)
         }
         Command::MakeComponent {
-            name: Some(name), ..
-        } => generate::component(&app_root()?, &name),
+            name: Some(name),
+            macro_form,
+            ..
+        } => generate::component(&app_root()?, &name, macro_form),
         Command::MakeComponent { .. } => Err(anyhow::anyhow!("give a name, or --ui")),
         Command::Migrate { args } => app_command("migrate", &args),
         Command::MigrateRollback { args } => app_command("migrate:rollback", &args),
         Command::MigrateFresh { args } => app_command("migrate:fresh", &args),
         Command::MigrateStatus => app_command("migrate:status", &[]),
+        Command::DbCheck => app_command("db:check", &[]),
         Command::DbSeed => app_command("db:seed", &[]),
         Command::App(args) => match args.split_first() {
             Some((command, rest)) => app_command(command, rest),
@@ -324,9 +376,30 @@ fn run(command: Command) -> Result<()> {
     }
 }
 
+/// The arguments `rnx make:migration --auto` passes to the app's `db:diff`.
+fn diff_args(name: Option<String>, path: &Path, yes: bool) -> Vec<String> {
+    let mut args: Vec<String> = name.into_iter().collect();
+    if path != Path::new("migrations") {
+        args.push("--path".into());
+        args.push(path.display().to_string());
+    }
+    if yes {
+        args.push("--yes".into());
+    }
+    args
+}
+
 /// Runs a command built into the app binary (`cargo run -- <command>`), since
 /// migrations and seeders are compiled into the app.
 fn app_command(command: &str, args: &[String]) -> Result<()> {
+    if !app_command_status(command, args)? {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+/// Runs a command built into the app binary and says whether it succeeded.
+pub(crate) fn app_command_status(command: &str, args: &[String]) -> Result<bool> {
     if !std::path::Path::new("Cargo.toml").is_file() {
         anyhow::bail!("no Cargo.toml here; run `rnx {command}` from your app's directory");
     }
@@ -335,10 +408,38 @@ fn app_command(command: &str, args: &[String]) -> Result<()> {
         .args(args)
         .status()
         .context("could not run cargo")?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
+    Ok(status.success())
+}
+
+/// A setting as the app sees it: `var(name)` when not empty, else the
+/// `name=` line of the `.env` text.
+pub(crate) fn setting_with(
+    var: impl Fn(&str) -> Option<String>,
+    env_file: Option<&str>,
+    name: &str,
+) -> Option<String> {
+    if let Some(value) = var(name).filter(|v| !v.is_empty()) {
+        return Some(value);
     }
-    Ok(())
+    let prefix = format!("{name}=");
+    env_file?
+        .lines()
+        .find_map(|line| {
+            let line = line.trim();
+            let line = line.strip_prefix("export ").unwrap_or(line).trim_start();
+            line.strip_prefix(prefix.as_str())
+        })
+        .map(|v| v.trim().trim_matches(['"', '\'']).to_owned())
+        .filter(|v| !v.is_empty())
+}
+
+/// A setting of the app in `dir`: the environment, then its `.env`.
+pub(crate) fn setting_in(dir: &Path, name: &str) -> Option<String> {
+    setting_with(
+        |n| std::env::var(n).ok(),
+        std::fs::read_to_string(dir.join(".env")).ok().as_deref(),
+        name,
+    )
 }
 
 /// The current directory, if it looks like a Renox app.
@@ -387,14 +488,11 @@ impl Database {
     /// The app's engine, from `DATABASE_URL` in the environment or in `.env`
     /// in the current directory; SQLite when neither says otherwise.
     pub(crate) fn of_current_app() -> Self {
-        let url = std::env::var("DATABASE_URL").ok().or_else(|| {
-            std::fs::read_to_string(".env").ok().and_then(|env| {
-                env.lines()
-                    .find_map(|line| line.trim().strip_prefix("DATABASE_URL="))
-                    .map(|url| url.trim().trim_matches('"').to_owned())
-            })
-        });
-        Self::of_url(url.as_deref().unwrap_or_default())
+        Self::of_url(
+            setting_in(Path::new("."), "DATABASE_URL")
+                .as_deref()
+                .unwrap_or_default(),
+        )
     }
 
     pub(crate) fn of_url(url: &str) -> Self {
@@ -481,6 +579,41 @@ fn with_key(env: &str, key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn diff_args_are_built_in_order() {
+        use super::diff_args;
+        use std::path::Path;
+        let p = Path::new("migrations");
+        assert!(diff_args(None, p, false).is_empty());
+        assert_eq!(diff_args(Some("x".into()), p, true), ["x", "--yes"]);
+        assert_eq!(
+            diff_args(Some("x".into()), Path::new("m2"), true),
+            ["x", "--path", "m2", "--yes"]
+        );
+    }
+
+    #[test]
+    fn settings_come_from_the_environment_then_env() {
+        let env = |v: &'static str| move |n: &str| (n == "A").then(|| v.to_owned());
+        let file = "B=1\nexport A=\"x y\"\nA_OLD=no\nC=''\nD='q'\n";
+        assert_eq!(
+            setting_with(env("e"), Some(file), "A").as_deref(),
+            Some("e")
+        );
+        assert_eq!(
+            setting_with(env(""), Some(file), "A").as_deref(),
+            Some("x y")
+        );
+        assert_eq!(
+            setting_with(|_| None, Some(file), "D").as_deref(),
+            Some("q")
+        );
+        assert_eq!(setting_with(|_| None, Some(file), "C"), None);
+        assert_eq!(setting_with(|_| None, Some(file), "Z"), None);
+        assert_eq!(setting_with(|_| None, None, "A"), None);
+        assert_eq!(setting_with(|_| None, Some("A_OLD=no\n"), "A"), None);
+    }
+
     use super::*;
 
     fn parse(args: &[&str]) -> Command {
@@ -532,6 +665,25 @@ mod tests {
             Command::MakeModule { resource: true, fields: Some(f), model: None, .. } if f == "name price:money"
         ));
         assert!(matches!(
+            parse(&["doctor", "--no-build"]),
+            Command::Doctor { no_build: true }
+        ));
+        assert!(matches!(
+            parse(&[
+                "make:module",
+                "products",
+                "--resource",
+                "--no-migrate",
+                "--open"
+            ]),
+            Command::MakeModule {
+                resource: true,
+                no_migrate: true,
+                open: true,
+                ..
+            }
+        ));
+        assert!(matches!(
             parse(&["serve", "--release"]),
             Command::Serve { cargo_args } if cargo_args == ["--release"]
         ));
@@ -544,7 +696,16 @@ mod tests {
             Command::MakeComponent {
                 name: None,
                 ui: true,
-                force: true
+                force: true,
+                macro_form: false
+            }
+        ));
+        assert!(matches!(
+            parse(&["make:component", "price_tag", "--macro"]),
+            Command::MakeComponent {
+                name: Some(_),
+                macro_form: true,
+                ..
             }
         ));
         // Anything else goes to the app.

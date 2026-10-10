@@ -25,6 +25,11 @@
 {%- for key, value in attrs | items %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endfor -%}
 {%- endmacro -%}
 
+{#- The attributes of a component's root, except `class`, which the macro merges into its own. -#}
+{%- macro _root_attrs(attrs) -%}
+{%- for key, value in attrs | items %}{% if key != "class" %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endif %}{% endfor -%}
+{%- endmacro -%}
+
 {%- macro _label(id, label, required, hidden=false) -%}
 <label class="rx-label{% if hidden %} rx-visually-hidden{% endif %}" for="{{ id }}">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</label>
 {%- endmacro -%}
@@ -50,7 +55,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `revealable`: a button that shows the password; `copyable`: a button
     that copies the value. A disabled field isn't sent with the form; a
     readonly one is. -#}
-{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false, hide_label=false, bag=none) -%}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false, hide_label=false, bag=none, min=none, max=none, step=none) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name, bag=bag) %}
 {%- set affixed = prefix or suffix or revealable or copyable %}
@@ -66,6 +71,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
     {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
     {%- if datalist %} list="{{ id }}-list"{% endif %}
+    {%- if min is not none %} min="{{ min }}"{% endif %}{% if max is not none %} max="{{ max }}"{% endif %}{% if step is not none %} step="{{ step }}"{% endif %}
     {%- if disabled %} disabled{% endif %}
     {%- if readonly %} readonly{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
@@ -141,7 +147,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     {%- if required %} required aria-required="true"{% endif %}
     {%- if disabled %} disabled{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
-    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error" data-rx-component="select"{{ _attrs(attrs) }}>
     {%- if placeholder and not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
     {%- for option in options %}
       {%- if option is string or option is number %}{% set value = option %}{% set text = option %}
@@ -306,7 +312,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
       {%- if disabled %} disabled{% endif %}
       {%- if readonly %} readonly{% endif %}
       {%- if message %} aria-invalid="true"{% endif %}
-      aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+      aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error" data-rx-component="date-picker"{{ _attrs(attrs) }}>
     <button class="rx-affix__button" type="button" popovertarget="{{ id }}-calendar" aria-label="{{ t('ui.choose_date') }}" aria-haspopup="dialog"{% if disabled or readonly %} disabled{% endif %}>{{ _icon("calendar") }}</button>
   </div>
   <div class="rx-popover" id="{{ id }}-calendar" popover data-rx-calendar-for="{{ id }}" role="dialog" aria-label="{{ label }}">
@@ -359,7 +365,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
       {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
       {%- if disabled %} disabled{% endif %}
       {%- if message %} aria-invalid="true"{% endif %}
-      aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+      aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error" data-rx-component="tags-input"{{ _attrs(attrs) }}>
   </div>
   {%- if suggestions %}
   <datalist id="{{ id }}-list">{% for option in suggestions %}<option value="{{ option }}"></option>{% endfor %}</datalist>
@@ -376,7 +382,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     validate the rows with `v.nested("lines", &self.lines)`. `rows`: the
     rows shown at first (maps or models); after a failed submit, the ones
     sent. `min`/`max` limit the count; adding needs JavaScript. -#}
-{% macro repeater(name, label, rows=[], add_label=none, item_label=none, min=0, max=none, reorderable=true, hint=none, id=none, span=none) -%}
+{% macro repeater(name, label, rows=[], add_label=none, item_label=none, min=0, max=none, reorderable=true, hint=none, id=none, span=none, attrs={}) -%}
 {%- set id = id or _id(name) %}
 {#- Only the list's own error (e.g. too many rows): each row's errors show
     in the row. -#}
@@ -384,7 +390,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- set message = own[0] if own else "" %}
 {%- set current = old(name, []) if has_old() else (rows if rows is defined and rows is not none else []) %}
 {%- set item = item_label or label %}
-<fieldset class="{{ _field_class(span) }} rx-fieldset rx-repeater" id="{{ id }}" data-rx-repeater="{{ name }}" data-rx-min="{{ min }}"{% if max %} data-rx-max="{{ max }}"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error">
+<fieldset class="{{ _field_class(span) }} rx-fieldset rx-repeater{% if attrs.class %} {{ attrs.class }}{% endif %}" id="{{ id }}" data-rx-repeater="{{ name }}" data-rx-min="{{ min }}"{% if max %} data-rx-max="{{ max }}"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error" data-rx-component="repeater"{{ _root_attrs(attrs) }}>
   <legend class="rx-label">{{ label }}</legend>
   {%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
   <div class="rx-repeater__rows" data-rx-rows>
@@ -443,8 +449,8 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     step shows at once, with the submit button at the end. `cancel=true`
     adds a Cancel button that closes the sheet the wizard is in (see
     `wizard_action`). -#}
-{% macro wizard(id, steps, submit_label, back_label=none, next_label=none, cancel=false, cancel_label=none) -%}
-<div class="rx-wizard" id="{{ id }}" data-rx-wizard>
+{% macro wizard(id, steps, submit_label, back_label=none, next_label=none, cancel=false, cancel_label=none, attrs={}) -%}
+<div class="rx-wizard{% if attrs.class %} {{ attrs.class }}{% endif %}" id="{{ id }}" data-rx-wizard data-rx-component="wizard"{{ _root_attrs(attrs) }}>
   <ol class="rx-wizard__steps">
     {%- for step in steps %}
     <li class="rx-wizard__step" data-rx-step-tab="{{ step[0] }}"><span class="rx-wizard__number" aria-hidden="true">{{ loop.index }}</span><span class="rx-wizard__name">{{ step[1] }}</span></li>
@@ -508,12 +514,12 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endmacro -%}
 
 {% macro button(label, variant="primary", type="submit", name=none, value=none, size=none, block=false, attrs={}, icon=none, badge=none, key=none, disabled=none, disabled_reason=none) -%}
-<button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if block %} rx-button--block{% endif %}" type="{{ type }}"
-  {%- if name %} name="{{ name }}"{% endif %}{% if value is not none %} value="{{ value }}"{% endif %}{{ _button_state(key, disabled, disabled_reason) }}{{ _attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</button>
+<button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if block %} rx-button--block{% endif %}{% if attrs.class %} {{ attrs.class }}{% endif %}" type="{{ type }}"
+  {%- if name %} name="{{ name }}"{% endif %}{% if value is not none %} value="{{ value }}"{% endif %}{{ _button_state(key, disabled, disabled_reason) }}{{ _root_attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</button>
 {%- endmacro %}
 
 {% macro link_button(href, label, variant="secondary", size=none, attrs={}, icon=none, badge=none, key=none, new_tab=false) -%}
-<a class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}" href="{{ href }}"{% if new_tab %} target="_blank" rel="noopener"{% endif %}{{ _button_state(key, false, none) }}{{ _attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</a>
+<a class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if attrs.class %} {{ attrs.class }}{% endif %}" href="{{ href }}"{% if new_tab %} target="_blank" rel="noopener"{% endif %}{{ _button_state(key, false, none) }}{{ _root_attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</a>
 {%- endmacro %}
 
 {#- A button with only an icon: `label` is what screen readers say and its
@@ -798,8 +804,8 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- `slide_over=true`: a panel from the side (full height) instead of a
     dialog in the middle; `width`: "sm", "md" (the default), "lg" or "xl".
     `icon`: success, info, warning or error, over the title. -#}
-{% macro sheet(id, title, message=none, slide_over=false, width=none, icon=none) -%}
-<dialog class="rx-sheet{% if slide_over %} rx-sheet--side{% endif %}{% if width %} rx-sheet--{{ width }}{% endif %}" id="{{ id }}" aria-labelledby="{{ id }}-title">
+{% macro sheet(id, title, message=none, slide_over=false, width=none, icon=none, attrs={}) -%}
+<dialog class="rx-sheet{% if slide_over %} rx-sheet--side{% endif %}{% if width %} rx-sheet--{{ width }}{% endif %}{% if attrs.class %} {{ attrs.class }}{% endif %}" id="{{ id }}" aria-labelledby="{{ id }}-title" data-rx-component="sheet"{{ _root_attrs(attrs) }}>
   <div class="rx-sheet__inner">
     {%- if icon %}<span class="rx-sheet__icon rx-sheet__icon--{{ icon }}" aria-hidden="true">{{ _icon(icon) }}</span>{% endif %}
     <h2 class="rx-sheet__title" id="{{ id }}-title">{{ title }}</h2>
@@ -825,9 +831,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     {% endcall %}
     `button=false` leaves out the button, for a sheet opened from an
     `action_group` (`menu_open(id, label)`) or any `data-rx-open="id"`. -#}
-{% macro action_sheet(id, label, action, title, description=none, submit_label=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, modal_icon=none, danger=false, target=none, swap=none, enctype=none, button=true) -%}
+{% macro action_sheet(id, label, action, title, description=none, submit_label=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, modal_icon=none, danger=false, target=none, swap=none, enctype=none, button=true, attrs={}) -%}
 {% if button %}{{ open_button(id, label, variant=variant, size=size, icon=icon, key=key) }}{% endif %}
-<dialog class="rx-sheet{% if slide_over %} rx-sheet--side{% endif %}{% if width %} rx-sheet--{{ width }}{% endif %}" id="{{ id }}" aria-labelledby="{{ id }}-title"{% if description %} aria-describedby="{{ id }}-message"{% endif %}>
+<dialog class="rx-sheet{% if slide_over %} rx-sheet--side{% endif %}{% if width %} rx-sheet--{{ width }}{% endif %}{% if attrs.class %} {{ attrs.class }}{% endif %}" id="{{ id }}" aria-labelledby="{{ id }}-title"{% if description %} aria-describedby="{{ id }}-message"{% endif %} data-rx-component="action-sheet"{{ _root_attrs(attrs) }}>
   <form class="rx-sheet__inner" method="post" action="{{ action }}" hx-post="{{ action }}" hx-swap="{{ swap or 'none' }}"{% if target %} hx-target="{{ target }}"{% endif %}{% if enctype %} enctype="{{ enctype }}" hx-encoding="{{ enctype }}"{% endif %} data-rx-action novalidate>
     {{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}
     {%- if modal_icon %}<span class="rx-sheet__icon rx-sheet__icon--{{ modal_icon }}" aria-hidden="true">{{ _icon(modal_icon) }}</span>{% endif %}
@@ -846,9 +852,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     Cancel is focused first, and only the sheet's button sends the form. -#}
 {#- `cancel_label` names the button that keeps things as they are ("Keep
     order"); `fields` are hidden values sent with the form ({"status": "cancelled"}). -#}
-{% macro confirm(id, label, action, title, message, confirm_label=none, method="DELETE", size=none, icon=none, modal_icon="warning", key=none, cancel_label=none, fields={}, button=true) -%}
+{% macro confirm(id, label, action, title, message, confirm_label=none, method="DELETE", size=none, icon=none, modal_icon="warning", key=none, cancel_label=none, fields={}, button=true, attrs={}) -%}
 {% if button %}{{ open_button(id, label, variant="plain-danger", size=size, icon=icon, key=key) }}{% endif %}
-<dialog class="rx-sheet" id="{{ id }}" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-message" role="alertdialog">
+<dialog class="rx-sheet{% if attrs.class %} {{ attrs.class }}{% endif %}" id="{{ id }}" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-message" role="alertdialog" data-rx-component="confirm"{{ _root_attrs(attrs) }}>
   <div class="rx-sheet__inner">
     {%- if modal_icon %}<span class="rx-sheet__icon rx-sheet__icon--{{ modal_icon }}" aria-hidden="true">{{ _icon(modal_icon) }}</span>{% endif %}
     <h2 class="rx-sheet__title" id="{{ id }}-title">{{ title }}</h2>
@@ -876,10 +882,10 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
       {% call wizard_step("new-product", "details") %}…{% endcall %}
       {% call wizard_step("new-product", "stock") %}…{% endcall %}
     {% endcall %} -#}
-{% macro wizard_action(id, label, action, title, steps, submit_label=none, description=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, live=true, target=none, swap=none, enctype=none, button=true) -%}
+{% macro wizard_action(id, label, action, title, steps, submit_label=none, description=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, live=true, target=none, swap=none, enctype=none, button=true, attrs={}) -%}
 {%- set body = caller() %}
 {% if button %}{{ open_button(id, label, variant=variant, size=size, icon=icon, key=key) }}{% endif %}
-<dialog class="rx-sheet rx-sheet--wizard{% if slide_over %} rx-sheet--side{% endif %} rx-sheet--{{ width or 'lg' }}" id="{{ id }}" aria-labelledby="{{ id }}-title"{% if description %} aria-describedby="{{ id }}-message"{% endif %}>
+<dialog class="rx-sheet rx-sheet--wizard{% if slide_over %} rx-sheet--side{% endif %} rx-sheet--{{ width or 'lg' }}{% if attrs.class %} {{ attrs.class }}{% endif %}" id="{{ id }}" aria-labelledby="{{ id }}-title"{% if description %} aria-describedby="{{ id }}-message"{% endif %} data-rx-component="wizard-action"{{ _root_attrs(attrs) }}>
   <form class="rx-sheet__inner" method="post" action="{{ action }}" hx-post="{{ action }}" hx-swap="{{ swap or 'none' }}"{% if target %} hx-target="{{ target }}"{% endif %}{% if enctype %} enctype="{{ enctype }}" hx-encoding="{{ enctype }}"{% endif %}{% if live %} data-live-validate{% endif %} data-rx-action novalidate>
     {{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}
     <h2 class="rx-sheet__title" id="{{ id }}-title">{{ title }}</h2>
@@ -988,11 +994,11 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- A segmented control: `tabs("orders", [["open", "Open"], ["done", "Done"]])`
     then `{% call tab_panel("orders", "open", selected=true) %}…{% endcall %}`
     for each. Arrow keys move between tabs. -#}
-{% macro tabs(id, items, selected=none, label=none) -%}
+{% macro tabs(id, items, selected=none, label=none, attrs={}) -%}
 {%- set current = selected or items[0][0] %}
-<div class="rx-segmented" role="tablist"{% if label %} aria-label="{{ label }}"{% endif %}>
+<div class="rx-segmented{% if attrs.class %} {{ attrs.class }}{% endif %}" role="tablist"{% if label %} aria-label="{{ label }}"{% endif %} data-rx-component="tabs"{{ _root_attrs(attrs) }}>
   {%- for item in items %}
-  <button class="rx-segmented__item" type="button" role="tab" id="{{ id }}-tab-{{ item[0] }}" aria-controls="{{ id }}-panel-{{ item[0] }}" aria-selected="{{ 'true' if item[0] == current else 'false' }}" tabindex="{{ 0 if item[0] == current else -1 }}">{{ item[1] }}</button>
+  <button class="rx-segmented__item" type="button" role="tab" id="{{ id }}-tab-{{ item[0] }}" data-rx-tab="{{ item[0] }}" aria-controls="{{ id }}-panel-{{ item[0] }}" aria-selected="{{ 'true' if item[0] == current else 'false' }}" tabindex="{{ 0 if item[0] == current else -1 }}">{{ item[1] }}</button>
   {%- endfor %}
 </div>
 {%- endmacro %}

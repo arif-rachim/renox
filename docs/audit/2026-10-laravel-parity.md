@@ -272,7 +272,8 @@ New rows:
 | Tailwind | Vite + Tailwind | `rnx new --tailwind`, `rnx tailwind`, `rnx serve` (pinned standalone CLI) | ✅ | – | M21e |
 | Fragments, out-of-band swaps, htmx headers | `fragments()` | `.fragment()`, `View::also`, `HxRetarget`, `HxReswap`, `HxPushUrl` | ✅ | – | M21b |
 | `@class`, `break`/`continue`, `truncate` | yes | `class_names`, `loop_controls`, the `words` filter | ✅ | – | M24, post-M28 (#94) |
-| Livewire / Inertia | stateful components / SPA | htmx + Alpine (`examples/htmx-recipes`) | 🟡/⛔ | Maj for SPA teams | – |
+| Livewire | stateful components | live components (`#[renox::live_component]`, `rx-click`/`rx-submit`/`rx-model`, `TestApp::live`; docs/live.md; the bike shop's `/about/htmx/live`) | ✅ | – | – |
+| Inertia | SPA | htmx + Alpine (the bike shop's `/about/htmx`); a JSON API for a SPA | ⛔ | Maj for SPA teams | – |
 | Markdown mail components | `x-mail::button/panel/table` | `renox/mail/components.html`: `button`, `panel`, `table`, `divider` | ✅ | – | M20c |
 
 New rows (Filament as the yardstick):
@@ -344,7 +345,7 @@ New rows:
 8. **Billing (Maj for SaaS):** subscriptions over Stripe or local gateways; feature flags.
    Subscriptions done (#155): `renox-billing` with Stripe and Xendit, docs/billing.md.
 
-Not planned, unchanged: a schema builder, Redis, WebSockets, Livewire/Inertia-style SPAs,
+Not planned, unchanged: a schema builder, Redis, WebSockets, Inertia-style SPAs (Livewire-style live components are done, docs/live.md),
 serverless, a REPL.
 
 ## Plan

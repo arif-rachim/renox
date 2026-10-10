@@ -1,6 +1,9 @@
 use std::future::Future;
 
-use super::{DateTime, Db, DbValue, Executor, ModelKey, Query, ToDbValue, now, quote, sql};
+use super::{
+    DateTime, Db, DbValue, Executor, ModelColumn, ModelIndex, ModelKey, Query, ToDbValue, now,
+    quote, sql,
+};
 use crate::{Error, Result};
 use anyhow::anyhow;
 
@@ -76,6 +79,17 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// Empties `created_at` / `updated_at` when they are `Option`s.
     #[doc(hidden)]
     fn forget_timestamps(&mut self) {}
+
+    /// The model's columns with the kind of each field's type. The derive
+    /// fills this in; a hand-written `impl Model` returns none.
+    fn column_info() -> Vec<ModelColumn> {
+        Vec::new()
+    }
+
+    /// The indexes declared with `#[model(index(…))]` and `#[model(unique(…))]`.
+    fn indexes() -> Vec<ModelIndex> {
+        Vec::new()
+    }
 
     /// A copy of the model that isn't saved yet (Laravel's `replicate`):
     /// the same values, with an unsaved id, no `deleted_at` and, when they

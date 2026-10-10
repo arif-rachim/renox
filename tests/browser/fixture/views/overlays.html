@@ -37,6 +37,13 @@
   <button id="side-close" type="button" class="rx-button rx-button--secondary" data-rx-close>Close</button>
 {% endcall %}
 
+{#- A sheet written as tags. -#}
+<rx-open-button id="tag-sheet" label="Tag sheet" />
+<rx-sheet id="tag-sheet" title="From tags" message="Written as tags." width="sm">
+  <p id="tag-sheet-body">Inside the tag sheet</p>
+  <rx-button type="button" variant="secondary" data-rx-close>Close it</rx-button>
+</rx-sheet>
+
 {#- A wizard in an action sheet: a 422 on the first step's field, sent from
     the last step, goes back to that step. -#}
 {% call action_sheet("wizard-sheet", "Book a trip", "/sheet", "Book a trip") %}

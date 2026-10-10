@@ -121,6 +121,14 @@ pub static PAGES: &[Page] = &[
         "Build pages from templates and ready-made parts: buttons, forms, tables."
     ),
     page!(
+        "live",
+        "Live components",
+        Guides,
+        "zap",
+        "docs/live.md",
+        "A part of a page with state in a Rust struct: click, and the server draws it again."
+    ),
+    page!(
         "grid",
         "The data grid",
         Guides,

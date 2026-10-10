@@ -1,0 +1,19 @@
+{% extends "layouts/app.html" %}
+{#- /about/htmx/live (src/app/about/live.rs): the checklist of /about/htmx as
+    a live component. The page only mounts it; everything inside is
+    about/live/_checklist.html. -#}
+{% from "renox/ui.html" import page_header, card, link_button %}
+{% block seo %}{{ seo(title=t('htmx.live.title'), description=t('htmx.live.lead')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('htmx.live.title'), subtitle=t('htmx.live.lead')) }}
+  {% call card(t('htmx.checklist.title'), subtitle=t('htmx.live.card')) %}
+    {% set component = checklist %}{% include "renox/live.html" %}
+  {% endcall %}
+  {% call card(t('htmx.live.left_out.title')) %}
+    <p class="rx-subtitle">{{ t('htmx.live.left_out.body') }}</p>
+    <div class="rx-row">{{ link_button(route('about.htmx'), t('htmx.live.see_htmx'), variant="secondary") }}</div>
+  {% endcall %}
+</div>
+{% endblock %}

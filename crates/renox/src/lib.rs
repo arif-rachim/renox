@@ -27,7 +27,9 @@
 #![warn(missing_docs)]
 
 pub use renox_core::*;
-pub use renox_macros::{DbEnum, FromRow, Model, Validate, embedded, migrations, test};
+pub use renox_macros::{
+    DbEnum, FromRow, Model, Validate, embedded, live_component, migrations, test,
+};
 
 pub use axum;
 pub use tokio;
@@ -39,6 +41,7 @@ pub mod prelude {
     pub use renox_core::auth::{Auth, Can, User};
     pub use renox_core::db::{DateTime, Db, Factory, FromRow, Model, Page, Paginated};
     pub use renox_core::events::Event;
+    pub use renox_core::live_component::LiveComponent;
     pub use renox_core::queue::{Job, JobContext};
     pub use renox_core::serde_json::json;
     pub use renox_core::webhook::{Webhook, WebhookCall, WebhookRequest};
@@ -111,6 +114,11 @@ pub struct MailGuide;
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/scheduling.md")]
 pub struct SchedulingGuide;
+
+/// Compiles the Rust in docs/live.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/live.md")]
+pub struct LiveGuide;
 
 /// Compiles the Rust in docs/testing.md as a doctest.
 #[cfg(doctest)]
@@ -390,6 +398,95 @@ pub struct CheatSheet;
 /// # use renox::prelude::*;
 /// #[derive(FromRow)]
 /// struct Row { #[row(default)] value: i64 }
+/// ```
+///
+/// Typed columns are checked by the compiler:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Product { id: i64, price: i64 }
+/// let _ = Product::query().where_(Product::PRICE.lt("cheap"));
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Product { id: i64, name: String }
+/// #[derive(Model, Default)]
+/// struct Order { id: i64, total: i64 }
+/// let _ = Order::query().order_by(Product::NAME);
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Product { id: i64, price: i64 }
+/// let _ = Product::PRCE;
+/// ```
+///
+/// Index columns must exist, and a default is a string:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(index(nope))]
+/// struct Post { id: i64, title: String }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Post { id: i64, #[model(default = 0)] views: i64 }
+/// ```
+///
+/// Form misuse:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Task { id: i64, #[form(skip)] owner_id: i64 }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(form)]
+/// struct Task { id: i64, #[form(upload)] size: i64 }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(form)]
+/// struct Task { id: i64, #[form(bogus)] title: String }
+/// ```
+///
+/// `#[live_component]` misuse:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// # use renox::live_component::LiveContext;
+/// # #[derive(serde::Serialize, serde::Deserialize)]
+/// # struct Todo {}
+/// #[renox::live_component(name = "todo")]
+/// impl Todo {
+///     #[live(action)]
+///     async fn toggle(&mut self, _ctx: &mut LiveContext) -> Result { Ok(()) }
+/// }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// # use renox::live_component::LiveContext;
+/// # #[derive(serde::Serialize, serde::Deserialize)]
+/// # struct Todo {}
+/// #[renox::live_component(view = "todo.html")]
+/// impl Todo {
+///     #[live(action)]
+///     async fn toggle(&self, _ctx: &mut LiveContext) -> Result { Ok(()) }
+/// }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// # use renox::live_component::LiveContext;
+/// # #[derive(serde::Serialize, serde::Deserialize)]
+/// # struct Todo {}
+/// #[renox::live_component(view = "todo.html")]
+/// impl Todo {
+///     #[live(action)]
+///     async fn _toggle(&mut self, _ctx: &mut LiveContext) -> Result { Ok(()) }
+/// }
 /// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;

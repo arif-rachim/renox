@@ -148,6 +148,10 @@ impl Module for Pages {
                 view("components.html", context! { note => "hi" })
             })
             .get("/icons", || async { view("icons.html", context! {}) })
+            .get("/marks", || async { view("marks.html", context! {}) })
+            .get("/passthrough", || async {
+                view("passthrough.html", context! {})
+            })
     }
 }
 
@@ -162,6 +166,23 @@ fn views() -> tempfile::TempDir {
 {{ input("name", "Name", required=true, hint="Up to 10 letters") }}
 {{ input("email", "Email", type="email", required=true) }}
 {{ input("nickname", "Nickname") }}{{ button("Sign up") }}</form>{{ toasts() }}"#,
+    );
+    write(
+        "passthrough.html",
+        r##"<rx-button class="mine" id="go" hx-target="#x" data-n="1" autofocus>Go</rx-button>"##,
+    );
+    write(
+        "marks.html",
+        r#"{% from "renox/ui.html" import sheet, action_sheet, confirm, wizard_action, wizard, wizard_step, tabs, repeater, select, tags_input, date_picker %}
+{% set a = {"class": "extra", "hx-get": "/x", "data-test": "1"} %}
+{% call sheet("s1", "Sheet", attrs=a) %}x{% endcall %}
+{% call action_sheet("s2", "Act", "/x", "Act", attrs=a) %}x{% endcall %}
+{{ confirm("s3", "Delete", "/x", "Sure", "Really?", attrs=a) }}
+{% call wizard_action("s4", "Wiz", "/x", "Wiz", [["one", "One"]], attrs=a) %}{% call wizard_step("w4", "one") %}y{% endcall %}{% endcall %}
+{% call wizard("w1", [["one", "One"]], "Go", attrs=a) %}{% call wizard_step("w1", "one") %}y{% endcall %}{% endcall %}
+{{ tabs("t1", [["a", "A"], ["b", "B"]], attrs=a) }}
+{% call(row, prefix) repeater("lines", "Lines", attrs=a) %}z{% endcall %}
+{{ select("size", "Size", ["s"]) }}{{ tags_input("tags", "Tags") }}{{ date_picker("day", "Day") }}"#,
     );
     write(
         "fields.html",
@@ -362,7 +383,9 @@ async fn components_see_the_request_and_refill_forms() {
     res.assert_see(r#"role="alertdialog""#)
         .assert_see(r#"<input type="hidden" name="_method" value="DELETE">"#)
         .assert_see(r#"aria-controls="m1""#)
-        .assert_see(r#"id="t-tab-b" aria-controls="t-panel-b" aria-selected="true""#)
+        .assert_see(
+            r#"id="t-tab-b" data-rx-tab="b" aria-controls="t-panel-b" aria-selected="true""#,
+        )
         .assert_see(r#"role="switch""#)
         .assert_see(r#"<option value="m" selected>Medium</option>"#)
         .assert_see(">about</textarea>");
@@ -864,4 +887,64 @@ async fn the_kit_serves_its_fonts_and_preloads_the_text_one() {
     assert!(css.contains(r#":root:where([data-rx-theme="warm"])"#));
     assert!(css.contains("--rx-type-hero:"));
     assert!(css.contains("--rx-type-display:"));
+}
+
+#[renox::test]
+async fn kit_components_mark_their_root_and_take_attrs() {
+    let (app, _dir) = app().await;
+    let page = app.get("/marks").await;
+    page.assert_ok();
+    let body = page.text();
+    for name in [
+        "sheet",
+        "action-sheet",
+        "confirm",
+        "wizard-action",
+        "wizard",
+        "tabs",
+        "repeater",
+        "select",
+        "tags-input",
+        "date-picker",
+    ] {
+        assert!(
+            body.contains(&format!(r#"data-rx-component="{name}""#)),
+            "missing {name}"
+        );
+    }
+    // `class` is merged into the root's own, the rest lands as attributes.
+    page.assert_see(r#"class="rx-sheet extra""#)
+        .assert_see(r#"class="rx-wizard extra""#)
+        .assert_see(r#"class="rx-segmented extra""#)
+        .assert_see(r#"hx-get="/x""#)
+        .assert_see(r#"data-test="1""#)
+        .assert_see(r#"data-rx-tab="a""#);
+    for tag in body
+        .split('<')
+        .filter(|t| t.contains("data-rx-component=\"action-sheet\""))
+    {
+        assert_eq!(tag.matches("class=").count(), 1, "{tag}");
+        assert!(tag.contains(r#"class="rx-sheet extra""#), "{tag}");
+        assert!(tag.contains(r#"hx-get="/x""#), "{tag}");
+    }
+}
+
+#[renox::test]
+async fn compiled_components_pass_other_attributes_to_the_root() {
+    let (app, _dir) = app().await;
+    let body = app.get("/passthrough").await.text();
+    let tag = body.split('<').find(|t| t.starts_with("button")).unwrap();
+    assert_eq!(tag.matches("class=").count(), 1, "{tag}");
+    assert!(
+        tag.contains(r#"class="rx-button rx-button--primary mine""#),
+        "{tag}"
+    );
+    for a in [
+        r##"hx-target="#x""##,
+        r#"id="go""#,
+        r#"data-n="1""#,
+        " autofocus",
+    ] {
+        assert!(tag.contains(a), "{a} in {tag}");
+    }
 }

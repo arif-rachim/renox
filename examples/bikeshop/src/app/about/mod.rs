@@ -3,7 +3,8 @@
 //! page); `/about/data`, the data model explained ([`data`]); and
 //! `/about/blocks`, the bike shop's own UI blocks working (`blocks.rs`);
 //! `/about/fields`, every form input with its Rust and database types
-//! (`fields.rs`); `/about/htmx`, htmx and Alpine recipes, live (`htmx.rs`).
+//! (`fields.rs`); `/about/htmx`, htmx and Alpine recipes, live (`htmx.rs`); `/about/htmx/live`, the same checklist as a live component
+//! (`live.rs`).
 //!
 //! The "About this page" mechanism is in `src/explain.rs`; the panel every
 //! page shows is `resources/views/about/_panel.html`.
@@ -13,6 +14,7 @@ pub mod data;
 pub mod explain;
 pub mod fields;
 pub mod htmx;
+pub mod live;
 
 use crate::explain::{self as about_this_page, Audience};
 use renox::prelude::*;
@@ -35,6 +37,11 @@ impl Module for About {
             .merge(blocks::routes())
             .merge(fields::routes())
             .merge(htmx::routes())
+            .merge(live::routes())
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.live_component::<live::LiveChecklist>();
     }
 }
 
