@@ -1167,16 +1167,82 @@ Line numbers are kept, so MiniJinja's own errors point at the line you wrote.
 | `rx-input`, `rx-textarea`, `rx-select`, `rx-checkbox`, `rx-radio`, `rx-checkbox-list`, `rx-toggle-buttons`, `rx-file`, `rx-date-picker`, `rx-tags-input` | the macro of the same name (`input`, `textarea`, `select`, ...) |
 | `rx-repeater`, `rx-key-value`, `rx-fieldset`, `rx-show-when`, `rx-hide-when`, `rx-form-errors`, `rx-form-grid` | `repeater`, `key_value`, `fieldset`, `show_when`, `hide_when`, `form_errors`, `form_grid` |
 | `rx-wizard`, `rx-wizard-step` | the `wizard` macros (a special tag) |
+| `rx-infolist`, `rx-entry`, `rx-repeatable` | `infolist`, `entry`, `repeatable` |
+| `rx-list`, `rx-card-grid`, `rx-media-card`, `rx-progress` | `list`, `card_grid`, `media_card`, `progress` |
+| `rx-stats`, `rx-stat`, `rx-dashboard`, `rx-widget`, `rx-period-filter` | `stats`, `stat`, `dashboard`, `widget`, `period_filter` |
+| `rx-chart` | the `chart(...)` template function (not a macro) |
+| `rx-grid` | `grid(page, tools=…)` of `renox/grid.html` |
+| `rx-rich-editor`, `rx-markdown-editor`, `rx-code-editor`, `rx-code-entry` | the macros of `renox-editors/editors.html` (registered by that plugin) |
 | `rx-stack`, `rx-row` | none: a `div` with the kit's class |
 | `rx-page`, `rx-push`, `rx-form`, `rx-table` | `{% extends %}`/`{% block %}`, `push`, a `<form>`, a loop with `table` markup |
 
-The macros stay the lower level. The kit's other parts (menus, sheets, tabs, dashboards, the
-navbar) have no tag yet; call their macros as shown above.
+The macros stay the lower level. A few parts (menus, sheets, tabs, the navbar) have no tag yet;
+call their macros as shown above.
 
-> [!NOTE]
-> **Not compiled yet:** the templates of the plugins (renox-2fa, oauth, admin, billing,
-> editors) are added with `add_template`, not loaded from files, so tags in them are not
-> rewritten. Write plugin templates with macros.
+A dashboard written with tags. `rx-chart` calls the `chart(...)` function, so it takes the same
+arguments (`kind`, `labels`, `series`, `format`, `title`, `id`):
+
+```html
+<rx-period-filter :selected="period" :options="periods" label="Period"/>
+<rx-stats columns="4">
+  <rx-stat label="Revenue" :value="revenue | money" :delta="change" icon="banknote"/>
+  <rx-stat label="Orders" :value="orders | number" route="orders.index"/>
+</rx-stats>
+<rx-dashboard columns="3">
+  <rx-widget title="Revenue" span="2">
+    <rx-chart kind="bar" :labels="labels" :series="series" format="money" title="Revenue" id="chart-revenue"/>
+  </rx-widget>
+</rx-dashboard>
+```
+
+A data grid is one tag. Its content draws the `custom` columns, with `row` and `column` in it,
+like the call block of the macro:
+
+```html
+<rx-grid :page="orders">
+  {% if column.key == "actions" %}<a class="rx-link" href="{{ route('orders.show', row.id) }}">Open</a>{% endif %}
+</rx-grid>
+```
+
+### Tags from a plugin
+
+A plugin's templates are compiled like the app's: add them with `renox::view::add_template`
+(inside `Registry::templates`), not `env.add_template_owned`. It compiles the tags first, and a
+mistake is an error naming the template and line. A plugin can also give its macros a tag with
+`Registry::component`:
+
+```rust
+use renox::prelude::*;
+use renox::view::{Component, Prop, add_template};
+
+struct Hello;
+
+impl Module for Hello {
+    fn name(&self) -> &'static str {
+        "hello"
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.templates(|env| {
+            add_template(
+                env,
+                "hello/ui.html",
+                "{% macro hello(name) %}<b>Hello {{ name }}</b>{% endmacro %}",
+            )
+            .unwrap();
+        });
+        app.component(
+            Component::macro_call("rx-hello", "hello/ui.html", "hello")
+                .prop(Prop::text("name").required())
+                .content(false),
+        );
+    }
+}
+```
+
+The tag must start with `rx-` and not clash with a built-in or another module's tag (a clash
+panics at boot). `renox-editors` does this for `rx-rich-editor`, `rx-markdown-editor`,
+`rx-code-editor` and `rx-code-entry`.
 
 ### Editor autocomplete
 

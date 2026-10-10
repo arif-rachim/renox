@@ -194,6 +194,16 @@ cell, and gives it two things:
 What's going on: for the `trend` column, the block draws a small chart, colored by whether the
 trend went up. For the `actions` column, it draws an "Open" button that links to the order.
 
+The same grid as a tag. The content is the call block's body, with `row` and `column` in it:
+
+```html
+<main class="rx-grid-fill">
+  <rx-grid :page="orders">
+    {% if column.key == "actions" %}<a class="rx-link" href="{{ route('orders.show', row.id) }}">Open</a>{% endif %}
+  </rx-grid>
+</main>
+```
+
 More about the template:
 
 - Without a call block, `custom` columns stay empty: `{{ grid(orders) }}`.

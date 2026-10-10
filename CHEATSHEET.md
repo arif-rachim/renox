@@ -471,6 +471,9 @@ classes keep working next to the utilities.
     <rx-input name="{{ prefix }}[opens]" label="Opens" type="time" :value="row.opens"/>
   </rx-repeater>
   <rx-wizard id="signup" submit-label="Create"><rx-wizard-step key="a" title="Name"><rx-input name="name" label="Name"/></rx-wizard-step></rx-wizard>
+  <rx-stats columns="3"><rx-stat label="Revenue" :value="revenue | money" :delta="change"/></rx-stats>
+  <rx-chart kind="line" :labels="labels" :series="series" title="Sales" id="sales"/>   {# calls chart(...) #}
+  <rx-grid :page="orders">{% if column.key == "actions" %}…{% endif %}</rx-grid>        {# row, column in the content #}
   <li rx-for="p in products" rx-if="p.active">{{ p.name }}</li>   {# rx-else on the next sibling #}
   <app-price-tag :amount="p.price"/>                              {# components/price_tag.html, starts with <rx-props amount> #}
 </rx-page>

@@ -80,10 +80,11 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   tags") are rewritten when a template loads. In an attribute, `title="{{ x }}"` is the value of
   `x` and `:title="x"` is an expression (no `{{ }}` after the colon); `{% %}` there is an error.
   `rx-else` goes on the very next sibling of its `rx-if` element, and never follows `rx-for`.
-  `class` is not allowed on kit tags (only on `rx-stack`, `rx-row`, `rx-form`). The templates of
-  plugins are not compiled: write macros in them. An `<app-…>` file needs `<rx-props>` first.
+  `class` is not allowed on kit tags (only on `rx-stack`, `rx-row`, `rx-form`).  An `<app-…>` file needs `<rx-props>` first.
   Form tags: `<rx-repeater>` gives its content `row` and `prefix` (`name="{{ prefix }}[qty]"`);
   `<rx-wizard id=…>` takes its steps from `<rx-wizard-step key=… title=…>` children.
+  `<rx-chart kind=…>` calls the `chart(...)` function; `<rx-grid :page=…>` has `row` and `column` in its content.
+  Plugin templates are compiled when added with `renox::view::add_template`; a plugin's tags come from `Registry::component`.
 - Route parameters are `{id}` (axum 0.8), not `:id`: `.get("/products/{id}", show)`.
 - `.require_auth()` guards only the routes added before it in that `Routes`; so do
   `.require_gate`, `.require_role`, `.require_permission`, `.require_ability` and
