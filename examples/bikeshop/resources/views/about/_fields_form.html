@@ -4,7 +4,6 @@
     after a failed save, else the value given here; the value formats are the
     ones the inputs expect: 2026-10-01, 08:00:00, 2026-10-01T10:30:00. A file
     is never refilled: the stored one is shown above its field. -#}
-{% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor %}{# moves to rx-* in #376 #}
 {% macro value(name) %}{{ sample[name] if sample and sample[name] is not none else '' }}{% endmacro %}
 {#- `live`: each field is checked by the server as it is left
     (renox.js sends the form with `X-Renox-Validate`; `Valid<T>` answers with
@@ -22,7 +21,7 @@
     {#- Free text with suggestions: the catalogue's brands in a <datalist>. -#}
     <rx-input name="brand" :label="t('fields.form.brand')" :value="value('brand')" :datalist="brands" :hint="t('fields.form.brand_hint')"/>
     {#- renox-editors: Markdown with a toolbar and a preview, sent as typed. -#}
-    {{ markdown_editor("description", t('fields.form.description'), value=value('description'), rows=4, span="full", hint=t('fields.form.description_hint')) }}
+    <rx-markdown-editor name="description" :label="t('fields.form.description')" :value="value('description')" rows="4" span="full" :hint="t('fields.form.description_hint')"/>
     <rx-input name="stock" :label="t('fields.form.stock')" type="number" :value="value('stock')" required min="0"/>
     <rx-input name="weight_kg" :label="t('fields.form.weight')" type="number" :value="value('weight_kg')" required suffix="kg" step="0.01" min="0"/>
     <rx-input name="price" :label="t('fields.form.price')" type="number" :value="price or ''" required :prefix="money_symbol" :step="money_step" min="0"/>
@@ -43,8 +42,8 @@
     <rx-tags-input name="tags" :label="t('fields.form.tags')" :value="sample.tags if sample else []" :suggestions="['commuter', 'e-bike', 'gravel', 'kids']" :hint="t('fields.form.tags_hint')"/>
     <rx-key-value name="specs" :label="t('fields.form.specs')" :value="sample.specs if sample else none" :key-label="t('fields.form.spec_name')" :value-label="t('fields.form.spec_value')" :add-label="t('fields.form.spec_add')"/>
     {#- renox-editors: rich text (HTML, cleaned on the server) and code. -#}
-    {{ rich_editor("details", t('fields.form.rich'), value=sample.details if sample else none, rows=5, hint=t('fields.form.rich_hint')) }}
-    {{ code_editor("settings", t('fields.form.settings'), value=value('settings'), language="json", rows=5, placeholder='{"wheel": "700c", "gears": 9}', hint=t('fields.form.settings_hint')) }}
+    <rx-rich-editor name="details" :label="t('fields.form.rich')" :value="sample.details if sample else none" rows="5" :hint="t('fields.form.rich_hint')"/>
+    <rx-code-editor name="settings" :label="t('fields.form.settings')" :value="value('settings')" language="json" rows="5" placeholder='{"wheel": "700c", "gears": 9}' :hint="t('fields.form.settings_hint')"/>
   </rx-fieldset>
   {# [/explain:fields.template] #}
 
