@@ -2774,6 +2774,230 @@
       ],
       "description": "A chart drawn as SVG with a data table; it calls the `chart(...)` function.",
       "name": "rx-chart"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The button's label.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "The menu list's id.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "The look.",
+          "name": "variant",
+          "values": [
+            {
+              "name": "primary"
+            },
+            {
+              "name": "secondary"
+            },
+            {
+              "name": "plain"
+            },
+            {
+              "name": "danger"
+            },
+            {
+              "name": "plain-danger"
+            }
+          ]
+        },
+        {
+          "description": "The size.",
+          "name": "size",
+          "values": [
+            {
+              "name": "small"
+            }
+          ]
+        }
+      ],
+      "description": "A button that opens a menu of actions; its content is the items.",
+      "name": "rx-menu"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The address; or use route.",
+          "name": "href",
+          "values": []
+        },
+        {
+          "description": "(required) The label; or give it as content.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "An icon's name.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "A file to save; the page stays.",
+          "name": "download",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "Opens in a new tab.",
+          "name": "new-tab",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "Draws the item as a dangerous action.",
+          "name": "danger",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "A link in a menu.",
+      "name": "rx-menu-link"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The address the form is sent to; or use route.",
+          "name": "action",
+          "values": []
+        },
+        {
+          "description": "(required) The label; or give it as content.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "The HTTP method.",
+          "name": "method",
+          "values": [
+            {
+              "name": "POST"
+            },
+            {
+              "name": "PUT"
+            },
+            {
+              "name": "PATCH"
+            },
+            {
+              "name": "DELETE"
+            }
+          ]
+        },
+        {
+          "description": "An icon's name.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "Draws the item as a dangerous action.",
+          "name": "danger",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "A menu item that sends a form.",
+      "name": "rx-menu-action"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The section's heading.",
+          "name": "title",
+          "values": []
+        }
+      ],
+      "description": "A titled part of a menu.",
+      "name": "rx-menu-section"
+    },
+    {
+      "attributes": [],
+      "description": "A line between parts of a menu.",
+      "name": "rx-menu-separator"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The id of the sheet to open.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "(required) The label; or give it as content.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "An icon's name.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "Draws the item as a dangerous action.",
+          "name": "danger",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "A menu item that opens a sheet or dialog by its id.",
+      "name": "rx-menu-open"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) A list of [href, label] pairs.",
+          "name": ":items",
+          "values": []
+        },
+        {
+          "description": "The href shown as chosen.",
+          "name": "current",
+          "values": []
+        },
+        {
+          "description": "The navigation's accessible name.",
+          "name": "label",
+          "values": []
+        }
+      ],
+      "description": "Links that look like a segmented control, for switching between pages.",
+      "name": "rx-link-tabs"
     }
   ],
   "version": 1.1

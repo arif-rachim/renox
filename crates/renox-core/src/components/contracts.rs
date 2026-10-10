@@ -87,6 +87,10 @@ pub(crate) enum Special {
     Wizard,
     /// `rx-wizard-step`, made by its parent.
     WizardStep,
+    /// `rx-tabs`.
+    Tabs,
+    /// `rx-tab`, made by its parent.
+    Tab,
 }
 
 /// One attribute a component takes.
@@ -441,6 +445,42 @@ pub(crate) static BUILTIN: &[Contract] = &[
         route_prop: None,
         attrs: false,
         parent: Some("rx-wizard"),
+    },
+    Contract {
+        tag: "rx-tabs",
+        doc: "Tabs with their panels; each `<rx-tab>` inside is one tab and its panel.",
+        render: Render::Special(Special::Tabs),
+        props: &[
+            text("id", true, "The tabs' id; the panels build theirs from it."),
+            text(
+                "selected",
+                false,
+                "The key of the open tab; the first by default.",
+            ),
+            text("label", false, "The tab list's accessible name."),
+        ],
+        slots: &[Slot {
+            doc: "Only `<rx-tab>` elements.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-tab",
+        doc: "One tab; its content is the panel.",
+        render: Render::Special(Special::Tab),
+        props: &[
+            text("key", true, "The tab's key, unique in the tabs."),
+            text("label", true, "The tab's text."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: Some("rx-tabs"),
     },
     Contract {
         tag: "rx-table",
@@ -1637,6 +1677,139 @@ pub(crate) static BUILTIN: &[Contract] = &[
             text("size-format", false, "How bubble sizes are shown."),
             text("size-title", false, "The size legend title."),
             text("id", false, "The element's id."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-menu",
+        doc: "A button that opens a menu of actions; its content is the items.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "menu",
+        },
+        props: &[
+            text("label", true, "The button's label."),
+            text("id", false, "The menu list's id."),
+            choice("variant", BUTTON_VARIANTS, "The look."),
+            choice("size", SIZES, "The size."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-menu-link",
+        doc: "A link in a menu.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "menu_link",
+        },
+        props: &[
+            text("href", true, "The address; or use route."),
+            text("label", true, "The label; or give it as content."),
+            text("icon", false, "An icon's name."),
+            flag("download", "A file to save; the page stays."),
+            flag("new-tab", "Opens in a new tab."),
+            flag("danger", "Draws the item as a dangerous action."),
+        ],
+        slots: &[slot_into("label", "The label.")],
+        events: &[],
+        route_prop: Some("href"),
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-menu-action",
+        doc: "A menu item that sends a form.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "menu_action",
+        },
+        props: &[
+            text(
+                "action",
+                true,
+                "The address the form is sent to; or use route.",
+            ),
+            text("label", true, "The label; or give it as content."),
+            choice(
+                "method",
+                &["POST", "PUT", "PATCH", "DELETE"],
+                "The HTTP method.",
+            ),
+            text("icon", false, "An icon's name."),
+            flag("danger", "Draws the item as a dangerous action."),
+        ],
+        slots: &[slot_into("label", "The label.")],
+        events: &[],
+        route_prop: Some("action"),
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-menu-section",
+        doc: "A titled part of a menu.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "menu_section",
+        },
+        props: &[text("title", true, "The section's heading.")],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-menu-separator",
+        doc: "A line between parts of a menu.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "menu_separator",
+        },
+        props: &[],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-menu-open",
+        doc: "A menu item that opens a sheet or dialog by its id.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "menu_open",
+        },
+        props: &[
+            text("id", true, "The id of the sheet to open."),
+            text("label", true, "The label; or give it as content."),
+            text("icon", false, "An icon's name."),
+            flag("danger", "Draws the item as a dangerous action."),
+        ],
+        slots: &[slot_into("label", "The label.")],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-link-tabs",
+        doc: "Links that look like a segmented control, for switching between pages.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "link_tabs",
+        },
+        props: &[
+            data("items", true, "A list of [href, label] pairs."),
+            text("current", false, "The href shown as chosen."),
+            text("label", false, "The navigation's accessible name."),
         ],
         slots: &[],
         events: &[],
