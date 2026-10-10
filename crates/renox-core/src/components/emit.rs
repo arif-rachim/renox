@@ -29,31 +29,29 @@ pub(super) fn pad(span_text: &str) -> String {
     }
 }
 
-fn bare(name: &str) -> &str {
-    name.strip_prefix(':').unwrap_or(name)
+/// Whether a macro component hands the attribute on in `attrs` (Decision 12 of #372).
+fn passes_through(name: &str) -> bool {
+    name.contains('-')
+        || name.starts_with('@')
+        || matches!(
+            name,
+            "min"
+                | "max"
+                | "step"
+                | "pattern"
+                | "minlength"
+                | "maxlength"
+                | "inputmode"
+                | "autofocus"
+                | "tabindex"
+                | "title"
+                | "form"
+                | "accept"
+        )
 }
 
-/// Checks the attributes against the contract.
-pub(super) fn check_attrs(
-    contract: &Contract,
-    attrs: &[Attr<'_>],
-    filled: &[&str],
-) -> Result<(), String> {
-    let names: Vec<&str> = contract.props.iter().map(|p| p.name).collect();
-    let required: Vec<&str> = contract
-        .props
-        .iter()
-        .filter(|p| p.required)
-        .map(|p| p.name)
-        .collect();
-    check_names(
-        contract.tag,
-        &names,
-        &required,
-        contract.attrs,
-        attrs,
-        filled,
-    )
+fn bare(name: &str) -> &str {
+    name.strip_prefix(':').unwrap_or(name)
 }
 
 /// Checks the attributes against a list of prop names; `open` lets other attributes through.
@@ -83,6 +81,61 @@ pub(super) fn check_names(
     for p in required {
         if !attrs.iter().any(|a| bare(a.name) == *p) && !filled.contains(p) {
             return Err(format!("<{tag}> needs the attribute \"{p}\""));
+        }
+    }
+    Ok(())
+}
+
+/// Checks the attributes against the contract.
+pub(super) fn check_attrs(
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    filled: &[&str],
+) -> Result<(), String> {
+    let tag = contract.tag;
+    let element = matches!(contract.render, Render::Element { .. });
+    let route = attrs.iter().find(|a| bare(a.name) == "route");
+    if route.is_some() {
+        let Some(prop) = contract.route_prop else {
+            return Err(format!("<{tag}> has no route shortcut"));
+        };
+        if attrs.iter().any(|a| bare(a.name) == prop) {
+            return Err(format!("<{tag}> takes route or \"{prop}\", not both"));
+        }
+    }
+    for a in attrs {
+        let n = bare(a.name);
+        if n == "route" {
+            continue;
+        }
+        if n == "class" && contract.attrs {
+            if element {
+                continue;
+            }
+            return Err(format!(
+                "<{tag}> doesn't take class yet; merging class comes with #373"
+            ));
+        }
+        if contract.props.iter().any(|p| p.name == n)
+            || (contract.attrs && (element || passes_through(n)))
+        {
+            continue;
+        }
+        let names: Vec<&str> = contract.props.iter().map(|p| p.name).collect();
+        let hint = suggest::did_you_mean(n, names.iter().copied())
+            .map(|x| format!("; did you mean \"{x}\"?"))
+            .unwrap_or_else(|| ".".to_owned());
+        let takes = if names.is_empty() {
+            "It takes no attributes".to_owned()
+        } else {
+            format!("It takes: {}", names.join(", "))
+        };
+        return Err(format!("<{tag}> has no attribute \"{n}\"{hint} {takes}"));
+    }
+    for p in contract.props.iter().filter(|p| p.required) {
+        let by_route = route.is_some() && contract.route_prop == Some(p.name);
+        if !attrs.iter().any(|a| bare(a.name) == p.name) && !filled.contains(&p.name) && !by_route {
+            return Err(format!("<{tag}> needs the attribute \"{}\"", p.name));
         }
     }
     Ok(())
@@ -469,17 +522,32 @@ fn emit_node(
                 alias: module.alias().to_owned(),
                 path: module.path().to_owned(),
             });
-            let mut args = Vec::new();
-            for a in attrs {
+            // Each argument with its place: props as written, then slots, then `attrs`.
+            let mut args: Vec<(usize, String)> = Vec::new();
+            let mut extra: Vec<String> = Vec::new();
+            for (order, a) in attrs.iter().enumerate() {
                 let n = bare(a.name);
-                let p = contract
-                    .props
-                    .iter()
-                    .find(|p| p.name == n)
-                    .expect("checked against the contract");
+                if n == "route" {
+                    let e = attrs::prop_expr(a, Kind::Text, &[])
+                        .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
+                    let prop = contract.route_prop.expect("checked against the contract");
+                    let at = contract
+                        .props
+                        .iter()
+                        .position(|p| p.name == prop)
+                        .unwrap_or(0);
+                    args.push((at, format!("{}=route({e})", attrs::snake(prop))));
+                    continue;
+                }
+                let Some(p) = contract.props.iter().find(|p| p.name == n) else {
+                    let e = attrs::prop_expr(a, Kind::Text, &[])
+                        .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
+                    extra.push(format!("{}: {e}", attrs::literal(n)));
+                    continue;
+                };
                 let e = attrs::prop_expr(a, p.kind, p.values)
                     .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
-                args.push(format!("{}={e}", attrs::snake(n)));
+                args.push((order, format!("{}={e}", attrs::snake(n))));
             }
             let mut pre = String::new();
             let mut caller: Option<(&Slot, &[Node<'_>])> = None;
@@ -498,9 +566,17 @@ fn emit_node(
                 emit_into(src, nodes, catalog, Some(name), used, counter, &mut body)?;
                 pre.push_str(&format!("{{% set __rx_slot_{n} %}}{body}{{% endset %}}"));
                 let target = slot.into.unwrap_or(slot.name);
-                args.push(format!("{}=__rx_slot_{n}", attrs::snake(target)));
+                args.push((
+                    attrs.len() + n,
+                    format!("{}=__rx_slot_{n}", attrs::snake(target)),
+                ));
             }
             out.push_str(&pre);
+            args.sort_by_key(|(at, _)| *at);
+            let mut args: Vec<String> = args.into_iter().map(|(_, a)| a).collect();
+            if !extra.is_empty() {
+                args.push(format!("attrs={{{}}}", extra.join(", ")));
+            }
             let call = format!("{}.{mac}({})", module.alias(), args.join(", "));
             let caller = caller.filter(|(slot, nodes)| !slot.optional || has_content(src, nodes));
             if let Some((slot, nodes)) = caller {
