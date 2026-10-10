@@ -255,6 +255,22 @@ Price and weight sit next to each other. City takes the whole row (`span="full"`
 suggests three cities. Below, a "Delivery" group asks for a speed (one choice) and extras
 (any number).
 
+The same fields as tags, for pages that use components (`name` and `label` are required;
+names with an underscore use a dash, so `current_name` is `current-name`; lists and other values
+are given with a colon, `:options="…"`):
+
+| Tag | Macro |
+|---|---|
+| `<rx-radio>` | `radio(name, label, options, selected, hint, required, inline, columns, …)` |
+| `<rx-checkbox-list>` | `checkbox_list(name, label, options, selected, hint, required, inline, columns, …)` |
+| `<rx-toggle-buttons>` | `toggle_buttons(name, label, options, selected, multiple, …)` |
+| `<rx-file>` | `file(name, label, accept, multiple, current, current_name, preview, …)` |
+| `<rx-date-picker>` | `date_picker(name, label, value, min, max, placeholder, readonly, disabled_dates, closed_weekdays, …)` |
+| `<rx-tags-input>` | `tags_input(name, label, value, suggestions, placeholder, …)` |
+
+Each also takes `hint`, `required`, `id`, `disabled`, `span` and `bag`, and passes any other
+attribute to the field.
+
 ### Rows of fields
 
 Some forms have a list inside them: the people to invite to a team, the lines of an order.
