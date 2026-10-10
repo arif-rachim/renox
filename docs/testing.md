@@ -270,6 +270,34 @@ tools let you run the work, or record it and check it.
 > `run_args` boots a new app on every call. With an in-memory database, each boot gets an
 > empty one, so give the app a file database for these tests.
 
+## Live components
+
+`app.live(component)` tests a live component without a page: it seals the state the way a mount
+does and keeps the snapshot between calls, as the browser does.
+
+```rust
+# use renox::prelude::*;
+# use renox::testing::TestApp;
+# #[derive(serde::Serialize, serde::Deserialize, Default)]
+# struct Counter { count: i64, search: String }
+# impl LiveComponent for Counter {
+#     const NAME: &'static str = "counter";
+#     const VIEW: &'static str = "live/counter.html";
+#     async fn call(&mut self, _: &str, _: Vec<serde_json::Value>,
+#         _: &mut renox::live_component::LiveContext) -> Result { Ok(()) }
+# }
+# async fn demo(app: TestApp) {
+let mut counter = app.live(Counter::default());
+counter.set("search", "tea");
+counter.call("increment").await.assert_ok();
+assert_eq!(counter.component().search, "tea");
+# }
+```
+
+`set` fields are sent with every call. `call_with("add", json!([5]))` passes arguments, and
+`component()` reads the state from the last answer. The component must be registered with
+`App::live_component`.
+
 ## Time
 
 Some things depend on time: a session that ends after two hours, a password confirmation that
