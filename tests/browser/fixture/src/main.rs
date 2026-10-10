@@ -185,6 +185,8 @@ impl Module for Pages {
                 Redirect::to("/widgets")
             })
             .get("/overlays", || async { view("overlays.html", context! {}) })
+            .get("/events", || async { view("events.html", context! {}) })
+            .post("/confirm-done", || async { "done" })
             // The navbar with a phone tab bar and a search behind a button.
             .get("/tabs", || async { view("tabs.html", context! {}) })
             .name("tabs.home")
