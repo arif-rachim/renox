@@ -151,6 +151,42 @@ const fn kind_prop(name: &'static str, doc: &'static str) -> Prop {
     }
 }
 
+const fn flag(name: &'static str, doc: &'static str) -> Prop {
+    Prop {
+        name,
+        kind: Kind::Bool,
+        required: false,
+        values: &[],
+        doc,
+    }
+}
+
+const fn choice(name: &'static str, values: &'static [&'static str], doc: &'static str) -> Prop {
+    Prop {
+        name,
+        kind: Kind::Enum,
+        required: false,
+        values,
+        doc,
+    }
+}
+
+const BUTTON_VARIANTS: &[&str] = &["primary", "secondary", "plain", "danger", "plain-danger"];
+const ICON_BUTTON_VARIANTS: &[&str] = &["plain", "primary", "danger"];
+const BUTTON_TYPES: &[&str] = &["submit", "button", "reset"];
+const SIZES: &[&str] = &["small"];
+
+/// The default slot, filling the prop `into`.
+const fn slot_into(into: &'static str, doc: &'static str) -> Slot {
+    Slot {
+        name: "",
+        into: Some(into),
+        args: &[],
+        optional: false,
+        doc,
+    }
+}
+
 /// The components Renox ships.
 pub(crate) static BUILTIN: &[Contract] = &[
     Contract {
@@ -261,6 +297,179 @@ pub(crate) static BUILTIN: &[Contract] = &[
         }],
         events: &[],
         route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-button",
+        doc: "A button; its content is the label.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "button",
+        },
+        props: &[
+            text("label", true, "The label; or give it as content."),
+            choice("variant", BUTTON_VARIANTS, "The look."),
+            choice("type", BUTTON_TYPES, "The button's type."),
+            text("name", false, "The name sent with a form."),
+            text("value", false, "The value sent with a form."),
+            choice("size", SIZES, "The size."),
+            flag("block", "Fills the width."),
+            text("icon", false, "An icon's name."),
+            text("badge", false, "A count shown on the button."),
+            text("key", false, "A keyboard shortcut."),
+            flag("disabled", "Turns the button off."),
+            text("disabled-reason", false, "Why the button is off."),
+        ],
+        slots: &[slot_into("label", "The label.")],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-link-button",
+        doc: "A link that looks like a button.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "link_button",
+        },
+        props: &[
+            text("href", true, "The address; or use route."),
+            text("label", true, "The label; or give it as content."),
+            choice("variant", BUTTON_VARIANTS, "The look."),
+            choice("size", SIZES, "The size."),
+            text("icon", false, "An icon's name."),
+            text("badge", false, "A count shown on the button."),
+            text("key", false, "A keyboard shortcut."),
+            flag("new-tab", "Opens in a new tab."),
+        ],
+        slots: &[slot_into("label", "The label.")],
+        events: &[],
+        route_prop: Some("href"),
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-icon-button",
+        doc: "A button with only an icon; the label is for screen readers and the tooltip.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "icon_button",
+        },
+        props: &[
+            text("icon", true, "An icon's name."),
+            text("label", true, "What screen readers say."),
+            text("href", false, "Makes it a link; or use route."),
+            choice("variant", ICON_BUTTON_VARIANTS, "The look."),
+            choice("type", BUTTON_TYPES, "The button's type."),
+            choice("size", SIZES, "The size."),
+            text("key", false, "A keyboard shortcut."),
+            text("badge", false, "A count shown on the button."),
+            flag("disabled", "Turns the button off."),
+            text("disabled-reason", false, "Why the button is off."),
+            flag("new-tab", "Opens in a new tab."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: Some("href"),
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-confirm",
+        doc: "A button that asks before it acts, with its dialog.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "confirm",
+        },
+        props: &[
+            text("id", true, "The dialog's id."),
+            text("label", true, "The button's label."),
+            text(
+                "action",
+                true,
+                "The address the form is sent to; or use route.",
+            ),
+            text("title", true, "The dialog's heading."),
+            text("message", true, "The question; or give it as content."),
+            text("confirm-label", false, "The confirm button's text."),
+            choice(
+                "method",
+                &["DELETE", "POST", "PUT", "PATCH"],
+                "The HTTP method.",
+            ),
+            choice("size", SIZES, "The size."),
+            text("icon", false, "An icon's name."),
+            choice(
+                "modal-icon",
+                &["warning", "error", "info", "success"],
+                "The dialog's icon.",
+            ),
+            text("key", false, "A keyboard shortcut."),
+            text("cancel-label", false, "The cancel button's text."),
+            Prop {
+                name: "fields",
+                kind: Kind::Data,
+                required: false,
+                values: &[],
+                doc: "Hidden fields sent with the form.",
+            },
+            flag("button", "Whether to draw the opening button."),
+        ],
+        slots: &[slot_into("message", "The question.")],
+        events: &[],
+        route_prop: Some("action"),
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-alert",
+        doc: "A message in a coloured box.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "alert",
+        },
+        props: &[
+            text("message", true, "The message; or give it as content."),
+            choice(
+                "kind",
+                &["info", "success", "warning", "error"],
+                "The colour.",
+            ),
+            text("title", false, "A heading."),
+        ],
+        slots: &[slot_into("message", "The message.")],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-empty",
+        doc: "What a list shows when it has nothing.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "empty",
+        },
+        props: &[
+            text("title", true, "The heading."),
+            text(
+                "message",
+                false,
+                "A line under the heading; or give it as content.",
+            ),
+            text(
+                "action-href",
+                false,
+                "The address of a button; or use route.",
+            ),
+            text("action-label", false, "The button's text."),
+            text("icon", false, "An icon's name."),
+        ],
+        slots: &[slot_into("message", "The message.")],
+        events: &[],
+        route_prop: Some("action-href"),
         attrs: false,
         parent: None,
     },
