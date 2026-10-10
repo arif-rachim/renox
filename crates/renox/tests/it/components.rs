@@ -1007,3 +1007,61 @@ async fn rx_repeater_matches_the_macro_and_shows_errors_on_nested_names() {
     assert!(pages[0].contains("aria-invalid=\"true\""), "{}", pages[0]);
     assert_eq!(pages[0], pages[1]);
 }
+
+#[renox::test]
+async fn rx_stats_and_stat_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.stats(columns=3) %}}{{{{ ui.stat(label=\"Revenue\", value=(total), delta=12.5, good=\"up\", trend=(trend), decimals=2) }}}}\
+             {{{{ ui.stat(label=\"Open\", value=\"4\", hint=\"today\", url=\"/open\", icon=\"home\") }}}}{{% endcall %}}"
+        ),
+        "<rx-stats columns=\"3\"><rx-stat label=\"Revenue\" value=\"{{ total }}\" :delta=\"12.5\" good=\"up\" :trend=\"trend\" decimals=\"2\"/>\
+         <rx-stat label=\"Open\" value=\"4\" hint=\"today\" url=\"/open\" icon=\"home\"/></rx-stats>",
+        serde_json::json!({"total": "$10", "trend": [1, 3, 2]}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_dashboard_and_widget_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.dashboard(columns=2) %}}{{% call ui.widget(title=\"Sales\", description=\"Per day\", span=2, id=\"w1\") %}}<p>in</p>{{% endcall %}}\
+             {{{{ ui.widget(title=\"Later\", url=\"/later\", poll=30, id=\"w2\") }}}}{{% endcall %}}"
+        ),
+        "<rx-dashboard columns=\"2\"><rx-widget title=\"Sales\" description=\"Per day\" span=\"2\" id=\"w1\"><p>in</p></rx-widget>\
+         <rx-widget title=\"Later\" url=\"/later\" poll=\"30\" id=\"w2\"/></rx-dashboard>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_period_filter_matches_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.period_filter(selected=(period)) }}}}{{{{ ui.period_filter(selected=(period), options=[[\"1d\", \"Day\"]], custom=false, label=\"Range\") }}}}"
+        ),
+        "<rx-period-filter :selected=\"period\"/><rx-period-filter :selected=\"period\" :options=\"[['1d', 'Day']]\" :custom=\"false\" label=\"Range\"/>",
+        serde_json::json!({"period": "30d"}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_chart_calls_the_function() {
+    same(
+        "{{ chart(\"bar\", sales, title=\"Sales\", height=200, stacked=true) }}{{ chart(\"heatmap\", columns=[\"a\"], rows=[\"x\"], values=[[1]]) }}",
+        "<rx-chart kind=\"bar\" :data=\"sales\" title=\"Sales\" height=\"200\" stacked/>\
+         <rx-chart kind=\"heatmap\" :columns=\"['a']\" :rows=\"['x']\" :values=\"[[1]]\"/>",
+        serde_json::json!({"sales": [3, 5, 4]}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_chart_needs_its_kind() {
+    let (app, _dir) = tables("<rx-chart :data=\"[1]\"/>", serde_json::json!({})).await;
+    let r = app.get("/r").await;
+    assert_eq!(r.status.as_u16(), 500);
+}
