@@ -1174,11 +1174,52 @@ Line numbers are kept, so MiniJinja's own errors point at the line you wrote.
 | `rx-chart` | the `chart(...)` template function (not a macro) |
 | `rx-grid` | `grid(page, tools=…)` of `renox/grid.html` |
 | `rx-rich-editor`, `rx-markdown-editor`, `rx-code-editor`, `rx-code-entry` | the macros of `renox-editors/editors.html` (registered by that plugin) |
+| `rx-navbar`, `rx-nav-links`, `rx-nav-link`, `rx-nav-search`, `rx-sidebar`, `rx-sidebar-link`, `rx-sidebar-section` | `navbar`, `nav_links`, `nav_link`, `nav_search`, `sidebar`, `sidebar_link`, `sidebar_section` |
+| `rx-menu`, `rx-menu-link`, `rx-menu-action`, `rx-menu-section`, `rx-menu-separator`, `rx-menu-open`, `rx-link-tabs` | `menu`, `menu_link`, `menu_action`, `menu_section`, `menu_separator`, `menu_open`, `link_tabs` |
+| `rx-tabs`, `rx-tab` | the `tabs` macros (a special tag) |
+| `rx-sheet`, `rx-open-button`, `rx-action-sheet`, `rx-notification-bell` | `sheet`, `open_button`, `action_sheet`, `notification_bell` |
+| `rx-shell` | none: a `div.rx-shell` |
 | `rx-stack`, `rx-row` | none: a `div` with the kit's class |
 | `rx-page`, `rx-push`, `rx-form`, `rx-table` | `{% extends %}`/`{% block %}`, `push`, a `<form>`, a loop with `table` markup |
 
-The macros stay the lower level. A few parts (menus, sheets, tabs, the navbar) have no tag yet;
-call their macros as shown above.
+The macros stay the lower level; every part of the kit has a tag now.
+
+Navigation, menus, tabs and sheets as tags. A link takes `href` or `route`, and its label as an
+attribute or as content. `<rx-tabs>` takes its tab list from the `<rx-tab key label>` children
+and gives each panel an id built from its own `id` (like `rx-wizard`):
+
+```html
+<rx-navbar brand="{{ app.name }}" href="{{ route('home') }}">
+  <rx-nav-links>
+    <rx-nav-link route="orders.index" label="Orders" :active="route_is('orders.*')"/>
+  </rx-nav-links>
+  <span class="rx-spacer"></span>
+  <rx-notification-bell/>
+  <rx-menu label="{{ auth.user.name }}" id="account-menu" variant="plain">
+    <rx-menu-link route="account.show" label="Account"/>
+    <rx-menu-separator/>
+    <rx-menu-action route="logout" label="Log out"/>
+  </rx-menu>
+</rx-navbar>
+
+<div class="rx-shell">  {# or <rx-shell> #}
+  <rx-sidebar brand="Back office">
+    <rx-sidebar-section title="Sales"/>
+    <rx-sidebar-link route="orders.index" label="Orders" icon="receipt"/>
+  </rx-sidebar>
+  <main>
+    <rx-tabs id="order-tabs" selected="items">
+      <rx-tab key="items" label="Items">…</rx-tab>
+      <rx-tab key="history" label="History">…</rx-tab>
+    </rx-tabs>
+    <rx-open-button id="note" label="Add note" variant="primary"/>
+    <rx-sheet id="note" title="Note">…</rx-sheet>
+  </main>
+</div>
+```
+
+`<rx-shell>` is the same element as `<div class="rx-shell">`. `<rx-sheet>` and
+`<rx-action-sheet>` take the sheet events (`@closed` and others) like any component.
 
 A dashboard written with tags. `rx-chart` calls the `chart(...)` function, so it takes the same
 arguments (`kind`, `labels`, `series`, `format`, `title`, `id`):

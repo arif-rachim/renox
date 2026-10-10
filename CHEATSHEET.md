@@ -471,6 +471,10 @@ classes keep working next to the utilities.
     <rx-input name="{{ prefix }}[opens]" label="Opens" type="time" :value="row.opens"/>
   </rx-repeater>
   <rx-wizard id="signup" submit-label="Create"><rx-wizard-step key="a" title="Name"><rx-input name="name" label="Name"/></rx-wizard-step></rx-wizard>
+  <rx-navbar brand="Shop"><rx-nav-links><rx-nav-link route="orders.index" label="Orders" :active="route_is('orders.*')"/></rx-nav-links></rx-navbar>
+  <rx-menu label="Account" id="acct"><rx-menu-link route="account.show" label="Account"/><rx-menu-separator/><rx-menu-action route="logout" label="Log out"/></rx-menu>
+  <rx-tabs id="t"><rx-tab key="a" label="Items">…</rx-tab><rx-tab key="b" label="History">…</rx-tab></rx-tabs>   {# tabs come from the children #}
+  <rx-open-button id="note" label="Add note"/><rx-sheet id="note" title="Note">…</rx-sheet>
   <rx-stats columns="3"><rx-stat label="Revenue" :value="revenue | money" :delta="change"/></rx-stats>
   <rx-chart kind="line" :labels="labels" :series="series" title="Sales" id="sales"/>   {# calls chart(...) #}
   <rx-grid :page="orders">{% if column.key == "actions" %}…{% endif %}</rx-grid>        {# row, column in the content #}
