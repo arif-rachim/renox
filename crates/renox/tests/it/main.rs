@@ -40,6 +40,7 @@ mod leftovers;
 mod logs;
 mod mail;
 mod method;
+mod model_forms;
 mod model_keys;
 mod models;
 mod notification_bell;
@@ -54,6 +55,7 @@ mod queue;
 mod requests;
 #[cfg(feature = "s3")]
 mod s3;
+mod schema_check;
 mod scoped_roles;
 mod search;
 mod second_factor;

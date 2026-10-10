@@ -44,7 +44,16 @@ use syn::{DeriveInput, parse_macro_input};
 ///   `Query::where_` and friends; `skip` fields get none. `no_typed_columns`
 ///   turns them off, for a struct with its own associated items of those names.
 /// - `default_scope = "path::to::fn"` and `hooks`: see `renox::db::Model`.
-#[proc_macro_derive(Model, attributes(model))]
+/// - `form` also generates `<Model>Form`, with the model's visibility: every
+///   field except `id`, `created_at`, `updated_at`, `deleted_at` and
+///   `#[model(skip)]`/`#[form(skip)]` fields, in their own types, deriving
+///   `Deserialize`, `Serialize` and `Validate` (so it works as `Valid<…>` and as
+///   a renox-admin form). `#[form(validate(required, max = 20))]` on a field
+///   becomes `#[validate(required, max = 20)]`; `bool` fields get
+///   `#[serde(default)]`. No rules come from types. `<Model>Form::fill(self,
+///   &mut Model)` copies the values onto a record. `#[form(…)]` without
+///   `#[model(form)]` is a compile error.
+#[proc_macro_derive(Model, attributes(model, form))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     model::expand(input)

@@ -17,6 +17,8 @@ mod query;
 mod query_log;
 pub mod relations;
 pub mod schema;
+#[allow(dead_code)] // used by `db:check` (370.5)
+pub(crate) mod schema_check;
 pub mod search;
 mod value;
 

@@ -1025,6 +1025,30 @@
     }
   }, true); // Cally's change event doesn't bubble: catch it on the way down.
 
+  // #424: a field says `rx:<component>:changed` with its value, after the
+  // native change (this listener bubbles; the date picker's runs first, in
+  // the capture phase, and re-dispatches a change on its input).
+  document.addEventListener("change", function (event) {
+    var el = event.target;
+    if (!el || !el.matches) return;
+    var value;
+    if (el.matches('select[data-rx-component="select"]')) {
+      value = el.multiple ? Array.from(el.selectedOptions, function (o) { return o.value; }) : el.value;
+    } else if (el.matches('[data-rx-component="tags-input"]')) {
+      var box = el.closest("[data-rx-tags]");
+      if (!box) return;
+      value = Array.from(box.querySelectorAll('.rx-tag input[type="hidden"]'), function (i) { return i.value; });
+      var json = JSON.stringify(value);
+      if (json === el._rxLast) return;
+      el._rxLast = json;
+    } else if (el.matches('[data-rx-component="date-picker"]')) {
+      value = el.value;
+    } else {
+      return;
+    }
+    emit(el, "changed", { value: value });
+  });
+
   // ---------- show_when / hide_when ----------
 
   // The values `name` has in `form` now: the ticked radio or checkboxes, a
