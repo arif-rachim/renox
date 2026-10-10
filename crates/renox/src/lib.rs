@@ -413,5 +413,18 @@ pub struct CheatSheet;
 /// struct Product { id: i64, price: i64 }
 /// let _ = Product::PRCE;
 /// ```
+///
+/// Index columns must exist, and a default is a string:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(index(nope))]
+/// struct Post { id: i64, title: String }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Post { id: i64, #[model(default = 0)] views: i64 }
+/// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;

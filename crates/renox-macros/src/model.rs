@@ -8,6 +8,8 @@ struct Field {
     name: String,
     ty: Type,
     skip: bool,
+    default: Option<LitStr>,
+    references: Option<LitStr>,
 }
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
@@ -26,6 +28,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let mut typed_columns = true;
     let mut search: Option<LitStr> = None;
     let mut search_language: Option<LitStr> = None;
+    let mut index_specs: Vec<(bool, Vec<syn::Ident>)> = Vec::new();
     for attr in input.attrs.iter().filter(|a| a.path().is_ident("model")) {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("table") {
@@ -49,9 +52,23 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             } else if meta.path.is_ident("search_language") {
                 search_language = Some(meta.value()?.parse::<LitStr>()?);
                 Ok(())
+            } else if meta.path.is_ident("index") || meta.path.is_ident("unique") {
+                let unique = meta.path.is_ident("unique");
+                let mut cols = Vec::new();
+                meta.parse_nested_meta(|inner| {
+                    cols.push(inner.path.get_ident().cloned().ok_or_else(|| {
+                        inner.error("expected a column name")
+                    })?);
+                    Ok(())
+                })?;
+                if cols.is_empty() {
+                    return Err(meta.error("expected at least one column"));
+                }
+                index_specs.push((unique, cols));
+                Ok(())
             } else {
                 Err(meta.error(
-                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `no_typed_columns`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"`",
+                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `no_typed_columns`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"`, `index(col, …)` or `unique(col, …)`",
                 ))
             }
         })?;
@@ -73,13 +90,22 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let mut fields = Vec::new();
     for field in &named.named {
         let mut skip = false;
+        let mut default = None;
+        let mut references = None;
         for attr in field.attrs.iter().filter(|a| a.path().is_ident("model")) {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("skip") {
                     skip = true;
                     Ok(())
+                } else if meta.path.is_ident("default") {
+                    default = Some(meta.value()?.parse::<LitStr>()?);
+                    Ok(())
+                } else if meta.path.is_ident("references") {
+                    references = Some(meta.value()?.parse::<LitStr>()?);
+                    Ok(())
                 } else {
-                    Err(meta.error("expected `skip`"))
+                    Err(meta
+                        .error("expected `skip`, `default = \"…\"` or `references = \"table\"`"))
                 }
             })?;
         }
@@ -89,6 +115,8 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             ident: field_ident,
             ty: field.ty.clone(),
             skip,
+            default,
+            references,
         });
     }
 
@@ -113,6 +141,31 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         .filter(|f| !f.skip)
         .map(|f| f.name.as_str())
         .collect();
+
+    let mut index_items = Vec::new();
+    for (unique, cols) in &index_specs {
+        let mut names = Vec::new();
+        for col in cols {
+            let name = col.to_string();
+            let name = name.trim_start_matches("r#").to_owned();
+            if !columns.contains(&name.as_str()) {
+                let kind = if *unique { "unique" } else { "index" };
+                return Err(Error::new_spanned(
+                    col,
+                    format!("`{kind}`: `{name}` isn't a column of this model"),
+                ));
+            }
+            names.push(name);
+        }
+        index_items.push(quote! { ::renox::db::ModelIndex::new(&[#(#names),*], #unique) });
+    }
+    let indexes_fn = (!index_items.is_empty()).then(|| {
+        quote! {
+            fn indexes() -> ::std::vec::Vec<::renox::db::ModelIndex> {
+                ::std::vec![#(#index_items),*]
+            }
+        }
+    });
 
     let mut searchable: Vec<String> = Vec::new();
     if let Some(lit) = &search {
@@ -203,13 +256,15 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         let (name, ty) = (&f.name, &f.ty);
         let rust_type = quote!(#ty).to_string();
         let nullable = is_option(ty);
+        let default = f.default.as_ref().map(|l| quote! { .default_sql(#l) });
+        let references = f.references.as_ref().map(|l| quote! { .references(#l) });
         quote! {
             ::renox::db::ModelColumn::new(
                 #name,
                 #rust_type,
                 (&::renox::db::schema::ColumnProbe::<#ty>::new()).kind(),
                 #nullable,
-            )
+            ) #default #references
         }
     });
     let forget_timestamps = ["created_at", "updated_at"].map(|name| {
@@ -298,6 +353,8 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
                 use ::renox::db::schema::{KnownColumn as _, UnknownColumn as _};
                 ::std::vec![#(#column_infos),*]
             }
+
+            #indexes_fn
 
             fn forget_timestamps(&mut self) {
                 #(#forget_timestamps)*

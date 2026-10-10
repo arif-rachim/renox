@@ -43,6 +43,10 @@ use syn::{DeriveInput, parse_macro_input};
 ///   SHOUTY_SNAKE_CASE (`Product::PRICE: Col<Product, i64>`), for
 ///   `Query::where_` and friends; `skip` fields get none. `no_typed_columns`
 ///   turns them off, for a struct with its own associated items of those names.
+/// - `index(a, b)` and `unique(a)` on the struct declare indexes
+///   (`Model::indexes`); every column must exist. On a field,
+///   `default = "sql"` records the column's SQL default and
+///   `references = "table"` the table it points at (`Model::column_info`).
 /// - `default_scope = "path::to::fn"` and `hooks`: see `renox::db::Model`.
 #[proc_macro_derive(Model, attributes(model))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
