@@ -46,6 +46,7 @@ rnx make:policy Product --module products
 rnx make:job SendReceipt --module products             # registered in the module's register()
 rnx make:command products:import --module products     # typed (clap); rnx products:import --help
 rnx make:mail order_shipped
+rnx make:migration --auto add_stock           # SQL from the models' changes (db:diff); review it, `--yes` never drops
 rnx make:migration add_stock_to_products               # in migrations/ (--path DIR: elsewhere)
 rnx make:factory Product --module products             # also make:seeder, make:test
 rnx make:notification OrderShipped --module orders     # also make:event, make:rule
