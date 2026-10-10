@@ -728,3 +728,55 @@ async fn rx_date_picker_matches_the_macro() {
     )
     .await;
 }
+
+#[renox::test]
+async fn rx_layout_fields_match_the_macros() {
+    same(
+        &format!(
+            "{UI}{{% call ui.fieldset(legend=\"Shipping\", hint=\"Where to\", columns=2) %}}<p>a</p>{{% endcall %}}\
+             {{% call ui.show_when(field=\"delivery\", values=\"courier\") %}}<p>b</p>{{% endcall %}}\
+             {{% call ui.show_when(field=\"delivery\", values=[\"courier\", \"post\"]) %}}<p>c</p>{{% endcall %}}\
+             {{% call ui.hide_when(field=\"pickup\", values=\"on\") %}}<p>d</p>{{% endcall %}}\
+             {{{{ ui.key_value(name=\"headers\", label=\"Headers\", value=[[\"a\", \"1\"]], key_label=\"Name\", value_label=\"Val\", add_label=\"More\", hint=\"Sent\", span=\"full\") }}}}\
+             {{{{ ui.key_value(name=\"plain\", label=\"Plain\") }}}}"
+        ),
+        "<rx-fieldset legend=\"Shipping\" hint=\"Where to\" columns=\"2\"><p>a</p></rx-fieldset>\
+         <rx-show-when field=\"delivery\" values=\"courier\"><p>b</p></rx-show-when>\
+         <rx-show-when field=\"delivery\" :values=\"['courier', 'post']\"><p>c</p></rx-show-when>\
+         <rx-hide-when field=\"pickup\" values=\"on\"><p>d</p></rx-hide-when>\
+         <rx-key-value name=\"headers\" label=\"Headers\" :value=\"[['a', '1']]\" key-label=\"Name\" value-label=\"Val\" add-label=\"More\" hint=\"Sent\" span=\"full\"/>\
+         <rx-key-value name=\"plain\" label=\"Plain\"/>",
+        serde_json::json!({}),
+    )
+    .await;
+}
+
+#[renox::test]
+async fn rx_select_options_url_and_editable_match_the_macro() {
+    same(
+        &format!(
+            "{UI}{{{{ ui.select(name=\"cat\", label=\"Category\", options=[], options_url=\"/options/cats\", editable=true, searchable=true) }}}}\
+             {{{{ ui.select(name=\"tags\", label=\"Tags\", options=[[\"a\", \"A\"]], selected=[\"a\"], multiple=true, hide_label=true) }}}}"
+        ),
+        "<rx-select name=\"cat\" label=\"Category\" :options=\"[]\" options-url=\"/options/cats\" editable searchable/>\
+         <rx-select name=\"tags\" label=\"Tags\" :options=\"[['a', 'A']]\" :selected=\"['a']\" multiple hide-label/>",
+        serde_json::json!({}),
+    )
+    .await;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("r.html"),
+        "<rx-select name=\"cat\" label=\"Category\" :options=\"[]\" options-url=\"/options/cats\" editable/>",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("m.html"), "").unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(FormPages), move |c| c.views_path = path).await;
+    let html = app.get("/r").await.assert_ok().text();
+    assert!(
+        html.contains("data-rx-options-url=\"/options/cats\""),
+        "{html}"
+    );
+    assert!(html.contains("data-rx-editable"), "{html}");
+}

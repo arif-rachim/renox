@@ -654,6 +654,20 @@ top holds the notification bell, and the page's content goes under it.
 | `progress(value, max=100, label=…, show_value=true)` | A progress bar (the browser's `<progress>`) in the kit's colours, with the percentage next to it. |
 | `menu_button(label, attrs={…}, danger=…)` | A menu item that is a plain button. `attrs` say what it does, usually with htmx (`hx-get`, `hx-delete`…). |
 
+### Layout fields as tags
+
+These macros also have tags. Each renders the same HTML as its macro (a test checks it).
+
+| Tag | Macro |
+| --- | --- |
+| `<rx-key-value name label :value key-label value-label add-label hint id span>` | `key_value(…)` |
+| `<rx-fieldset legend hint columns>…</rx-fieldset>` | `{% call fieldset(…) %}` |
+| `<rx-show-when field values>…</rx-show-when>` | `{% call show_when(field, values) %}` |
+| `<rx-hide-when field values>…</rx-hide-when>` | `{% call hide_when(field, values) %}` |
+
+`values` is one word (`values="courier"`) or a list (`:values="['courier', 'post']"`).
+`<rx-select>` takes `options-url` and `editable` for options answered by the server.
+
 ### More classes and options
 
 Some things are classes or options, not macros:
