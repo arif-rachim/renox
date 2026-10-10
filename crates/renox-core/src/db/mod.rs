@@ -17,6 +17,8 @@ mod query;
 mod query_log;
 pub mod relations;
 pub mod schema;
+#[allow(dead_code)] // used by `db:check` (370.5)
+pub(crate) mod schema_check;
 pub mod search;
 mod value;
 
@@ -27,7 +29,7 @@ use anyhow::Context;
 use axum::extract::FromRef;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 
-pub use column::{Col, Comparable, Condition};
+pub use column::{Col, Comparable, Condition, IntoColumn};
 pub use conn::Conn;
 #[doc(hidden)]
 pub use conn::bounds;

@@ -53,6 +53,45 @@ impl<M, T> Col<M, T> {
     }
 }
 
+/// Anything that names a column of the model `M`: a string, or a typed [`Col`] of `M`.
+///
+/// Taken by `order_by`, `order_by_desc` and `pluck`. Implemented for `&str`, `&&str`,
+/// `String`, `&String` and `Col<M, T>`.
+pub trait IntoColumn<M> {
+    /// The column's name.
+    fn column_name(&self) -> &str;
+}
+
+impl<M> IntoColumn<M> for &str {
+    fn column_name(&self) -> &str {
+        self
+    }
+}
+
+impl<M> IntoColumn<M> for &&str {
+    fn column_name(&self) -> &str {
+        self
+    }
+}
+
+impl<M> IntoColumn<M> for String {
+    fn column_name(&self) -> &str {
+        self
+    }
+}
+
+impl<M> IntoColumn<M> for &String {
+    fn column_name(&self) -> &str {
+        self
+    }
+}
+
+impl<M, T> IntoColumn<M> for Col<M, T> {
+    fn column_name(&self) -> &str {
+        self.name
+    }
+}
+
 /// Says that a column of type `Self` can be compared with a value of type `V`.
 ///
 /// Implemented by Renox only, for a type and itself, an `Option` and its inner type, and

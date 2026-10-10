@@ -426,5 +426,24 @@ pub struct CheatSheet;
 /// #[derive(Model, Default)]
 /// struct Post { id: i64, #[model(default = 0)] views: i64 }
 /// ```
+///
+/// Form misuse:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// struct Task { id: i64, #[form(skip)] owner_id: i64 }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(form)]
+/// struct Task { id: i64, #[form(upload)] size: i64 }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model, Default)]
+/// #[model(form)]
+/// struct Task { id: i64, #[form(bogus)] title: String }
+/// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;
