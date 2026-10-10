@@ -65,6 +65,10 @@ pub(crate) enum Special {
     Form,
     /// `rx-table`.
     Table,
+    /// `rx-wizard`.
+    Wizard,
+    /// `rx-wizard-step`, made by its parent.
+    WizardStep,
 }
 
 /// One attribute a component takes.
@@ -299,6 +303,87 @@ pub(crate) static BUILTIN: &[Contract] = &[
         route_prop: None,
         attrs: false,
         parent: None,
+    },
+    Contract {
+        tag: "rx-page",
+        doc: "The whole template: extends a layout, sets the SEO title and fills its blocks.",
+        render: Render::Special(Special::Page),
+        props: &[
+            text("layout", true, "The layout's file name; plain text."),
+            text("title", false, "The page title for the SEO tags."),
+            text(
+                "description",
+                false,
+                "The page description for the SEO tags.",
+            ),
+        ],
+        slots: &[Slot {
+            doc: "The page's content block; `<rx-slot name=\"X\">` fills the layout's block X.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-push",
+        doc: "Content added to a stack of the layout.",
+        render: Render::Special(Special::Push),
+        props: &[
+            text("stack", true, "The stack's name."),
+            text("once", false, "A key: the content is added once per page."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-wizard",
+        doc: "A form in steps; each `<rx-wizard-step>` inside is one step.",
+        render: Render::Special(Special::Wizard),
+        props: &[
+            text(
+                "id",
+                true,
+                "The wizard's id; its steps build theirs from it.",
+            ),
+            text("submit-label", true, "The last step's submit button."),
+            text("back-label", false, "The back button's text."),
+            text("next-label", false, "The next button's text."),
+            Prop {
+                name: "cancel",
+                kind: Kind::Bool,
+                required: false,
+                values: &[],
+                doc: "Shows a cancel button that closes the sheet.",
+            },
+            text("cancel-label", false, "The cancel button's text."),
+        ],
+        slots: &[Slot {
+            doc: "Only `<rx-wizard-step>` elements.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-wizard-step",
+        doc: "One step of a wizard; its fields are the content.",
+        render: Render::Special(Special::WizardStep),
+        props: &[
+            text("key", true, "The step's key, unique in the wizard."),
+            text("title", false, "The step's name in the progress list."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: Some("rx-wizard"),
     },
     Contract {
         tag: "rx-button",
