@@ -6,6 +6,7 @@ var kit = window.Renox._kit;
 var errorKey = kit.errorKey;
 var firstField = kit.firstField;
 var setup = kit.setup;
+var emit = kit.emit;
 
 // ---------- Repeater ----------
 
@@ -73,6 +74,7 @@ function addRow(rep) {
   if (window.htmx && window.htmx.process) window.htmx.process(row);
   var first = firstField(row);
   if (first) first.focus();
+  emit(rep, "added", { index: index });
 }
 
 document.addEventListener("click", function (event) {
@@ -85,8 +87,10 @@ document.addEventListener("click", function (event) {
   var row = button.closest("[data-rx-row]");
   if (button.hasAttribute("data-rx-row-remove")) {
     var next = row.nextElementSibling || row.previousElementSibling;
+    var gone = parseInt(row.getAttribute("data-rx-index"), 10);
     row.remove();
     renumber(rep);
+    emit(rep, "removed", { index: gone });
     var focus = next && firstField(next) || rep.querySelector("[data-rx-row-add]");
     if (focus) focus.focus();
   } else if (button.hasAttribute("data-rx-row-up") && row.previousElementSibling) {

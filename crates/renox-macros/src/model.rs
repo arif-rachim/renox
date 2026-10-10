@@ -199,6 +199,19 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         }
     });
     // `replicate()`: a copy gets new timestamps when it is saved.
+    let column_infos = fields.iter().filter(|f| !f.skip).map(|f| {
+        let (name, ty) = (&f.name, &f.ty);
+        let rust_type = quote!(#ty).to_string();
+        let nullable = is_option(ty);
+        quote! {
+            ::renox::db::ModelColumn::new(
+                #name,
+                #rust_type,
+                (&::renox::db::schema::ColumnProbe::<#ty>::new()).kind(),
+                #nullable,
+            )
+        }
+    });
     let forget_timestamps = ["created_at", "updated_at"].map(|name| {
         column(name).filter(|f| is_option(&f.ty)).map(|f| {
             let ident = &f.ident;
@@ -279,6 +292,11 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             fn touch(&mut self, now: ::renox::db::DateTime, creating: bool) {
                 #created
                 #updated
+            }
+
+            fn column_info() -> ::std::vec::Vec<::renox::db::ModelColumn> {
+                use ::renox::db::schema::{KnownColumn as _, UnknownColumn as _};
+                ::std::vec![#(#column_infos),*]
             }
 
             fn forget_timestamps(&mut self) {
