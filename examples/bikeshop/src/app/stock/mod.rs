@@ -148,6 +148,8 @@ impl Module for Stock {
 
     fn register(&self, app: &mut Registry) {
         app.job::<import::ImportPriceList>();
+        // `view:check` compares the template's variables with the struct's fields.
+        app.view_data::<purchasing::SupplierList>();
         reorder::schedule(app.schedule());
     }
 }

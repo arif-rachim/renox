@@ -41,6 +41,19 @@ use crate::app::workshop::model::{PartStatus, WorkOrder, WorkOrderPart, WorkStat
 
 // --- Suppliers ---
 
+// [explain:stock.suppliers.page]
+/// What `stock/suppliers/index.html` gets: a typed view context. The template is named
+/// once, here, and `view:check` (registered in `Stock::register`) reports a variable the
+/// template uses that this struct lacks.
+#[derive(Serialize, ViewData)]
+#[view(template = "stock/suppliers/index.html")]
+pub struct SupplierList {
+    /// A page of suppliers, each with `supplier`, `items` (its price list's size) and
+    /// `open` (the active store's open orders with it).
+    pub suppliers: Paginated<renox::serde_json::Value>,
+}
+// [/explain:stock.suppliers.page]
+
 /// `GET /staff/suppliers` (`stock.suppliers`): every supplier, with how
 /// many items their price list has and the active store's open orders.
 // [explain:stock.suppliers.handler]
@@ -81,7 +94,7 @@ pub async fn suppliers(State(db): State<Db>, Page(page): Page) -> Result<View> {
             "supplier": s,
         })
     });
-    Ok(view("stock/suppliers/index.html", context! { suppliers }))
+    Ok(View::typed(SupplierList { suppliers }))
 }
 // [/explain:stock.suppliers.handler]
 

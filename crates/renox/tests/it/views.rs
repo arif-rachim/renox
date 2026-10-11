@@ -53,6 +53,14 @@ impl Module for Pages {
             })
             .get("/routes", || async { view("routes.html", context! {}) })
             .get("/no-route", || async { view("no_route.html", context! {}) })
+            .get("/typed", || async {
+                View::typed(TypedPage {
+                    title: "Suppliers".into(),
+                    n: 3,
+                    hidden: "secret".into(),
+                })
+                .status(StatusCode::ACCEPTED)
+            })
             .get("/json-trigger", || async {
                 (
                     Toast::info("Saved."),
@@ -70,6 +78,18 @@ impl Module for Pages {
     }
 }
 
+/// A page struct: its template comes from the type.
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "typed.html")]
+struct TypedPage {
+    title: String,
+    #[serde(rename = "count")]
+    n: u32,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    hidden: String,
+}
+
 fn views() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     let dir = root.path().join("views");
@@ -79,6 +99,10 @@ fn views() -> tempfile::TempDir {
     // Next to the views, not in them: no view name may reach it.
     std::fs::write(root.path().join("secret.html"), "TOP SECRET").unwrap();
     write("plain.html", "plain page");
+    write(
+        "typed.html",
+        "{{ title }}: {{ count }} [{% if hidden is defined %}leak{% endif %}]",
+    );
     // `route()` with a query value left out, and a route that doesn't exist.
     write("routes.html", "{{ route('login', page=none, q='a b') }}");
     write("no_route.html", "{{ route('no.such.route') }}");
@@ -457,4 +481,16 @@ async fn pages_and_fragments_that_fail_are_500s() {
         .await
         .assert_status(500)
         .assert_see("fragmented.html");
+}
+
+#[renox::test]
+async fn a_typed_view_renders_its_own_template_with_its_fields() {
+    assert_eq!(<TypedPage as renox::ViewData>::TEMPLATE, "typed.html");
+    assert_eq!(<TypedPage as renox::ViewData>::FIELDS, ["title", "count"]);
+    let (app, _dir) = app(|_| {}).await;
+    app.get("/typed")
+        .await
+        .assert_status(202)
+        .assert_view("typed.html")
+        .assert_see("Suppliers: 3 []");
 }

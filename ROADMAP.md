@@ -2007,6 +2007,19 @@ Notes:
   (vendored), so CSRF, toasts and `HX-*` headers work unchanged. Names starting with `_` are
   reserved (`_refresh` is built in). Left out of v1: nested components, files, `rx-click`
   modifiers; the `<live-…>` tag follows #372. Guide: docs/live.md.
+- **Typed view contexts** (#383, the owner approved them on 2026-10-11 in #487, after looking at
+  what #372's contracts and #377's route checks already catch): `#[derive(ViewData)]` with
+  `#[view(template = "…")]` implements `renox::view::ViewData` (`TEMPLATE`, `FIELDS`: the
+  serialized names, so `#[serde(rename)]` counts and `skip` fields don't; `flatten` and
+  `rename_all` are compile errors). `View::typed(page)` takes the template from the type (not
+  `View::typed("x.html", page)`), so `view:check` can find it; a struct is checked only once
+  registered (`App::view_data::<T>()`, `Registry::view_data`). The check is
+  `Template::undeclared_variables(false)` on what MiniJinja loads (after the `rx-*` compiler)
+  minus the fields, the request globals, the environment's globals and functions, the
+  `App::share` keys (and the names the template defines, which MiniJinja already leaves out):
+  `"{var}" isn't a field of {Type}`. It doesn't follow `extends`, `include` or macros, so a
+  variable used only in a layout or a partial is not checked (accepted false negatives).
+  `context!` views stay as they are. Shown on the bike shop's supplier list.
 
 ## Not planned
 

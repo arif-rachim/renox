@@ -517,12 +517,20 @@ pub fn entries() -> Vec<Explanation> {
                           check store by store: the routes only need `purchasing.manage` in \
                           the active store.",
                 },
+                Feature {
+                    api: "View::typed",
+                    why: "The page's data is a struct deriving `ViewData`, which names its \
+                          template; `view:check` (and the tests' `assert_views_compile`) \
+                          reports a variable the template uses that the struct lacks, so a \
+                          renamed field can't leave the page printing nothing.",
+                },
             ],
             under_hood: "Four queries: the page of suppliers (with its count), their price-list \
                          sizes and their open orders (draft, ordered, partial) at this store.",
             docs: &[
                 "docs/relations.md#more-of-the-query-builder",
                 "docs/routing.md#guards",
+                "docs/ui.md#typed-view-contexts",
             ],
             sources: &[
                 PURCHASING,
@@ -533,6 +541,10 @@ pub fn entries() -> Vec<Explanation> {
                 Code {
                     title: "Handler: counts per supplier with `group_by` + `select_as`",
                     region: "stock.suppliers.handler",
+                },
+                Code {
+                    title: "Page data: a struct that names its template and fields",
+                    region: "stock.suppliers.page",
                 },
                 Code {
                     title: "Template: the kit's `table`, one row per supplier",

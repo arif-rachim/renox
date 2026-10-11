@@ -222,7 +222,8 @@ implement. Examples: `Model`, `Notification`, `ModelHooks`, `validation::Validat
 (A **provided method** is a trait method that already has a body. You don't have to write it,
 so a new one doesn't break your `impl`.)
 
-`FromRow` stays one method.
+`FromRow` stays one method. `view::ViewData` is meant to be derived (`#[derive(ViewData)]`);
+a constant added to it in 1.x comes with a default like the others.
 
 ### Sealed traits
 

@@ -237,7 +237,8 @@ See [Checking models against the tables](types.md#checking-models-against-the-ta
 ### Templates
 
 `app.assert_views_compile()` compiles every template (the app's, the built-in ones and the
-plugins') and checks each literal `route('name')` against the route table. It panics with one
+plugins') and checks each literal `route('name')` against the route table, and the
+variables of [typed view contexts](ui.md#typed-view-contexts) against their structs. It panics with one
 `template:line: message` line per problem, the same list `rnx view:check` prints. `rnx new`
 apps have this test already:
 

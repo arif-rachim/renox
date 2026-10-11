@@ -279,6 +279,32 @@ fn view_extras(app: App) -> App {
 }
 ```
 
+A typed view context: a struct per page that names its template. `rnx view:check` (and
+`assert_views_compile`) reports a variable the template uses that the struct lacks (besides
+the globals above, the `App::share` keys and what the template sets itself); it doesn't follow
+`extends`/`include`/macros. Details in [docs/ui.md](docs/ui.md#typed-view-contexts).
+
+```rust
+use renox::prelude::*;
+
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "suppliers/index.html")]
+struct SupplierList {
+    suppliers: Vec<String>,
+    #[serde(rename = "total")] // the template's name for it; `#[serde(skip)]` fields aren't variables
+    count: usize,
+}
+
+async fn suppliers() -> View {
+    View::typed(SupplierList { suppliers: vec![], count: 0 }) // the template comes from the type
+}
+
+/// Registered so `view:check` knows the struct (in a module: `app.view_data::<T>()` in `register`).
+fn typed_views(app: App) -> App {
+    app.view_data::<SupplierList>()
+}
+```
+
 ## Components and the UI kit (details in docs/ui.md)
 
 The UI kit is a set of ready-made page parts: fields, buttons, menus, tables and more. Each
@@ -752,7 +778,8 @@ struct Product {
 /// struct (repeatable), `default = "0"` and `references = "users"` on a field. Use them as
 /// `#[model(table = "products", index(user_id))]` and `#[model(default = "0")] price: i64`.
 /// In a test, `TestApp::new(app).await.assert_views_compile()` (or `rnx view:check`) compiles
-/// every template and checks its `route('name')` calls.
+/// every template and checks its `route('name')` calls, and the variables of typed views
+/// (`#[derive(ViewData)]` structs registered with `App::view_data`, see Views).
 /// `rnx view:data` writes `.vscode/renox-components.json` (VS Code tag autocomplete; `rnx serve`
 /// refreshes it, `rnx new` sets `html.customData`). JetBrains isn't covered.
 /// Register the model so `rnx db:check` (and `assert_models_match_schema` in tests)

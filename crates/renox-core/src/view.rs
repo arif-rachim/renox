@@ -126,6 +126,76 @@ pub struct Views {
     embedded: Option<&'static [(&'static str, &'static str)]>,
     /// The plugins' components, next to the built-in ones.
     plugin_components: Arc<Vec<crate::components::Contract>>,
+    /// The page structs registered with `App::view_data`, checked by `view:check`.
+    typed: Arc<Vec<TypedView>>,
+    /// The keys of `App::share` / `Registry::share` values, which every view gets.
+    shared: Arc<Vec<String>>,
+}
+
+/// A page struct registered with `App::view_data`: its template and fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TypedView {
+    /// The struct's name, without its module path.
+    pub name: String,
+    /// `ViewData::TEMPLATE`.
+    pub template: &'static str,
+    /// `ViewData::FIELDS`.
+    pub fields: &'static [&'static str],
+}
+
+impl TypedView {
+    pub(crate) fn of<T: ViewData>() -> Self {
+        Self {
+            name: short_type_name(std::any::type_name::<T>()),
+            template: T::TEMPLATE,
+            fields: T::FIELDS,
+        }
+    }
+}
+
+/// `app::pages::Suppliers<'a>` → `Suppliers<'a>`: the last path segment, generics kept.
+fn short_type_name(full: &str) -> String {
+    let base = full.split('<').next().unwrap_or(full);
+    let start = base.rfind("::").map_or(0, |i| i + 2);
+    full[start..].to_owned()
+}
+
+/// The data of one page: a struct whose fields are its template's variables, so the
+/// compiler checks the handler's side and `view:check` the template's (the variables it
+/// uses that the struct lacks). Derive it with `#[derive(ViewData)]` and
+/// `#[view(template = "…")]`, render it with [`View::typed`], and register it with
+/// `App::view_data::<T>()` (`Registry::view_data` in a module) so `view:check` knows it.
+///
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(serde::Serialize, ViewData)]
+/// #[view(template = "suppliers/index.html")]
+/// struct SupplierList {
+///     suppliers: Vec<String>,
+///     #[serde(rename = "total")]
+///     count: usize,
+/// }
+///
+/// assert_eq!(SupplierList::TEMPLATE, "suppliers/index.html");
+/// assert_eq!(SupplierList::FIELDS, ["suppliers", "total"]);
+///
+/// async fn index() -> View {
+///     View::typed(SupplierList { suppliers: vec!["Velo".into()], count: 1 })
+/// }
+/// let app = App::new().view_data::<SupplierList>();
+/// ```
+///
+/// The check reads what MiniJinja loads (after the `rx-*` components are compiled) and
+/// follows neither `extends` nor `include` nor imported macros: a variable used only in
+/// the layout or a partial isn't checked. Besides the struct's fields, a template may
+/// use the request globals (`auth`, `request`, `t`, `old`…), the environment's
+/// functions and globals, the `App::share` keys and the names it defines itself.
+pub trait ViewData: Serialize {
+    /// The template the page renders, relative to `VIEWS_PATH`.
+    const TEMPLATE: &'static str;
+    /// The names the template sees: the fields as serialized (`#[serde(rename)]` applied,
+    /// skipped fields left out).
+    const FIELDS: &'static [&'static str];
 }
 
 /// One template that does not compile, found by [`Views::check`].
@@ -575,6 +645,8 @@ impl Views {
             dir: config.views_path.clone(),
             embedded,
             plugin_components,
+            typed: Arc::new(Vec::new()),
+            shared: Arc::new(Vec::new()),
         }
     }
 
@@ -639,7 +711,62 @@ impl Views {
                 Ok(_) => {}
             }
         }
+        for typed in self.typed.iter() {
+            self.check_typed(&env, typed, &mut problems);
+        }
         problems
+    }
+
+    /// Records the page structs (`App::view_data`) and the shared keys, for [`Views::check`].
+    pub(crate) fn with_typed(mut self, typed: Vec<TypedView>, shared: Vec<String>) -> Self {
+        self.typed = Arc::new(typed);
+        self.shared = Arc::new(shared);
+        self
+    }
+
+    /// Reports the variables `typed`'s template uses that its struct doesn't have. The
+    /// template is the one MiniJinja loads, after the `rx-*` components are compiled.
+    fn check_typed(
+        &self,
+        env: &minijinja::Environment<'_>,
+        typed: &TypedView,
+        problems: &mut Vec<ViewProblem>,
+    ) {
+        let template = match env.get_template(typed.template) {
+            Ok(template) => template,
+            // A template that doesn't compile is already reported.
+            Err(err) if err.kind() != ErrorKind::TemplateNotFound => return,
+            Err(_) => {
+                problems.push(ViewProblem {
+                    template: typed.template.to_owned(),
+                    line: None,
+                    message: format!("not found, but {} renders it", typed.name),
+                });
+                return;
+            }
+        };
+        let globals: std::collections::HashSet<&str> =
+            env.globals().map(|(name, _)| name).collect();
+        let mut unknown: Vec<String> = template
+            .undeclared_variables(false)
+            .into_iter()
+            .filter(|var| {
+                !typed.fields.contains(&var.as_str())
+                    && !REQUEST_GLOBALS.contains(&var.as_str())
+                    && !globals.contains(var.as_str())
+                    && !self.shared.iter().any(|key| key == var)
+                    // Names the component compiler makes up (`__rx_slot_1`).
+                    && !var.starts_with("__rx")
+            })
+            .collect();
+        unknown.sort();
+        for var in unknown {
+            problems.push(ViewProblem {
+                template: typed.template.to_owned(),
+                line: first_use(template.source(), &var),
+                message: format!("\"{var}\" isn't a field of {}", typed.name),
+            });
+        }
     }
 
     /// Whether a template of this name exists (the app's or a built-in).
@@ -1026,6 +1153,32 @@ pub struct View {
     status: StatusCode,
 }
 
+/// The line of the first `{{ … }}` or `{% … %}` tag that names `var`, if any.
+fn first_use(source: &str, var: &str) -> Option<usize> {
+    let word = regex::Regex::new(&format!(r"\b{}\b", regex::escape(var))).ok()?;
+    let mut rest = source;
+    let mut offset = 0;
+    while let Some(open) = rest.find('{') {
+        let after = &rest[open..];
+        let close = match after.get(..2) {
+            Some("{{") => "}}",
+            Some("{%") => "%}",
+            _ => {
+                offset += open + 1;
+                rest = &rest[open + 1..];
+                continue;
+            }
+        };
+        let end = after.find(close).map_or(after.len(), |i| i + 2);
+        if word.is_match(&after[..end]) {
+            return Some(source[..offset + open].matches('\n').count() + 1);
+        }
+        offset += open + end;
+        rest = &rest[open + end..];
+    }
+    None
+}
+
 /// Renders `name` from the views directory with `ctx` (anything serializable,
 /// usually `context! { ... }`).
 pub fn view(name: impl Into<String>, ctx: impl Serialize) -> View {
@@ -1039,6 +1192,26 @@ pub fn view(name: impl Into<String>, ctx: impl Serialize) -> View {
 }
 
 impl View {
+    /// Renders a page struct in its own template ([`ViewData::TEMPLATE`]): the typed
+    /// form of [`view`]. Register the struct with `App::view_data::<T>()` so
+    /// `view:check` reports the template's variables the struct lacks.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// #[derive(serde::Serialize, ViewData)]
+    /// #[view(template = "orders/show.html")]
+    /// struct OrderPage {
+    ///     number: String,
+    /// }
+    ///
+    /// async fn show() -> View {
+    ///     View::typed(OrderPage { number: "A-1".into() }).fragment("summary")
+    /// }
+    /// ```
+    pub fn typed<T: ViewData>(page: T) -> View {
+        view(T::TEMPLATE, page)
+    }
+
     /// For HTMX requests (except `hx-boost`), render only this `{% block %}`.
     pub fn fragment(mut self, block: impl Into<String>) -> Self {
         self.fragment = Some(block.into());

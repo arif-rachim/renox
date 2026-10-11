@@ -1,5 +1,5 @@
 //! Procedural macros for Renox. Use them through the `renox` crate:
-//! `#[derive(Model, FromRow, DbEnum, Validate)]`, `renox::migrations!()`,
+//! `#[derive(Model, FromRow, DbEnum, Validate, ViewData)]`, `renox::migrations!()`,
 //! `renox::embedded!()` and `#[renox::test]`.
 #![warn(missing_docs)]
 
@@ -10,6 +10,7 @@ mod live;
 mod migrations;
 mod model;
 mod validate;
+mod view_data;
 
 use proc_macro::TokenStream;
 use syn::{DeriveInput, parse_macro_input};
@@ -100,6 +101,37 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
 pub fn derive_validate(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     validate::expand(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Implements `renox::view::ViewData` for a page struct: its template, from
+/// `#[view(template = "…")]`, and its fields, which are the template's variables.
+/// Render it with `View::typed(page)`; register it with `App::view_data::<T>()` so
+/// `view:check` reports the variables the template uses that the struct lacks.
+///
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(serde::Serialize, ViewData)]
+/// #[view(template = "suppliers/index.html")]
+/// struct SupplierList {
+///     suppliers: Vec<String>,
+///     #[serde(rename = "total")]
+///     count: usize,
+///     #[serde(skip)]
+///     cache_key: String,
+/// }
+///
+/// assert_eq!(SupplierList::FIELDS, ["suppliers", "total"]);
+/// ```
+///
+/// The names follow `#[serde(rename = "…")]` and leave out `skip` /
+/// `skip_serializing` fields; `#[serde(flatten)]` and `rename_all` are compile
+/// errors (the derive couldn't list the names the template sees).
+#[proc_macro_derive(ViewData, attributes(view))]
+pub fn derive_view_data(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    view_data::expand(input)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

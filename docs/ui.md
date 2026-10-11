@@ -26,6 +26,8 @@ full reload.
 
 - [Components](#components-see-the-request): your own reusable pieces, which can see the
   request (old input, errors, translations).
+- [Typed view contexts](#typed-view-contexts): a struct per page, checked against its
+  template by `view:check`.
 - [Components as tags](#components-as-tags): the kit written as `<rx-…>` HTML tags.
   Includes [editor autocomplete](#editor-autocomplete) for VS Code.
 - [The UI kit](#the-ui-kit) that ships with Renox (`renox/ui.html`):
@@ -114,7 +116,55 @@ The first line imports the macro. The second calls it, with the field's name and
 
 `rnx view:check` (or `app.assert_views_compile()` in a test) compiles every template and checks
 each literal `route('name')` against the route table, printing `template:line: message` per
-problem. See [the testing guide](testing.md#templates).
+problem. It also checks [typed view contexts](#typed-view-contexts). See
+[the testing guide](testing.md#templates).
+
+### Typed view contexts
+
+`view("x.html", context! { … })` hands the template whatever the map holds: a field renamed in
+the handler, or a typo in the template, only shows as an empty spot on the page. A **typed view
+context** is a struct for one page instead. It names its template, its fields are the
+template's variables, and `view:check` reports a variable the template uses that the struct
+lacks:
+
+```rust
+use renox::prelude::*;
+
+/// What `suppliers/index.html` gets.
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "suppliers/index.html")]
+struct SupplierList {
+    suppliers: Vec<String>,
+    #[serde(rename = "total")] // the template says `total`
+    count: usize,
+}
+
+async fn index() -> View {
+    let suppliers = vec!["Velo Parts".to_owned()];
+    // The template comes from the type.
+    View::typed(SupplierList { count: suppliers.len(), suppliers })
+}
+
+fn app() -> App {
+    // Registered, so `view:check` connects the template to the struct.
+    // In a module: `app.view_data::<SupplierList>()` in `register`.
+    App::new().view_data::<SupplierList>()
+}
+```
+
+With `{{ suplliers }}` in the template, `rnx view:check` prints
+`suppliers/index.html:4: "suplliers" isn't a field of SupplierList`. Besides the fields
+(their serialized names: `#[serde(rename)]` counts, `skip` fields don't), a template may use
+the request globals (`auth`, `request`, `t()`, `old()`…), every function and global of the
+environment (`route()`, `asset()`, your `App::templates` ones), the `App::share` keys, and
+the names it sets itself (`{% set %}`, loop variables, imports). `View::typed(page)` returns
+a normal `View`: `.fragment(…)`, `.also(…)` and `.status(…)` work as before.
+
+What the check can't see: it reads the page's own template as MiniJinja loads it (after the
+`<rx-…>` tags are compiled), so it doesn't follow `{% extends %}`, `{% include %}` or
+imported macros. A variable used only in the layout or a partial isn't checked, and a struct
+that isn't registered isn't checked at all. `#[serde(flatten)]` and `rename_all` are
+compile errors, since the derive couldn't list the names the template sees.
 
 ### Only once per page
 
