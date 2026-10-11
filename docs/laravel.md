@@ -816,15 +816,23 @@ The rest of Blade:
 | `@class([...])`, `@push`/`@stack`, `@once` | `class_names(…)`, `{% call push('scripts') %}` / `stack('scripts')`, `once('key')` |
 | `@vite(...)` | `{{ renox_head() }}` (htmx, Alpine, renox.js) and `asset('app.css')` (hashed URL) |
 | `View::share` / view composers | `App::share(key, \|ctx\| async { … })` |
-| `<x-alert type="error">…</x-alert>` | a macro: `{% from "components/alert.html" import alert %}`, `{% call alert("error") %}…{% endcall %}` |
+| `<x-alert type="error">…</x-alert>` | `<rx-alert kind="error">…</rx-alert>`, or your own `<app-alert>` (`components/alert.html`) |
 
 ### Components
 
-Components are MiniJinja macros (`rnx make:component price_tag`). They still see `old()`,
-`error()`, `t()`, `auth` and `csrf_field()`.
+Components are written as tags, as Blade components are: `<rx-input name="email" label="Email"
+required/>`, `<rx-table :rows="products">`, and `rx-if` / `rx-else` / `rx-for` on any element.
+Your own components are `<app-*>` files that start with `<rx-props>`
+(`rnx make:component price_tag` writes one). They still see `old()`, `error()`, `t()`, `auth`
+and `csrf_field()`.
 
-Renox ships a whole kit of them in `renox/ui.html`: inputs, selects, date pickers, repeaters,
-sheets, tables, navigation. That's what Breeze's Blade components and Filament's forms give you.
+The tags become MiniJinja macro calls when a template loads, and a wrong tag or attribute fails
+with the file, the line and "did you mean"; `rnx view:check` checks every template at once.
+The macros underneath (`renox/ui.html`) still work for what has no tag.
+
+Renox ships a whole kit of them: inputs, selects, date pickers, repeaters, sheets, tables,
+navigation. That's what Breeze's Blade components and Filament's forms give you
+([ui.md](ui.md#components-as-tags)).
 
 Views get the data you pass with `context! { … }`.
 
@@ -1378,7 +1386,7 @@ address, loads that page of orders, and passes it to the template.
 | Actions and modals | `action_sheet`, `slide_over`, `confirm`, `icon_button`, keyboard shortcuts |
 | Notifications | `Toast` and the `notification_bell` over Server-Sent Events |
 | Widgets | `stat`/`stats`, `chart(…)`, `renox::chart::Trend` |
-| Panel navigation | `navbar`, `sidebar` + `rx-shell`, `page_header` |
+| Panel navigation | `<rx-navbar>`, `<rx-sidebar>` in `<rx-shell>`, `<rx-page-header>` |
 | Resources (`ProductResource`), policies, `DeleteBulkAction`, `TrashedFilter` | `impl AdminResource` with the `renox-admin` crate: columns, fields, `filters`, `actions`, the model's `Policy`, soft deletes ([admin.md](admin.md)) |
 
 Details: [ui.md](ui.md) and [grid.md](grid.md).
@@ -1392,7 +1400,7 @@ list.
 |---|---|---|
 | Redis (cache, queue, sessions) | not planned | the database: `CACHE_STORE=database`, the database queue, `SESSION_DRIVER=database` |
 | Broadcasting, Reverb, WebSockets | WebSockets not planned | Server-Sent Events power the notification bell; poll with htmx (`hx-trigger="every 10s"`) or the grid's `.poll(30)` for the rest |
-| Schema builder (`Blueprint`) | not planned | SQL migrations; a `.postgres.up.sql` file when the two databases differ |
+| Schema builder (`Blueprint`) | not planned | SQL migrations, written for you from the models by `rnx make:migration --auto` (`db:diff`) and checked by `rnx db:check`; a `.postgres.up.sql` file when the two databases differ |
 | Tinker | not planned | `db:shell` for SQL, and your own commands (`App::command`, `typed_command`) for code |
 | MySQL, several connections, read/write split | SQLite and PostgreSQL, one `Db` per app | `renox::db::sql` for reports; a second sqlx pool by hand if you must |
 | Livewire | live components | `#[renox::live_component]`, `rx-click`, `rx-model` ([live.md](live.md)) |

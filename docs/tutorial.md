@@ -883,7 +883,9 @@ what: roles, permissions and API tokens.
 > [!TIP]
 > **The shortcut.** `rnx make:module bookmarks --resource --fields "title:string url:string
 > note:text"` writes a module like this one in one go: model, migration, form, the seven
-> handlers, the pages and tests. It also runs the migration and prints the page's address. Building it by hand once shows you what those files do.
+> handlers, the pages and tests. It also runs the migration and prints the page's address
+> (`--open` opens it in the browser, `--no-migrate` leaves the migration for later). Building
+> it by hand once shows you what those files do.
 
 ## 6. A weekly digest mail
 

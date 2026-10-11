@@ -171,7 +171,8 @@ field for you.
 - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`,
   `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
   `rate_limit::LimitRequest`, `SentNotification`, `SentBroadcast`, `db::InvalidUlid`, `grid::Grid`,
-  `grid::Column`, `db::ModelColumn`, `db::ModelIndex`, `grid::GridPrefs`, `grid::RowOrder`, `grid::Workbook`,
+  `grid::Column`, `db::ModelColumn`, `db::ModelIndex`, `db::Condition` (made by a typed
+  column: `Product::PRICE.lt(…)`), `grid::GridPrefs`, `grid::RowOrder`, `grid::Workbook`,
   `grid::Action` (`Action::sheet`), `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
   `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
   `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use

@@ -531,7 +531,7 @@ write in Renox.
 | `whereHas`, `whereDoesntHave` | `.where_has(Comment::where_eq("approved", true), "post_id")`, `.where_doesnt_have(…)` (EXISTS) |
 | `whereNotIn(fn …)` (sub-query) | `.where_not_in_query(col, Other::query(), "col")` |
 | `whereRaw`, `orderByRaw` | `.where_raw("DATE(created_at) = DATE(?)", [value])`, `.order_by_raw("total DESC")` |
-| `groupBy`, `having`, `selectRaw` | `.group_by(col).having_raw("COUNT(*) > ?", [2]).select_as::<(i64, i64), _>(&db, "col, COUNT(*)")` |
+| `groupBy`, `having`, `selectRaw` | `.group_by(col).having_raw("COUNT(*) > ?", [2]).select_as::<(i64, i64), _>(&db, "col, COUNT(*)")`; group by an expression with `.group_by_raw("strftime('%Y', created_at)")` |
 | `lockForUpdate`, `sharedLock` | `.lock_for_update()` / `.shared_lock()` on `&mut tx` (PostgreSQL; SQLite: `db.begin_immediate()`). Only calls that read rows lock them: `get`, `first`, `pluck`, `select_as` and a page's items, not `count`, `exists`, `sum`/`avg`/`min`/`max`, `update`, `increment` or `delete` |
 | `firstOrNew`, `updateOrCreate`, `refresh` | `.first_or_new(&db, \|\| new)`, `.update_or_create(&db, \|\| new, \|m\| …)`, `model.refresh(&db)` |
 | `HasUlids`, `HasUuids`, string keys | `id: Ulid` / `id: Uuid` / `id: String` (made on insert, or set by you); `Pivot<Ulid, i64>` |
