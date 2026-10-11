@@ -1,42 +1,20 @@
-{% extends "layouts/app.html" %}
-{% from "renox/grid.html" import grid %}
-{% from "renox/ui.html" import checkbox_list, badge, open_button %}
-{% from "patterns.html" import page_title, figures %}
-
-{#- A sheet per person to change their roles: a form sent with htmx; errors
-    stay in the sheet, a success refreshes the page. -#}
-{% macro roles_sheet(member, role_names) -%}
-<dialog class="rx-sheet" id="roles-{{ member.id }}" aria-labelledby="roles-{{ member.id }}-title">
-  <form class="rx-sheet__inner" method="post" action="{{ route('users.roles', member.id) }}" hx-post="{{ route('users.roles', member.id) }}" hx-swap="none" data-rx-action novalidate>
-    {{ csrf_field() }}{{ method_field('PUT') }}
-    <h2 class="rx-sheet__title" id="roles-{{ member.id }}-title">{{ t('users.roles_of', name=member.name) }}</h2>
-    <div class="rx-sheet__body">
-      {{ checkbox_list("roles", t('users.roles'), role_names, selected=member.roles, id="roles-" ~ member.id ~ "-list", hint=t('users.roles_hint')) }}
-    </div>
-    <div class="rx-sheet__actions">
-      <button class="rx-button rx-button--secondary" type="button" data-rx-close><span class="rx-button__label">{{ t('users.cancel') }}</span></button>
-      <button class="rx-button rx-button--primary" type="submit"><span class="rx-button__label">{{ t('users.save') }}</span></button>
-    </div>
-  </form>
-</dialog>
-{%- endmacro %}
-
-{% block seo %}{{ seo(title=t('users.title')) }}{% endblock %}
-{% block content %}
-{{ page_title("users", t('users.title'), subtitle=t('users.subtitle')) }}
-{{ figures([
-  {"value": totals.people | number, "label": t('users.figures.people'), "icon": "users"},
-  {"value": totals.admins | number, "label": t('users.figures.admins'), "icon": "shield-check", "tone": "clay"},
-  {"value": totals.verified | number, "label": t('users.figures.verified'), "icon": "circle-check", "tone": "sand"},
-], label=t('users.figures.label')) }}
-{% call(row, column) grid(users) %}
-  {%- if column.key == "roles" -%}
-    {%- for role in row.roles %}{{ badge(role, "info" if role == "admin" else none) }} {% else %}<span class="rx-subtitle">{{ t('users.no_role') }}</span>{% endfor -%}
-  {%- elif column.key == "actions" -%}
-    {{ open_button("roles-" ~ row.id, t('users.roles'), size="small") }}
-  {%- endif -%}
-{% endcall %}
-{%- for member in members %}
-{{ roles_sheet(member, role_names) }}
-{%- endfor %}
-{% endblock %}
+<rx-page layout="layouts/app.html" title="{{ t('users.title') }}">
+  <app-page-title icon="users" title="{{ t('users.title') }}" subtitle="{{ t('users.subtitle') }}"/>
+  <app-figures label="{{ t('users.figures.label') }}" :items="[
+    {'value': totals.people | number, 'label': t('users.figures.people'), 'icon': 'users'},
+    {'value': totals.admins | number, 'label': t('users.figures.admins'), 'icon': 'shield-check', 'tone': 'clay'},
+    {'value': totals.verified | number, 'label': t('users.figures.verified'), 'icon': 'circle-check', 'tone': 'sand'},
+  ]"/>
+  <rx-grid :page="users">
+    {%- if column.key == "roles" -%}
+      {%- for role in row.roles %}<rx-badge :kind="'info' if role == 'admin' else none">{{ role }}</rx-badge> {% else %}<span class="rx-subtitle">{{ t('users.no_role') }}</span>{% endfor -%}
+    {%- elif column.key == "actions" -%}
+      <rx-open-button id="roles-{{ row.id }}" label="{{ t('users.roles') }}" size="small"/>
+    {%- endif -%}
+  </rx-grid>
+  {#- A sheet per person to change their roles: a form sent with htmx; errors
+      stay in the sheet, a success refreshes the page. -#}
+  <rx-action-sheet rx-for="member in members" :button="false" id="roles-{{ member.id }}" label="{{ t('users.roles') }}" action="{{ route('users.roles', member.id) }}" method="PUT" title="{{ t('users.roles_of', name=member.name) }}" submit-label="{{ t('users.save') }}">
+    <rx-checkbox-list name="roles" label="{{ t('users.roles') }}" :options="role_names" :selected="member.roles" id="roles-{{ member.id }}-list" hint="{{ t('users.roles_hint') }}"/>
+  </rx-action-sheet>
+</rx-page>

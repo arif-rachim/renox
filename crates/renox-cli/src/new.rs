@@ -93,6 +93,14 @@ const STARTER: &[(&str, &str)] = &[
         include_str!("../stubs/starter/resources/views/home/index.html"),
     ),
     (
+        "resources/views/components/figures.html",
+        include_str!("../stubs/starter/resources/views/components/figures.html"),
+    ),
+    (
+        "resources/views/components/page_title.html",
+        include_str!("../stubs/starter/resources/views/components/page_title.html"),
+    ),
+    (
         "resources/views/dashboard/show.html",
         include_str!("../stubs/starter/resources/views/dashboard/show.html"),
     ),
@@ -765,7 +773,7 @@ mod tests {
         let root = dir.path().join("desk");
         // Every stub once, the kit's version where it has one, and its own files.
         let files = files(true);
-        assert_eq!(files.len(), STUBS.len() + 15);
+        assert_eq!(files.len(), STUBS.len() + 17);
         for (file, _) in &files {
             assert!(root.join(file).is_file(), "{file}");
         }
