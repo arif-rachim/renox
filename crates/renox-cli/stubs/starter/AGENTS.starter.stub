@@ -6,10 +6,12 @@ patterns that belong to this app (they came from Renox's `examples/bikeshop`):
 - `resources/views/patterns.html`: the patterns as macros: `hero` (a headline with one coloured
   phrase, `<em>`; `compact=true` for a page's top, as the dashboard's welcome card),
   `section_head` (a section's heading with a "see all" link), `feature_card` in a
-  `<ul class="app-showcase">` grid, `figures` (a strip of numbers with icons), `summary` (lines and
-  a total), `steps` (a numbered list), `empty_state`, `page_title` (the kit's `page_header` with
-  an icon) and `stat_card` (the kit's `stat` with an icon).
-  Import them with `{% from "patterns.html" import hero, section_head %}`.
+  `<ul class="app-showcase">` grid, `summary` (lines and
+  a total), `steps` (a numbered list), `empty_state` and `stat_card` (the kit's `stat` with an
+  icon). Import them with `{% from "patterns.html" import hero, section_head %}`.
+- `resources/views/components/`: the patterns that are tags: `<app-figures :items label>` (a strip
+  of numbers with icons) and `<app-page-title icon title subtitle>` (the kit's `page_header` with
+  an icon). Pages are written with `<rx-page>` and the kit's `<rx-…>` tags.
 - `public/patterns.css`: their styles (`app-*` classes), CSS grids on the kit's tokens
   (`--rx-space-*`, `--rx-type-*`, `--rx-accent`, `--rx-accent-2`, `--rx-tint`, `--rx-ink`), light
   and dark. The art beside the heroes and on the sign-in pages is CSS gradients on those tokens

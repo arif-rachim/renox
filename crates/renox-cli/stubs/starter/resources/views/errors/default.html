@@ -1,5 +1,6 @@
 {% extends "layouts/app.html" if auth.check else "layouts/public.html" %}
-{#- Every error page (404, 403, 500…), in the app's layout: the sidebar one
+{#- Not an <rx-page>: its layout depends on who is signed in, and <rx-page> takes a fixed file.
+    Every error page (404, 403, 500…), in the app's layout: the sidebar one
     when logged in, the public one for guests. Add errors/404.html and
     friends for one status; `status`, `reason` and `detail` are set (with
     APP_DEBUG also `request_line` and `template`). -#}

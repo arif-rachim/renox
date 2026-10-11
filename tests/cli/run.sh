@@ -255,7 +255,11 @@ fi
 step "rnx new atlas --database $DATABASE (plain, a name before \"renox\": #124)"
 new_app atlas --database "$DATABASE"
 use_database atlas
+# The pages are written with tags (#493): no kit macro import, and no {% %} in the home page.
+if grep -rn 'from "renox/' resources/views/home resources/views/errors; then echo "FAIL: kit macros in the plain app's pages"; exit 1; fi
+if grep -n '{%' resources/views/home/index.html; then echo "FAIL: {% %} in the plain app's home page"; exit 1; fi
 check_app
+cargo run --quiet -- view:check
 
 step "rnx new pulse --notifications --database $DATABASE (the bell in the plain app: #151)"
 new_app pulse --notifications --database "$DATABASE"
@@ -286,7 +290,17 @@ new_app studio --starter --database "$DATABASE"
 use_database studio
 test -f src/app/users/mod.rs
 grep -q '.module(Permissions)' src/lib.rs
+# The starter's pages are written with tags (#493). Only these keep `{% %}` on purpose:
+# patterns.html (the macros), the pages that call its macros (hero, section_head, ...),
+# errors/default.html (its layout depends on who is signed in) and the sign-in pages' layout.
+# No page imports the kit's macros, and the components are tags.
+if grep -rn 'from "renox/' resources/views/home resources/views/dashboard resources/views/users resources/views/activity resources/views/errors resources/views/components; then
+    echo "FAIL: kit macros in the starter's pages"
+    exit 1
+fi
+test -f resources/views/components/figures.html
 check_app
+cargo run --quiet -- view:check
 if runs; then
     cargo run --quiet -- migrate
 
