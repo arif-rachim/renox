@@ -117,7 +117,7 @@ def main():
     # 3. A list page.
     write(mod_rs, "\n".join(module_lines(mod_rs)) + "\n" + block_after("below the `pub mod model;` line"))
     write(index_html, block_after("Replace `resources/views/bookmarks/index.html`:"))
-    nav = block_after("links inside the `navbar` call, before the spacer:").splitlines()
+    nav = block_after("links inside the `rx-navbar` tag, before the spacer:").splitlines()
     links = nav[1:nav.index(next(l for l in nav if "rx-spacer" in l))]
     layout = "resources/views/layouts/app.html"
     spacer = '    <span class="rx-spacer"></span>'

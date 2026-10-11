@@ -407,14 +407,14 @@ What's going on:
 - `{% block bookmarks %}` gives the list a name. In step 4, the app sends back just this part.
 
 Last, a link in the navigation bar. In `resources/views/layouts/app.html`, add the section
-links inside the `navbar` call, before the spacer:
+links inside the `rx-navbar` tag, before the spacer:
 
 ```html
-{% call navbar(app.name, href=route('home')) %}
+<rx-navbar brand="{{ app.name }}" href="{{ route('home') }}">
   {% if auth.check %}
-    {% call nav_links() %}
-      {{ nav_link(route('bookmarks.index'), "Bookmarks", active=route_is('bookmarks.*')) }}
-    {% endcall %}
+    <rx-nav-links>
+      <rx-nav-link route="bookmarks.index" label="Bookmarks" :active="route_is('bookmarks.*')"/>
+    </rx-nav-links>
   {% endif %}
   <span class="rx-spacer"></span>
   …
