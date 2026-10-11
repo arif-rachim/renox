@@ -1,15 +1,12 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, link_button, icon %}
+{#- The service plans compared (#237): the shop's `compare_plans` block
+    (cards on a CSS grid, then a table, task by task). Prices are a month. -#}
+<rx-page layout="layouts/app.html" title="{{ t('plans.index.title') }}" description="{{ t('plans.index.lead') }}">
+{% from "renox/ui.html" import icon %}
 {% from "renox-blocks/blocks.html" import compare_plans %}
 {% from "plans/_parts.html" import assets %}
 {% from "layouts/_hero.html" import page_hero %}
-{% block seo %}{{ seo(title=t('plans.index.title'), description=t('plans.index.lead')) }}{% endblock %}
-
-{#- The service plans compared (#237): the shop's `compare_plans` block
-    (cards on a CSS grid, then a table, task by task). Prices are a month. -#}
-{% block content %}
 {{ assets() }}
-<div class="rx-stack">
+<rx-stack>
   {{ page_hero(t('plans.index.title'), lead=t('plans.index.lead'), eyebrow=t('plans.index.eyebrow'), photo="/images/site/plans.webp", compact=true) }}
   {# [explain:plans.index.template] #}
   <div class="bs-plans-page" data-bs-reveal>
@@ -17,16 +14,14 @@
     <section class="rx-card bs-plans-page__how" aria-labelledby="plans-how">
       <h2 class="rx-card__title" id="plans-how">{{ t('plans.index.how_title') }}</h2>
       <ol class="bs-plans-steps">
-        {%- for n, sign in [[1, "bike"], [2, "calendar-check"], [3, "refresh-cw"]] %}
-        <li><span class="bs-icon-circle">{{ icon(sign) }}</span><span>{{ t('plans.index.how_' ~ n) }}</span></li>
-        {%- endfor %}
+        <li rx-for="step in [[1, 'bike'], [2, 'calendar-check'], [3, 'refresh-cw']]"><span class="bs-icon-circle">{{ icon(step[1]) }}</span><span>{{ t('plans.index.how_' ~ step[0]) }}</span></li>
       </ol>
       <div class="bs-plans-page__actions">
-        {%- if auth.check %}{{ link_button(route('plans.mine'), t('plans.mine.title'), variant="secondary") }}{% endif %}
-        {{ link_button(route('plans.mails'), t('plans.mails.title'), variant="plain") }}
+        <rx-link-button rx-if="auth.check" route="plans.mine" label="{{ t('plans.mine.title') }}" variant="secondary"/>
+        <rx-link-button route="plans.mails" label="{{ t('plans.mails.title') }}" variant="plain"/>
       </div>
     </section>
   {# [/explain:plans.index.template] #}
   </div>
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>

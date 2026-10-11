@@ -1,14 +1,7 @@
-{% extends "layouts/app.html" %}
-{% from "renox/grid.html" import grid %}
-{% from "patterns.html" import page_title, empty_state %}
-
-{% block seo %}{{ seo(title=t('activity.title')) }}{% endblock %}
-{% block content %}
-{{ page_title("history", t('activity.title'), subtitle=t('activity.subtitle')) }}
-{%- if recorded %}
-{{ grid(activity) }}
-{%- else %}
-{#- Nothing recorded at all yet: the pattern's empty state rather than an empty grid. -#}
-<div class="app-panel">{{ empty_state("history", t('activity.empty'), t('activity.empty_text')) }}</div>
-{%- endif %}
-{% endblock %}
+<rx-page layout="layouts/app.html" title="{{ t('activity.title') }}">
+  {% from "patterns.html" import empty_state %}
+  <app-page-title icon="history" title="{{ t('activity.title') }}" subtitle="{{ t('activity.subtitle') }}"/>
+  <rx-grid rx-if="recorded" :page="activity"/>
+  {#- Nothing recorded at all yet: the pattern's empty state rather than an empty grid. -#}
+  <div rx-else class="app-panel">{{ empty_state("history", t('activity.empty'), t('activity.empty_text')) }}</div>
+</rx-page>

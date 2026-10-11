@@ -1,34 +1,25 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, table, confirm, empty, link_button %}
-{% from "api/_parts.html" import assets, fresh_token, token_form %}
-{% block seo %}{{ seo(title=t('api.tokens.title')) }}{% endblock %}
-
 {#- A customer's personal API tokens (#241): make one, see it once, revoke. -#}
-{% block content %}
+<rx-page layout="layouts/app.html" title="{{ t('api.tokens.title') }}">
+{% from "api/_parts.html" import assets, fresh_token, token_form %}
 {{ assets() }}
-<div class="rx-stack">
-  {{ page_header(t('api.tokens.title'), subtitle=t('api.tokens.lead')) }}
+<rx-stack>
+  <rx-page-header title="{{ t('api.tokens.title') }}" subtitle="{{ t('api.tokens.lead') }}"/>
   {%- if fresh %}{{ fresh_token(fresh, base) }}{% endif %}
   <div class="bs-tokens">
-    {% call card(title=t('api.tokens.yours')) %}
-      {%- if tokens %}
-      {% call table([t('api.tokens.name'), t('api.tokens.abilities'), t('api.tokens.last_used'), t('api.tokens.expires'), ""], caption=t('api.tokens.yours')) %}
-        {%- for tk in tokens %}
-        <tr>
-          <td>{{ tk.name }}</td>
-          <td>{{ tk.abilities | join(", ") }}</td>
-          <td>{{ (tk.last_used_at | since) if tk.last_used_at else t('api.tokens.never') }}</td>
-          <td>{{ (tk.expires_at | date) if tk.expires_at else "—" }}</td>
-          <td>{{ confirm("revoke-" ~ tk.id, t('api.tokens.revoke'), route('api.tokens.destroy', tk.id), t('api.tokens.revoke_title'), t('api.tokens.revoke_text'), method="POST", size="small") }}</td>
-        </tr>
-        {%- endfor %}
-      {% endcall %}
-      {%- else %}{{ empty(t('api.tokens.none'), t('api.tokens.none_text'), icon="key-round") }}{% endif %}
-    {% endcall %}
-    {% call card(title=t('api.tokens.new')) %}
+    <rx-card title="{{ t('api.tokens.yours') }}">
+      <rx-table :rows="tokens" as="tk" caption="{{ t('api.tokens.yours') }}">
+        <rx-column label="{{ t('api.tokens.name') }}">{{ tk.name }}</rx-column>
+        <rx-column label="{{ t('api.tokens.abilities') }}">{{ tk.abilities | join(", ") }}</rx-column>
+        <rx-column label="{{ t('api.tokens.last_used') }}">{{ (tk.last_used_at | since) if tk.last_used_at else t('api.tokens.never') }}</rx-column>
+        <rx-column label="{{ t('api.tokens.expires') }}">{{ (tk.expires_at | date) if tk.expires_at else "—" }}</rx-column>
+        <rx-column label=""><rx-confirm :id="'revoke-' ~ tk.id" label="{{ t('api.tokens.revoke') }}" :action="route('api.tokens.destroy', tk.id)" title="{{ t('api.tokens.revoke_title') }}" message="{{ t('api.tokens.revoke_text') }}" method="POST" size="small"/></rx-column>
+        <rx-slot name="empty"><rx-empty title="{{ t('api.tokens.none') }}" message="{{ t('api.tokens.none_text') }}" icon="key-round"/></rx-slot>
+      </rx-table>
+    </rx-card>
+    <rx-card title="{{ t('api.tokens.new') }}">
       {{ token_form(route('api.tokens.store'), abilities, t('api.tokens.name_hint')) }}
-      <p class="rx-hint">{{ link_button(route('api.about'), t('api.about.link'), variant="plain", size="small") }}</p>
-    {% endcall %}
+      <p class="rx-hint"><rx-link-button route="api.about" label="{{ t('api.about.link') }}" variant="plain" size="small"/></p>
+    </rx-card>
   </div>
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>
