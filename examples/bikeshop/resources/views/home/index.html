@@ -1,22 +1,19 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import link_button, icon %}
-{% from "layouts/_category_icon.html" import category_icon %}
-{% from "layouts/_hero.html" import page_hero %}
-{% block seo %}{{ seo(title=t('shop.name'), description=t('home.lead')) }}{% endblock %}
-
 {#- The storefront (#328, "warm editorial"): a hero, the category chips, the
     popular bikes, the categories as photo tiles, the three services and
     the stores. Each part is a CSS grid (public/theme.css); the cards are the
     kit's media_card. `storefront` comes from the catalog area (only on `/`). -#}
-{% block content %}
-<div class="rx-stack bs-home" data-bs-reveal>
+<rx-page layout="layouts/app.html" title="{{ t('shop.name') }}" description="{{ t('home.lead') }}">
+{% from "renox/ui.html" import icon %}
+{% from "layouts/_category_icon.html" import category_icon %}
+{% from "layouts/_hero.html" import page_hero %}
+<rx-stack class="bs-home" data-bs-reveal>
   {# [explain:home.template] #}
   {% call page_hero(t('home.hero.title'), accent=t('home.hero.accent'), lead=t('home.lead'), eyebrow=t('home.hero.eyebrow'),
                     photo="/images/site/hero.webp", inset="/images/site/workshop-2.webp",
                     badge={"icon": icon("wrench"), "title": t('home.hero.badge_title'), "text": t('home.hero.badge_text')}) %}
     <p class="bs-hero__actions">
-      {{ link_button(route('catalog.index'), t('catalog.home.shop'), variant="primary", icon="shopping-bag") }}
-      {%- if storefront and storefront.rent_url %}{{ link_button(storefront.rent_url, t('catalog.home.rent'), icon="key-round") }}{% endif %}
+      <rx-link-button route="catalog.index" label="{{ t('catalog.home.shop') }}" variant="primary" icon="shopping-bag"/>
+      <rx-link-button rx-if="storefront and storefront.rent_url" :href="storefront.rent_url" label="{{ t('catalog.home.rent') }}" icon="key-round"/>
     </p>
     {%- if storefront %}
     <ul class="bs-hero__figures" role="list">
@@ -48,15 +45,15 @@
     <article class="bs-service bs-service--photo">
       <img src="/images/site/workshop-1.webp" alt="" width="1200" height="800" loading="lazy">
       <div><span class="bs-service__icon">{{ icon("wrench", size=22) }}</span><h2 class="bs-service__title">{{ t('home.services.workshop.title') }}</h2><p class="bs-service__text">{{ t('home.service.text') }}</p></div>
-      {%- if storefront and storefront.service_url %}{{ link_button(storefront.service_url, t('catalog.home.service'), icon="calendar-check") }}{% endif %}
+      <rx-link-button rx-if="storefront and storefront.service_url" :href="storefront.service_url" label="{{ t('catalog.home.service') }}" icon="calendar-check"/>
     </article>
     <article class="bs-service bs-service--teal">
       <div><span class="bs-service__icon">{{ icon("key-round", size=22) }}</span><h2 class="bs-service__title">{{ t('home.services.rent.title') }}</h2><p class="bs-service__text">{{ t('home.rent.text') }}</p></div>
-      {%- if storefront and storefront.rent_url %}{{ link_button(storefront.rent_url, t('home.services.rent.button'), icon="bike") }}{% endif %}
+      <rx-link-button rx-if="storefront and storefront.rent_url" :href="storefront.rent_url" label="{{ t('home.services.rent.button') }}" icon="bike"/>
     </article>
     <article class="bs-service bs-service--clay">
       <div><span class="bs-service__icon">{{ icon("calendar-check", size=22) }}</span><h2 class="bs-service__title">{{ t('home.services.plans.title') }}</h2><p class="bs-service__text">{{ t('home.services.plans.text') }}</p></div>
-      {{ link_button(route('plans.index'), t('home.services.plans.button'), icon="arrow-right") }}
+      <rx-link-button route="plans.index" label="{{ t('home.services.plans.button') }}" icon="arrow-right"/>
     </article>
   </section>
 
@@ -84,5 +81,5 @@
     </ul>
   </section>
   {%- endif %}
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>

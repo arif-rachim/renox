@@ -1,32 +1,26 @@
-{% extends "layouts/app.html" %}
 {#- The demo billing gateway's "hosted page" (src/app/plans/demo.rs): stands
     in for Stripe's or Xendit's page when their keys aren't set. Paying here
     queues the webhook a gateway would send, signed, to this app's own
     /billing/webhooks/demo. -#}
-{% from "renox/ui.html" import card, button, alert, infolist, entry %}
+<rx-page layout="layouts/app.html" title="{{ t('plans.demo.title') }}">
 {% from "plans/_parts.html" import assets %}
-{% block seo %}{{ seo(title=t('plans.demo.title')) }}{% endblock %}
-
-{% block content %}
 {{ assets() }}
 <div class="bs-demo-billing" data-bs-reveal>
-  {{ alert(t('plans.demo.notice'), kind="warning", title=t('plans.demo.notice_title')) }}
-  {% call card(t('plans.demo.title'), subtitle=t('plans.demo.merchant', shop=t('shop.name'))) %}
-    {% call infolist(columns=2) %}
-      {{ entry(t('plans.fields.plan'), paying.plan) }}
-      {{ entry(t('plans.fields.bike'), paying.bike) }}
-      {% call entry(t('plans.fields.monthly')) %}<strong>{{ paying.amount | money }}</strong> / {{ t('blocks.plans.month') }}{% endcall %}
-    {% endcall %}
-    <form method="post" action="{{ action }}">
-      {{ csrf_field() }}
+  <rx-alert kind="warning" title="{{ t('plans.demo.notice_title') }}" message="{{ t('plans.demo.notice') }}"/>
+  <rx-card title="{{ t('plans.demo.title') }}" subtitle="{{ t('plans.demo.merchant', shop=t('shop.name')) }}">
+    <rx-infolist columns="2">
+      <rx-entry label="{{ t('plans.fields.plan') }}" :value="paying.plan"/>
+      <rx-entry label="{{ t('plans.fields.bike') }}" :value="paying.bike"/>
+      <rx-entry label="{{ t('plans.fields.monthly') }}"><strong>{{ paying.amount | money }}</strong> / {{ t('blocks.plans.month') }}</rx-entry>
+    </rx-infolist>
+    <rx-form :action="action">
       <input type="hidden" name="outcome" value="pay">
-      {{ button(t('plans.demo.pay', amount=(paying.amount | money)), variant="primary", block=true, key="p") }}
-    </form>
-    <form method="post" action="{{ action }}">
-      {{ csrf_field() }}
+      <rx-button label="{{ t('plans.demo.pay', amount=(paying.amount | money)) }}" variant="primary" block key="p"/>
+    </rx-form>
+    <rx-form :action="action">
       <input type="hidden" name="outcome" value="decline">
-      {{ button(t('plans.demo.decline'), variant="plain", block=true) }}
-    </form>
-  {% endcall %}
+      <rx-button label="{{ t('plans.demo.decline') }}" variant="plain" block/>
+    </rx-form>
+  </rx-card>
 </div>
-{% endblock %}
+</rx-page>

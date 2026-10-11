@@ -1,49 +1,44 @@
-{% extends "layouts/store.html" %}
 {#- A store's own page, on its own host (`stores.site`, src/app/home/stores.rs):
     the store's hero, what it has today, where it is and when it's open.
     `site`: store, address, bikes_free, bikes_here, products_in_stock; the
     shop's pages as absolute addresses (shop_url, rent_url, service_url,
     catalog_url). Only the kit and the shop's hero macro. -#}
-{% from "renox/ui.html" import card, columns, infolist, entry, stats, stat, table, link_button %}
+<rx-page layout="layouts/store.html" title="{{ t('home.stores.store', name=site.store.name) }}" description="{{ t('stores.site.lead', name=site.store.name) }}">
+{% from "renox/ui.html" import columns %}
 {% from "layouts/_hero.html" import page_hero %}
 {% set store = site.store %}
-{% block seo %}{{ seo(title=t('home.stores.store', name=store.name), description=t('stores.site.lead', name=store.name)) }}{% endblock %}
-
-{% block content %}
-<div class="rx-stack" data-bs-reveal>
+<rx-stack data-bs-reveal>
   {% call page_hero(t('home.stores.store', name=store.name), lead=t('stores.site.lead', name=store.name),
                     eyebrow=site.address, photo="/images/site/store-" ~ store.slug ~ ".webp", compact=true) %}
     <p class="bs-hero__actions">
-      {{ link_button(rent_url, t('stores.site.rent'), variant="primary") }}
-      {{ link_button(service_url, t('stores.site.service')) }}
+      <rx-link-button :href="rent_url" label="{{ t('stores.site.rent') }}" variant="primary"/>
+      <rx-link-button :href="service_url" label="{{ t('stores.site.service') }}"/>
     </p>
   {% endcall %}
 
   {# [explain:stores.template] #}
-  {% call stats(3) %}
-    {{ stat(t('stores.site.bikes_free'), site.bikes_free | number, hint=t('stores.site.bikes_here', count=site.bikes_here)) }}
-    {{ stat(t('stores.site.products'), site.products_in_stock | number, url=catalog_url, hint=t('stores.site.products_hint')) }}
-    {{ stat(t('stores.site.workshop'), t('stores.site.hours_value', hours=((store.workshop_minutes_per_day / 60) | round(1) | number)), url=service_url, hint=t('stores.site.workshop_hint')) }}
-  {% endcall %}
+  <rx-stats columns="3">
+    <rx-stat label="{{ t('stores.site.bikes_free') }}" :value="site.bikes_free | number" hint="{{ t('stores.site.bikes_here', count=site.bikes_here) }}"/>
+    <rx-stat label="{{ t('stores.site.products') }}" :value="site.products_in_stock | number" :url="catalog_url" hint="{{ t('stores.site.products_hint') }}"/>
+    <rx-stat label="{{ t('stores.site.workshop') }}" :value="t('stores.site.hours_value', hours=((store.workshop_minutes_per_day / 60) | round(1) | number))" :url="service_url" hint="{{ t('stores.site.workshop_hint') }}"/>
+  </rx-stats>
   {# [/explain:stores.template] #}
 
   {% call columns(2) %}
-    {% call card(t('stores.site.visit')) %}
-      {% call infolist() %}
-        {{ entry(t('stores.site.address'), site.address) }}
-        {{ entry(t('stores.site.phone'), store.phone, url="tel:" ~ store.phone) }}
-        {{ entry(t('stores.site.email'), store.email, url="mailto:" ~ store.email, copyable=true) }}
-      {% endcall %}
-    {% endcall %}
-    {% call card(t('stores.site.hours')) %}
-      {% call table([t('stores.site.day'), [t('stores.site.open'), "num"]], caption=t('stores.site.hours')) %}
-        {%- for day in store.opening_hours %}
-        <tr><td>{{ t('staff.stores.days.' ~ day.day) }}</td><td class="rx-num">{{ day.opens }}–{{ day.closes }}</td></tr>
-        {%- else %}
-        <tr><td colspan="2">{{ t('stores.site.closed') }}</td></tr>
-        {%- endfor %}
-      {% endcall %}
-    {% endcall %}
+    <rx-card title="{{ t('stores.site.visit') }}">
+      <rx-infolist>
+        <rx-entry label="{{ t('stores.site.address') }}" :value="site.address"/>
+        <rx-entry label="{{ t('stores.site.phone') }}" :value="store.phone" :url="'tel:' ~ store.phone"/>
+        <rx-entry label="{{ t('stores.site.email') }}" :value="store.email" :url="'mailto:' ~ store.email" copyable/>
+      </rx-infolist>
+    </rx-card>
+    <rx-card title="{{ t('stores.site.hours') }}">
+      <rx-table :rows="store.opening_hours" as="day" caption="{{ t('stores.site.hours') }}">
+        <rx-column label="{{ t('stores.site.day') }}">{{ t('staff.stores.days.' ~ day.day) }}</rx-column>
+        <rx-column label="{{ t('stores.site.open') }}" align="num">{{ day.opens }}–{{ day.closes }}</rx-column>
+        <rx-slot name="empty"><p class="rx-subtitle">{{ t('stores.site.closed') }}</p></rx-slot>
+      </rx-table>
+    </rx-card>
   {% endcall %}
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>

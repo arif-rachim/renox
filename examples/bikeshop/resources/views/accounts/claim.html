@@ -3,33 +3,28 @@
     it); `summary` (name, orders, rentals, bikes), `email` (where the
     invitation went), `problem` (none, "taken" or "other_email") and
     `action` (this signed address, which the button posts back to). -#}
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, stats, stat, button, alert, link_button %}
-{% block seo %}{{ seo(title=t('accounts.claim.title')) }}{% endblock %}
-
-{% block content %}
+<rx-page layout="layouts/app.html" title="{{ t('accounts.claim.title') }}">
 {% include "accounts/_styles.html" %}
 <div class="bs-claim" data-bs-reveal>
-  {{ page_header(t('accounts.claim.title'), subtitle=t('accounts.claim.lead', name=summary.name)) }}
+  <rx-page-header title="{{ t('accounts.claim.title') }}" subtitle="{{ t('accounts.claim.lead', name=summary.name) }}"/>
   {# [explain:accounts.claim.template] #}
   {%- if problem == "taken" %}
-  {{ alert(t('accounts.claim.taken'), kind="warning") }}
-  {{ link_button(route('account.show'), t('nav.account')) }}
+  <rx-alert kind="warning" message="{{ t('accounts.claim.taken') }}"/>
+  <rx-link-button route="account.show" label="{{ t('nav.account') }}"/>
   {%- elif problem == "other_email" %}
-  {{ alert(t('accounts.claim.other_email', email=email, current=auth.user.email), kind="error") }}
+  <rx-alert kind="error" message="{{ t('accounts.claim.other_email', email=email, current=auth.user.email) }}"/>
   {%- else %}
-  {% call card(title=summary.name, subtitle=t('accounts.claim.what')) %}
-    {% call stats(3) %}
-      {{ stat(t('accounts.claim.orders'), summary.orders) }}
-      {{ stat(t('accounts.claim.rentals'), summary.rentals) }}
-      {{ stat(t('accounts.claim.bikes'), summary.bikes) }}
-    {% endcall %}
-    <form method="post" action="{{ action }}">
-      {{ csrf_field() }}
-      <div class="rx-card__footer">{{ button(t('accounts.claim.button')) }}</div>
-    </form>
-  {% endcall %}
+  <rx-card title="{{ summary.name }}" subtitle="{{ t('accounts.claim.what') }}">
+    <rx-stats columns="3">
+      <rx-stat label="{{ t('accounts.claim.orders') }}" :value="summary.orders"/>
+      <rx-stat label="{{ t('accounts.claim.rentals') }}" :value="summary.rentals"/>
+      <rx-stat label="{{ t('accounts.claim.bikes') }}" :value="summary.bikes"/>
+    </rx-stats>
+    <rx-form :action="action">
+      <div class="rx-card__footer"><rx-button label="{{ t('accounts.claim.button') }}"/></div>
+    </rx-form>
+  </rx-card>
   {%- endif %}
   {# [/explain:accounts.claim.template] #}
 </div>
-{% endblock %}
+</rx-page>

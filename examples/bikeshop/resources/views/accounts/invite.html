@@ -1,25 +1,20 @@
 {#- `accounts.invite` (staff, `customers.manage`): invite a walk-in customer
     to claim their record. The address is saved on the record and gets a
     signed link that works for seven days (src/app/accounts/claim.rs). -#}
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, input, button, infolist, entry %}
-{% block seo %}{{ seo(title=t('accounts.invite.title')) }}{% endblock %}
-
-{% block content %}
-<div class="rx-stack" data-bs-reveal>
-  {{ page_header(t('accounts.invite.title'), subtitle=t('accounts.invite.lead')) }}
+<rx-page layout="layouts/staff.html" title="{{ t('accounts.invite.title') }}">
+<rx-stack data-bs-reveal>
+  <rx-page-header title="{{ t('accounts.invite.title') }}" subtitle="{{ t('accounts.invite.lead') }}"/>
   {# [explain:accounts.invite.template] #}
-  <form method="post" action="{{ route('accounts.invite.send', customer.id) }}" data-live-validate>
-    {{ csrf_field() }}
-    {% call card(title=customer.name) %}
-      {% call infolist(columns=2) %}
-        {{ entry(t('accounts.contact.phone'), customer.phone) }}
-        {{ entry(t('accounts.invite.since'), customer.created_at, format="date") }}
-      {% endcall %}
-      {{ input("email", t('accounts.invite.email'), type="email", value=customer.email, required=true, hint=t('accounts.invite.email_hint')) }}
-      <div class="rx-card__footer">{{ button(t('accounts.invite.send')) }}</div>
-    {% endcall %}
-  </form>
+  <rx-form :action="route('accounts.invite.send', customer.id)" live>
+    <rx-card title="{{ customer.name }}">
+      <rx-infolist columns="2">
+        <rx-entry label="{{ t('accounts.contact.phone') }}" :value="customer.phone"/>
+        <rx-entry label="{{ t('accounts.invite.since') }}" :value="customer.created_at" format="date"/>
+      </rx-infolist>
+      <rx-input name="email" label="{{ t('accounts.invite.email') }}" type="email" :value="customer.email" required hint="{{ t('accounts.invite.email_hint') }}"/>
+      <div class="rx-card__footer"><rx-button label="{{ t('accounts.invite.send') }}"/></div>
+    </rx-card>
+  </rx-form>
   {# [/explain:accounts.invite.template] #}
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>
