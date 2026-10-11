@@ -78,7 +78,7 @@
             <rx-entry label="{{ t('workshop.fields.customer') }}" :value="customer.name if customer else none"/>
             <rx-entry label="{{ t('workshop.fields.store') }}" :value="store.name if store else none"/>
             <rx-entry label="{{ t('workshop.fields.day') }}" :value="order.scheduled_for" format="datetime"/>
-            <rx-entry label="{{ t('workshop.order.mechanic') }}" :value="mechanic" placeholder="{{ t('workshop.board.unassigned') }}"/>
+            <rx-entry label="{{ t('workshop.order.mechanic') }}" :value="(mechanic)" placeholder="{{ t('workshop.board.unassigned') }}"/>
             <rx-entry label="{{ t('workshop.fields.labour') }}" :value="order.labour" format="money"/>
             <rx-entry label="{{ t('workshop.fields.parts') }}" :value="order.parts" format="money"/>
             <rx-entry label="{{ t('workshop.fields.total') }}" :value="order.total" format="money"/>

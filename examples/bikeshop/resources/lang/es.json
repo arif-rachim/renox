@@ -1196,7 +1196,8 @@
       "under_hood": "Cuatro consultas: la página de proveedores (con su recuento), el tamaño de sus listas de precios y sus pedidos abiertos (borrador, pedido, parcial) en esta tienda.",
       "features": {
         "0": "Los recuentos junto a cada proveedor son dos consultas `GROUP BY` (`group_by` + `select_as`) sobre los proveedores de la página, no una consulta por fila, así la página cuesta lo mismo con 5 proveedores que con 500.",
-        "1": "Los proveedores son de la empresa, no de una tienda, así que no hay registro que comprobar tienda por tienda: las rutas solo necesitan `purchasing.manage` en la tienda activa."
+        "1": "Los proveedores son de la empresa, no de una tienda, así que no hay registro que comprobar tienda por tienda: las rutas solo necesitan `purchasing.manage` en la tienda activa.",
+        "2": "Los datos de la página son una estructura que deriva `ViewData`, la cual nombra su plantilla; `view:check` (y `assert_views_compile` de las pruebas) avisa de una variable que la plantilla usa y la estructura no tiene, así un campo renombrado no puede dejar la página sin imprimir nada."
       }
     },
     "stock.suppliers.create": {

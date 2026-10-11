@@ -10,7 +10,7 @@
     {% call columns(2) %}
       <rx-card title="{{ t('rentals.fleet.bike') }}">
         <rx-infolist>
-          <rx-entry label="{{ t('rentals.fields.owner') }}" :value="owner" hint="{{ t('rentals.fleet.owner_hint') }}"/>
+          <rx-entry label="{{ t('rentals.fields.owner') }}" :value="(owner)" hint="{{ t('rentals.fleet.owner_hint') }}"/>
           <rx-entry label="{{ t('rentals.fields.location') }}" :value="location" hint="{{ t('rentals.fleet.location_hint') }}"/>
           <rx-entry label="{{ t('rentals.fields.condition') }}" :value="t('rentals.condition.' ~ bike.condition)"/>
           <rx-entry label="{{ t('rentals.fields.hourly_rate') }}" :value="bike.hourly_rate" format="money"/>

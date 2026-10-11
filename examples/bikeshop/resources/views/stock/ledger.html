@@ -31,7 +31,7 @@
       <div>
         <rx-card :title="t('stock.ledger.level')">
           <rx-infolist>
-            <rx-entry :label="t('stock.fields.owner_store')" :value="owner" :hint="t('stock.ledger.owner_hint')"/>
+            <rx-entry :label="t('stock.fields.owner_store')" :value="(owner)" :hint="t('stock.ledger.owner_hint')"/>
             <rx-entry :label="t('stock.fields.location_store')" :value="location" :hint="t('stock.ledger.location_hint')"/>
             <rx-entry :label="t('stock.fields.on_hand')" :value="level.on_hand" format="number"/>
             <rx-entry :label="t('stock.fields.reserved')" :value="level.reserved" format="number"/>

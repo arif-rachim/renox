@@ -55,7 +55,7 @@
         <rx-card :title="t('stock.consignments.details')">
           <rx-infolist>
             <rx-entry :label="t('stock.fields.status')">{{ shipment_status(status) }}</rx-entry>
-            <rx-entry :label="t('stock.fields.owner_store')" :value="owner" :hint="t('stock.consignments.owner_hint')"/>
+            <rx-entry :label="t('stock.fields.owner_store')" :value="(owner)" :hint="t('stock.consignments.owner_hint')"/>
             <rx-entry :label="t('stock.fields.location_store')" :value="location" :hint="t('stock.consignments.location_hint')"/>
             <rx-entry :label="t('stock.consignments.note')" :value="shipment.note"/>
           </rx-infolist>
