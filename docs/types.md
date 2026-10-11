@@ -223,7 +223,173 @@ Use `#[model(table = "products", soft_deletes)]` with a `deleted_at: Option<Date
 - `restore` clears `deleted_at`;
 - `force_delete` really removes the row.
 
+### Typed columns
+
+`#[derive(Model)]` makes a constant for every field, named in SHOUTY_SNAKE_CASE. Use them in
+queries instead of strings: a misspelt column or a value of the wrong type no longer compiles.
+`#[model(no_typed_columns)]` turns them off.
+
+```rust
+# use renox::prelude::*;
+#[derive(Model, Default)]
+struct Product {
+    id: i64,
+    name: String,
+    price: i64,
+}
+
+# async fn demo(db: &Db) -> Result {
+let cheap = Product::query()
+    .where_(Product::PRICE.lt(20_000))
+    .order_by(Product::NAME)
+    .get(db)
+    .await?;
+# Ok(())
+# }
+```
+
 ### PostgreSQL
 
 > [!WARNING]
 > Use `BIGINT` for `i64` columns. A plain `INTEGER` is 32-bit and won't read into an `i64`.
+
+## Checking models against the tables
+
+A model and its migration are written by hand, so they can drift apart: a column renamed in
+one and not the other, `Option<String>` over a `NOT NULL` column, a `String` over a number.
+`rnx db:check` builds the schema from your migrations on a scratch database and compares
+every registered model with its table. Register the models you want checked:
+
+```rust
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "products")]
+struct Product {
+    id: i64,
+    name: String,
+    price: i64,
+    note: Option<String>,
+}
+
+fn app() -> App {
+    // Registering the same model twice keeps one. In a module, use
+    // `app.model::<Product>()` inside `register`.
+    App::new().model::<Product>()
+}
+```
+
+What is compared, for each model:
+
+- the table exists, and every model column is in it;
+- the table has no `NOT NULL` column without a default (and not the primary key) that the
+  model lacks, because an insert would fail;
+- the column's type fits the field's (table below);
+- an `Option<T>` field sits over a nullable column, and a plain field over a `NOT NULL` one
+  (`id` is exempt);
+- a hand-written `impl Model` that gives no column info is reported, since there is nothing
+  to compare.
+
+| Field kind | SQLite (by affinity) | PostgreSQL |
+|---|---|---|
+| `i64`, `u32` / `i32`, `u16` / `i8`, `i16`, `u8` | INTEGER, NUMERIC | `bigint` / `integer` / `smallint` |
+| `f64` / `f32` | REAL, NUMERIC | `double precision` / `real` |
+| `String`, enums, `Ulid`, `Encrypted<T>` | TEXT | `text`, `character varying`, `character` |
+| `Vec<u8>` | BLOB | `bytea` |
+| `bool` | INTEGER, NUMERIC | `boolean` |
+| `DateTime` | TEXT, NUMERIC | `timestamp with time zone` |
+| `NaiveDateTime` | TEXT, NUMERIC | `timestamp without time zone` |
+| `NaiveDate` | TEXT, NUMERIC | `date` |
+| `NaiveTime` | TEXT, NUMERIC | `time without time zone` |
+| `Json<T>`, `serde_json::Value` | TEXT, NUMERIC | `jsonb`, `json`, `text`, `character varying` |
+| `Uuid` | BLOB, NUMERIC | `uuid` |
+
+The command prints the problems grouped by model and exits with 1 when there are any, so it
+fits a CI step. When all is well it prints `N model(s) match the schema.`
+
+The scratch database depends on `DATABASE_URL`. With PostgreSQL, the migrations run in a fresh
+schema on that server, dropped after the check. Otherwise they run on an in-memory SQLite
+database. Your real data is never touched, and there is no flag to point it elsewhere.
+
+A field whose type Renox does not know (a type of your own) skips the type check, and the
+rest still runs. To have it checked too, say which kind of column it fills:
+
+```rust
+use renox::db::{ColumnKind, ColumnType};
+
+struct Sku(String);
+
+impl ColumnType for Sku {
+    const KIND: ColumnKind = ColumnKind::Text;
+}
+```
+
+`#[derive(DbEnum)]` already counts as text. To run the same check inside your tests, see
+`assert_models_match_schema` in [the testing guide](testing.md).
+
+## Migrations from models
+
+Instead of writing a migration by hand, change the model and let Renox write the SQL:
+
+```bash
+rnx make:migration --auto add_sku     # or, in the app binary: my-app db:diff add_sku
+```
+
+The command builds the schema from your existing migrations on a scratch database (as
+`db:check` does), compares it with the registered models and writes the difference as plain SQL
+files you can read and edit before running `rnx migrate`. When nothing differs it prints
+`Nothing to change.` and writes no file. Register every model with `App::model::<T>()`.
+
+Indexes, defaults and foreign keys are declared on the model:
+
+```rust
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "posts", index(user_id), unique(slug), index(user_id, created_at))]
+struct Post {
+    id: i64,
+    #[model(references = "users")]
+    user_id: i64,
+    slug: String,
+    #[model(default = "0")]
+    views: i64,
+    created_at: Option<DateTime>,
+}
+
+fn app() -> App {
+    App::new().model::<Post>()
+}
+```
+
+- `index(a, b)` and `unique(a)` on the struct, repeatable, with one or more columns. They are
+  named `{table}_{columns}_index` or `…_unique`, like `posts_user_id_index`.
+- `default = "…"` is raw SQL, written as given on both databases.
+- `references = "users"` is a foreign key to `users(id)` with no `ON DELETE` action.
+
+What it handles: new tables for models that have none, added and dropped columns, a changed
+type or nullability, renamed columns, and conventionally named indexes. Defaults and foreign
+keys are written when a table or column is created; a change to either on an existing column
+is not detected, so write that migration yourself. Tables are never dropped, and the `id`
+column is never altered. A `NOT NULL` column added to an existing table needs a `default`
+(or make the field an `Option`). A field of a type Renox does not know is an error: implement
+`ColumnType` for it. Two models on one table are an error.
+
+Anything that could lose data is asked first: `` Was `t.old` renamed to `t.new`? `` and
+`` Drop column `t.c` (its data is lost)? ``, and `` Drop index `name`? `` for a convention-named
+index the model no longer declares. The answer defaults to no, and no leaves the change out. With
+`--yes` (or no terminal) nothing is dropped; `--yes` turns any rename or drop into an error that
+lists them. Indexes with other names and `UNIQUE` column constraints are never touched.
+
+PostgreSQL gets `ALTER TABLE` statements. SQLite adds a column in place when it is nullable (or
+has a default and no `references`) and otherwise rebuilds the table: a new table, the shared
+columns copied, the old one dropped and the new one renamed, with the indexes recreated. A
+rebuild is refused, and you are asked to write it by hand, when the table has a `CHECK` or
+`CONSTRAINT`, a table-level `UNIQUE (` or `PRIMARY KEY (`, or when another table references it
+with an `ON DELETE` action other than `NO ACTION` or `RESTRICT`.
+
+Files: `NAME.up.sql` and `NAME.down.sql`. In an app on SQLite they are SQLite SQL, plus
+`NAME.postgres.up.sql` and `NAME.postgres.down.sql` when the PostgreSQL text differs. In an app
+on PostgreSQL there are only the two, in PostgreSQL SQL. `--path DIR` writes somewhere other
+than `migrations`. The scratch database follows `DATABASE_URL`, so your own data is never
+touched.

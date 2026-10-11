@@ -252,6 +252,33 @@ describe('as a guest', () => {
       assert.equal(new URL(searches[0]).searchParams.get('search'), 'customer 1');
     }));
 
+  test('sorting and filtering emit events on the document; paging emits neither', () =>
+    onGrid(async (page) => {
+      await page.eval(() => {
+        window._rxEvents = [];
+        for (const name of ['sorted', 'filtered', 'selected'])
+          document.addEventListener('rx:grid:' + name, (e) => window._rxEvents.push({ name, detail: e.detail }));
+      });
+      const events = () => page.eval(() => window._rxEvents);
+      await redraw(page, () => page.eval(() => document.querySelector('th [data-grid-sort]').click()));
+      const sorted = (await events()).filter((e) => e.name === 'sorted');
+      assert.equal(sorted.length, 1, JSON.stringify(await events()));
+      assert.ok(sorted[0].detail.sort, JSON.stringify(sorted[0]));
+      await redraw(page, () => page.type('[data-grid-search]', 'customer 1'));
+      await sleep(500);
+      const filtered = (await events()).filter((e) => e.name === 'filtered');
+      assert.equal(filtered.length, 1, JSON.stringify(await events()));
+      assert.match(filtered[0].detail.query, /search=customer\+1/);
+      await page.goto(`${app.url}/grid?state=1`);
+      await page.eval(() => {
+        window._rxEvents = [];
+        for (const name of ['sorted', 'filtered'])
+          document.addEventListener('rx:grid:' + name, (e) => window._rxEvents.push({ name, detail: e.detail }));
+      });
+      await redraw(page, () => page.eval(() => document.querySelector('[data-grid-page]:not([disabled])').click()));
+      assert.deepEqual(await events(), [], 'paging emits neither');
+    }));
+
   test('groups fold and unfold', () =>
     onGrid(async (page) => {
       await redraw(page, () =>
@@ -581,6 +608,22 @@ describe('logged in', () => {
       // Without a question: every matching order marked shipped.
       await redraw(page, () => page.eval(() => [...document.querySelectorAll('[data-grid-bulk-action]')].find((b) => b.textContent.includes('shipped')).click()));
       await page.waitFor((t) => document.querySelector('.rx-toast')?.textContent.includes(`${t} orders marked shipped`), {}, total);
+    }));
+
+  test('selecting rows emits selected with the ids; select all matching says all', () =>
+    onGrid(async (page) => {
+      await page.eval(() => {
+        window._rxEvents = [];
+        document.addEventListener('rx:grid:selected', (e) => window._rxEvents.push(e.detail));
+      });
+      const ids = await page.eval(() => [...document.querySelectorAll('tbody tr[data-id]')].slice(0, 2).map((r) => r.dataset.id));
+      for (const id of ids) await page.click(`tbody tr[data-id="${id}"] [data-grid-select]`);
+      const events = await page.eval(() => window._rxEvents);
+      assert.deepEqual(events.at(-1), { ids, all: false });
+      await page.click('[data-grid-select-all]');
+      await page.click('[data-grid-select-matching]');
+      const last = (await page.eval(() => window._rxEvents)).at(-1);
+      assert.equal(last.all, true);
     }));
 
   test('an action that asks for input opens its sheet with the selection', () =>

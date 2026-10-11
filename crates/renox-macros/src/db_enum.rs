@@ -80,6 +80,10 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             }
         }
 
+        impl ::renox::db::ColumnType for #ident {
+            const KIND: ::renox::db::ColumnKind = ::renox::db::ColumnKind::Text;
+        }
+
         impl ::renox::serde::Serialize for #ident {
             fn serialize<S: ::renox::serde::Serializer>(
                 &self,

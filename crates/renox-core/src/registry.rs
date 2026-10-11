@@ -16,8 +16,11 @@ pub struct Registry {
     pub(crate) schedule: Schedule,
     pub(crate) duplicate_job: Option<&'static str>,
     pub(crate) webhooks: HashMap<&'static str, crate::webhook::HandleFn>,
+    pub(crate) live_components: HashMap<&'static str, crate::live_component::LiveFn>,
+    pub(crate) duplicate_live: Option<&'static str>,
     pub(crate) commands: Vec<crate::command::Command>,
     pub(crate) templates: Vec<crate::view::TemplateHook>,
+    pub(crate) components: Vec<crate::components::Component>,
     pub(crate) shares: Vec<(String, crate::view::ShareFn)>,
     pub(crate) channels: HashMap<String, crate::auth::notifications::ChannelFn>,
     pub(crate) reporters: Vec<crate::report::ReportFn>,
@@ -37,6 +40,7 @@ pub struct Registry {
     pub(crate) provided: HashMap<TypeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>,
     /// Seeders for `db:seed`: the app's (`App::seeder`), then the modules'.
     pub(crate) seeders: Vec<Seeder>,
+    pub(crate) models: Vec<crate::db::schema::ModelInfo>,
 }
 
 /// A seeder registered with `App::seeder` or `Registry::seeder`.
@@ -52,10 +56,32 @@ pub(crate) struct StaticAsset {
 }
 
 impl Registry {
+    /// Tells `db:check` about a model, so its fields are compared with the
+    /// table. Registering the same model twice keeps one.
+    pub fn model<M: crate::db::Model>(&mut self) -> &mut Self {
+        let info = crate::db::schema::model_info::<M>();
+        if !self.models.iter().any(|m| m.type_id == info.type_id) {
+            self.models.push(info);
+        }
+        self
+    }
+
     /// Lets workers run jobs of type `J`.
     pub fn job<J: Job>(&mut self) -> &mut Self {
         if self.jobs.insert(J::NAME, handler::<J>()).is_some() {
             self.duplicate_job.get_or_insert(J::NAME);
+        }
+        self
+    }
+
+    /// Registers the live component `C` (see `renox::live_component`).
+    pub fn live_component<C: crate::live_component::LiveComponent>(&mut self) -> &mut Self {
+        if self
+            .live_components
+            .insert(C::NAME, crate::live_component::handler::<C>())
+            .is_some()
+        {
+            self.duplicate_live.get_or_insert(C::NAME);
         }
         self
     }
@@ -155,6 +181,58 @@ impl Registry {
         hook: impl Fn(&mut minijinja::Environment<'static>) + Send + Sync + 'static,
     ) -> &mut Self {
         self.templates.push(std::sync::Arc::new(hook));
+        self
+    }
+
+    /// Registers a template component, so pages can write `<rx-hello …>` for a
+    /// macro of the module's own templates (added with
+    /// [`add_template`](crate::view::add_template) in [`Registry::templates`]).
+    /// An unknown attribute or a missing required one fails when the page
+    /// loads, like the built-in components.
+    ///
+    /// # Panics
+    ///
+    /// When the tag doesn't start with `rx-` or is a built-in component, or
+    /// when two modules register the same tag.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox::view::{Component, Prop, add_template};
+    ///
+    /// struct Hello;
+    ///
+    /// impl Module for Hello {
+    ///     fn name(&self) -> &'static str {
+    ///         "hello"
+    ///     }
+    ///
+    ///     fn register(&self, app: &mut Registry) {
+    ///         app.templates(|env| {
+    ///             add_template(
+    ///                 env,
+    ///                 "hello/ui.html",
+    ///                 "{% macro hello(name) %}<b>Hello {{ name }}</b>{% endmacro %}",
+    ///             )
+    ///             .unwrap();
+    ///         });
+    ///         app.component(
+    ///             Component::macro_call("rx-hello", "hello/ui.html", "hello")
+    ///                 .prop(Prop::text("name").required())
+    ///                 .content(false),
+    ///         );
+    ///     }
+    /// }
+    /// ```
+    pub fn component(&mut self, component: crate::components::Component) -> &mut Self {
+        if let Some(problem) = component.problem() {
+            panic!("Registry::component: {problem}");
+        }
+        assert!(
+            !self.components.iter().any(|c| c.tag() == component.tag()),
+            "Registry::component: <{}> is registered twice",
+            component.tag()
+        );
+        self.components.push(component);
         self
     }
 

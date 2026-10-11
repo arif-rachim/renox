@@ -91,6 +91,8 @@ Paths are relative to this folder.
 |---|---|---|
 | Home page: the kit's `navbar`, `card_grid` + `media_card`, `Routes::etag`, `seo()`, Motion | `/` | [src/app/home/mod.rs](src/app/home/mod.rs), [resources/views/home/index.html](resources/views/home/index.html) |
 | Catalogue with filters and sorting, categories (`Found<M>`), the `range_slider` block | `/shop`, `/shop/{slug}` | [src/app/catalog/browse.rs](src/app/catalog/browse.rs), [src/app/catalog/filters.rs](src/app/catalog/filters.rs) |
+| Models checked against the migrations (`app.model::<…>()`, `rnx db:check`, `assert_models_match_schema`) | `rnx db:check` | [src/app/catalog/mod.rs](src/app/catalog/mod.rs) (`register`), [tests/catalog.rs](tests/catalog.rs) |
+| Migrations written from the models: `index(..)` on `Category`, `Brand` and `Product`; `db:diff index_brands_name` wrote the `brands(name)` index (`db:diff` again prints `Nothing to change.`) | `rnx make:migration --auto` | [src/app/catalog/model.rs](src/app/catalog/model.rs), [migrations/](migrations/) (`…_index_brands_name.*`) |
 | Full-text search (`#[model(search)]`: FTS5 / `tsvector`), suggestions in the navbar | `/search?q=helmet` | [src/app/catalog/model.rs](src/app/catalog/model.rs), [migrations/](migrations/) (`…_search_products.*`) |
 | Product page: `gallery` and `swatches` blocks, what fits (`Pivot`), stock per store, recently viewed (session) | `/products/{slug}` | [src/app/catalog/product.rs](src/app/catalog/product.rs), [resources/views/catalog/show.html](resources/views/catalog/show.html) |
 | Sitemap and robots.txt | `/sitemap.xml` | [src/app/catalog/mod.rs](src/app/catalog/mod.rs) |
@@ -112,6 +114,17 @@ Paths are relative to this folder.
 | Each store's own page on its own host: `Routes::domain`, `DomainParams`, a domain `fallback` | `north.localhost:3000/` | [src/app/home/stores.rs](src/app/home/stores.rs), [resources/views/home/store.html](resources/views/home/store.html), [layouts/store.html](resources/views/layouts/store.html) |
 | Every form input ↔ Rust ↔ SQLite ↔ PostgreSQL, a form that tries them all (files public and private, `Uuid` keys, the editors, live validation), read back on an infolist | `/about/fields` | [src/app/about/fields.rs](src/app/about/fields.rs), [resources/views/about/_fields_form.html](resources/views/about/_fields_form.html), [tests/fields.rs](tests/fields.rs) |
 | htmx recipes, live: a modal form, out-of-band swaps (`.also`), `HxRetarget`/`HxReswap`, inline edit, Alpine tabs, `HxRefresh`/`HxRedirect`, toasts, infinite scroll | `/about/htmx` | [src/app/about/htmx.rs](src/app/about/htmx.rs), [resources/views/about/htmx.html](resources/views/about/htmx.html), [tests/htmx.rs](tests/htmx.rs) |
+| The same checklist as a live component: a struct and a method per action, `rx-click`, `rx-model`, `rx-submit`, a signed snapshot | `/about/htmx/live` | [src/app/about/live.rs](src/app/about/live.rs), [resources/views/about/live/_checklist.html](resources/views/about/live/_checklist.html), [tests/htmx.rs](tests/htmx.rs) |
+
+`/about/htmx/live` rebuilds the pre-ride checklist as a live component (same session list, so both pages show the same items) and leaves out what the checklist alone doesn't need: the bikes' infinite scroll, the duplicate retargeted onto its row (`HxRetarget`/`HxReswap`), Clear's `HxRefresh` and Ready's `HX-Redirect`, the double-click and Escape of the inline edit, and `hx-confirm` on delete. Lines of code (`wc -l`):
+
+| | htmx | live component |
+|---|---|---|
+| Rust (`htmx.rs` / `live.rs`) | 382 (293 without the bikes and Ready) | 170 |
+| Templates (`htmx.html` + `htmx/*.html` / `live.html` + `live/*.html`) | 170 (about 150 without the bikes) | 60 |
+| Total | 552 (about 443 for the checklist alone) | 230 |
+
+The live version has no routes, fragments or out-of-band parts of its own: `live.rs` defines one route (the page) and the component, and its 170 lines include doc comments and the two small validation structs.
 
 ### The staff side
 
@@ -392,6 +405,8 @@ $ cargo run -- schedule:list
 
 The Rust tests are in [tests/](tests/), one file per area; the browser tests are
 `tests/browser/bikeshop-*.test.mjs` at the repository's root.
+
+**Forms from models.** The admin's brand form is not written by hand: `Brand` in [src/app/catalog/model.rs](src/app/catalog/model.rs) is `#[model(table = "brands", form)]` with `#[form(validate(...))]` rules, which generates `BrandForm` and `fill` (docs/validation.md, "Forms from models").
 
 ## Adding a page
 

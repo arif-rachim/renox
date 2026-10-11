@@ -7,7 +7,9 @@ use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use serde::{Deserialize, Serialize};
 
 use super::Policy;
-use crate::db::{DateTime, Db, DbValue, Executor, FromRow, Model, Row, ToDbValue, sql};
+use crate::db::{
+    ColumnKind, DateTime, Db, DbValue, Executor, FromRow, Model, ModelColumn, Row, ToDbValue, sql,
+};
 use crate::{Error, Result};
 
 /// A row of the `users` table created by the `Auth` module.
@@ -115,6 +117,24 @@ impl Model for User {
             self.created_at = Some(now);
         }
         self.updated_at = Some(now);
+    }
+
+    fn column_info() -> Vec<ModelColumn> {
+        let col = ModelColumn::new;
+        vec![
+            col("id", "i64", ColumnKind::BigInt, false),
+            col("name", "String", ColumnKind::Text, false),
+            col("email", "String", ColumnKind::Text, false),
+            col("password", "String", ColumnKind::Text, false),
+            col(
+                "email_verified_at",
+                "Option<DateTime>",
+                ColumnKind::DateTime,
+                true,
+            ),
+            col("created_at", "Option<DateTime>", ColumnKind::DateTime, true),
+            col("updated_at", "Option<DateTime>", ColumnKind::DateTime, true),
+        ]
     }
 }
 

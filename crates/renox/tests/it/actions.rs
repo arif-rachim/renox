@@ -95,7 +95,7 @@ async fn an_action_sheet_is_a_button_and_a_form_in_a_sheet() {
         // The button: its icon, its shortcut, what it opens.
         .assert_see(r#"<button class="rx-button rx-button--secondary" type="button" data-rx-open="stock-7" aria-haspopup="dialog" data-rx-key="s"><span class="rx-button__icon" aria-hidden="true"><svg"#)
         // The sheet and its form: sent with htmx, PUT through _method.
-        .assert_see(r#"<dialog class="rx-sheet rx-sheet--lg" id="stock-7" aria-labelledby="stock-7-title" aria-describedby="stock-7-message">"#)
+        .assert_see(r#"<dialog class="rx-sheet rx-sheet--lg" id="stock-7" aria-labelledby="stock-7-title" aria-describedby="stock-7-message" data-rx-component="action-sheet">"#)
         .assert_see(r#"<form class="rx-sheet__inner" method="post" action="/products/7/stock" hx-post="/products/7/stock" hx-swap="none" data-rx-action novalidate>"#)
         .assert_see(r#"<input type="hidden" name="_method" value="PUT">"#)
         .assert_see(r#"<p class="rx-sheet__message" id="stock-7-message">Now 3.</p>"#)
@@ -141,7 +141,7 @@ async fn icon_buttons_and_buttons_carry_icons_counts_keys_and_reasons() {
         .assert_see(r#"<span class="rx-button__label">None waiting</span><span class="rx-button__badge">0</span></a>"#)
         .assert_see(r#"<span class="rx-button__label">Blank</span></a>"#)
         .assert_see(r#"<span class="rx-button__label">Filters</span><span class="rx-button__badge">3</span></button>"#)
-        .assert_see(r#"<dialog class="rx-sheet rx-sheet--side rx-sheet--sm" id="panel" aria-labelledby="panel-title">"#)
+        .assert_see(r#"<dialog class="rx-sheet rx-sheet--side rx-sheet--sm" id="panel" aria-labelledby="panel-title" data-rx-component="sheet">"#)
         .assert_see(r#"<span class="rx-sheet__icon rx-sheet__icon--success" aria-hidden="true">"#);
 }
 

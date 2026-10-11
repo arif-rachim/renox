@@ -44,6 +44,7 @@ use super::model::Store;
 use crate::app::access::catalogue::{
     CATALOG_MANAGE, PLANS_MANAGE, PRICES_CHANGE, PURCHASING_MANAGE, STAFF_ACCESS, STORES_MANAGE,
 };
+use crate::app::catalog::model::BrandForm;
 use crate::app::catalog::model::{
     Brand, Category, CategoryKind, Product, ProductPhoto, ProductVariant,
 };
@@ -235,19 +236,6 @@ impl AdminResource for Categories {
 /// The brands resource.
 pub struct Brands;
 
-// [explain:admin.brands.form]
-/// A brand's form.
-#[derive(Deserialize, Serialize, Validate)]
-pub struct BrandForm {
-    #[validate(required, max = 100)]
-    pub name: String,
-    #[validate(required, max = 100, alpha_dash)]
-    pub slug: String,
-    #[validate(url, max = 255)]
-    pub website: Option<String>,
-}
-// [/explain:admin.brands.form]
-
 // [explain:admin.brands.show]
 impl AdminResource for Brands {
     type Model = Brand;
@@ -291,9 +279,8 @@ impl AdminResource for Brands {
     }
     // [/explain:admin.brands.form]
     fn fill(&self, brand: &mut Brand, form: BrandForm) {
-        brand.name = form.name;
-        brand.slug = form.slug;
-        brand.website = form.website.filter(|w| !w.trim().is_empty());
+        form.fill(brand);
+        brand.website = brand.website.take().filter(|w| !w.trim().is_empty());
     }
 }
 

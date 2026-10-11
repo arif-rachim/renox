@@ -628,3 +628,64 @@ async fn app_layers_wrap_domain_routes() {
         .await
         .assert_see("admin 404");
 }
+
+#[renox::test]
+async fn view_check_passes_clean_views_and_fails_broken_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let views = dir.path().join("views");
+    std::fs::create_dir_all(&views).unwrap();
+    std::fs::write(views.join("ok.html"), "<p>{{ 1 + 1 }}</p>").unwrap();
+    let make = || {
+        let mut config = config(dir.path());
+        config.views_path = views.clone();
+        App::with_config(config)
+    };
+    make().run_args(["view:check"]).await.unwrap();
+
+    std::fs::write(views.join("broken.html"), "{% if %}").unwrap();
+    assert!(make().run_args(["view:check"]).await.is_err());
+
+    // An app command of the same name runs in place of the built-in one.
+    make()
+        .command("view:check", "Mine", |_args, _state| async move { Ok(()) })
+        .run_args(["view:check"])
+        .await
+        .unwrap();
+}
+
+#[renox::test]
+async fn view_data_writes_the_editor_file_with_the_apps_components() {
+    let dir = tempfile::tempdir().unwrap();
+    let components = dir.path().join("views/components");
+    std::fs::create_dir_all(&components).unwrap();
+    std::fs::write(
+        components.join("price_tag.html"),
+        "<rx-props amount currency=\"USD\" />\n<b>{{ amount }}</b>",
+    )
+    .unwrap();
+    std::fs::write(
+        components.join("macros.html"),
+        "{% macro x() %}{% endmacro %}",
+    )
+    .unwrap();
+    let mut config = config(dir.path());
+    config.views_path = dir.path().join("views");
+    let out = dir.path().join(".vscode/renox-components.json");
+    App::with_config(config)
+        .run_args(["view:data", "--out", out.to_str().unwrap()])
+        .await
+        .unwrap();
+    let data: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
+    let tags = data["tags"].as_array().unwrap();
+    let tag = tags.iter().find(|t| t["name"] == "app-price-tag").unwrap();
+    let attrs: Vec<&str> = tag["attributes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(attrs, ["amount", "currency"]);
+    assert!(tags.iter().any(|t| t["name"] == "rx-table"));
+    assert!(!tags.iter().any(|t| t["name"] == "app-macros"));
+}

@@ -50,7 +50,7 @@ pub struct Item {
 /// The visitor's checklist, newest first.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Checklist {
-    next_id: u32,
+    pub(super) next_id: u32,
     pub items: Vec<Item>,
 }
 
@@ -85,7 +85,7 @@ impl Checklist {
         session.get(SESSION_KEY).unwrap_or_default()
     }
 
-    fn save(&self, session: &Session) -> Result {
+    pub fn save(&self, session: &Session) -> Result {
         session.put(SESSION_KEY, self)
     }
 
@@ -94,7 +94,7 @@ impl Checklist {
         self.items.iter().filter(|i| !i.done).count()
     }
 
-    fn find(&mut self, id: u32) -> Result<&mut Item> {
+    pub fn find(&mut self, id: u32) -> Result<&mut Item> {
         self.items
             .iter_mut()
             .find(|i| i.id == id)

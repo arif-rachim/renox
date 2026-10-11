@@ -190,3 +190,17 @@ async fn sessions_end_after_their_lifetime() {
     app.travel(Duration::from_secs(3 * 60 * 60)); // past SESSION_LIFETIME's 120 minutes
     app.get("/account").await.assert_redirect("/login");
 }
+
+#[renox::test]
+async fn the_models_match_the_schema() {
+    TestApp::new({{crate_name}}::app())
+        .await
+        .assert_models_match_schema()
+        .await;
+}
+
+#[renox::test]
+async fn every_view_compiles() {
+    let app = TestApp::new({{crate_name}}::app()).await;
+    app.assert_views_compile();
+}

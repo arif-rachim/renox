@@ -98,6 +98,15 @@ RNX="$CARGO_TARGET_DIR/debug/rnx"
 step "rnx new shop --database $DATABASE"
 new_app shop --database "$DATABASE"
 use_database shop
+if [ "$(uname -m)" = x86_64 ] && command -v mold >/dev/null && command -v clang >/dev/null; then
+    grep -q 'fuse-ld=mold' .cargo/config.toml
+elif [ "$(uname -m)" = x86_64 ]; then test ! -e .cargo/config.toml; fi
+
+step "rnx doctor (no build), and outside an app"
+"$RNX" doctor --no-build | tee "$WORK/doctor.txt"
+grep -q '✓ APP_KEY' "$WORK/doctor.txt"
+if APP_KEY=short "$RNX" doctor --no-build >/dev/null; then echo "FAIL: a short APP_KEY passed"; exit 1; fi
+(cd "$WORK" && "$RNX" doctor --no-build | grep -q 'not in an app directory')
 grep '^renox' Cargo.toml
 
 step "no template placeholder left in the new app"
@@ -122,8 +131,9 @@ step "every generator"
 "$RNX" make:policy Book --module catalog
 "$RNX" make:mail order_shipped
 "$RNX" make:migration add_sku_to_products
-"$RNX" make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
-"$RNX" make:module tags --resource
+"$RNX" make:module products --resource $(runs || echo --no-migrate) --fields "name:string price:money notes:text active:bool due_on:date"
+"$RNX" make:module tags --resource --no-migrate
+if grep -n '{%' resources/views/products/*.html resources/views/tags/*.html; then echo "FAIL: {% %} in generated views"; exit 1; fi
 "$RNX" make:factory Book --module catalog
 "$RNX" make:seeder DemoData
 "$RNX" make:test Checkout
@@ -132,6 +142,7 @@ step "every generator"
 "$RNX" make:rule TaxId --module catalog
 "$RNX" make:middleware StampRequests
 "$RNX" make:component price_tag
+"$RNX" make:component legacy_tag --macro
 "$RNX" make:deploy
 
 step "make:component --ui forwards to the app's ui:publish"
@@ -165,7 +176,10 @@ if runs; then
     cargo test
     step "the app's own commands"
     cargo run -q -- migrate
+    "$RNX" doctor | grep -q 'Migrations: all ran'
     cargo run -q -- migrate:status
+    cargo run -q -- db:check
+    cargo run -q -- migrate:status | grep -q 'ran.*create_products_table'
     cargo run -q -- catalog:import
     # A typed command (clap): its flags, its --help, and a clear error.
     cargo run -q -- catalog:import --dry-run | grep -q 'dry run'
@@ -176,6 +190,29 @@ if runs; then
     fi
     grep -q 'Usage: catalog:import' "$WORK/err.txt"
     cargo run -q -- route:list
+
+    step "make:migration --auto: add a column, then an index, from the models"
+    edit_model() {
+        python3 - "$1" "$2" <<'PY'
+import sys
+old, new = sys.argv[1], sys.argv[2]
+p = "src/app/catalog/model.rs"
+s = open(p).read()
+assert old in s, "missing: " + old
+open(p, "w").write(s.replace(old, new, 1))
+PY
+    }
+    edit_model '    pub updated_at: Option<DateTime>,
+' '    pub updated_at: Option<DateTime>,
+    pub sku: Option<String>,
+'
+    "$RNX" make:migration --auto add_sku
+    edit_model '#[model(table = "books")]' '#[model(table = "books", index(sku))]'
+    "$RNX" make:migration --auto index_sku
+    cargo run -q -- migrate
+    cargo run -q -- db:check
+    cargo test
+    "$RNX" make:migration --auto | grep -q 'Nothing to change'
 
     if [ "$DATABASE" = sqlite ]; then
         step "the app over HTTP: every page, a --resource module's forms (tests/cli/smoke.py)"
@@ -224,7 +261,7 @@ step "rnx new pulse --notifications --database $DATABASE (the bell in the plain 
 new_app pulse --notifications --database "$DATABASE"
 use_database pulse
 grep -q '.notifications())' src/lib.rs
-grep -q 'notification_bell(unread_notifications)' resources/views/layouts/app.html
+grep -q '<rx-notification-bell' resources/views/layouts/app.html
 check_app
 
 if [ "$DATABASE" = sqlite ]; then

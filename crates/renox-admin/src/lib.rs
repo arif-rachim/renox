@@ -290,12 +290,14 @@ impl Module for Admin {
             for (name, source) in VIEWS {
                 // The app's own file of that name wins.
                 if env.get_template(name).is_err() {
-                    let _ = env.add_template(name, source);
+                    renox::view::add_template(env, *name, *source)
+                        .expect("a built-in template compiles");
                 }
             }
             for (name, source) in &slots {
                 if env.get_template(name).is_err() {
-                    let _ = env.add_template_owned(*name, source.clone());
+                    renox::view::add_template(env, *name, source.clone())
+                        .expect("a built-in template compiles");
                 }
             }
         });

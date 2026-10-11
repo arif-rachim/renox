@@ -124,6 +124,8 @@ mod tests {
             docker.contains("cargo chef cook --release"),
             "dependencies in their own layer"
         );
+        let ignore = fs::read_to_string(dir.path().join(".dockerignore")).unwrap();
+        assert!(ignore.lines().any(|l| l == ".cargo"), "{ignore}");
         let unit = fs::read_to_string(dir.path().join("deploy/coffee-shop.service")).unwrap();
         assert!(
             unit.contains("Description=Coffee Shop")

@@ -181,4 +181,40 @@ describe('/about/htmx under CSP=strict', () => {
       assert.equal(await page.eval(() => location.pathname), '/shop');
       await page.waitFor(() => /good ride/.test(document.querySelector('.rx-toast')?.textContent || ''), { message: 'the toast after HX-Redirect' });
     }));
+
+  test('the live component version adds, ticks, renames and deletes (rx-click, rx-model)', () =>
+    browser.with(async (page) => {
+      await page.goto(`${app.url}/about/htmx/live`);
+      await page.waitFor(() => !!window.RenoxLive);
+      const titles = () => page.eval(() => [...document.querySelectorAll('#checklist li .rx-list__main')].map((e) => e.textContent.trim()));
+      const rowOf = (title) => page.eval((t) => [...document.querySelectorAll('#checklist li')].find((li) => li.textContent.includes(t))?.id, title);
+
+      // Add: an empty title is refused under the field, then it is added.
+      await page.click('form[rx-submit=add] button[type=submit]');
+      await page.waitFor(() => document.querySelector('#new-title').getAttribute('aria-invalid') === 'true');
+      await page.type('#new-title', 'Fill the bottle');
+      await page.click('form[rx-submit=add] button[type=submit]');
+      await page.waitFor(() => document.querySelector('#checklist li')?.textContent.includes('Fill the bottle'));
+      const open = () => page.eval(() => parseInt(document.querySelector('#open-count').textContent, 10));
+      const before = await open();
+      let id = await rowOf('Fill the bottle');
+
+      // Tick it: the count follows.
+      await page.click(`#${id} input[type=checkbox]`);
+      await page.waitFor((b) => parseInt(document.querySelector('#open-count').textContent, 10) === b - 1, {}, before);
+
+      // Rename it inline.
+      await page.click(`#${id} button[rx-click^="edit"]`);
+      await page.waitFor((i) => !!document.querySelector(`#${i} input[name=edit_title]`), {}, id);
+      await page.type(`#${id} input[name=edit_title]`, 'Fill both bottles', { clear: true });
+      await page.click(`#${id} button[type=submit]`);
+      await page.waitFor(() => document.querySelector('#checklist')?.textContent.includes('Fill both bottles'));
+
+      // Delete it.
+      id = await rowOf('Fill both bottles');
+      await page.click(`#${id} button[rx-click^="delete"]`);
+      await page.waitFor(() => !document.querySelector('#checklist').textContent.includes('Fill both bottles'));
+      assert.ok(!(await titles()).includes('Fill both bottles'));
+      page.assertClean({ allow: [/422/] });
+    }));
 });

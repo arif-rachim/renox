@@ -62,6 +62,12 @@ impl renox::Module for Catalog {
     // [/explain:catalog.routes]
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<model::Category>()
+            .model::<model::Brand>()
+            .model::<model::Product>()
+            .model::<model::ProductVariant>()
+            .model::<model::ProductPhoto>();
         // [explain:home.storefront]
         // The home page's featured bikes and categories, only for `/`, so
         // other pages run no query for it.

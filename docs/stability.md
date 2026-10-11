@@ -167,16 +167,16 @@ field for you.
 - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
 - `auth::Can<T>` (use `Can::new`), `schedule::UpcomingRun`, `maintenance::DownOptions` (use
   `DownOptions::new()` or `Default`)
-- `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
+- `view::Component`, `view::Prop`, `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
 - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`,
   `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
   `rate_limit::LimitRequest`, `SentNotification`, `SentBroadcast`, `db::InvalidUlid`, `grid::Grid`,
-  `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`, `grid::Workbook`,
+  `grid::Column`, `db::ModelColumn`, `db::ModelIndex`, `grid::GridPrefs`, `grid::RowOrder`, `grid::Workbook`,
   `grid::Action` (`Action::sheet`), `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
   `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
   `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use
   `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`),
-  `import::ImportReport`, `import::FailedRow`, `auth::permissions::Assignment`
+  `live_component::Mounted`, `import::ImportReport`, `import::FailedRow`, `auth::permissions::Assignment`
   (`auth::permissions::Scope` has private fields: make one with `Scope::of`, `of_id`, `new`
   or `global`; `Scopes` stays `All` / `Only`, so a `match` on it needs no `_` arm)
 - `AppStateInner`: what an `AppState` holds, read as the state's fields
@@ -191,7 +191,7 @@ compiles when a new variant appears.
 
 - `Error`, `Environment`, `CspMode`, `Channel`, `DbValue`, `Inspected` (a `Rule`
   matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`,
-  `grid::Kind`, `grid::Summary`, `grid::ExportFormat`
+  `grid::Kind`, `db::ColumnKind`, `grid::Summary`, `grid::ExportFormat`
 - the settings: `SessionDriver`, `LogFormat`, `CacheStore`, `mail::MailDriver`,
   `mail::MailEncryption`, `storage::DiskDriver`, and `webhook::WebhookStatus`
 
@@ -236,6 +236,7 @@ breaking anyone.
 - `db::Executor` is sealed: only `&Db` and `&mut Transaction` (and the `db::Conn` that
   `into_conn` makes of them, for several statements).
 - `db::relations::ForeignKey` is sealed: only a key type or an `Option` of one.
+- `db::Comparable` (which values a typed `Col` accepts) is implemented by Renox only.
 
 ### Why `Dialect` isn't on the list
 

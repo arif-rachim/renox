@@ -86,11 +86,13 @@ impl Module for Editors {
 
     fn register(&self, app: &mut Registry) {
         assets::register(app);
+        components(app);
         app.templates(|env| {
             for (name, source) in VIEWS {
                 // The app's own file of that name wins.
                 if env.get_template(name).is_err() {
-                    let _ = env.add_template(name, source);
+                    renox::view::add_template(env, *name, *source)
+                        .expect("a built-in template compiles");
                 }
             }
             env.add_function("renox_editors", || {
@@ -142,6 +144,68 @@ fn code_text(value: minijinja::Value) -> String {
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/editors.md")]
 pub struct Guide;
+
+/// The editors as tags: `<rx-rich-editor>`, `<rx-markdown-editor>`,
+/// `<rx-code-editor>` and `<rx-code-entry>`.
+fn components(app: &mut Registry) {
+    use renox::view::{Component, Prop};
+    const T: &str = "renox-editors/editors.html";
+    let field = |tag: &str, mac: &str, doc: &str| {
+        Component::macro_call(tag, T, mac)
+            .doc(doc)
+            .content(false)
+            .prop(Prop::text("name").required())
+            .prop(Prop::text("label").required())
+            .prop(Prop::text("value"))
+            .prop(Prop::text("hint"))
+            .prop(Prop::bool("required"))
+            .prop(Prop::text("placeholder"))
+            .prop(Prop::number("rows"))
+            .prop(Prop::text("id"))
+            .prop(Prop::bool("disabled"))
+            .prop(Prop::text("span"))
+            .prop(Prop::bool("hide-label"))
+            .prop(Prop::text("bag"))
+    };
+    app.component(field(
+        "rx-rich-editor",
+        "rich_editor",
+        "A rich text editor (Trix) that sends HTML.",
+    ));
+    app.component(
+        field(
+            "rx-markdown-editor",
+            "markdown_editor",
+            "A Markdown editor with a toolbar and a preview.",
+        )
+        .prop(Prop::bool("readonly")),
+    );
+    app.component(
+        field(
+            "rx-code-editor",
+            "code_editor",
+            "A code editor with syntax highlighting.",
+        )
+        .prop(Prop::text("language"))
+        .prop(Prop::text("tab"))
+        .prop(Prop::bool("readonly")),
+    );
+    app.component(
+        Component::macro_call("rx-code-entry", T, "code_entry")
+            .doc("Code or JSON shown in an infolist, with a copy button.")
+            .content(false)
+            .prop(Prop::text("label").required())
+            .prop(Prop::data("value"))
+            .prop(Prop::text("language"))
+            .prop(Prop::bool("copyable"))
+            .prop(Prop::text("hint"))
+            .prop(Prop::text("placeholder"))
+            .prop(Prop::text("max-height"))
+            .prop(Prop::text("span"))
+            .prop(Prop::bool("hide-label"))
+            .prop(Prop::text("id")),
+    );
+}
 
 #[cfg(test)]
 mod tests {

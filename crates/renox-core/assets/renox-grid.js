@@ -14,6 +14,8 @@
     return meta ? meta.content : "";
   }
 
+  function emit(el, name, detail) { var c = el && el.getAttribute && el.getAttribute("data-rx-component"); if (!c) return; el.dispatchEvent(new CustomEvent("rx:" + c + ":" + name, { bubbles: true, detail: detail || {} })); }
+
   function config(grid) {
     if (!grid._rx) {
       try { grid._rx = JSON.parse(grid.getAttribute("data-rx-grid")); } catch (_) { grid._rx = {}; }
@@ -173,11 +175,15 @@
   document.addEventListener("submit", function (event) {
     var grid = event.target.closest && event.target.closest("form.rx-grid");
     if (!grid || event.target !== grid) return;
+    var cause = grid._rxCause || (grid._rxKeepPage ? "page" : "filter");
+    grid._rxCause = null;
     if (!grid._rxKeepPage) setState(grid, "page", "1");
     if (grid._rxFocusSearch) { window._rxSearchFocus = grid.id; grid._rxFocusSearch = false; }
     grid._rxKeepPage = false;
     syncKept(grid);
     trim(grid);
+    if (cause === "sort") emit(grid, "sorted", { sort: grid.querySelector('[data-grid-state="sort"]').value });
+    else if (cause === "filter") emit(grid, "filtered", { query: new URLSearchParams(new FormData(grid)).toString() });
     // Without htmx the browser submits the form itself; give the fields back after.
     if (!window.htmx) setTimeout(function () { untrim(grid); }, 0);
   }, true);
@@ -201,6 +207,7 @@
     if (!grid) return;
     if (target.hasAttribute("data-grid-sort")) {
       setState(grid, "sort", target.getAttribute("data-grid-sort"));
+      grid._rxCause = "sort";
       submit(grid);
     } else if (target.hasAttribute("data-grid-page")) {
       setState(grid, "page", target.getAttribute("data-grid-page"));
@@ -903,6 +910,10 @@
     return Array.prototype.slice.call(grid.querySelectorAll("[data-grid-select]:checked"));
   }
 
+  function emitSelection(grid) {
+    emit(grid, "selected", { ids: selectedBoxes(grid).map(function (b) { return b.value; }), all: !!grid._rxAllMatching });
+  }
+
   function syncSelection(grid) {
     var bar = grid.querySelector("[data-grid-bulk]");
     if (!bar) return;
@@ -1000,9 +1011,11 @@
       grid.querySelectorAll("[data-grid-select]").forEach(function (b) { b.checked = el.checked; });
       grid._rxAllMatching = false;
       syncSelection(grid);
+      emitSelection(grid);
     } else if (el.hasAttribute("data-grid-select")) {
       grid._rxAllMatching = false;
       syncSelection(grid);
+      emitSelection(grid);
     }
   });
 
@@ -1017,9 +1030,11 @@
     if (t.hasAttribute("data-grid-select-matching")) {
       grid._rxAllMatching = true;
       syncSelection(grid);
+      emitSelection(grid);
     } else if (t.hasAttribute("data-grid-select-none")) {
       grid.querySelectorAll("[data-grid-select]").forEach(function (b) { b.checked = false; });
       syncSelection(grid);
+      emitSelection(grid);
     } else if (t.hasAttribute("data-grid-bulk-action")) {
       var ids = selectedBoxes(grid).map(function (b) { return b.value; });
       var all = !!grid._rxAllMatching;

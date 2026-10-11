@@ -10,6 +10,7 @@ structured.
 ```bash
 cd examples/hello
 cp .env.example .env             # APP_LOCALE=en: English unless the browser prefers Spanish
+rnx doctor                       # what is missing, with the fix
 rnx key:generate                 # writes APP_KEY to .env
 cargo run -- migrate
 cargo run -- db:seed             # optional: 30 fake entries

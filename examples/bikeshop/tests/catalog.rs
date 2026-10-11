@@ -761,3 +761,11 @@ async fn each_store_has_its_own_page_on_its_own_host() {
         .assert_view("home/index.html")
         .assert_see(&format!(r#"href="http://{host}/""#));
 }
+
+#[renox::test]
+async fn the_catalog_models_match_the_schema() {
+    TestApp::new(bikeshop::app())
+        .await
+        .assert_models_match_schema()
+        .await;
+}

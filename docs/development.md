@@ -9,13 +9,28 @@ rebuilds **your** code when you change it. Templates, translations and files in 
 need a build at all: they reload by themselves. The settings below make both kinds of build
 quicker.
 
+## Start with rnx doctor
+
+Run `rnx doctor` on a new machine, or when something does not work. It checks what a Renox app
+needs and says how to fix what is missing: Rust and its version, the linker, sccache, then (inside
+an app) `.env`, `APP_KEY`, the database and whether the migrations ran.
+
+Each line starts with a mark: `✓` is fine, `!` is a warning (the app works, but slower or
+less safe), `✗` is a problem that must be fixed. The exit code is 1 when any check shows `✗`, and
+0 otherwise, so you can run it in a script or in CI.
+
+`rnx doctor` builds the app to ask it about its database. `rnx doctor --no-build` skips that and
+the database checks. Outside an app directory it checks the machine only and tells you so.
+
 ### In this guide
 
+- [Start with rnx doctor](#start-with-rnx-doctor): what is missing on this machine or in this app.
 - [What `rnx new` already does](#what-rnx-new-already-does): two speed-ups every new app has.
 - [A faster linker](#a-faster-linker): speed up the last step of every build.
 - [Fewer dependencies](#fewer-dependencies): build less code by turning off parts you don't use.
 - [Sharing compiled dependencies](#sharing-compiled-dependencies): reuse work between apps.
 - [Docker](#docker): keep Docker builds quick.
+- [Editor autocomplete](#editor-autocomplete): tag and attribute suggestions for templates.
 
 ### Words you'll meet
 
@@ -67,8 +82,13 @@ smaller file links faster, and linking is the part of each rebuild you wait for.
 
 Linking is most of the time of an incremental rebuild. A faster linker helps on every change.
 
-On Linux, install [mold](https://github.com/rui314/mold) (or lld), then add a file
-`.cargo/config.toml` to the app:
+`rnx new` writes `.cargo/config.toml` for you when it finds [mold](https://github.com/rui314/mold)
+and clang on the machine (or lld on aarch64 Linux). It keeps the file out of Git and Docker
+(`.gitignore` and `.dockerignore`), because it only suits your machine, and it tells you it did it.
+Run `rnx doctor` to see which linker is in use.
+
+On x86_64 Linux, Rust's default is already `rust-lld` (since Rust 1.90), so mold is the only
+further step. To do it by hand, install mold and clang, then add `.cargo/config.toml` to the app:
 
 ```toml
 # Use clang to drive the link, and tell it to use mold (Linux, 64-bit Intel/AMD)
@@ -82,8 +102,8 @@ This tells Rust: "when you build for 64-bit Linux, use `clang` to link, and let 
 On other systems:
 
 - **macOS:** the default linker (ld-prime) is already fast. Nothing to do.
-- **Windows:** use `rust-lld`. Add `rustflags = ["-C", "link-arg=-fuse-ld=lld"]` for the
-  target `x86_64-pc-windows-msvc`.
+- **Windows:** use `rust-lld`. Set `linker = "rust-lld.exe"` under
+  `[target.x86_64-pc-windows-msvc]`.
 
 ## Fewer dependencies
 
@@ -142,3 +162,12 @@ code, only your own crate is compiled, not every dependency again.
 > [!IMPORTANT]
 > Commit `Cargo.lock` to your repository. It records the exact version of every dependency,
 > so the dependency layer is built from the same versions each time.
+
+## Editor autocomplete
+
+New apps get suggestions for the kit's `<rx-…>` tags in VS Code. `rnx serve` writes
+`.vscode/renox-components.json` after each build (the same as running `rnx view:data`), and
+`.vscode/settings.json` points `html.customData` at it. The file is git-ignored. If a build
+can't write it, `rnx serve` warns and keeps running. See
+[the UI guide](ui.md#editor-autocomplete). JetBrains IDEs aren't covered: they read Web Types,
+not this format.

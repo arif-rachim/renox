@@ -405,3 +405,50 @@ async fn rich_text_is_stored_cleaned_and_an_empty_preview_is_fine() {
         .assert_dont_see("<p>");
     app.post("/_renox/editors/preview", &[]).await.assert_ok();
 }
+
+#[renox::test]
+async fn the_editors_work_as_tags() {
+    let tags = r#"<form method="post" action="/posts">
+<rx-rich-editor name="body" label="Body" :value="post.body" required />
+<rx-markdown-editor name="notes" label="Notes" :value="post.notes" rows="5" />
+<rx-code-editor name="config" label="Config" :value="post.config" language="json" />
+</form>
+<dl><rx-code-entry label="Config" :value="post.config" language="json" /></dl>"#;
+    let app = TestApp::new(
+        App::new()
+            .module(Editors::new())
+            .module(Posts)
+            .module(Tags)
+            .templates(move |env| {
+                renox::view::add_template(env, "tags.html", tags).unwrap();
+            }),
+    )
+    .await;
+    let html = app.get("/tags").await.assert_ok().text();
+    for needle in [
+        r#"name="body""#,
+        r#"<trix-editor"#,
+        r#"data-preview-url="/_renox/editors/preview""#,
+        r#"data-rx-code-editor data-language="json""#,
+        r#"class="rx-code-entry""#,
+    ] {
+        assert!(html.contains(needle), "missing {needle}\n{html}");
+    }
+}
+
+struct Tags;
+
+impl Module for Tags {
+    fn name(&self) -> &'static str {
+        "tags"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/tags", || async {
+            view(
+                "tags.html",
+                context! { post => context! { body => "<p>Hi</p>", notes => "**Hi**", config => "{\"a\": 1}" } },
+            )
+        })
+    }
+}

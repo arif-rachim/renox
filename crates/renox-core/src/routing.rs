@@ -657,6 +657,12 @@ impl RouteTable {
         self.paths.get(name).map(String::as_str)
     }
 
+    /// Every route name, in no particular order.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
+        self.paths.keys().map(String::as_str)
+    }
+
     /// Records the methods `name` answers (`GET`, `PUT|PATCH`, `*` for any).
     pub(crate) fn set_method(&mut self, name: &str, method: &str) {
         self.methods.insert(name.to_owned(), method.to_owned());

@@ -219,3 +219,63 @@ async fn bulk_actions_refresh_or_redirect() {
         .assert_redirect("/shop");
     assert_eq!(Checklist::default().items.len(), 5);
 }
+
+#[renox::test]
+async fn the_live_checklist_shares_the_session_list_and_runs_its_actions() {
+    use bikeshop::app::about::live::LiveChecklist;
+    let app = TestApp::new(bikeshop::app()).await;
+    app.get("/about/htmx/live")
+        .await
+        .assert_ok()
+        .assert_view("about/live.html")
+        .assert_see(">Pump the tyres<")
+        .assert_see("data-rx-live=\"checklist\"");
+
+    let mut live = app.live(LiveChecklist::default());
+    live.set("title", "Fill the bottle");
+    live.call("add")
+        .await
+        .assert_ok()
+        .assert_see(">Fill the bottle<")
+        .assert_see(">5 to do<");
+    assert_eq!(live.component().title, "");
+    // The htmx page reads the same list.
+    app.get("/about/htmx").await.assert_see(">Fill the bottle<");
+
+    // Empty: a 422 under the field.
+    live.set("title", "  ");
+    live.call("add").await.assert_invalid("title");
+
+    live.call_with("toggle", renox::serde_json::json!([2]))
+        .await
+        .assert_ok()
+        .assert_see(">4 to do<");
+
+    live.call_with("edit", renox::serde_json::json!([2]))
+        .await
+        .assert_ok()
+        .assert_see(r#"value="Check the brakes""#);
+    assert_eq!(live.component().editing, Some(2));
+    live.set("edit_title", "");
+    live.call("save_edit").await.assert_invalid("edit_title");
+    live.set("edit_title", " Check both brakes ");
+    live.call("save_edit")
+        .await
+        .assert_ok()
+        .assert_see(">Check both brakes<");
+    assert_eq!(live.component().editing, None);
+
+    live.call_with("show", renox::serde_json::json!(["done"]))
+        .await
+        .assert_ok()
+        .assert_see(">Check both brakes<")
+        .assert_dont_see(">Oil the chain<");
+
+    live.call_with("delete", renox::serde_json::json!([2]))
+        .await
+        .assert_ok()
+        .assert_dont_see(">Check both brakes<");
+    live.call_with("delete", renox::serde_json::json!([99]))
+        .await
+        .assert_not_found();
+}

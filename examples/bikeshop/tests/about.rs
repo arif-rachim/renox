@@ -591,3 +591,9 @@ async fn the_language_menu_remembers_the_choice() {
     app.post("/locale/xx", &[]).await.assert_status(303);
     app.get("/").await.assert_see("Inicio");
 }
+
+#[renox::test]
+async fn every_view_compiles() {
+    let app = TestApp::new(bikeshop::app()).await;
+    app.assert_views_compile();
+}

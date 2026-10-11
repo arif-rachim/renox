@@ -104,6 +104,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   views/grid.html          the data grid macro (renox/grid.html), grid_print.html (its print
                            export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
+  src/components/          the tag compiler: `<rx-…>`/`<app-…>` and `rx-if`/`rx-else`/`rx-for` to MiniJinja
+                           when a template loads (scan.rs, tree.rs, attrs.rs, contracts.rs: the static
+                           component table, emit.rs, special.rs: rx-page/push/form/table, app.rs, suggest.rs)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/icons.rs             the kit's icons: Lucide paths (lucide-static 1.53.0, ISC; assets/NOTICE,
                            assets/lucide-LICENSE) drawn by `renox_icon`, behind ui.html's `icon(…)`
@@ -316,7 +319,8 @@ crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, se
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
                            standalone CLI: download via curl + SHA-256 check, build/watch; used by
-                           new --tailwind, serve, build)
+                           new --tailwind, serve, build), doctor.rs (rnx doctor),
+                           tools.rs (programs on PATH, the fast linker rnx new writes)
   build.rs                 sets RENOX_GIT_REV (the commit `rnx new` pins apps to)
   stubs/starter/           `rnx new --starter`: the starter kit's files, written over the
                            stubs below (same path) or next to them (`STARTER` in new.rs)
@@ -650,6 +654,9 @@ so a helper can't build a temporary `Vec` and pass `&tmp` to a loader: inline th
 a closure borrowing `req` alive across `next.run(req).await` (scope it in a block).
 
 ### 4.3 Built-in templates, texts and template helpers
+- Templates are compiled by `components::compile` in the loader (`view.rs`): tags become macro calls
+  on `renox/ui.html`, and a new kit macro gets a `Contract` in `components/contracts.rs`. Plugin
+  templates (`env.add_template`) skip it. Errors read `file:line: message`; line numbers are kept.
 - Add the file under `crates/renox-core/views/…` **and** register it in `BUILTIN` in `view.rs`.
   Built-in names are prefixed `renox/` (e.g. `renox/auth/login.html`). Forgetting `BUILTIN` gives
   "template not found" at runtime only.
@@ -1479,6 +1486,10 @@ picks the build, not the terminal.
   tests/fields.rs. The entries above name removed examples: they are history. In headless
   Chrome the tab that sent the bike shop's login form gets no key presses afterwards; tests
   that type after logging in log in from a tab of their own.
+- **#372, components as tags** (epic #385; tasks #443–#458): `components/` compiles `<rx-…>`,
+  `<app-…>` and `rx-if`/`rx-else`/`rx-for` to MiniJinja at load (the loader hook, a static contract
+  table, `make:component` writing `<rx-props>`); bikeshop's supplier and field pages use it; guide:
+  docs/ui.md "Components as tags". Plugin templates are not compiled yet.
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
