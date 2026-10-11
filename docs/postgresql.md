@@ -74,7 +74,9 @@ The `--database postgres` option does three things for you:
 - it sets `TEST_DATABASE_URL` in `.env`: the database the tests use (see [Tests](#tests)).
 
 After that, `rnx make:migration` and `rnx make:model -m` write PostgreSQL SQL for you. They
-read `DATABASE_URL` to know which database you use.
+read `DATABASE_URL` to know which database you use. So do `rnx make:migration --auto` (and
+`db:diff`), which write PostgreSQL SQL from the models, and `rnx db:check`, which compares the
+models with the tables the migrations build on PostgreSQL.
 
 ## Switching an existing app
 

@@ -282,8 +282,9 @@ async fn subscribed(w: &World, weekday: i64) -> PlanSubscription {
 }
 
 async fn latest(w: &World) -> PlanSubscription {
-    PlanSubscription::where_eq("customer_bike_id", w.bike.id)
-        .order_by_desc("id")
+    PlanSubscription::query()
+        .where_(PlanSubscription::CUSTOMER_BIKE_ID.eq(w.bike.id))
+        .order_by_desc(PlanSubscription::ID)
         .first(w.app.db())
         .await
         .unwrap()
@@ -291,8 +292,9 @@ async fn latest(w: &World) -> PlanSubscription {
 }
 
 async fn visits_of(w: &World, sub: &PlanSubscription) -> Vec<PlanVisit> {
-    PlanVisit::where_eq("plan_subscription_id", sub.id)
-        .order_by("seq")
+    PlanVisit::query()
+        .where_(PlanVisit::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .order_by(PlanVisit::SEQ)
         .get(w.app.db())
         .await
         .unwrap()
@@ -401,7 +403,8 @@ async fn subscribing_checks_out_at_stripe_and_the_webhook_starts_the_plan() {
         .await
         .assert_ok();
     w.app.run_jobs().await;
-    let invoices = PlanInvoice::where_eq("plan_subscription_id", sub.id)
+    let invoices = PlanInvoice::query()
+        .where_(PlanInvoice::PLAN_SUBSCRIPTION_ID.eq(sub.id))
         .get(w.app.db())
         .await
         .unwrap();
@@ -521,7 +524,8 @@ async fn visits_come_a_week_ahead_on_the_weekday_for_months_and_missed_ones_dont
         }
     }
     // Missed visits are recorded, not booked again.
-    let orders = WorkOrder::where_eq("plan_subscription_id", sub.id)
+    let orders = WorkOrder::query()
+        .where_(WorkOrder::PLAN_SUBSCRIPTION_ID.eq(sub.id))
         .count(w.app.db())
         .await
         .unwrap();
@@ -809,7 +813,8 @@ async fn a_failed_payment_holds_the_visits_until_it_is_paid() {
     assert_eq!(order.status, WorkStatus::Booked);
     assert_eq!(local_day(&w, order.scheduled_for), first);
     // One invoice row for the payment, now paid.
-    let invoice = PlanInvoice::where_eq("payment_id", "in_9")
+    let invoice = PlanInvoice::query()
+        .where_(PlanInvoice::PAYMENT_ID.eq("in_9"))
         .first(w.app.db())
         .await
         .unwrap()

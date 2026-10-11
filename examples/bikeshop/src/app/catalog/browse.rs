@@ -56,7 +56,9 @@ impl Card {
         let mut photos: HashMap<i64, Vec<ProductPhoto>> = has_many(
             db,
             &products,
-            ProductPhoto::query().order_by("position").order_by("id"),
+            ProductPhoto::query()
+                .order_by(ProductPhoto::POSITION)
+                .order_by(ProductPhoto::ID),
             "product_id",
             |p| p.product_id,
         )
@@ -100,8 +102,8 @@ impl Tree {
     pub async fn load(db: &Db) -> Result<Tree> {
         Ok(Tree {
             all: Category::query()
-                .order_by("position")
-                .order_by("id")
+                .order_by(Category::POSITION)
+                .order_by(Category::ID)
                 .get(db)
                 .await?,
         })
@@ -206,9 +208,10 @@ pub async fn my_bikes(db: &Db, user: Option<&User>) -> Result<Vec<CustomerBike>>
     let Some(customer) = Customer::of_user(db, user.id).await? else {
         return Ok(Vec::new());
     };
-    CustomerBike::where_eq("customer_id", customer.id)
-        .where_not_null("product_id")
-        .order_by("id")
+    CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .where_(CustomerBike::PRODUCT_ID.is_not_null())
+        .order_by(CustomerBike::ID)
         .get(db)
         .await
 }
@@ -260,7 +263,7 @@ pub async fn listing(
     let in_scope = || {
         Product::query()
             .when(category_ids.is_some(), |q| {
-                q.where_in("category_id", category_ids.clone().unwrap_or_default())
+                q.where_(Product::CATEGORY_ID.is_in(category_ids.clone().unwrap_or_default()))
             })
             .where_search(&filters.q)
     };
@@ -367,7 +370,7 @@ async fn facets(
         .await?
         .unwrap_or(0);
     let specs: Vec<Json<std::collections::BTreeMap<String, String>>> =
-        scope.clone().pluck(db, "specs").await?;
+        scope.clone().pluck(db, Product::SPECS).await?;
     let mut wheels = BTreeSet::new();
     let mut frames = BTreeSet::new();
     let mut ebikes = false;
@@ -601,7 +604,7 @@ pub async fn suggest(
         Vec::new()
     } else {
         let products = Product::search(&q)
-            .order_by("id")
+            .order_by(Product::ID)
             .limit(SUGGESTIONS)
             .get(&db)
             .await?;

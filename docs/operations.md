@@ -60,6 +60,9 @@ the queue workers and the scheduler.
 | `webhook:failed`, `webhook:retry <id>` | Failed webhook calls (see Failed webhook calls). |
 | `cache:prune`, `session:prune` | Deletes expired cache rows and database sessions. |
 | `schedule:list`, `schedule:run <task>`, `schedule:work` | The scheduler (`schedule:work` runs it alone, when `serve` runs with `SCHEDULER=false`). |
+| `db:check` | Compares the models registered with `App::model` with the tables the migrations build, and fails on a mismatch. |
+| `db:diff [name] [--yes]` | Writes a migration for what changed in those models (`rnx make:migration --auto`). Review it before `migrate`. |
+| `view:check` | Compiles every template and checks its components and route names. |
 | `route:list` | Every route with its name, module and guards. |
 | `ui:publish [--force]` | Copies the UI kit into the app (`resources/views/components/ui.html`, `public/css/renox-ui.css`), so you can change it there. |
 | `down [--secret S] [--retry N]`, `up` | Maintenance mode. |
@@ -471,6 +474,10 @@ When you deploy, you usually run `migrate` first. Here is how it behaves:
 > [!IMPORTANT]
 > To change the schema, add a new migration. Never edit one that has already run.
 
+- Before shipping, run `db:check` and `view:check` (CI is a good place), or call
+  `assert_models_match_schema` and `assert_views_compile` in a test (see [testing.md](testing.md)).
+  `rnx doctor` says what an environment is missing: `.env`, `APP_KEY`, the database, pending
+  migrations.
 - Restart the app after `migrate`. (The Dockerfile and `deploy/README.md` already do: migrate,
   then start.) Migrations run inside the app itself (tests, `migrate:fresh`) are safe:
   connections opened before them are dropped. But a server that keeps running while another

@@ -109,17 +109,17 @@ pub async fn variants(
     } else if query.q.chars().filter(|c| c.is_alphanumeric()).count() < 2 {
         Vec::new()
     } else {
-        let mut found = ProductVariant::where_eq("sku", query.q.to_uppercase())
+        let mut found = ProductVariant::query()
+            .where_(ProductVariant::SKU.eq(query.q.to_uppercase()))
             .get(&db)
             .await?;
         let products = Product::search(&query.q).limit(10).get(&db).await?;
         let more = ProductVariant::query()
-            .where_in(
-                "product_id",
-                products.iter().map(|p| p.id).collect::<Vec<_>>(),
+            .where_(
+                ProductVariant::PRODUCT_ID.is_in(products.iter().map(|p| p.id).collect::<Vec<_>>()),
             )
-            .order_by("product_id")
-            .order_by("id")
+            .order_by(ProductVariant::PRODUCT_ID)
+            .order_by(ProductVariant::ID)
             .limit(30)
             .get(&db)
             .await?;
@@ -183,11 +183,11 @@ pub async fn customers(
         let like = format!("%{}%", query.q);
         Customer::query()
             .where_any(|q| {
-                q.where_like("name", like.clone())
-                    .where_like("email", like.clone())
-                    .where_like("phone", like.clone())
+                q.where_(Customer::NAME.like(&like))
+                    .where_(Customer::EMAIL.like(&like))
+                    .where_(Customer::PHONE.like(&like))
             })
-            .order_by("name")
+            .order_by(Customer::NAME)
             .limit(20)
             .get(&db)
             .await?
@@ -440,7 +440,8 @@ pub async fn pay(
     )
     .await?;
     // Handed over across the counter.
-    Order::where_eq("id", order.id)
+    Order::query()
+        .where_(Order::ID.eq(order.id))
         .update(
             db,
             &[("status", &OrderStatus::Completed), ("completed_at", &now)],

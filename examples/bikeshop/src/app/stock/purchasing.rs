@@ -60,27 +60,24 @@ pub struct SupplierList {
 pub async fn suppliers(State(db): State<Db>, Page(page): Page) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let suppliers = Supplier::query()
-        .order_by("name")
+        .order_by(Supplier::NAME)
         .paginate(&db, page, 25)
         .await?;
     let ids: Vec<i64> = suppliers.items.iter().map(|s| s.id).collect();
     let items: Vec<(i64, i64)> = SupplierItem::query()
-        .where_in("supplier_id", ids.clone())
+        .where_(SupplierItem::SUPPLIER_ID.is_in(ids.clone()))
         .group_by("supplier_id")
         .select_as(&db, "supplier_id, COUNT(*)")
         .await?;
     // [/explain:stock.suppliers.handler]
     let open: Vec<(i64, i64)> = PurchaseOrder::query()
-        .where_in("supplier_id", ids)
-        .where_eq("store_id", store)
-        .where_in(
-            "status",
-            [
-                PurchaseStatus::Draft,
-                PurchaseStatus::Ordered,
-                PurchaseStatus::Partial,
-            ],
-        )
+        .where_(PurchaseOrder::SUPPLIER_ID.is_in(ids))
+        .where_(PurchaseOrder::STORE_ID.eq(store))
+        .where_(PurchaseOrder::STATUS.is_in([
+            PurchaseStatus::Draft,
+            PurchaseStatus::Ordered,
+            PurchaseStatus::Partial,
+        ]))
         .group_by("supplier_id")
         .select_as(&db, "supplier_id, COUNT(*)")
         .await?;
@@ -176,8 +173,9 @@ pub async fn supplier_show(
     Found(supplier): Found<Supplier>,
 ) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
-    let items = SupplierItem::where_eq("supplier_id", supplier.id)
-        .order_by("variant_id")
+    let items = SupplierItem::query()
+        .where_(SupplierItem::SUPPLIER_ID.eq(supplier.id))
+        .order_by(SupplierItem::VARIANT_ID)
         .paginate(&db, page, 50)
         .await?;
     let names = variant_names(&db, items.items.iter().map(|i| i.variant_id).collect()).await?;
@@ -185,9 +183,10 @@ pub async fn supplier_show(
         let name = names.get(&item.variant_id).cloned().unwrap_or_default();
         json!({ "name": name.label(), "sku": name.sku, "price": name.price, "item": item })
     });
-    let orders = PurchaseOrder::where_eq("supplier_id", supplier.id)
-        .where_eq("store_id", store)
-        .order_by_desc("id")
+    let orders = PurchaseOrder::query()
+        .where_(PurchaseOrder::SUPPLIER_ID.eq(supplier.id))
+        .where_(PurchaseOrder::STORE_ID.eq(store))
+        .order_by_desc(PurchaseOrder::ID)
         .limit(10)
         .get(&db)
         .await?;
@@ -222,23 +221,23 @@ pub async fn index(
         .status
         .filter(|s| TABS.contains(&s.as_str()))
         .unwrap_or_else(|| "open".to_owned());
-    let orders =
-        access::visible::<PurchaseOrder>(catalogue::STOCK_VIEW).where_eq("store_id", store);
+    let orders = access::visible::<PurchaseOrder>(catalogue::STOCK_VIEW)
+        .where_(PurchaseOrder::STORE_ID.eq(store));
     // [/explain:stock.purchasing.handler]
     let orders = match tab.as_str() {
-        "open" => orders.where_in(
-            "status",
-            [
-                PurchaseStatus::Draft,
-                PurchaseStatus::Ordered,
-                PurchaseStatus::Partial,
-            ],
-        ),
-        "received" => orders.where_eq("status", PurchaseStatus::Received),
+        "open" => orders.where_(PurchaseOrder::STATUS.is_in([
+            PurchaseStatus::Draft,
+            PurchaseStatus::Ordered,
+            PurchaseStatus::Partial,
+        ])),
+        "received" => orders.where_(PurchaseOrder::STATUS.eq(PurchaseStatus::Received)),
         _ => orders,
     };
     // [explain:stock.purchasing.handler]
-    let orders = orders.order_by_desc("id").paginate(&db, page, 25).await?;
+    let orders = orders
+        .order_by_desc(PurchaseOrder::ID)
+        .paginate(&db, page, 25)
+        .await?;
     let suppliers =
         renox::db::relations::belongs_to::<Supplier, _, _>(&db, &orders.items, |o| o.supplier_id)
             .await?;
@@ -279,16 +278,17 @@ pub struct Need {
 /// level, topped up to twice the level. One map by variant.
 pub async fn needs(db: &Db, store: i64) -> Result<BTreeMap<i64, Need>> {
     let mut needs: BTreeMap<i64, Need> = BTreeMap::new();
-    let waiting: Vec<i64> = WorkOrder::where_eq("store_id", store)
-        .where_eq("status", WorkStatus::WaitingParts)
+    let waiting: Vec<i64> = WorkOrder::query()
+        .where_(WorkOrder::STORE_ID.eq(store))
+        .where_(WorkOrder::STATUS.eq(WorkStatus::WaitingParts))
         .get(db)
         .await?
         .into_iter()
         .map(|o| o.id)
         .collect();
     for part in WorkOrderPart::query()
-        .where_in("work_order_id", waiting)
-        .where_eq("status", PartStatus::Waiting)
+        .where_(WorkOrderPart::WORK_ORDER_ID.is_in(waiting))
+        .where_(WorkOrderPart::STATUS.eq(PartStatus::Waiting))
         .get(db)
         .await?
     {
@@ -300,8 +300,9 @@ pub async fn needs(db: &Db, store: i64) -> Result<BTreeMap<i64, Need>> {
         }
     }
     // [/explain:stock.purchasing.needs]
-    let here: Vec<StockRow> = StockRow::where_eq("location_store_id", store)
-        .where_op("reorder_level", ">", 0)
+    let here: Vec<StockRow> = StockRow::query()
+        .where_(StockRow::LOCATION_STORE_ID.eq(store))
+        .where_(StockRow::REORDER_LEVEL.gt(0))
         .get(db)
         .await?;
     let mut available: HashMap<i64, (i64, i64)> = HashMap::new();
@@ -348,14 +349,15 @@ pub struct NewQuery {
 // [explain:stock.purchasing.create.handler]
 pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
-    let suppliers = Supplier::query().order_by("name").get(&db).await?;
+    let suppliers = Supplier::query().order_by(Supplier::NAME).get(&db).await?;
     let supplier = query
         .supplier
         .and_then(|id| suppliers.iter().find(|s| s.id == id).cloned());
     let mut needs = needs(&db, store).await?;
     let mut rest = Vec::new();
     if let Some(supplier) = &supplier {
-        let items = SupplierItem::where_eq("supplier_id", supplier.id)
+        let items = SupplierItem::query()
+            .where_(SupplierItem::SUPPLIER_ID.eq(supplier.id))
             .get(&db)
             .await?;
         // [/explain:stock.purchasing.create.handler]
@@ -536,8 +538,9 @@ pub struct LineView {
 }
 
 async fn lines_of(db: &Db, order: &PurchaseOrder) -> Result<Vec<LineView>> {
-    let lines = PurchaseOrderLine::where_eq("purchase_order_id", order.id)
-        .order_by("id")
+    let lines = PurchaseOrderLine::query()
+        .where_(PurchaseOrderLine::PURCHASE_ORDER_ID.eq(order.id))
+        .order_by(PurchaseOrderLine::ID)
         .get(db)
         .await?;
     let names = variant_names(db, lines.iter().map(|l| l.variant_id).collect()).await?;
@@ -669,8 +672,9 @@ pub async fn send(
     let mut order = manageable(&state.db, &user, id).await?;
     let supplier = Supplier::find_or_404(&state.db, order.supplier_id).await?;
     let lang = state.current_lang();
-    let moved = PurchaseOrder::where_eq("id", order.id)
-        .where_eq("status", PurchaseStatus::Draft)
+    let moved = PurchaseOrder::query()
+        .where_(PurchaseOrder::ID.eq(order.id))
+        .where_(PurchaseOrder::STATUS.eq(PurchaseStatus::Draft))
         .update(&state.db, &[("status", &PurchaseStatus::Ordered)])
         .await?;
     abort_if(
@@ -729,13 +733,15 @@ pub async fn cancel(
     Path(id): Path<i64>,
 ) -> Result<(Toast, Redirect)> {
     let order = manageable(&state.db, &user, id).await?;
-    let received: i64 = PurchaseOrderLine::where_eq("purchase_order_id", order.id)
+    let received: i64 = PurchaseOrderLine::query()
+        .where_(PurchaseOrderLine::PURCHASE_ORDER_ID.eq(order.id))
         .sum(&state.db, "received_quantity")
         .await?;
     let lang = state.current_lang();
     let moved = if received == 0 {
-        PurchaseOrder::where_eq("id", order.id)
-            .where_in("status", [PurchaseStatus::Draft, PurchaseStatus::Ordered])
+        PurchaseOrder::query()
+            .where_(PurchaseOrder::ID.eq(order.id))
+            .where_(PurchaseOrder::STATUS.is_in([PurchaseStatus::Draft, PurchaseStatus::Ordered]))
             .update(&state.db, &[("status", &PurchaseStatus::Cancelled)])
             .await?
     } else {
@@ -808,7 +814,8 @@ pub async fn receive_lines(
         .map(|l| (l.line, l.received.unwrap_or(0)))
         .collect();
     let mut tx = db.begin().await?;
-    let lines = PurchaseOrderLine::where_eq("purchase_order_id", order.id)
+    let lines = PurchaseOrderLine::query()
+        .where_(PurchaseOrderLine::PURCHASE_ORDER_ID.eq(order.id))
         .get(&mut tx)
         .await?;
     let mut open = 0;
@@ -859,15 +866,17 @@ pub async fn receive_lines(
     } else {
         PurchaseStatus::Partial
     };
-    let moved = PurchaseOrder::where_eq("id", order.id)
-        .where_in("status", [PurchaseStatus::Ordered, PurchaseStatus::Partial])
+    let moved = PurchaseOrder::query()
+        .where_(PurchaseOrder::ID.eq(order.id))
+        .where_(PurchaseOrder::STATUS.is_in([PurchaseStatus::Ordered, PurchaseStatus::Partial]))
         .update(&mut tx, &[("status", &status)])
         .await?;
     if moved == 0 {
         return Err(abort(StatusCode::CONFLICT, "This order isn't open."));
     }
     if status == PurchaseStatus::Received {
-        PurchaseOrder::where_eq("id", order.id)
+        PurchaseOrder::query()
+            .where_(PurchaseOrder::ID.eq(order.id))
             .update(&mut tx, &[("received_at", &renox::db::now())])
             .await?;
     }

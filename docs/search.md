@@ -84,7 +84,7 @@ struct Search {
 async fn index(State(db): State<Db>, Page(page): Page, Query(s): Query<Search>) -> Result<View> {
     let q = s.q.unwrap_or_default();
     let posts = Post::search(&q)          // the matches, best first
-        .where_eq("published", true)      // any other filter
+        .where_(Post::PUBLISHED.eq(true)) // any other filter
         .latest()                         // breaks ties between equal matches
         .paginate(&db, page, 20)
         .await?;
@@ -112,7 +112,7 @@ scope and hides soft-deleted rows, and takes every filter, `count`, `first`, `pl
 // Newest first, among the matches.
 let recent = Post::query().where_search("espresso").latest().limit(5).get(&db).await?;
 // How many drafts mention it.
-let drafts = Post::where_eq("published", false).where_search("espresso").count(&db).await?;
+let drafts = Post::query().where_(Post::PUBLISHED.eq(false)).where_search("espresso").count(&db).await?;
 # let _ = (recent, drafts); Ok(()) }
 ```
 
@@ -222,6 +222,6 @@ let grid = Grid::new("posts")
 | `use Searchable;` + `toSearchableArray()` | `#[model(search = "title, body")]` |
 | the `database` engine, a full-text index in a migration | `renox::db::search::migration::<Post>("…")` |
 | `Post::search('coffee')->get()` | `Post::search("coffee").get(&db)` |
-| `->where('published', true)->paginate(20)` | `.where_eq("published", true).paginate(&db, page, 20)` |
+| `->where('published', true)->paginate(20)` | `.where_(Post::PUBLISHED.eq(true)).paginate(&db, page, 20)` |
 | `scout:import` | `renox::db::search::rebuild::<Post>(&db)` (rarely needed: triggers keep it current) |
 | `searchable()` / `unsearchable()` on a model | automatic on every write |

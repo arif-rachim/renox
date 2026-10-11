@@ -56,6 +56,11 @@ impl Module for Staff {
     // [/explain:staff.dashboard.handler]
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::staff::model::Store>()
+            .model::<crate::app::staff::model::Staff>()
+            .model::<crate::app::staff::model::StaffHelpRequest>()
+            .model::<crate::app::staff::model::StaffHelpHour>();
         // Two-factor login is required for staff (two_factor.rs).
         app.listen(two_factor::on_logged_in)
             .listen(two_factor::on_enabled)

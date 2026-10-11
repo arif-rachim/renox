@@ -147,6 +147,15 @@ impl Module for Stock {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::stock::model::StockLevel>()
+            .model::<crate::app::stock::model::StockMovement>()
+            .model::<crate::app::stock::model::Supplier>()
+            .model::<crate::app::stock::model::PurchaseOrder>()
+            .model::<crate::app::stock::model::PurchaseOrderLine>()
+            .model::<crate::app::stock::model::ConsignmentShipment>()
+            .model::<crate::app::stock::model::ConsignmentShipmentLine>()
+            .model::<crate::app::stock::model::SupplierItem>();
         app.job::<import::ImportPriceList>();
         // `view:check` compares the template's variables with the struct's fields.
         app.view_data::<purchasing::SupplierList>();

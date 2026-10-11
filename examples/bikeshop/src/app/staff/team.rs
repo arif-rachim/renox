@@ -102,7 +102,7 @@ async fn members(db: &Db, store: i64) -> Result<Vec<Member>> {
     .bind(renox::db::now())
     .scalars(db)
     .await?;
-    let mut staff: Vec<Staff> = Staff::query().order_by("id").get(db).await?;
+    let mut staff: Vec<Staff> = Staff::query().order_by(Staff::ID).get(db).await?;
     staff.retain(|s| s.home_store_id == store || with_role.contains(&s.user_id));
     let user_ids: Vec<i64> = staff.iter().map(|s| s.user_id).collect();
     // [/explain:staff.team.index.members]
@@ -498,7 +498,7 @@ fn role_label(name: &str) -> String {
 
 /// Whether the invitation was used: the person has the role in the store.
 async fn already_joined(db: &Db, email: &str, store: i64, role: &str) -> Result<bool> {
-    let Some(user) = User::where_eq("email", email).first(db).await? else {
+    let Some(user) = User::query().where_eq("email", email).first(db).await? else {
         return Ok(false);
     };
     let scope = store_scope(store);
@@ -521,7 +521,8 @@ pub async fn join(
 ) -> Result<View> {
     let store = Store::find_or_404(&db, store).await?;
     let email = normalize_email(&email);
-    let has_account = User::where_eq("email", email.clone())
+    let has_account = User::query()
+        .where_eq("email", email.clone())
         .first(&db)
         .await?
         .is_some();
@@ -583,7 +584,11 @@ pub async fn accept(
     if already_joined(db, &email, store.id, &role).await? {
         return Err(Error::NotFound);
     }
-    let person = match User::where_eq("email", email.clone()).first(db).await? {
+    let person = match User::query()
+        .where_eq("email", email.clone())
+        .first(db)
+        .await?
+    {
         // An existing account joins only when logged in as itself.
         Some(existing) => {
             if !user.as_ref().is_some_and(|u| u.id == existing.id) {

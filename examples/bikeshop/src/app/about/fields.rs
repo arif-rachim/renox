@@ -31,6 +31,7 @@ use renox::validation::Dimensions;
 use renox_editors::RichText;
 use serde::{Deserialize, Serialize};
 
+use crate::app::catalog::model::Brand;
 use crate::explain::NotAPage;
 
 /// A frame size: one choice of a few, the kit's `radio`, stored as a word.
@@ -434,7 +435,7 @@ async fn form_context(
 ) -> Result<renox::minijinja::Value> {
     // The datalist's suggestions: the catalogue's brands.
     let brands: Vec<String> = crate::app::catalog::model::Brand::query()
-        .order_by("name")
+        .order_by(Brand::NAME)
         .limit(50)
         .get(&state.db)
         .await?
@@ -453,8 +454,9 @@ async fn form_context(
 
 /// One sample of the person's, or a 404 (someone else's is "not found" too).
 async fn own(db: &Db, user: &User, id: Uuid) -> Result<FieldSample> {
-    FieldSample::where_eq("id", id)
-        .where_eq("user_id", user.id)
+    FieldSample::query()
+        .where_(FieldSample::ID.eq(id))
+        .where_(FieldSample::USER_ID.eq(user.id))
         .first(db)
         .await?
         .ok_or(Error::NotFound)
@@ -465,8 +467,9 @@ async fn own(db: &Db, user: &User, id: Uuid) -> Result<FieldSample> {
 async fn index(State(state): State<AppState>, user: Option<AuthUser>) -> Result<View> {
     let samples = match &user {
         Some(user) => {
-            FieldSample::where_eq("user_id", user.id)
-                .order_by_desc("created_at")
+            FieldSample::query()
+                .where_(FieldSample::USER_ID.eq(user.id))
+                .order_by_desc(FieldSample::CREATED_AT)
                 .get(&state.db)
                 .await?
         }

@@ -968,7 +968,7 @@ async fn workshop(tx: &mut Transaction, world: &mut World, books: &mut Books) ->
     }
     PlanSubscription::insert_many(&mut *tx, subscriptions).await?;
     let subscriptions = PlanSubscription::query()
-        .order_by("id")
+        .order_by(PlanSubscription::ID)
         .get(&mut *tx)
         .await?;
 

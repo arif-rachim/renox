@@ -139,6 +139,12 @@ impl Module for Rentals {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::rentals::model::RentalBike>()
+            .model::<crate::app::rentals::model::BikePlacement>()
+            .model::<crate::app::rentals::model::Rental>()
+            .model::<crate::app::rentals::model::IdentityDocument>()
+            .model::<crate::app::rentals::model::RentalPhoto>();
         // The deposit paid online (or not): the shared payments contract.
         app.listen(|event: PaymentSucceeded, state: AppState| async move {
             if let Payable::Rental(id) = event.payable {
@@ -191,7 +197,7 @@ pub fn active_store() -> Result<i64> {
 /// An absolute link to the route `name` (with one parameter or none), for
 /// mails and notifications. A plain function, so the `&dyn Display` list
 /// `AppState::absolute_url` takes never lives across an `.await` in the
-/// callers (that would make their futures non-`Send`, CLAUDE.md §4.2).
+/// callers (that would make their futures non-`Send`, docs/contributing/conventions.md §4.2).
 pub fn link(state: &AppState, name: &str, param: Option<impl std::fmt::Display>) -> Result<String> {
     match param {
         Some(param) => state.absolute_url(name, &[&param]),

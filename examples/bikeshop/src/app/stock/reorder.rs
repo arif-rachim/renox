@@ -71,8 +71,9 @@ pub struct StoreReport {
 
 /// The variants short at `store`, with spares elsewhere and suppliers.
 pub async fn low_at(db: &Db, store: i64) -> Result<Vec<Low>> {
-    let rows = StockRow::where_eq("location_store_id", store)
-        .where_op("reorder_level", ">", 0)
+    let rows = StockRow::query()
+        .where_(StockRow::LOCATION_STORE_ID.eq(store))
+        .where_(StockRow::REORDER_LEVEL.gt(0))
         .get(db)
         .await?;
     let mut here: BTreeMap<i64, (i64, i64)> = BTreeMap::new();
@@ -87,15 +88,15 @@ pub async fn low_at(db: &Db, store: i64) -> Result<Vec<Low>> {
     let ids: Vec<i64> = here.keys().copied().collect();
     // Other stores' own goods on their own shelves.
     let elsewhere = StockRow::query()
-        .where_in("variant_id", ids.clone())
-        .where_op("owner_store_id", "!=", store)
+        .where_(StockRow::VARIANT_ID.is_in(ids.clone()))
+        .where_(StockRow::OWNER_STORE_ID.ne(store))
         .where_raw("owner_store_id = location_store_id", Vec::<i64>::new())
         .get(db)
         .await?;
     let items = SupplierItem::query()
-        .where_in("variant_id", ids.clone())
-        .order_by("cost")
-        .order_by("supplier_id")
+        .where_(SupplierItem::VARIANT_ID.is_in(ids.clone()))
+        .order_by(SupplierItem::COST)
+        .order_by(SupplierItem::SUPPLIER_ID)
         .get(db)
         .await?;
     let names = variant_names(db, ids).await?;
@@ -154,9 +155,10 @@ pub async fn run(state: &AppState) -> Result<Vec<StoreReport>> {
 /// Replaces the store's untouched suggested drafts with today's: one per
 /// supplier, for the variants it sells.
 async fn suggest(db: &Db, store: i64, low: &[Low]) -> Result<Vec<i64>> {
-    let old: Vec<i64> = PurchaseOrder::where_eq("store_id", store)
-        .where_eq("status", PurchaseStatus::Draft)
-        .where_eq("suggested", true)
+    let old: Vec<i64> = PurchaseOrder::query()
+        .where_(PurchaseOrder::STORE_ID.eq(store))
+        .where_(PurchaseOrder::STATUS.eq(PurchaseStatus::Draft))
+        .where_(PurchaseOrder::SUGGESTED.eq(true))
         .get(db)
         .await?
         .into_iter()
@@ -165,11 +167,11 @@ async fn suggest(db: &Db, store: i64, low: &[Low]) -> Result<Vec<i64>> {
     if !old.is_empty() {
         let mut tx = db.begin().await?;
         PurchaseOrderLine::query()
-            .where_in("purchase_order_id", old.clone())
+            .where_(PurchaseOrderLine::PURCHASE_ORDER_ID.is_in(old.clone()))
             .delete(&mut tx)
             .await?;
         PurchaseOrder::query()
-            .where_in("id", old)
+            .where_(PurchaseOrder::ID.is_in(old))
             .delete(&mut tx)
             .await?;
         tx.commit().await?;

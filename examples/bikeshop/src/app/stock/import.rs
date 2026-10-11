@@ -91,7 +91,8 @@ pub async fn write_row(tx: &mut Transaction, supplier_id: i64, row: PriceRow) ->
         }
         None => {
             let slug = row.product.unwrap_or_default();
-            let Some(product) = Product::where_eq("slug", slug.trim())
+            let Some(product) = Product::query()
+                .where_(Product::SLUG.eq(slug.trim()))
                 .first(&mut *tx)
                 .await?
             else {

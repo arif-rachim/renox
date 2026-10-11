@@ -131,21 +131,17 @@ pub async fn index(
     let bikes = access::visible::<RentalBike>(catalogue::FLEET_VIEW);
     let bikes = match tab.as_str() {
         "mine_here" => bikes
-            .where_eq("owner_store_id", store)
-            .where_eq("location_store_id", store),
-        "others_here" => {
-            bikes
-                .where_eq("location_store_id", store)
-                .where_op("owner_store_id", "!=", store)
-        }
-        "mine_elsewhere" => {
-            bikes
-                .where_eq("owner_store_id", store)
-                .where_op("location_store_id", "!=", store)
-        }
+            .where_(RentalBike::OWNER_STORE_ID.eq(store))
+            .where_(RentalBike::LOCATION_STORE_ID.eq(store)),
+        "others_here" => bikes
+            .where_(RentalBike::LOCATION_STORE_ID.eq(store))
+            .where_(RentalBike::OWNER_STORE_ID.ne(store)),
+        "mine_elsewhere" => bikes
+            .where_(RentalBike::OWNER_STORE_ID.eq(store))
+            .where_(RentalBike::LOCATION_STORE_ID.ne(store)),
         _ => bikes.where_any(|any| {
-            any.where_eq("owner_store_id", store)
-                .where_eq("location_store_id", store)
+            any.where_(RentalBike::OWNER_STORE_ID.eq(store))
+                .where_(RentalBike::LOCATION_STORE_ID.eq(store))
         }),
     };
     let grid = fleet_grid(&lang);
@@ -168,9 +164,9 @@ pub async fn index(
     // The counts on the tabs: three small queries.
     let base = || access::visible::<RentalBike>(catalogue::FLEET_VIEW);
     let counts = json!({
-        "mine_here": base().where_eq("owner_store_id", store).where_eq("location_store_id", store).count(&state.db).await?,
-        "others_here": base().where_eq("location_store_id", store).where_op("owner_store_id", "!=", store).count(&state.db).await?,
-        "mine_elsewhere": base().where_eq("owner_store_id", store).where_op("location_store_id", "!=", store).count(&state.db).await?,
+        "mine_here": base().where_(RentalBike::OWNER_STORE_ID.eq(store)).where_(RentalBike::LOCATION_STORE_ID.eq(store)).count(&state.db).await?,
+        "others_here": base().where_(RentalBike::LOCATION_STORE_ID.eq(store)).where_(RentalBike::OWNER_STORE_ID.ne(store)).count(&state.db).await?,
+        "mine_elsewhere": base().where_(RentalBike::OWNER_STORE_ID.eq(store)).where_(RentalBike::LOCATION_STORE_ID.ne(store)).count(&state.db).await?,
     });
     Ok(view(
         "rentals/fleet.html",
@@ -266,19 +262,22 @@ pub async fn show(
         })
         .collect();
     // [/explain:rentals.fleet.show.handler]
-    let rentals = Rental::where_eq("rental_bike_id", bike.id)
-        .order_by_desc("starts_at")
+    let rentals = Rental::query()
+        .where_(Rental::RENTAL_BIKE_ID.eq(bike.id))
+        .order_by_desc(Rental::STARTS_AT)
         .limit(20)
         .get(db)
         .await?;
     let rentals = RentalRow::load(db, rentals).await?;
-    let placements = BikePlacement::where_eq("rental_bike_id", bike.id)
-        .order_by_desc("requested_at")
+    let placements = BikePlacement::query()
+        .where_(BikePlacement::RENTAL_BIKE_ID.eq(bike.id))
+        .order_by_desc(BikePlacement::REQUESTED_AT)
         .limit(20)
         .get(db)
         .await?;
-    let work_orders = WorkOrder::where_eq("rental_bike_id", bike.id)
-        .order_by_desc("scheduled_for")
+    let work_orders = WorkOrder::query()
+        .where_(WorkOrder::RENTAL_BIKE_ID.eq(bike.id))
+        .order_by_desc(WorkOrder::SCHEDULED_FOR)
         .limit(20)
         .get(db)
         .await?;

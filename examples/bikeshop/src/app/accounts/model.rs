@@ -146,6 +146,9 @@ impl Customer {
 
     /// The customer record of a logged-in user, if they have one.
     pub async fn of_user(db: &Db, user_id: i64) -> Result<Option<Customer>> {
-        Customer::where_eq("user_id", user_id).first(db).await
+        Customer::query()
+            .where_(Customer::USER_ID.eq(user_id))
+            .first(db)
+            .await
     }
 }

@@ -145,7 +145,7 @@ pub fn visible<M: StoreRecord>(permission: &str) -> Query<M> {
 /// not see it ([`StoreRecord::VIEW`] in none of its stores).
 ///
 /// A plain `fn` returning a `Send` future (not an `async fn`), so handlers
-/// that await it stay `Send` (Renox's CLAUDE.md §4.2: rustc can't prove it
+/// that await it stay `Send` (Renox's docs/contributing/conventions.md §4.2: rustc can't prove it
 /// for a generic async fn over an executor).
 pub fn find<'a, M: StoreRecord<Key = i64> + Send + 'a>(
     db: &'a Db,

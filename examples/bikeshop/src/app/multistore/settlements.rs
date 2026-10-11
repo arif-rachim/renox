@@ -69,9 +69,9 @@ pub async fn settle_month(state: &AppState, first: NaiveDate) -> Result<Vec<Sett
     let until = day_start(&state.config, next_month(first));
     let mut tx = db.begin().await?;
     let sums: Vec<(i64, i64, i64)> = IntercompanyEntry::query()
-        .where_null("settlement_id")
-        .where_op("booked_at", ">=", from)
-        .where_op("booked_at", "<", until)
+        .where_(IntercompanyEntry::SETTLEMENT_ID.is_null())
+        .where_(IntercompanyEntry::BOOKED_AT.gte(from))
+        .where_(IntercompanyEntry::BOOKED_AT.lt(until))
         .group_by("debtor_store_id")
         .group_by("creditor_store_id")
         .select_as(
@@ -92,7 +92,7 @@ pub async fn settle_month(state: &AppState, first: NaiveDate) -> Result<Vec<Sett
                 q.where_raw("debtor_store_id = ? AND creditor_store_id = ?", [low, high])
                     .where_raw("debtor_store_id = ? AND creditor_store_id = ?", [high, low])
             })
-            .where_eq("period_start", first)
+            .where_(Settlement::PERIOD_START.eq(first))
             .first(&mut tx)
             .await?;
         let mut settlement = match existing {
@@ -205,8 +205,8 @@ async fn statements(db: &Db, list: Vec<Settlement>) -> Result<Vec<Statement>> {
 /// statements the person may see, newest first. Three queries a page.
 pub async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
     let list = access::visible::<Settlement>(catalogue::INTERCOMPANY_VIEW)
-        .order_by_desc("period_start")
-        .order_by("id")
+        .order_by_desc(Settlement::PERIOD_START)
+        .order_by(Settlement::ID)
         .paginate(&db, page, 25)
         .await?;
     let rows = statements(&db, list.items.clone()).await?;
@@ -230,9 +230,10 @@ pub struct Side {
 /// entries, and each store's confirmation.
 pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let settlement = access::find::<Settlement>(&db, &user, id).await?;
-    let entries = IntercompanyEntry::where_eq("settlement_id", settlement.id)
-        .order_by("booked_at")
-        .order_by("id")
+    let entries = IntercompanyEntry::query()
+        .where_(IntercompanyEntry::SETTLEMENT_ID.eq(settlement.id))
+        .order_by(IntercompanyEntry::BOOKED_AT)
+        .order_by(IntercompanyEntry::ID)
         .get(&db)
         .await?;
     let mut sides: HashMap<i64, BTreeMap<String, (i64, i64)>> = HashMap::new();
@@ -323,8 +324,9 @@ pub async fn confirm_side(
     // [explain:multistore.settlements.show.confirm]
     access::require(user, catalogue::INTERCOMPANY_SETTLE, attr, &*settlement)?;
     let now = renox::db::now();
-    let changed = Settlement::where_eq("id", settlement.id)
-        .where_eq("status", SettlementStatus::Open)
+    let changed = Settlement::query()
+        .where_(Settlement::ID.eq(settlement.id))
+        .where_(Settlement::STATUS.eq(SettlementStatus::Open))
         .where_null(at)
         .update(
             &state.db,
@@ -402,8 +404,9 @@ impl Job for SendStatement {
         let Some(settlement) = Settlement::find(db, self.settlement_id).await? else {
             return Ok(());
         };
-        let entries = IntercompanyEntry::where_eq("settlement_id", settlement.id)
-            .order_by("booked_at")
+        let entries = IntercompanyEntry::query()
+            .where_(IntercompanyEntry::SETTLEMENT_ID.eq(settlement.id))
+            .order_by(IntercompanyEntry::BOOKED_AT)
             .get(db)
             .await?;
         let stores: HashMap<i64, String> = Store::all_by_name(db)
@@ -455,7 +458,8 @@ impl Job for SendStatement {
                 state.mailer.send(mail).await?;
             }
         }
-        Settlement::where_eq("id", settlement.id)
+        Settlement::query()
+            .where_(Settlement::ID.eq(settlement.id))
             .update(db, &[("mailed_at", &renox::db::now())])
             .await?;
         Ok(())

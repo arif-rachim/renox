@@ -78,19 +78,19 @@ pub async fn index(
         .filter(|s| TABS.contains(&s.as_str()))
         .unwrap_or_else(|| "open".to_owned());
     let query = access::visible::<Order>(catalogue::ORDERS_VIEW).when(store.is_some(), |q| {
-        q.where_eq("operating_store_id", store.unwrap_or_default())
+        q.where_(Order::OPERATING_STORE_ID.eq(store.unwrap_or_default()))
     });
     let query = match tab.as_str() {
-        "open" => query.where_in("status", [OrderStatus::Paid, OrderStatus::Ready]),
-        "pending" => query.where_eq("status", OrderStatus::Pending),
-        "ready" => query.where_eq("status", OrderStatus::Ready),
-        "completed" => query.where_eq("status", OrderStatus::Completed),
-        "cancelled" => query.where_eq("status", OrderStatus::Cancelled),
-        _ => query.where_eq("status", OrderStatus::Refunded),
+        "open" => query.where_(Order::STATUS.is_in([OrderStatus::Paid, OrderStatus::Ready])),
+        "pending" => query.where_(Order::STATUS.eq(OrderStatus::Pending)),
+        "ready" => query.where_(Order::STATUS.eq(OrderStatus::Ready)),
+        "completed" => query.where_(Order::STATUS.eq(OrderStatus::Completed)),
+        "cancelled" => query.where_(Order::STATUS.eq(OrderStatus::Cancelled)),
+        _ => query.where_(Order::STATUS.eq(OrderStatus::Refunded)),
     };
     let orders = query
-        .order_by_desc("placed_at")
-        .order_by_desc("id")
+        .order_by_desc(Order::PLACED_AT)
+        .order_by_desc(Order::ID)
         .paginate(&db, page, PER_PAGE)
         .await?;
     let customers = belongs_to::<Customer, _, _>(&db, &orders.items, |o| o.customer_id).await?;
@@ -141,18 +141,21 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
         .completed_at
         .or(order.paid_at)
         .map(|t| t + Duration::days(RETURN_DAYS));
-    let payments = Payment::where_eq("payable_type", Order::TABLE)
-        .where_eq("payable_id", order.id)
-        .order_by("id")
+    let payments = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq(Order::TABLE))
+        .where_(Payment::PAYABLE_ID.eq(order.id))
+        .order_by(Payment::ID)
         .get(&db)
         .await?;
-    let movements = StockMovement::where_eq("reference_type", Order::TABLE)
-        .where_eq("reference_id", order.id)
-        .order_by("id")
+    let movements = StockMovement::query()
+        .where_(StockMovement::REFERENCE_TYPE.eq(Order::TABLE))
+        .where_(StockMovement::REFERENCE_ID.eq(order.id))
+        .order_by(StockMovement::ID)
         .get(&db)
         .await?;
-    let bikes = CustomerBike::where_eq("order_id", order.id)
-        .order_by("id")
+    let bikes = CustomerBike::query()
+        .where_(CustomerBike::ORDER_ID.eq(order.id))
+        .order_by(CustomerBike::ID)
         .get(&db)
         .await?;
     let data = StaffOrder {
@@ -195,8 +198,9 @@ pub async fn ready(
 ) -> Result<Response> {
     let order = access::find::<Order>(&state.db, &user, id).await?;
     access::require(&user, catalogue::ORDERS_SELL, StoreAttr::Operating, &order)?;
-    let moved = Order::where_eq("id", order.id)
-        .where_eq("status", OrderStatus::Paid)
+    let moved = Order::query()
+        .where_(Order::ID.eq(order.id))
+        .where_(Order::STATUS.eq(OrderStatus::Paid))
         .update(&state.db, &[("status", &OrderStatus::Ready)])
         .await?;
     abort_if(
@@ -250,8 +254,9 @@ pub async fn complete(
     let order = access::find::<Order>(&db, &user, id).await?;
     access::require(&user, catalogue::ORDERS_SELL, StoreAttr::Operating, &order)?;
     let now = renox::db::now();
-    let moved = Order::where_eq("id", order.id)
-        .where_in("status", [OrderStatus::Paid, OrderStatus::Ready])
+    let moved = Order::query()
+        .where_(Order::ID.eq(order.id))
+        .where_(Order::STATUS.is_in([OrderStatus::Paid, OrderStatus::Ready]))
         .update(
             &db,
             &[("status", &OrderStatus::Completed), ("completed_at", &now)],
@@ -268,8 +273,9 @@ pub async fn complete(
             .map(|n| n.trim().to_uppercase())
             .filter(|n| !n.is_empty());
         if let Some(number) = number {
-            CustomerBike::where_eq("id", frame.bike_id)
-                .where_eq("order_id", order.id)
+            CustomerBike::query()
+                .where_(CustomerBike::ID.eq(frame.bike_id))
+                .where_(CustomerBike::ORDER_ID.eq(order.id))
                 .update(&db, &[("frame_number", &number)])
                 .await?;
         }
@@ -353,7 +359,10 @@ pub async fn take_back(
             &[("days", &RETURN_DAYS.to_string())],
         ),
     )?;
-    let items = OrderItem::where_eq("order_id", order.id).get(db).await?;
+    let items = OrderItem::query()
+        .where_(OrderItem::ORDER_ID.eq(order.id))
+        .get(db)
+        .await?;
     let wanted: HashMap<i64, i64> = form
         .lines
         .iter()
@@ -365,10 +374,11 @@ pub async fn take_back(
         StatusCode::UNPROCESSABLE_ENTITY,
         lang.t("sales.staff.nothing_returned", &[]),
     )?;
-    let original = Payment::where_eq("payable_type", Order::TABLE)
-        .where_eq("payable_id", order.id)
-        .where_eq("status", PaymentStatus::Paid)
-        .order_by("id")
+    let original = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq(Order::TABLE))
+        .where_(Payment::PAYABLE_ID.eq(order.id))
+        .where_(Payment::STATUS.eq(PaymentStatus::Paid))
+        .order_by(Payment::ID)
         .first(db)
         .await?;
     let staff = staff_id(db, &user).await?;
@@ -423,7 +433,8 @@ pub async fn take_back(
     } else {
         order.status
     };
-    Order::where_eq("id", order.id)
+    Order::query()
+        .where_(Order::ID.eq(order.id))
         .update(&mut tx, &[("returned_at", &now), ("status", &status)])
         .await?;
     tx.commit().await?;

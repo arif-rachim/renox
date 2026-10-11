@@ -42,10 +42,11 @@ pub async fn local_of(db: &Db, subscription: &Subscription) -> Result<Option<Pla
     let Some(bike) = bike_of_billing_name(&subscription.name) else {
         return Ok(None);
     };
-    PlanSubscription::where_eq("customer_bike_id", bike)
-        .where_op("status", "!=", SubscriptionStatus::Cancelled)
-        .where_eq("user_id", subscription.billable_id)
-        .order_by_desc("id")
+    PlanSubscription::query()
+        .where_(PlanSubscription::CUSTOMER_BIKE_ID.eq(bike))
+        .where_(PlanSubscription::STATUS.ne(SubscriptionStatus::Cancelled))
+        .where_(PlanSubscription::USER_ID.eq(subscription.billable_id))
+        .order_by_desc(PlanSubscription::ID)
         .first(db)
         .await
 }
@@ -57,7 +58,8 @@ pub async fn mirror(state: &AppState, subscription: &Subscription) -> Result {
     let Some(mut sub) = local_of(db, subscription).await? else {
         return Ok(());
     };
-    let Some(plan) = ServicePlan::where_eq("slug", slug_of(&subscription.plan))
+    let Some(plan) = ServicePlan::query()
+        .where_(ServicePlan::SLUG.eq(slug_of(&subscription.plan)))
         .first(db)
         .await?
     else {
@@ -147,13 +149,15 @@ pub async fn payment(state: &AppState, paid: Paid<'_>) -> Result {
     };
     // `USD` for card plans, `IDR` for Xendit's (Stripe writes `usd`).
     let currency = paid.currency.to_ascii_uppercase();
-    let earlier_paid = PlanInvoice::where_eq("plan_subscription_id", sub.id)
-        .where_eq("paid", true)
-        .where_op("payment_id", "!=", paid.payment_id)
+    let earlier_paid = PlanInvoice::query()
+        .where_(PlanInvoice::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .where_(PlanInvoice::PAID.eq(true))
+        .where_(PlanInvoice::PAYMENT_ID.ne(paid.payment_id))
         .exists(db)
         .await?;
-    match PlanInvoice::where_eq("gateway", paid.gateway)
-        .where_eq("payment_id", paid.payment_id)
+    match PlanInvoice::query()
+        .where_(PlanInvoice::GATEWAY.eq(paid.gateway))
+        .where_(PlanInvoice::PAYMENT_ID.eq(paid.payment_id))
         .first(db)
         .await?
     {
@@ -270,8 +274,9 @@ async fn tell(
 /// at the gateway and deletes its rows; the shop ends their plans and
 /// takes the upcoming visits off the workshop's days.
 pub async fn account_deleted(db: &Db, user_id: i64) -> Result {
-    let subs = PlanSubscription::where_eq("user_id", user_id)
-        .where_op("status", "!=", SubscriptionStatus::Cancelled)
+    let subs = PlanSubscription::query()
+        .where_(PlanSubscription::USER_ID.eq(user_id))
+        .where_(PlanSubscription::STATUS.ne(SubscriptionStatus::Cancelled))
         .get(db)
         .await?;
     for mut sub in subs {

@@ -126,7 +126,7 @@ pub async fn products(
     let db = &state.db;
     let q = query.q.trim().to_owned();
     let found = if q.is_empty() {
-        Product::query().order_by("name")
+        Product::query().order_by(Product::NAME)
     } else {
         Product::search(&q)
     };
@@ -160,7 +160,8 @@ pub async fn product(
     Path(slug): Path<String>,
 ) -> Result<Json<Value>> {
     let db = &state.db;
-    let product = Product::where_eq("slug", slug.as_str())
+    let product = Product::query()
+        .where_(Product::SLUG.eq(slug.as_str()))
         .first(db)
         .await?
         .ok_or(Error::NotFound)?;
@@ -170,7 +171,7 @@ pub async fn product(
         .ok_or(Error::NotFound)?;
     let ids: Vec<i64> = card.variants.iter().map(|v| v.id).collect();
     let levels = StockLevel::query()
-        .where_in("variant_id", ids)
+        .where_(StockLevel::VARIANT_ID.is_in(ids))
         .get(db)
         .await?;
     let stores = Store::all_by_name(db).await?;
@@ -214,8 +215,9 @@ pub async fn product(
 /// `GET /api/v1/me/bikes` (`api.me.bikes`, `read`): the customer's bikes.
 pub async fn bikes(State(db): State<Db>, user: AuthUser) -> Result<Json<Value>> {
     let customer = customer_of(&db, &user).await?;
-    let bikes = CustomerBike::where_eq("customer_id", customer.id)
-        .order_by("name")
+    let bikes = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .order_by(CustomerBike::NAME)
         .get(&db)
         .await?;
     let data: Vec<Value> = bikes
@@ -240,12 +242,13 @@ pub async fn work_orders(
 ) -> Result<Json<Value>> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
-    let bikes: Vec<i64> = CustomerBike::where_eq("customer_id", customer.id)
-        .pluck(db, "id")
+    let bikes: Vec<i64> = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .pluck(db, CustomerBike::ID)
         .await?;
     let page = WorkOrder::query()
-        .where_in("customer_bike_id", bikes)
-        .order_by_desc("scheduled_for")
+        .where_(WorkOrder::CUSTOMER_BIKE_ID.is_in(bikes))
+        .order_by_desc(WorkOrder::SCHEDULED_FOR)
         .paginate(db, query.page.unwrap_or(1), PER_PAGE)
         .await?;
     let page = page.map(|o| {
@@ -269,12 +272,13 @@ pub async fn work_orders(
 /// customer's bikes, with the next visit.
 pub async fn plans(State(db): State<Db>, user: AuthUser) -> Result<Json<Value>> {
     let customer = customer_of(&db, &user).await?;
-    let bikes: Vec<i64> = CustomerBike::where_eq("customer_id", customer.id)
-        .pluck(&db, "id")
+    let bikes: Vec<i64> = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .pluck(&db, CustomerBike::ID)
         .await?;
     let subs = PlanSubscription::query()
-        .where_in("customer_bike_id", bikes)
-        .order_by_desc("id")
+        .where_(PlanSubscription::CUSTOMER_BIKE_ID.is_in(bikes))
+        .order_by_desc(PlanSubscription::ID)
         .get(&db)
         .await?;
     let plans = ServicePlan::find_many(
@@ -308,8 +312,9 @@ pub async fn rentals(
 ) -> Result<Json<Value>> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
-    let page = Rental::where_eq("customer_id", customer.id)
-        .order_by_desc("starts_at")
+    let page = Rental::query()
+        .where_(Rental::CUSTOMER_ID.eq(customer.id))
+        .order_by_desc(Rental::STARTS_AT)
         .paginate(db, query.page.unwrap_or(1), PER_PAGE)
         .await?;
     let page = page.map(|r| rental_json(&state, &r));
@@ -387,8 +392,9 @@ pub async fn orders(
 ) -> Result<Json<Value>> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
-    let page = Order::where_eq("customer_id", customer.id)
-        .order_by_desc("id")
+    let page = Order::query()
+        .where_(Order::CUSTOMER_ID.eq(customer.id))
+        .order_by_desc(Order::ID)
         .paginate(db, query.page.unwrap_or(1), PER_PAGE)
         .await?;
     let page = page.map(|o| {

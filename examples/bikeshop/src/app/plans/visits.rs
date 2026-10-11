@@ -125,14 +125,15 @@ async fn next_visit_on(
     sub: &PlanSubscription,
     frequency: Frequency,
 ) -> Result<Option<NaiveDate>> {
-    let ids: Vec<i64> = PlanVisit::where_eq("plan_subscription_id", sub.id)
-        .where_eq("status", VisitStatus::Scheduled)
-        .where_not_null("work_order_id")
-        .pluck(db, "work_order_id")
+    let ids: Vec<i64> = PlanVisit::query()
+        .where_(PlanVisit::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .where_(PlanVisit::STATUS.eq(VisitStatus::Scheduled))
+        .where_(PlanVisit::WORK_ORDER_ID.is_not_null())
+        .pluck(db, PlanVisit::WORK_ORDER_ID)
         .await?;
     let first: Option<DateTime> = WorkOrder::query()
-        .where_in("id", ids)
-        .order_by("scheduled_for")
+        .where_(WorkOrder::ID.is_in(ids))
+        .order_by(WorkOrder::SCHEDULED_FOR)
         .first(db)
         .await?
         .map(|o| o.scheduled_for);
@@ -340,15 +341,16 @@ pub async fn move_to(
 pub async fn mark_missed(state: &AppState) -> Result<u64> {
     let db = &state.db;
     let (start_of_today, _) = day_bounds(&state.config, today(&state.config));
-    let orders = WorkOrder::where_eq("source", WorkSource::Plan)
-        .where_eq("status", WorkStatus::Booked)
-        .where_op("scheduled_for", "<", start_of_today)
+    let orders = WorkOrder::query()
+        .where_(WorkOrder::SOURCE.eq(WorkSource::Plan))
+        .where_(WorkOrder::STATUS.eq(WorkStatus::Booked))
+        .where_(WorkOrder::SCHEDULED_FOR.lt(start_of_today))
         .get(db)
         .await?;
     let ids: Vec<i64> = orders.iter().map(|o| o.id).collect();
     let mut visits = PlanVisit::query()
-        .where_in("work_order_id", ids)
-        .where_eq("status", VisitStatus::Scheduled)
+        .where_(PlanVisit::WORK_ORDER_ID.is_in(ids))
+        .where_(PlanVisit::STATUS.eq(VisitStatus::Scheduled))
         .get(db)
         .await?;
     for visit in &mut visits {
@@ -375,8 +377,9 @@ pub async fn hold(db: &Db, sub: &mut PlanSubscription) -> Result {
         sub.held_at = Some(renox::db::now());
         sub.save_only(db, &["held_at"]).await?;
     }
-    let mut visits = PlanVisit::where_eq("plan_subscription_id", sub.id)
-        .where_eq("status", VisitStatus::Scheduled)
+    let mut visits = PlanVisit::query()
+        .where_(PlanVisit::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .where_(PlanVisit::STATUS.eq(VisitStatus::Scheduled))
         .get(db)
         .await?;
     for visit in &mut visits {
@@ -397,8 +400,9 @@ pub async fn release(state: &AppState, sub: &mut PlanSubscription) -> Result {
     sub.save_only(db, &["held_at"]).await?;
     let today = today(&state.config);
     let tasks = plan_tasks(db, sub.service_plan_id).await?;
-    let held = PlanVisit::where_eq("plan_subscription_id", sub.id)
-        .where_eq("status", VisitStatus::Held)
+    let held = PlanVisit::query()
+        .where_(PlanVisit::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .where_(PlanVisit::STATUS.eq(VisitStatus::Held))
         .get(db)
         .await?;
     for mut visit in held {
@@ -420,8 +424,9 @@ pub async fn release(state: &AppState, sub: &mut PlanSubscription) -> Result {
 /// Paused, cancelled or ended: the upcoming visits are taken off the
 /// workshop's days (cancelled).
 pub async fn cancel_upcoming(db: &Db, sub: &PlanSubscription, from: Option<NaiveDate>) -> Result {
-    let mut visits = PlanVisit::where_eq("plan_subscription_id", sub.id)
-        .where_in("status", [VisitStatus::Scheduled, VisitStatus::Held])
+    let mut visits = PlanVisit::query()
+        .where_(PlanVisit::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .where_(PlanVisit::STATUS.is_in([VisitStatus::Scheduled, VisitStatus::Held]))
         .get(db)
         .await?;
     for visit in &mut visits {
@@ -435,7 +440,8 @@ pub async fn cancel_upcoming(db: &Db, sub: &PlanSubscription, from: Option<Naive
 
 /// A work order was collected: its visit is done.
 pub async fn done(db: &Db, work_order_id: i64) -> Result {
-    if let Some(mut visit) = PlanVisit::where_eq("work_order_id", work_order_id)
+    if let Some(mut visit) = PlanVisit::query()
+        .where_(PlanVisit::WORK_ORDER_ID.eq(work_order_id))
         .first(db)
         .await?
         && visit.status == VisitStatus::Scheduled
@@ -450,11 +456,11 @@ pub async fn done(db: &Db, work_order_id: i64) -> Result {
 /// passed (status cancelled, the rest of the visits cancelled). How many.
 pub async fn end_finished(db: &Db, today: NaiveDate) -> Result<u64> {
     let subs = PlanSubscription::query()
-        .where_in(
-            "status",
-            [SubscriptionStatus::Active, SubscriptionStatus::Paused],
+        .where_(
+            PlanSubscription::STATUS
+                .is_in([SubscriptionStatus::Active, SubscriptionStatus::Paused]),
         )
-        .where_op("ends_on", "<", today)
+        .where_(PlanSubscription::ENDS_ON.lt(today))
         .get(db)
         .await?;
     for mut sub in subs.iter().cloned() {

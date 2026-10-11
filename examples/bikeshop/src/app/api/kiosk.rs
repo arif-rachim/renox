@@ -57,8 +57,9 @@ pub async fn of(db: &Db, device: &Device) -> Result<Kiosk> {
         .id_of("kiosk")
         .and_then(|id| id.parse().ok())
         .ok_or(Error::Forbidden)?;
-    let kiosk = Kiosk::where_eq("id", id)
-        .where_null("revoked_at")
+    let kiosk = Kiosk::query()
+        .where_(Kiosk::ID.eq(id))
+        .where_(Kiosk::REVOKED_AT.is_null())
         .first(db)
         .await?;
     kiosk.ok_or(Error::Forbidden)
@@ -68,8 +69,9 @@ pub async fn of(db: &Db, device: &Device) -> Result<Kiosk> {
 /// store's, or no such code).
 async fn own_rental(db: &Db, kiosk: &Kiosk, code: &str) -> Result<Rental> {
     let code: Ulid = code.parse().map_err(|_| Error::NotFound)?;
-    Rental::where_eq("reservation_code", code)
-        .where_eq("operating_store_id", kiosk.store_id)
+    Rental::query()
+        .where_(Rental::RESERVATION_CODE.eq(code))
+        .where_(Rental::OPERATING_STORE_ID.eq(kiosk.store_id))
         .first(db)
         .await?
         .ok_or(Error::NotFound)
@@ -197,7 +199,8 @@ pub async fn give_back(
     let db = &state.db;
     let kiosk = of(db, &device).await?;
     let code: Ulid = code.parse().map_err(|_| Error::NotFound)?;
-    let mut rental = Rental::where_eq("reservation_code", code)
+    let mut rental = Rental::query()
+        .where_(Rental::RESERVATION_CODE.eq(code))
         .first(db)
         .await?
         .filter(|r| r.is_out() || r.operating_store_id == kiosk.store_id)

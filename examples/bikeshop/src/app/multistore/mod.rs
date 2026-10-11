@@ -102,6 +102,9 @@ impl Module for Multistore {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::multistore::model::IntercompanyEntry>()
+            .model::<crate::app::multistore::model::Settlement>();
         // The books follow the business: a closed rental and a collected
         // fleet repair are booked between the stores involved.
         app.listen(|event: RentalClosed, state: AppState| async move {

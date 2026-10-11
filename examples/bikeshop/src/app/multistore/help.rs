@@ -96,7 +96,7 @@ pub async fn rows(db: &Db, user: &User, requests: Vec<StaffHelpRequest>) -> Resu
         .collect();
     let ids: Vec<i64> = requests.iter().map(|r| r.id).collect();
     let minutes: Vec<(i64, i64)> = StaffHelpHour::query()
-        .where_in("help_request_id", ids)
+        .where_(StaffHelpHour::HELP_REQUEST_ID.is_in(ids))
         .group_by("help_request_id")
         .select_as(db, "help_request_id, CAST(SUM(minutes) AS BIGINT)")
         .await?;
@@ -142,11 +142,11 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let requests = StaffHelpRequest::query()
         .where_any(|q| {
-            q.where_eq("from_store_id", store)
-                .where_eq("to_store_id", store)
+            q.where_(StaffHelpRequest::FROM_STORE_ID.eq(store))
+                .where_(StaffHelpRequest::TO_STORE_ID.eq(store))
         })
-        .order_by_desc("starts_at")
-        .order_by_desc("id")
+        .order_by_desc(StaffHelpRequest::STARTS_AT)
+        .order_by_desc(StaffHelpRequest::ID)
         .limit(100)
         .get(&db)
         .await?;
@@ -183,8 +183,9 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .filter(|id| others.iter().any(|s| s.id == *id))
         .or_else(|| others.first().map(|s| s.id))
         .unwrap_or_default();
-    let staff = Staff::where_eq("home_store_id", lending)
-        .where_eq("active", true)
+    let staff = Staff::query()
+        .where_(Staff::HOME_STORE_ID.eq(lending))
+        .where_(Staff::ACTIVE.eq(true))
         .get(&db)
         .await?;
     // [/explain:multistore.help.create.handler]
@@ -346,8 +347,9 @@ async fn advance(
     user: &User,
 ) -> Result<bool> {
     let now = renox::db::now();
-    let moved = StaffHelpRequest::where_eq("id", request.id)
-        .where_eq("status", from)
+    let moved = StaffHelpRequest::query()
+        .where_(StaffHelpRequest::ID.eq(request.id))
+        .where_(StaffHelpRequest::STATUS.eq(from))
         .update(
             db,
             &[
@@ -571,7 +573,8 @@ pub async fn end(
     } else {
         request.from_store_id
     };
-    StaffHelpRequest::where_eq("id", request.id)
+    StaffHelpRequest::query()
+        .where_(StaffHelpRequest::ID.eq(request.id))
         .update(
             db,
             &[

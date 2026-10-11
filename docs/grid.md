@@ -37,7 +37,7 @@ grouped, summed, filtered with rules, remembered and exported
 |---|---|
 | **handler** | The Rust function that runs when someone opens a page, and returns the page. |
 | **template** | An HTML file with blanks that the app fills in. The grid is drawn by one. |
-| **macro** | A reusable piece of template, called like a function: `grid(orders)`. |
+| **tag** | A reusable piece of template written like HTML: `<rx-grid :page="orders"/>`. |
 | **extractor** | A handler argument that Renox fills in from the request, like `GridRequest`. |
 | **query** | A database question built in Rust, like `Order::query()` ("all orders"). |
 | **query string** | The part of a URL after `?`, like `?page=2&sort=-total`. The grid keeps its state there. |
@@ -128,7 +128,7 @@ filters, search, sort and page to it, and returns a `GridPage`. Pass the `GridPa
 view as it is.
 
 Any `Query` works as the starting point. The grid only ever shows what that query allows. For
-example, `Order::query().where_eq("team_id", team)` shows only one team's orders, and a model's
+example, `Order::query().where_(Order::TEAM_ID.eq(team))` shows only one team's orders, and a model's
 default scope applies too.
 
 What else you can do with the page and the grid:
@@ -170,57 +170,44 @@ we get one page of matching orders, and finally count all of them with `filter`.
 
 ## The template
 
-The template draws the grid with the `grid` macro from `renox/grid.html`.
+The template draws the grid with the `<rx-grid>` tag (from `renox/grid.html`).
 
-Most columns draw themselves. `custom` columns are different: you draw them, in a **call
-block** (`{% call … %} … {% endcall %}`). The grid runs the call block once for each custom
-cell, and gives it two things:
+Most columns draw themselves. `custom` columns are different: you draw them, in the tag's
+content. The grid runs the content once for each custom cell, and gives it two things:
 
 - `row`: the row's values (the model's fields, the values from related tables, and what
   `extend` added);
 - `column`: the column being drawn (`column.key` tells you which one).
 
 ```html
-{% from "renox/grid.html" import grid %}
-{% from "renox/ui.html" import link_button %}
-<main class="rx-grid-fill">
-  {% call(row, column) grid(orders) %}
-    {% if column.key == "trend" %}<span class="{{ 'rx-up' if row.up else 'rx-down' }}">{{ sparkline(row.trend) }}</span>
-    {% elif column.key == "actions" %}{{ link_button(route('orders.show', row.id), "Open", size="small") }}{% endif %}
-  {% endcall %}
-</main>
-```
-
-What's going on: for the `trend` column, the block draws a small chart, colored by whether the
-trend went up. For the `actions` column, it draws an "Open" button that links to the order.
-
-The same grid as a tag. The content is the call block's body, with `row` and `column` in it:
-
-```html
 <main class="rx-grid-fill">
   <rx-grid :page="orders">
-    {% if column.key == "actions" %}<a class="rx-link" href="{{ route('orders.show', row.id) }}">Open</a>{% endif %}
+    {% if column.key == "trend" %}<span class="{{ 'rx-up' if row.up else 'rx-down' }}">{{ sparkline(row.trend) }}</span>
+    {% elif column.key == "actions" %}<rx-link-button href="{{ route('orders.show', row.id) }}" label="Open" size="small"/>{% endif %}
   </rx-grid>
 </main>
 ```
 
+What's going on: for the `trend` column, the content draws a small chart, colored by whether the
+trend went up. For the `actions` column, it draws an "Open" button that links to the order.
+
 More about the template:
 
-- Without a call block, `custom` columns stay empty: `{{ grid(orders) }}`.
-- `grid(page, tools=…)` puts your own HTML in the toolbar, next to the grid's own buttons. A
+- Without content, `custom` columns stay empty: `<rx-grid :page="orders"/>`.
+- `tools=` puts your own HTML in the toolbar, next to the grid's own buttons. A
   "New" button is a common example. Capture the HTML with a block `set`, so it isn't escaped
-  (shown as text instead of HTML):
+  (shown as text instead of HTML), and pass it as data:
 
   ```html
-  {% set new_order %}{{ link_button(route('orders.create'), "New order", variant="primary", size="small") }}{% endset %}
-  {% call(row, column) grid(orders, tools=new_order) %}…{% endcall %}
+  {% set new_order %}<rx-link-button route="orders.create" label="New order" variant="primary" size="small"/>{% endset %}
+  <rx-grid :page="orders" :tools="new_order">…</rx-grid>
   ```
 
-- The call block is also asked for two special keys:
+- The content is also asked for two special keys:
   - `column.key == "_details"` is the row's details (see [Row details](#row-details)).
   - `column.key == "_empty"` gives the buttons under an empty grid's message (see
     [Empty grids](#empty-grids)).
-- The macro adds the grid's stylesheet and script itself (`renox_grid()`). Your layout (the
+- The tag adds the grid's stylesheet and script itself (`renox_grid()`). Your layout (the
   frame around every page) should have:
   - `{{ renox_ui() }}`, because the grid uses the UI kit's buttons;
   - `{{ toasts() }}`, for actions and edits that answer with a `Toast`.
@@ -255,7 +242,7 @@ The kind of column decides how values look and which filter the heading gets.
 | `tags(key, label, options)` | a JSON array (`Json<Vec<String>>`) as tags | rows with any of the picked |
 | `image` | the image at the URL in the value (`.round()` for avatars) | none |
 | `color` | a swatch of the CSS color, with its code | like text |
-| `custom` | whatever the call block draws | none |
+| `custom` | whatever the tag's content draws | none |
 
 A few things to know about the table:
 
@@ -447,7 +434,7 @@ fn orders_grid() -> Grid {
 - `.audit()` makes a click on a row (or on the chevron in the row tools) open a panel under it.
   The panel shows the row's audit values (who changed it, and when), if it has them:
   `created_by`, `created_at`, `updated_by` and `updated_at`.
-- `.details()` adds to that panel whatever the call block draws for
+- `.details()` adds to that panel whatever the tag's content draws for
   `column.key == "_details"`, after the audit values when there are any.
 - With details on, a click on the row opens the details, and `row_url` becomes a link in the
   row tools instead.
@@ -645,7 +632,7 @@ value (say, the same region) under a heading of their own.
 `.empty_state("No orders yet", Some("Orders show up here as customers buy."))` says what to show
 in a grid that has no rows yet: a heading, and an optional line under it.
 
-The call block can add buttons there, for `column.key == "_empty"` (a "New order" button, for
+The tag's content can add buttons there, for `column.key == "_empty"` (a "New order" button, for
 example).
 
 A grid that is empty because of its filters is different: it says nothing matches, and offers
@@ -795,7 +782,7 @@ fn ledger() -> Grid {
 
 /// GET /products/{id}/ledger.csv: one product's movements, newest first.
 async fn export_ledger(Path(id): Path<i64>, request: GridRequest) -> Result<Response> {
-    let movements = StockMovement::where_eq("product_id", id).order_by_desc("id");
+    let movements = StockMovement::query().where_(StockMovement::PRODUCT_ID.eq(id)).order_by_desc(StockMovement::ID);
     ledger().export_as(movements, ExportFormat::Csv, &request).await
 }
 ```
@@ -822,8 +809,8 @@ async fn export_ledger(Path(id): Path<i64>, request: GridRequest) -> Result<Resp
       let sales = Grid::new("sales").column(Column::money("total", "Total"));
       let refunds = Grid::new("refunds").column(Column::money("amount", "Amount"));
       Workbook::new("summary")
-          .sheet("Sales", &sales, Sale::query().order_by("id"), &request).await?
-          .sheet("Refunds", &refunds, Refund::query().order_by("id"), &request).await?
+          .sheet("Sales", &sales, Sale::query().order_by(Sale::ID), &request).await?
+          .sheet("Refunds", &refunds, Refund::query().order_by(Refund::ID), &request).await?
           .into_response()
   }
   ```

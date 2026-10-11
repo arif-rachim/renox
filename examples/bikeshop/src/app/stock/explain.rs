@@ -106,8 +106,8 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "push + stack, csp_nonce()",
-                    why: "The stock pages add their script with `{% call push('scripts', \
-                          once='stock-js') %}` from `stock/_parts.html`: the layout prints it \
+                    why: "The stock pages add their script with `<rx-push stack=\"scripts\" \
+                          once=\"stock-js\">` from `stock/_parts.html`: the layout prints it \
                           where its `stack('scripts')` is, once however many parts ask for it, \
                           and only on the pages that use it. The tag carries `nonce=\"{{ \
                           csp_nonce() }}\"`, so it runs under `CSP=strict` too.",
@@ -317,10 +317,9 @@ pub fn entries() -> Vec<Explanation> {
                 SCOPES,
                 Feature {
                     api: "Query<T>",
-                    why: "\"Ours or at our store\": `where_any(|q| q.where_eq(\"owner_store_id\", \
-                          store).where_eq(\"location_store_id\", store))` inside what \
+                    why: "\"Ours or at our store\": `where_any(|q| q.where_(RentalBike::OWNER_STORE_ID.eq(store)).where_(RentalBike::LOCATION_STORE_ID.eq(store)))` inside what \
                           `access::visible` allows, so the OR can never widen what the person \
-                          may see; the tabs narrow by status with `where_in`.",
+                          may see; the tabs narrow by status with `is_in`.",
                 },
                 Feature {
                     api: "UI kit: link_tabs + table",

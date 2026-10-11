@@ -103,6 +103,11 @@ impl Module for Accounts {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::accounts::model::Country>()
+            .model::<crate::app::accounts::model::City>()
+            .model::<crate::app::accounts::model::Address>()
+            .model::<crate::app::accounts::model::Customer>();
         app.job::<privacy::ExportMyData>();
         app.listen(privacy::on_account_deleted);
         app.schedule()
@@ -180,7 +185,7 @@ async fn contact_section(db: &Db, user: &User) -> Result<renox::serde_json::Valu
         None => None,
     };
     let countries: Vec<(String, String)> = Country::query()
-        .order_by("name")
+        .order_by(Country::NAME)
         .get(db)
         .await?
         .into_iter()
@@ -225,8 +230,9 @@ pub async fn update_contact(
     let db = &state.db;
     let mut customer = registration::customer_of(db, &user).await?;
     let city_name = form.city.trim().to_owned();
-    let city = match City::where_eq("country_id", form.country_id)
-        .where_eq("name", city_name.clone())
+    let city = match City::query()
+        .where_(City::COUNTRY_ID.eq(form.country_id))
+        .where_(City::NAME.eq(city_name.clone()))
         .first(db)
         .await?
     {

@@ -387,7 +387,8 @@ async fn the_dashboard_is_cached_until_income_changes() {
     assert_eq!(fresh.revenue, 265_000 + rental.price);
 
     // So does `changed`, which every listener calls.
-    Order::where_eq("id", w.order.id)
+    Order::query()
+        .where_(Order::ID.eq(w.order.id))
         .update(w.app.db(), &[("status", &"refunded")])
         .await
         .unwrap();
@@ -542,7 +543,8 @@ async fn the_pages_use_a_fixed_number_of_queries() {
     let app = TestApp::new(bikeshop::app()).await;
     let db = app.db().clone();
     seed::shop::build(&db, seed::Volume::small()).await.unwrap();
-    let owner = User::where_eq("email", "owner@bikeshop.test")
+    let owner = User::query()
+        .where_eq("email", "owner@bikeshop.test")
         .first(&db)
         .await
         .unwrap()

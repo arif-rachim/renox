@@ -103,7 +103,8 @@ struct Site {
 async fn site(State(state): State<AppState>, domain: DomainParams) -> Result<View> {
     let db = &state.db;
     let slug = domain.get("store").unwrap_or_default();
-    let store = Store::where_eq("slug", slug)
+    let store = Store::query()
+        .where_(Store::SLUG.eq(slug))
         .first(db)
         .await?
         .ok_or(Error::NotFound)?;
@@ -112,16 +113,14 @@ async fn site(State(state): State<AppState>, domain: DomainParams) -> Result<Vie
         .remove(&store.address_id)
         .map(|a| a.line());
     let here = || {
-        RentalBike::where_eq("location_store_id", store.id).where_op(
-            "status",
-            "<>",
-            BikeStatus::Retired,
-        )
+        RentalBike::query()
+            .where_(RentalBike::LOCATION_STORE_ID.eq(store.id))
+            .where_(RentalBike::STATUS.ne(BikeStatus::Retired))
     };
     let bikes_here = here().count(db).await? as i64;
     // [/explain:stores.handler]
     let bikes_free = here()
-        .where_eq("status", BikeStatus::Available)
+        .where_(RentalBike::STATUS.eq(BikeStatus::Available))
         .count(db)
         .await? as i64;
     let products_in_stock = renox::db::sql(

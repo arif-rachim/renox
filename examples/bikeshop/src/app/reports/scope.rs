@@ -96,7 +96,7 @@ impl Reach {
         let everywhere = matches!(scopes, Scopes::All);
         let stores: Vec<StoreRef> = scopes
             .apply(Store::query(), &["id"])
-            .order_by("name")
+            .order_by(Store::NAME)
             .get(db)
             .await?
             .into_iter()

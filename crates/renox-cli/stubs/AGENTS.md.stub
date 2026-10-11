@@ -51,7 +51,7 @@ rnx make:migration --auto add_stock           # SQL from the models' changes (db
 rnx make:migration add_stock_to_products               # in migrations/ (--path DIR: elsewhere)
 rnx make:factory Product --module products             # also make:seeder, make:test
 rnx make:notification OrderShipped --module orders     # also make:event, make:rule
-rnx make:middleware StampRequests                      # also make:component (an <app-…> tag; --macro: the older macro form)
+rnx make:middleware StampRequests                      # also make:component (an <app-…> tag)
 rnx make:component --ui                                # copy the UI kit in to change it (same as rnx ui:publish)
 rnx make:deploy                                        # Dockerfile, systemd unit + socket, Litestream
 rnx build                                              # release binary in dist/ (Tailwind CSS minified first)
@@ -103,6 +103,10 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `auth::change_password`, which keeps the user logged in.
 - Prefer typed columns in queries (`.where_(Product::PRICE.lt(20_000)).order_by(Product::NAME)`):
   a misspelt field then fails to compile instead of when the query runs.
+- For a page with many variables, a typed view context beats a `context!` map: `#[derive(Serialize,
+  ViewData)] #[view(template = "x/index.html")]`, `View::typed(page)`, registered with
+  `app.view_data::<T>()` in `register`; `rnx view:check` then reports a template variable the
+  struct lacks (docs/ui.md "typed view context"; it doesn't follow `extends`/`include`).
 - A model with `#[model(default_scope = "…")]` (e.g. the current team) filters every query,
   including `find`; use `Model::unscoped()` in admin code and commands that must see all rows.
 - A model's key is its `id` field's type: `i64`, `renox::db::Ulid`, `renox::uuid::Uuid` (the

@@ -73,8 +73,9 @@ pub async fn paid(state: &AppState, order_id: i64, staff_id: Option<i64>) -> Res
     let db = &state.db;
     let now = renox::db::now();
     let mut tx = db.begin().await?;
-    let moved = Order::where_eq("id", order_id)
-        .where_eq("status", OrderStatus::Pending)
+    let moved = Order::query()
+        .where_(Order::ID.eq(order_id))
+        .where_(Order::STATUS.eq(OrderStatus::Pending))
         .update(
             &mut tx,
             &[("status", &OrderStatus::Paid), ("paid_at", &now)],
@@ -85,7 +86,8 @@ pub async fn paid(state: &AppState, order_id: i64, staff_id: Option<i64>) -> Res
         return Ok(false); // paid already, or cancelled
     }
     let order = Order::find_or_404(&mut tx, order_id).await?;
-    let items = OrderItem::where_eq("order_id", order.id)
+    let items = OrderItem::query()
+        .where_(OrderItem::ORDER_ID.eq(order.id))
         .get(&mut tx)
         .await?;
     ledger::sell(&mut tx, &order, &items, staff_id.or(order.served_by)).await?;
@@ -100,8 +102,9 @@ pub async fn paid(state: &AppState, order_id: i64, staff_id: Option<i64>) -> Res
 /// payment fails, and the customer hears why.
 pub async fn cancel(state: &AppState, order: &Order, staff_id: Option<i64>) -> Result<bool> {
     let mut tx = state.db.begin().await?;
-    let moved = Order::where_eq("id", order.id)
-        .where_eq("status", OrderStatus::Pending)
+    let moved = Order::query()
+        .where_(Order::ID.eq(order.id))
+        .where_(Order::STATUS.eq(OrderStatus::Pending))
         .update(&mut tx, &[("status", &OrderStatus::Cancelled)])
         .await?;
     if moved == 0 {
@@ -109,9 +112,10 @@ pub async fn cancel(state: &AppState, order: &Order, staff_id: Option<i64>) -> R
         return Ok(false);
     }
     ledger::release(&mut tx, order, staff_id).await?;
-    Payment::where_eq("payable_type", Order::TABLE)
-        .where_eq("payable_id", order.id)
-        .where_eq("status", PaymentStatus::Pending)
+    Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq(Order::TABLE))
+        .where_(Payment::PAYABLE_ID.eq(order.id))
+        .where_(Payment::STATUS.eq(PaymentStatus::Pending))
         .update(&mut tx, &[("status", &PaymentStatus::Failed)])
         .await?;
     tx.commit().await?;
@@ -128,19 +132,21 @@ pub async fn cancel(state: &AppState, order: &Order, staff_id: Option<i64>) -> R
 /// directly. Returns how many were cancelled.
 pub async fn expire(state: AppState) -> Result<usize> {
     let cutoff = renox::db::now() - Duration::minutes(PAY_WITHIN_MINUTES);
-    let overdue = Order::where_eq("status", OrderStatus::Pending)
-        .where_eq("channel", Channel::Online)
-        .where_op("placed_at", "<", cutoff)
-        .order_by("id")
+    let overdue = Order::query()
+        .where_(Order::STATUS.eq(OrderStatus::Pending))
+        .where_(Order::CHANNEL.eq(Channel::Online))
+        .where_(Order::PLACED_AT.lt(cutoff))
+        .order_by(Order::ID)
         .limit(500)
         .get(&state.db)
         .await?;
     let mut cancelled = 0;
     for order in overdue {
-        let pending: Vec<i64> = Payment::where_eq("payable_type", Order::TABLE)
-            .where_eq("payable_id", order.id)
-            .where_eq("status", PaymentStatus::Pending)
-            .pluck(&state.db, "id")
+        let pending: Vec<i64> = Payment::query()
+            .where_(Payment::PAYABLE_TYPE.eq(Order::TABLE))
+            .where_(Payment::PAYABLE_ID.eq(order.id))
+            .where_(Payment::STATUS.eq(PaymentStatus::Pending))
+            .pluck(&state.db, Payment::ID)
             .await?;
         for payment in pending {
             payments::mark_failed(&state, payment).await?;
@@ -164,7 +170,8 @@ pub async fn register_bikes(db: &Db, order: &Order, items: &[OrderItem]) -> Resu
     let Some(customer_id) = order.customer_id else {
         return Ok(0);
     };
-    if CustomerBike::where_eq("order_id", order.id)
+    if CustomerBike::query()
+        .where_(CustomerBike::ORDER_ID.eq(order.id))
         .exists(db)
         .await?
     {
@@ -175,14 +182,12 @@ pub async fn register_bikes(db: &Db, order: &Order, items: &[OrderItem]) -> Resu
             .await?;
     let products = Product::query()
         .with_trashed()
-        .where_in(
-            "id",
-            variants.iter().map(|v| v.product_id).collect::<Vec<_>>(),
-        )
+        .where_(Product::ID.is_in(variants.iter().map(|v| v.product_id).collect::<Vec<_>>()))
         .get(db)
         .await?;
-    let bikes: Vec<i64> = Category::where_eq("kind", CategoryKind::Bike)
-        .pluck(db, "id")
+    let bikes: Vec<i64> = Category::query()
+        .where_(Category::KIND.eq(CategoryKind::Bike))
+        .pluck(db, Category::ID)
         .await?;
     let today = order.paid_at.unwrap_or_else(renox::db::now).date_naive();
     let mut made = 0;
@@ -292,9 +297,10 @@ pub struct OrderPage {
 }
 
 async fn page_data(db: &Db, order: Order) -> Result<OrderPage> {
-    let payments = Payment::where_eq("payable_type", Order::TABLE)
-        .where_eq("payable_id", order.id)
-        .order_by("id")
+    let payments = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq(Order::TABLE))
+        .where_(Payment::PAYABLE_ID.eq(order.id))
+        .order_by(Payment::ID)
         .get(db)
         .await?;
     let returnable = returnable(&order);

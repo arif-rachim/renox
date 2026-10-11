@@ -2,13 +2,13 @@
 
 {#- The pages' stylesheet (public/areas/stock.css), once. -#}
 {% macro styles() -%}
-{% call push('head', once='stock-css') %}<link rel="stylesheet" href="{{ asset('areas/stock.css') }}">{% endcall %}
+<rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
 {{ scripts() }}
 {%- endmacro %}
 
 {#- The pages' small script (public/areas/stock.js), once. -#}
 {% macro scripts() -%}
-{% call push('scripts', once='stock-js') %}<script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}
+<rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
 {%- endmacro %}
 
 {#- A status stepper: `steps` is a list of {key, done, current}; each step's label is

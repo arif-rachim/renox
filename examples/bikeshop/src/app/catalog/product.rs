@@ -162,21 +162,20 @@ pub async fn show(
         .cloned();
     let breadcrumbs = tree.path_to(product.category_id);
     let brand = Brand::find(db, product.brand_id).await?;
-    let variants = ProductVariant::where_eq("product_id", product.id)
-        .order_by("id")
+    let variants = ProductVariant::query()
+        .where_(ProductVariant::PRODUCT_ID.eq(product.id))
+        .order_by(ProductVariant::ID)
         .get(db)
         .await?;
-    let photos = ProductPhoto::where_eq("product_id", product.id)
-        .order_by("position")
-        .order_by("id")
+    let photos = ProductPhoto::query()
+        .where_(ProductPhoto::PRODUCT_ID.eq(product.id))
+        .order_by(ProductPhoto::POSITION)
+        .order_by(ProductPhoto::ID)
         .get(db)
         .await?;
-    let stores = Store::query().order_by("id").get(db).await?;
+    let stores = Store::query().order_by(Store::ID).get(db).await?;
     let levels = StockLevel::query()
-        .where_in(
-            "variant_id",
-            variants.iter().map(|v| v.id).collect::<Vec<_>>(),
-        )
+        .where_(StockLevel::VARIANT_ID.is_in(variants.iter().map(|v| v.id).collect::<Vec<_>>()))
         .get(db)
         .await?;
     let mut available: HashMap<(i64, i64), i64> = HashMap::new();
@@ -274,10 +273,7 @@ pub async fn show(
     // A bike of this model in the rental fleet: "rent this model".
     let rentable = kind == Some(CategoryKind::Bike)
         && RentalBike::query()
-            .where_in(
-                "variant_id",
-                variants.iter().map(|v| v.id).collect::<Vec<_>>(),
-            )
+            .where_(RentalBike::VARIANT_ID.is_in(variants.iter().map(|v| v.id).collect::<Vec<_>>()))
             .where_not_in("status", [BikeStatus::Retired])
             .exists(db)
             .await?;

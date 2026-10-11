@@ -168,8 +168,9 @@ async fn the_cart_holds_no_more_than_the_store_has() {
     assert_eq!(cart.lines[0].quantity, 1);
 
     // Someone else buys it: the next visit lowers the line to zero and drops it.
-    StockLevel::where_eq("variant_id", w.helmet.id)
-        .where_eq("location_store_id", w.south.id)
+    StockLevel::query()
+        .where_(StockLevel::VARIANT_ID.eq(w.helmet.id))
+        .where_(StockLevel::LOCATION_STORE_ID.eq(w.south.id))
         .update(app.db(), &[("reserved", &1)])
         .await
         .unwrap();
@@ -260,7 +261,8 @@ async fn a_guest_cart_joins_the_saved_cart_after_logging_in() {
         .assert_see("Helmet")
         .assert_see("Chain");
     app.assert_session_missing("cart");
-    let row = SavedCart::where_eq("user_id", user.id)
+    let row = SavedCart::query()
+        .where_(SavedCart::USER_ID.eq(user.id))
         .first(db)
         .await
         .unwrap()
@@ -278,7 +280,8 @@ async fn a_guest_cart_joins_the_saved_cart_after_logging_in() {
     );
     // From now on, the account's cart is used (another device sees it too).
     post(&app, "/cart", add(&w.helmet, 1)).await;
-    let row = SavedCart::where_eq("user_id", user.id)
+    let row = SavedCart::query()
+        .where_(SavedCart::USER_ID.eq(user.id))
         .first(db)
         .await
         .unwrap()
@@ -324,8 +327,9 @@ fn pickup(store: &Store) -> Vec<(&'static str, String)> {
 
 /// The one level of `variant` at `store`: (on hand, reserved).
 async fn level(app: &TestApp, variant: i64, store: i64) -> (i64, i64) {
-    let l = StockLevel::where_eq("variant_id", variant)
-        .where_eq("location_store_id", store)
+    let l = StockLevel::query()
+        .where_(StockLevel::VARIANT_ID.eq(variant))
+        .where_(StockLevel::LOCATION_STORE_ID.eq(store))
         .first(app.db())
         .await
         .unwrap()
@@ -335,9 +339,10 @@ async fn level(app: &TestApp, variant: i64, store: i64) -> (i64, i64) {
 
 /// The order's ledger: (reason, quantity) in order.
 async fn ledger_of(app: &TestApp, order: i64) -> Vec<(MovementReason, i64)> {
-    StockMovement::where_eq("reference_type", "orders")
-        .where_eq("reference_id", order)
-        .order_by("id")
+    StockMovement::query()
+        .where_(StockMovement::REFERENCE_TYPE.eq("orders"))
+        .where_(StockMovement::REFERENCE_ID.eq(order))
+        .order_by(StockMovement::ID)
         .get(app.db())
         .await
         .unwrap()
@@ -348,9 +353,10 @@ async fn ledger_of(app: &TestApp, order: i64) -> Vec<(MovementReason, i64)> {
 
 /// Sends the gateway's signed notification for the order's pending payment.
 async fn gateway_says(app: &TestApp, order: &Order, status: &str) -> renox::testing::TestResponse {
-    let payment = Payment::where_eq("payable_type", "orders")
-        .where_eq("payable_id", order.id)
-        .order_by_desc("id")
+    let payment = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq("orders"))
+        .where_(Payment::PAYABLE_ID.eq(order.id))
+        .order_by_desc(Payment::ID)
         .first(app.db())
         .await
         .unwrap()
@@ -366,7 +372,7 @@ async fn gateway_says(app: &TestApp, order: &Order, status: &str) -> renox::test
 
 async fn last_order(app: &TestApp) -> Order {
     Order::query()
-        .order_by_desc("id")
+        .order_by_desc(Order::ID)
         .first(app.db())
         .await
         .unwrap()
@@ -539,7 +545,8 @@ async fn a_guest_order_is_reserved_then_paid_by_the_signed_webhook() {
     assert_eq!(payment.status, PaymentStatus::Paid);
     assert_eq!(payment.method, PaymentMethod::Gateway);
     // The bike is now one of the customer's bikes, waiting for its frame number.
-    let bikes = CustomerBike::where_eq("order_id", order.id)
+    let bikes = CustomerBike::query()
+        .where_(CustomerBike::ORDER_ID.eq(order.id))
         .get(app.db())
         .await
         .unwrap();
@@ -634,7 +641,8 @@ async fn the_last_unit_goes_to_one_of_two_concurrent_checkouts() {
 
     // Over HTTP: a cart with the bike, then it is gone: the cart says so.
     post(&app, "/cart", add(&w.chain, 1)).await;
-    StockLevel::where_eq("variant_id", w.chain.id)
+    StockLevel::query()
+        .where_(StockLevel::VARIANT_ID.eq(w.chain.id))
         .update(&db, &[("reserved", &10)])
         .await
         .unwrap();
@@ -670,7 +678,8 @@ async fn unpaid_orders_expire_after_thirty_minutes_and_release_the_stock() {
         ledger_of(&app, order.id).await,
         [(MovementReason::Reserved, 2), (MovementReason::Released, 2)]
     );
-    let payment = Payment::where_eq("payable_id", order.id)
+    let payment = Payment::query()
+        .where_(Payment::PAYABLE_ID.eq(order.id))
         .first(app.db())
         .await
         .unwrap()
@@ -808,7 +817,8 @@ async fn staff_move_orders_on_and_take_returns_within_fourteen_days() {
             .any(|m| m.subject.contains("ready for pickup"))
     );
     // The handover, with the bike's frame number.
-    let bike = CustomerBike::where_eq("order_id", order.id)
+    let bike = CustomerBike::query()
+        .where_(CustomerBike::ORDER_ID.eq(order.id))
         .first(db)
         .await
         .unwrap()
@@ -837,8 +847,9 @@ async fn staff_move_orders_on_and_take_returns_within_fourteen_days() {
     );
 
     // A cashier may not refund.
-    let chain_line = OrderItem::where_eq("order_id", order.id)
-        .where_eq("variant_id", w.chain.id)
+    let chain_line = OrderItem::query()
+        .where_(OrderItem::ORDER_ID.eq(order.id))
+        .where_(OrderItem::VARIANT_ID.eq(w.chain.id))
         .first(db)
         .await
         .unwrap()
@@ -871,8 +882,9 @@ async fn staff_move_orders_on_and_take_returns_within_fourteen_days() {
     );
     let ledger = ledger_of(&app, order.id).await;
     assert_eq!(ledger.last(), Some(&(MovementReason::Return, 2)));
-    let refund = Payment::where_eq("payable_id", order.id)
-        .where_eq("status", PaymentStatus::Refunded)
+    let refund = Payment::query()
+        .where_(Payment::PAYABLE_ID.eq(order.id))
+        .where_(Payment::STATUS.eq(PaymentStatus::Refunded))
         .first(db)
         .await
         .unwrap()
@@ -955,7 +967,8 @@ async fn a_counter_sale_follows_the_same_rules() {
     assert_eq!(order.channel, Channel::Counter);
     assert_eq!(order.status, OrderStatus::Completed);
     assert_eq!(level(&app, w.helmet.id, w.north.id).await, (1, 0));
-    let payment = Payment::where_eq("payable_id", order.id)
+    let payment = Payment::query()
+        .where_(Payment::PAYABLE_ID.eq(order.id))
         .first(db)
         .await
         .unwrap()

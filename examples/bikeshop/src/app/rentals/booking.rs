@@ -41,14 +41,16 @@ pub const HOLDING: [RentalStatus; 3] = [
 /// The rentals of `bike_id` that clash with `start..end` (touching periods
 /// don't clash; an overdue rental clashes with everything).
 pub fn clashing(bike_id: i64, start: DateTime, end: DateTime) -> Query<Rental> {
-    Rental::where_eq("rental_bike_id", bike_id).where_any(|any| {
-        any.where_eq("status", RentalStatus::Overdue)
-            .where_all(|all| {
-                all.where_in("status", [RentalStatus::Reserved, RentalStatus::Active])
-                    .where_op("starts_at", "<", end)
-                    .where_op("due_at", ">", start)
-            })
-    })
+    Rental::query()
+        .where_(Rental::RENTAL_BIKE_ID.eq(bike_id))
+        .where_any(|any| {
+            any.where_(Rental::STATUS.eq(RentalStatus::Overdue))
+                .where_all(|all| {
+                    all.where_(Rental::STATUS.is_in([RentalStatus::Reserved, RentalStatus::Active]))
+                        .where_(Rental::STARTS_AT.lt(end))
+                        .where_(Rental::DUE_AT.gt(start))
+                })
+        })
 }
 
 /// Whether a bike in this status may be booked at all.
@@ -69,7 +71,8 @@ pub async fn free_bikes(
     end: DateTime,
     variant_ids: Option<Vec<i64>>,
 ) -> Result<Vec<(RentalBike, Quote)>> {
-    let mut bikes = RentalBike::where_eq("location_store_id", store_id)
+    let mut bikes = RentalBike::query()
+        .where_(RentalBike::LOCATION_STORE_ID.eq(store_id))
         .where_not_in(
             "status",
             [
@@ -78,24 +81,24 @@ pub async fn free_bikes(
                 BikeStatus::Retired,
             ],
         )
-        .order_by("daily_rate")
-        .order_by("id");
+        .order_by(RentalBike::DAILY_RATE)
+        .order_by(RentalBike::ID);
     if let Some(ids) = variant_ids {
-        bikes = bikes.where_in("variant_id", ids);
+        bikes = bikes.where_(RentalBike::VARIANT_ID.is_in(ids));
     }
     let bikes = bikes.get(db).await?;
     let ids: Vec<i64> = bikes.iter().map(|b| b.id).collect();
     let busy: Vec<i64> = Rental::query()
-        .where_in("rental_bike_id", ids)
+        .where_(Rental::RENTAL_BIKE_ID.is_in(ids))
         .where_any(|any| {
-            any.where_eq("status", RentalStatus::Overdue)
+            any.where_(Rental::STATUS.eq(RentalStatus::Overdue))
                 .where_all(|all| {
-                    all.where_in("status", [RentalStatus::Reserved, RentalStatus::Active])
-                        .where_op("starts_at", "<", end)
-                        .where_op("due_at", ">", start)
+                    all.where_(Rental::STATUS.is_in([RentalStatus::Reserved, RentalStatus::Active]))
+                        .where_(Rental::STARTS_AT.lt(end))
+                        .where_(Rental::DUE_AT.gt(start))
                 })
         })
-        .pluck(db, "rental_bike_id")
+        .pluck(db, Rental::RENTAL_BIKE_ID)
         .await?;
     Ok(bikes
         .into_iter()
@@ -162,7 +165,8 @@ async fn book_in(
     tx: &mut Transaction,
     new: &NewRental,
 ) -> Result<std::result::Result<Rental, Refusal>> {
-    let Some(bike) = RentalBike::where_eq("id", new.bike_id)
+    let Some(bike) = RentalBike::query()
+        .where_(RentalBike::ID.eq(new.bike_id))
         .lock_for_update()
         .first(&mut *tx)
         .await?

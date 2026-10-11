@@ -90,14 +90,14 @@ async fn walk(volume: Volume) -> BTreeMap<String, usize> {
     seed::shop::build(&db, volume).await.unwrap();
 
     let category = Category::query()
-        .order_by("id")
+        .order_by(Category::ID)
         .first(&db)
         .await
         .unwrap()
         .unwrap()
         .slug;
     let product = Product::query()
-        .order_by("id")
+        .order_by(Product::ID)
         .first(&db)
         .await
         .unwrap()

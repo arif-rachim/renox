@@ -16,6 +16,7 @@ pub mod fields;
 pub mod htmx;
 pub mod live;
 
+use crate::app::staff::model::Store;
 use crate::explain::{self as about_this_page, Audience};
 use renox::prelude::*;
 use std::collections::BTreeSet;
@@ -74,7 +75,7 @@ async fn pages(
 
     // A store's page is on its own host: link to the first store's.
     let first_store = crate::app::staff::model::Store::query()
-        .order_by("id")
+        .order_by(Store::ID)
         .first(&state.db)
         .await?
         .map(|store| crate::app::home::stores::site_url(&state.config, &store.slug));

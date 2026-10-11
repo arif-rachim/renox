@@ -61,8 +61,9 @@ impl OrderView {
     /// The order with its lines, products, store, customer and address:
     /// seven queries however many lines.
     pub async fn load(db: &Db, order: Order) -> Result<OrderView> {
-        let items = OrderItem::where_eq("order_id", order.id)
-            .order_by("id")
+        let items = OrderItem::query()
+            .where_(OrderItem::ORDER_ID.eq(order.id))
+            .order_by(OrderItem::ID)
             .get(db)
             .await?;
         let variants =
@@ -71,10 +72,7 @@ impl OrderView {
         // Discontinued products still name the lines of old orders.
         let products = Product::query()
             .with_trashed()
-            .where_in(
-                "id",
-                variants.iter().map(|v| v.product_id).collect::<Vec<_>>(),
-            )
+            .where_(Product::ID.is_in(variants.iter().map(|v| v.product_id).collect::<Vec<_>>()))
             .get(db)
             .await?;
         let lines = items
@@ -104,7 +102,7 @@ impl OrderView {
             Some(id) => {
                 Customer::query()
                     .with_trashed()
-                    .where_eq("id", id)
+                    .where_(Customer::ID.eq(id))
                     .first(db)
                     .await?
             }

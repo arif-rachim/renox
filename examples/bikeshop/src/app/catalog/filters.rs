@@ -263,7 +263,7 @@ impl Filters {
         if !self.brands.is_empty() {
             query = query.where_in_query(
                 "brand_id",
-                Brand::query().where_in("slug", self.brands.clone()),
+                Brand::query().where_(Brand::SLUG.is_in(self.brands.clone())),
                 "id",
             );
         }
@@ -283,7 +283,7 @@ impl Filters {
         if !self.sizes.is_empty() {
             query = query.where_in_query(
                 "id",
-                ProductVariant::query().where_in("size", self.sizes.clone()),
+                ProductVariant::query().where_(ProductVariant::SIZE.is_in(self.sizes.clone())),
                 "product_id",
             );
         }
@@ -342,7 +342,7 @@ impl Filters {
                  JOIN product_variants pv ON pv.id = oi.variant_id \
                  WHERE pv.product_id = products.id) DESC",
             ),
-            Sort::Newest => query.order_by_desc("created_at"),
+            Sort::Newest => query.order_by_desc(Product::CREATED_AT),
             Sort::PriceAsc => query.order_by_raw(
                 "(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = products.id) ASC",
             ),
@@ -350,7 +350,7 @@ impl Filters {
                 "(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = products.id) DESC",
             ),
         };
-        query.order_by("id")
+        query.order_by(Product::ID)
     }
 }
 

@@ -43,10 +43,11 @@ pub async fn run(state: &AppState) -> Result<Run> {
     let today = visits::today(&state.config);
     let ended = visits::end_finished(db, today).await?;
     let missed = visits::mark_missed(state).await?;
-    let subs = PlanSubscription::where_eq("status", SubscriptionStatus::Active)
-        .where_null("paused_at")
-        .where_null("held_at")
-        .order_by("id")
+    let subs = PlanSubscription::query()
+        .where_(PlanSubscription::STATUS.eq(SubscriptionStatus::Active))
+        .where_(PlanSubscription::PAUSED_AT.is_null())
+        .where_(PlanSubscription::HELD_AT.is_null())
+        .order_by(PlanSubscription::ID)
         .get(db)
         .await?;
     let mut made = 0;

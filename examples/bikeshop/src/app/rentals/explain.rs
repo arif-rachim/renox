@@ -708,7 +708,7 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Query<T>",
                     why: "The payments are rows of the shared `payments` table pointing at the \
                           rental by `payable_type` + `payable_id` (the same table sales and \
-                          the workshop use), read with a plain query: `Payment::where_eq(…)` \
+                          the workshop use), read with a plain query: `Payment::query().where_(Payment::PAYABLE_ID.eq(…))` \
                           on both columns and the paid status. One kind of parent is needed \
                           here, so no `Morph` loader is.",
                 },

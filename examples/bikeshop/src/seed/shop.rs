@@ -1061,7 +1061,10 @@ async fn fleet(tx: &mut Transaction, world: &mut World) -> Result {
         }
     }
     RentalBike::insert_many(&mut *tx, bikes).await?;
-    world.bikes = RentalBike::query().order_by("id").get(&mut *tx).await?;
+    world.bikes = RentalBike::query()
+        .order_by(RentalBike::ID)
+        .get(&mut *tx)
+        .await?;
 
     // About one in ten is placed at another store, some time in the last
     // eight months; the owner store keeps it in its books.
@@ -1129,7 +1132,7 @@ async fn demo_customer(db: &Db, world: &mut World) -> Result {
     tx.commit().await?;
     let user_id = ids["customer@bikeshop.test"];
     let address = Address::query()
-        .order_by("id")
+        .order_by(Address::ID)
         .first(db)
         .await?
         .map(|a| a.id);

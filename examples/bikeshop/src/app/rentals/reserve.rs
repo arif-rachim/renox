@@ -128,13 +128,15 @@ pub async fn search(
     );
     let problem = period_problem(start, end, renox::db::now());
 
-    let categories = Category::where_eq("kind", CategoryKind::Bike)
-        .order_by("name")
+    let categories = Category::query()
+        .where_(Category::KIND.eq(CategoryKind::Bike))
+        .order_by(Category::NAME)
         .get(db)
         .await?;
     // The variants rented out at this store, for the size filter and names.
-    let at_store: Vec<i64> = RentalBike::where_eq("location_store_id", store_id)
-        .pluck(db, "variant_id")
+    let at_store: Vec<i64> = RentalBike::query()
+        .where_(RentalBike::LOCATION_STORE_ID.eq(store_id))
+        .pluck(db, RentalBike::VARIANT_ID)
         .await?;
     let names = variant_names(db, at_store.clone()).await?;
     let mut sizes: Vec<String> = names.values().filter_map(|(_, s)| s.clone()).collect();
@@ -149,12 +151,13 @@ pub async fn search(
         .and_then(|c| c.parse::<i64>().ok())
         .filter(|c| *c > 0);
     if let Some(category) = category {
-        let products: Vec<i64> = Product::where_eq("category_id", category)
-            .pluck(db, "id")
+        let products: Vec<i64> = Product::query()
+            .where_(Product::CATEGORY_ID.eq(category))
+            .pluck(db, Product::ID)
             .await?;
         let ids: Vec<i64> = ProductVariant::query()
-            .where_in("product_id", products)
-            .pluck(db, "id")
+            .where_(ProductVariant::PRODUCT_ID.is_in(products))
+            .pluck(db, ProductVariant::ID)
             .await?;
         wanted = Some(ids);
     }
@@ -235,17 +238,18 @@ async fn day_timeline(
         &state.config,
         day.and_hms_opt(CLOSES, 0, 0).unwrap_or(day_of),
     );
-    let bikes = RentalBike::where_eq("location_store_id", store_id)
-        .order_by("id")
+    let bikes = RentalBike::query()
+        .where_(RentalBike::LOCATION_STORE_ID.eq(store_id))
+        .order_by(RentalBike::ID)
         .limit(12)
         .get(db)
         .await?;
     let ids: Vec<i64> = bikes.iter().map(|b| b.id).collect();
     let rentals = Rental::query()
-        .where_in("rental_bike_id", ids)
-        .where_in("status", booking::HOLDING)
-        .where_op("starts_at", "<", last)
-        .where_op("due_at", ">", first)
+        .where_(Rental::RENTAL_BIKE_ID.is_in(ids))
+        .where_(Rental::STATUS.is_in(booking::HOLDING))
+        .where_(Rental::STARTS_AT.lt(last))
+        .where_(Rental::DUE_AT.gt(first))
         .get(db)
         .await?;
     let names = variant_names(db, bikes.iter().map(|b| b.variant_id).collect()).await?;
@@ -404,8 +408,9 @@ pub async fn reserve(
 /// is as good as a wrong one).
 pub async fn own_rental(db: &Db, user: &User, code: &str) -> Result<(Customer, Rental)> {
     let customer = customer_of(db, user).await?;
-    let rental = Rental::where_eq("reservation_code", code)
-        .where_eq("customer_id", customer.id)
+    let rental = Rental::query()
+        .where_eq("reservation_code", code)
+        .where_(Rental::CUSTOMER_ID.eq(customer.id))
         .first(db)
         .await?
         .ok_or(Error::NotFound)?;
@@ -539,8 +544,9 @@ pub async fn cancel_rental(
 // [explain:rentals.mine.handler]
 pub async fn mine(State(state): State<AppState>, user: AuthUser) -> Result<View> {
     let customer = customer_of(&state.db, &user).await?;
-    let rentals = Rental::where_eq("customer_id", customer.id)
-        .order_by_desc("starts_at")
+    let rentals = Rental::query()
+        .where_(Rental::CUSTOMER_ID.eq(customer.id))
+        .order_by_desc(Rental::STARTS_AT)
         .limit(50)
         .get(&state.db)
         .await?;

@@ -292,7 +292,8 @@ async fn the_demo_users_can_work() {
     let app = seeded().await;
     let db = app.db();
     let user = |email: &'static str| async move {
-        User::where_eq("email", email)
+        User::query()
+            .where_eq("email", email)
             .first(db)
             .await
             .unwrap()

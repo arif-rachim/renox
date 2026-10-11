@@ -47,8 +47,10 @@ pub struct SheetRow {
 /// at the active store, own goods first, then goods held for other stores.
 pub async fn sheet(State(db): State<Db>, Query(query): Query<TakeQuery>) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
-    let here =
-        || access::visible::<StockRow>(catalogue::STOCK_VIEW).where_eq("location_store_id", store);
+    let here = || {
+        access::visible::<StockRow>(catalogue::STOCK_VIEW)
+            .where_(StockRow::LOCATION_STORE_ID.eq(store))
+    };
     // The categories with stock here, for the picker (one query).
     let mut categories: Vec<String> = here()
         .get(&db)
@@ -63,9 +65,9 @@ pub async fn sheet(State(db): State<Db>, Query(query): Query<TakeQuery>) -> Resu
         .filter(|c| categories.contains(c))
         .or_else(|| categories.first().cloned());
     let rows = here()
-        .where_eq("category", category.clone().unwrap_or_default())
-        .order_by("product")
-        .order_by("sku")
+        .where_(StockRow::CATEGORY.eq(category.clone().unwrap_or_default()))
+        .order_by(StockRow::PRODUCT)
+        .order_by(StockRow::SKU)
         .get(&db)
         .await?;
     let stores: HashMap<i64, String> = Store::all_by_name(&db)

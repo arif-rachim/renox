@@ -25,8 +25,9 @@ pub const PHOTO_LINK: Duration = Duration::from_secs(10 * 60);
 /// The customer's bike `id`, or a 404.
 pub async fn own_bike(db: &Db, user: &User, id: i64) -> Result<CustomerBike> {
     let customer = customer_of(db, user).await?;
-    CustomerBike::where_eq("id", id)
-        .where_eq("customer_id", customer.id)
+    CustomerBike::query()
+        .where_(CustomerBike::ID.eq(id))
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
         .first(db)
         .await?
         .ok_or(Error::NotFound)
@@ -34,12 +35,13 @@ pub async fn own_bike(db: &Db, user: &User, id: i64) -> Result<CustomerBike> {
 
 /// The catalogue's bike models, for the "model" select (id, name).
 async fn bike_models(db: &Db) -> Result<Vec<(i64, String)>> {
-    let categories: Vec<i64> = Category::where_eq("kind", CategoryKind::Bike)
-        .pluck(db, "id")
+    let categories: Vec<i64> = Category::query()
+        .where_(Category::KIND.eq(CategoryKind::Bike))
+        .pluck(db, Category::ID)
         .await?;
     Ok(Product::query()
-        .where_in("category_id", categories)
-        .order_by("name")
+        .where_(Product::CATEGORY_ID.is_in(categories))
+        .order_by(Product::NAME)
         .limit(300)
         .get(db)
         .await?
@@ -54,14 +56,15 @@ async fn bike_models(db: &Db) -> Result<Vec<(i64, String)>> {
 pub async fn index(State(state): State<AppState>, user: AuthUser) -> Result<View> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
-    let bikes = CustomerBike::where_eq("customer_id", customer.id)
-        .order_by("name")
+    let bikes = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .order_by(CustomerBike::NAME)
         .get(db)
         .await?;
     let orders = has_many::<WorkOrder, _, _>(
         db,
         &bikes,
-        WorkOrder::query().order_by_desc("scheduled_for"),
+        WorkOrder::query().order_by_desc(WorkOrder::SCHEDULED_FOR),
         "customer_bike_id",
         |o: &WorkOrder| o.customer_bike_id.unwrap_or_default(),
     )
@@ -174,8 +177,9 @@ pub async fn show(
 ) -> Result<View> {
     let db = &state.db;
     let bike = own_bike(db, &user, id).await?;
-    let orders = WorkOrder::where_eq("customer_bike_id", bike.id)
-        .order_by_desc("scheduled_for")
+    let orders = WorkOrder::query()
+        .where_(WorkOrder::CUSTOMER_BIKE_ID.eq(bike.id))
+        .order_by_desc(WorkOrder::SCHEDULED_FOR)
         .get(db)
         .await?;
     let tasks = has_many::<WorkOrderTask, _, _>(
@@ -201,7 +205,7 @@ pub async fn show(
     let notes = has_many::<WorkOrderNote, _, _>(
         db,
         &orders,
-        WorkOrderNote::query().where_not_null("body"),
+        WorkOrderNote::query().where_(WorkOrderNote::BODY.is_not_null()),
         "work_order_id",
         |n: &WorkOrderNote| n.work_order_id,
     )

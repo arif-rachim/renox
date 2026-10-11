@@ -158,7 +158,7 @@ A point-of-sale number pad that types into a field of the form, for a touch scre
 counter:
 
 ```html
-{{ input("paid", "Amount paid", attrs={"inputmode": "numeric", "maxlength": "9"}) }}
+<rx-input name="paid" label="Amount paid" inputmode="numeric" maxlength="9"/>
 {{ keypad("rx-paid", decimal=true, enter_label="Pay") }}
 ```
 

@@ -60,7 +60,7 @@ impl Store {
 
     /// Every store, by name.
     pub async fn all_by_name(db: &Db) -> Result<Vec<Store>> {
-        Store::query().order_by("name").get(db).await
+        Store::query().order_by(Store::NAME).get(db).await
     }
 }
 
@@ -90,7 +90,10 @@ pub struct Staff {
 impl Staff {
     /// The staff record of a user, if they work here.
     pub async fn of_user(db: &Db, user_id: i64) -> Result<Option<Staff>> {
-        Staff::where_eq("user_id", user_id).first(db).await
+        Staff::query()
+            .where_(Staff::USER_ID.eq(user_id))
+            .first(db)
+            .await
     }
 }
 

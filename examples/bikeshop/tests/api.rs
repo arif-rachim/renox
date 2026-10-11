@@ -190,7 +190,8 @@ async fn managers_make_kiosk_tokens_shown_once_and_revoke_them() {
         .get("/staff/api-tokens")
         .await
         .assert_dont_see("id=\"fresh-token\"");
-    let kiosk = Kiosk::where_eq("store_id", w.north.id)
+    let kiosk = Kiosk::query()
+        .where_(Kiosk::STORE_ID.eq(w.north.id))
         .first(w.app.db())
         .await
         .unwrap()
@@ -306,8 +307,9 @@ async fn each_endpoint_refuses_no_token_a_missing_ability_and_another_stores_dat
     // The bikes are its store's only.
     let bikes = get(&w, &reader, "/api/v1/kiosk/bikes").await;
     bikes.assert_ok().assert_json_path("store_id", w.north.id);
-    let south_bikes: Vec<i64> = RentalBike::where_eq("location_store_id", w.south.id)
-        .pluck(w.app.db(), "id")
+    let south_bikes: Vec<i64> = RentalBike::query()
+        .where_(RentalBike::LOCATION_STORE_ID.eq(w.south.id))
+        .pluck(w.app.db(), RentalBike::ID)
         .await
         .unwrap();
     let listed: Vec<i64> = bikes
@@ -323,9 +325,10 @@ async fn each_endpoint_refuses_no_token_a_missing_ability_and_another_stores_dat
 /// What a rental settles to, comparable between two rentals.
 async fn outcome(w: &World, id: i64) -> (RentalStatus, DepositStatus, i64, i64, i64, Vec<i64>) {
     let r = Rental::find(w.app.db(), id).await.unwrap().unwrap();
-    let mut paid: Vec<i64> = Payment::where_eq("payable_type", "rentals")
-        .where_eq("payable_id", id)
-        .pluck(w.app.db(), "amount")
+    let mut paid: Vec<i64> = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq("rentals"))
+        .where_(Payment::PAYABLE_ID.eq(id))
+        .pluck(w.app.db(), Payment::AMOUNT)
         .await
         .unwrap();
     paid.sort();

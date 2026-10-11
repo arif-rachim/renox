@@ -159,9 +159,9 @@ struct Bike {
 async fn load_bikes(db: &Db, before: Option<i64>) -> Result<(Vec<Bike>, Option<i64>)> {
     let mut rows = Product::query()
         .when(before.is_some(), |q| {
-            q.where_op("id", "<", before.unwrap_or_default())
+            q.where_(Product::ID.lt(before.unwrap_or_default()))
         })
-        .order_by_desc("id")
+        .order_by_desc(Product::ID)
         .limit(PER_LOAD + 1)
         .get(db)
         .await?;

@@ -28,6 +28,7 @@ pub mod product;
 use renox::prelude::*;
 use serde::Serialize;
 
+use crate::app::staff::model::Store;
 use browse::{Card, Tree};
 use model::{Category, CategoryKind, Product};
 
@@ -141,13 +142,13 @@ pub async fn storefront(db: &Db) -> Result<Storefront> {
         .map(|c| c.id)
         .collect();
     let featured = Product::query()
-        .where_in("category_id", bike_categories.clone())
+        .where_(Product::CATEGORY_ID.is_in(bike_categories.clone()))
         .order_by_raw(
             "(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi \
              JOIN product_variants pv ON pv.id = oi.variant_id \
              WHERE pv.product_id = products.id) DESC",
         )
-        .order_by("id")
+        .order_by(Product::ID)
         .limit(FEATURED)
         .get(db)
         .await?;
@@ -166,11 +167,11 @@ pub async fn storefront(db: &Db) -> Result<Storefront> {
         })
         .collect();
     let bikes = Product::query()
-        .where_in("category_id", bike_categories)
+        .where_(Product::CATEGORY_ID.is_in(bike_categories))
         .count(db)
         .await?;
     let stores = crate::app::staff::model::Store::query()
-        .order_by("id")
+        .order_by(Store::ID)
         .select_as::<(String, String), _>(db, "name, slug")
         .await?
         .into_iter()
@@ -203,14 +204,14 @@ pub async fn sitemap(State(state): State<AppState>) -> Result<renox::seo::Sitema
         .route("home", &[], None)?
         .route("catalog.index", &[], None)?;
     for category in Category::query()
-        .order_by("position")
+        .order_by(Category::POSITION)
         .get(&state.db)
         .await?
     {
         map = map.route("catalog.category", &[&category.slug], category.updated_at)?;
     }
     for (slug, updated) in Product::query()
-        .order_by("id")
+        .order_by(Product::ID)
         .select_as::<(String, Option<DateTime>), _>(&state.db, "slug, updated_at")
         .await?
     {

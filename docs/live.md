@@ -167,7 +167,16 @@ async fn page(ctx: LiveContext) -> Result<View> {
 }
 ```
 
-In the page's template:
+In the page's template, write the tag (the name after `live-` is for the reader; the component
+comes from `:component`):
+
+```html
+<live-counter :component="counter"/>
+```
+
+The tag takes no content. Other attributes land on the wrapper (`class`, `data-*`), and
+`@saved="open = false"` listens to the events the component dispatches (see
+[ui.md](ui.md#components-as-tags)). It compiles to the include form, which still works:
 
 ```html
 {% with component = counter %}{% include "renox/live.html" %}{% endwith %}
@@ -305,7 +314,7 @@ Live components are the right tool for a part of a page that has state. Know wha
   sibling components.
 - **No throttle.** The route has no rate limit in v1 and takes no `App::layer` layers. Put
   expensive work behind the action's own checks.
-- Not in v1: files, modifiers such as `rx-click.prevent`, and a `<live-…>` tag.
+- Not in v1: files and modifiers such as `rx-click.prevent`.
 
 ## Testing
 

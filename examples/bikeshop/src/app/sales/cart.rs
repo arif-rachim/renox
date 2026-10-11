@@ -104,7 +104,10 @@ impl Cart {
         let Some(user) = user else {
             return Ok(guest.unwrap_or_default());
         };
-        let saved = SavedCart::where_eq("user_id", user.id).first(db).await?;
+        let saved = SavedCart::query()
+            .where_(SavedCart::USER_ID.eq(user.id))
+            .first(db)
+            .await?;
         let mut cart = saved
             .map(|s| Cart {
                 store_id: s.store_id,
@@ -146,7 +149,10 @@ impl Cart {
     pub async fn clear(db: &Db, session: &Session, user: Option<&User>) -> Result {
         session.remove(SESSION_KEY);
         if let Some(user) = user {
-            SavedCart::where_eq("user_id", user.id).delete(db).await?;
+            SavedCart::query()
+                .where_(SavedCart::USER_ID.eq(user.id))
+                .delete(db)
+                .await?;
         }
         Ok(())
     }
@@ -163,8 +169,9 @@ pub async fn available_at(
     if variant_ids.is_empty() {
         return Ok(available);
     }
-    for level in StockLevel::where_eq("location_store_id", store_id)
-        .where_in("variant_id", variant_ids.to_vec())
+    for level in StockLevel::query()
+        .where_(StockLevel::LOCATION_STORE_ID.eq(store_id))
+        .where_(StockLevel::VARIANT_ID.is_in(variant_ids.to_vec()))
         .get(db)
         .await?
     {
@@ -207,7 +214,7 @@ impl CartView {
     /// can't fill any more are lowered in `cart` (the caller saves it when
     /// `changed`); lines whose product was discontinued are taken out.
     pub async fn load(db: &Db, cart: &mut Cart) -> Result<CartView> {
-        let stores = Store::query().order_by("id").get(db).await?;
+        let stores = Store::query().order_by(Store::ID).get(db).await?;
         if cart
             .store_id
             .is_none_or(|id| !stores.iter().any(|s| s.id == id))
@@ -237,7 +244,9 @@ impl CartView {
         let mut photos: HashMap<i64, Vec<ProductPhoto>> = has_many(
             db,
             &products,
-            ProductPhoto::query().order_by("position").order_by("id"),
+            ProductPhoto::query()
+                .order_by(ProductPhoto::POSITION)
+                .order_by(ProductPhoto::ID),
             "product_id",
             |p| p.product_id,
         )
@@ -362,7 +371,7 @@ pub async fn add(
 ) -> Result<Response> {
     let user = user.as_deref();
     let mut cart = Cart::load(&db, &session, user).await?;
-    let stores = Store::query().order_by("id").get(&db).await?;
+    let stores = Store::query().order_by(Store::ID).get(&db).await?;
     // A cart's first line picks its store: the first that has the variant.
     let store = match cart
         .store_id

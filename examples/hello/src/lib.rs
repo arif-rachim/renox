@@ -112,6 +112,8 @@ impl Module for Guestbook {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `db:check` and `view:check` read what the app registers.
+        app.model::<Entry>().view_data::<GuestbookPage>();
         app.job::<ThankGuest>()
             .listen(|event: EntryPosted, state| async move {
                 state
@@ -150,7 +152,7 @@ struct PruneEntries {
 impl AppCommand for PruneEntries {
     async fn run(self, state: AppState) -> Result {
         let cutoff = renox::db::now() - renox::chrono::TimeDelta::days(self.days);
-        let old = || Entry::query().where_op("created_at", "<", cutoff);
+        let old = || Entry::query().where_(Entry::CREATED_AT.lt(cutoff));
         let count = old().count(&state.db).await?;
         if count == 0 {
             println!("No entries older than {} days.", self.days);
@@ -166,9 +168,17 @@ impl AppCommand for PruneEntries {
     }
 }
 
+/// What `guestbook/index.html` gets: a typed context, so `view:check` knows the page's
+/// variables.
+#[derive(Serialize, ViewData)]
+#[view(template = "guestbook/index.html")]
+struct GuestbookPage {
+    entries: Paginated<Entry>,
+}
+
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
     let entries = Entry::query().latest().paginate(&db, page, 10).await?;
-    Ok(view("guestbook/index.html", context! { entries }).fragment("entries"))
+    Ok(View::typed(GuestbookPage { entries }).fragment("entries"))
 }
 
 /// Invalid input never gets here: `Valid` sends regular posts back with the
@@ -202,7 +212,7 @@ async fn store(
         let entries = Entry::query().latest().paginate(&state.db, 1, 10).await?;
         return Ok((
             HxTrigger("entry-added".into()),
-            view("guestbook/index.html", context! { entries }).fragment("entries"),
+            View::typed(GuestbookPage { entries }).fragment("entries"),
         )
             .into_response());
     }

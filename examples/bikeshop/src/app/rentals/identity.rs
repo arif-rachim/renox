@@ -32,8 +32,9 @@ pub const PHOTO_LINK: Duration = Duration::from_secs(5 * 60);
 
 /// The customer's latest ID document, if they sent one.
 pub async fn latest(db: &Db, customer_id: i64) -> Result<Option<IdentityDocument>> {
-    IdentityDocument::where_eq("customer_id", customer_id)
-        .order_by_desc("id")
+    IdentityDocument::query()
+        .where_(IdentityDocument::CUSTOMER_ID.eq(customer_id))
+        .order_by_desc(IdentityDocument::ID)
         .first(db)
         .await
 }
@@ -117,8 +118,9 @@ pub async fn store(
         .await?;
     // [/explain:rentals.identity.store]
     // Earlier pending documents are replaced by this one.
-    IdentityDocument::where_eq("customer_id", customer.id)
-        .where_eq("status", IdentityStatus::Pending)
+    IdentityDocument::query()
+        .where_(IdentityDocument::CUSTOMER_ID.eq(customer.id))
+        .where_(IdentityDocument::STATUS.eq(IdentityStatus::Pending))
         .update(&state.db, &[("status", &IdentityStatus::Refused)])
         .await?;
     // [explain:rentals.identity.store]
@@ -159,9 +161,10 @@ pub async fn store(
 /// chose, and the operating stores of their open rentals (the counter that
 /// hands them a bike checks the ID there).
 async fn checking_stores(db: &Db, document: &IdentityDocument) -> Result<Vec<i64>> {
-    let mut stores: Vec<i64> = Rental::where_eq("customer_id", document.customer_id)
-        .where_in("status", booking::HOLDING)
-        .pluck(db, "operating_store_id")
+    let mut stores: Vec<i64> = Rental::query()
+        .where_(Rental::CUSTOMER_ID.eq(document.customer_id))
+        .where_(Rental::STATUS.is_in(booking::HOLDING))
+        .pluck(db, Rental::OPERATING_STORE_ID)
         .await?;
     stores.push(document.store_id);
     stores.sort_unstable();
@@ -200,8 +203,8 @@ struct Waiting {
 // [explain:rentals.identities.handler]
 pub async fn index(State(state): State<AppState>) -> Result<View> {
     let documents = access::visible::<IdentityDocument>(catalogue::RENTALS_VERIFY_ID)
-        .where_eq("status", IdentityStatus::Pending)
-        .order_by("submitted_at")
+        .where_(IdentityDocument::STATUS.eq(IdentityStatus::Pending))
+        .order_by(IdentityDocument::SUBMITTED_AT)
         .limit(100)
         .get(&state.db)
         .await?;

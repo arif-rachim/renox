@@ -37,7 +37,8 @@ async fn sign_up(app: &TestApp, name: &str, email: &str) -> User {
         ],
     )
     .await;
-    User::where_eq("email", email)
+    User::query()
+        .where_eq("email", email)
         .first(app.db())
         .await
         .unwrap()
@@ -290,7 +291,8 @@ async fn social_login_makes_a_customer_on_fake_http() {
         .await
         .assert_redirect("/");
     app.assert_authenticated(None);
-    let user = User::where_eq("email", "leo@example.com")
+    let user = User::query()
+        .where_eq("email", "leo@example.com")
         .first(app.db())
         .await
         .unwrap()
@@ -676,7 +678,7 @@ async fn deleting_the_account_leaves_no_personal_data_and_keeps_the_books() {
 
     let gone = Customer::query()
         .with_trashed()
-        .where_eq("id", customer.id)
+        .where_(Customer::ID.eq(customer.id))
         .first(app.db())
         .await
         .unwrap()

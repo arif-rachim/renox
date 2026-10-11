@@ -50,9 +50,10 @@ cargo build -p renox-cli                                  # in the checkout
 cd .. && renox/target/debug/rnx new demo --renox-path renox
 ```
 
-[CLAUDE.md](CLAUDE.md) describes the architecture, the conventions and the problems solved so
-far. Read it before changing anything large; it's written for human contributors as much as
-for coding agents.
+[CLAUDE.md](CLAUDE.md) is the short guide (the rules that always apply) and points to
+[docs/contributing/](docs/contributing/): the architecture, the conventions and the problems
+solved so far. Read the file for the area you change before changing anything large; it's
+written for human contributors as much as for coding agents.
 
 ## What every change needs
 
@@ -123,7 +124,7 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p bikeshop --features
   New code comes with tests that run it; check the report for the files you touched.
 
 - **UI changes.** Check pages in a real browser (desktop, a phone width, dark mode): several
-  bugs only showed there (see CLAUDE.md §6.4). A change to renox.js, the UI kit, the data grid
+  bugs only showed there (see [§6.4](docs/contributing/traps.md)). A change to renox.js, the UI kit, the data grid
   or the editors gets a test in `tests/browser/` (headless Chrome over the DevTools protocol,
   Node 24, no npm packages): `tests/browser/run.sh`, or one file with
   `tests/browser/run.sh grid`. CI's `browser` job runs them all, in two halves side by side (`BROWSER_SHARD=rest` and `bikeshop`).

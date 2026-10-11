@@ -37,8 +37,9 @@ use crate::app::workshop::model::{CustomerBike, WorkOrder};
 pub async fn own_subscription(db: &Db, user: &User, id: i64) -> Result<PlanSubscription> {
     let customer = customer_of(db, user).await?;
     let sub = PlanSubscription::find_or_404(db, id).await?;
-    let owns = CustomerBike::where_eq("id", sub.customer_bike_id)
-        .where_eq("customer_id", customer.id)
+    let owns = CustomerBike::query()
+        .where_(CustomerBike::ID.eq(sub.customer_bike_id))
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
         .exists(db)
         .await?;
     if owns { Ok(sub) } else { Err(Error::NotFound) }
@@ -89,15 +90,16 @@ pub fn shown_status(sub: &PlanSubscription) -> &'static str {
 pub async fn index(State(state): State<AppState>, user: AuthUser) -> Result<View> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
-    let bikes = CustomerBike::where_eq("customer_id", customer.id)
+    let bikes = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
         .get(db)
         .await?;
     let subs = PlanSubscription::query()
-        .where_in(
-            "customer_bike_id",
-            bikes.iter().map(|b| b.id).collect::<Vec<_>>(),
+        .where_(
+            PlanSubscription::CUSTOMER_BIKE_ID
+                .is_in(bikes.iter().map(|b| b.id).collect::<Vec<_>>()),
         )
-        .order_by_desc("id")
+        .order_by_desc(PlanSubscription::ID)
         .get(db)
         .await?;
     let lines = lines(db, subs, &bikes).await?;
@@ -121,15 +123,15 @@ async fn lines(db: &Db, subs: Vec<PlanSubscription>, bikes: &[CustomerBike]) -> 
     let stores = Store::all_by_name(db).await?;
     let ids: Vec<i64> = subs.iter().map(|s| s.id).collect();
     let done: Vec<(i64, i64)> = PlanVisit::query()
-        .where_in("plan_subscription_id", ids.clone())
-        .where_eq("status", VisitStatus::Done)
+        .where_(PlanVisit::PLAN_SUBSCRIPTION_ID.is_in(ids.clone()))
+        .where_(PlanVisit::STATUS.eq(VisitStatus::Done))
         .group_by("plan_subscription_id")
         .select_as(db, "plan_subscription_id, COUNT(*)")
         .await?;
     let done: HashMap<i64, i64> = done.into_iter().collect();
     let invoices = PlanInvoice::query()
-        .where_in("plan_subscription_id", ids)
-        .order_by_desc("id")
+        .where_(PlanInvoice::PLAN_SUBSCRIPTION_ID.is_in(ids))
+        .order_by_desc(PlanInvoice::ID)
         .get(db)
         .await?;
     // [/explain:plans.mine.query]
@@ -198,8 +200,9 @@ pub async fn show(
         None => None,
     };
     let store = Store::find(db, sub.store_id).await?;
-    let visits = PlanVisit::where_eq("plan_subscription_id", sub.id)
-        .order_by_desc("seq")
+    let visits = PlanVisit::query()
+        .where_(PlanVisit::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .order_by_desc(PlanVisit::SEQ)
         .limit(40)
         .get(db)
         .await?;
@@ -243,8 +246,9 @@ pub async fn show(
             }))
         })
         .collect();
-    let invoices = PlanInvoice::where_eq("plan_subscription_id", sub.id)
-        .order_by_desc("id")
+    let invoices = PlanInvoice::query()
+        .where_(PlanInvoice::PLAN_SUBSCRIPTION_ID.eq(sub.id))
+        .order_by_desc(PlanInvoice::ID)
         .get(db)
         .await?;
     // [explain:plans.show.billing]
@@ -262,8 +266,9 @@ pub async fn show(
         None
     };
     // [/explain:plans.show.billing]
-    let others: Vec<(String, String)> = ServicePlan::where_eq("active", true)
-        .order_by("price")
+    let others: Vec<(String, String)> = ServicePlan::query()
+        .where_(ServicePlan::ACTIVE.eq(true))
+        .order_by(ServicePlan::PRICE)
         .get(db)
         .await?
         .into_iter()
@@ -388,8 +393,9 @@ pub async fn swap(
     let mut sub = own_subscription(db, &user, id).await?;
     // [/explain:plans.show.swap]
     let slug = form.plan.unwrap_or_default();
-    let plan = ServicePlan::where_eq("slug", slug.as_str())
-        .where_eq("active", true)
+    let plan = ServicePlan::query()
+        .where_(ServicePlan::SLUG.eq(slug.as_str()))
+        .where_(ServicePlan::ACTIVE.eq(true))
         .first(db)
         .await?
         .ok_or(Error::NotFound)?;

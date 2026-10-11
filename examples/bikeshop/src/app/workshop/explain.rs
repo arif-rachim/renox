@@ -125,7 +125,7 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Query<T>",
                     why: "`own_bike` looks the bike up by its id **and** the signed-in \
-                          customer (two `where_eq`), so another customer's id simply isn't \
+                          customer (two typed `eq` conditions), so another customer's id simply isn't \
                           found (404): there is no separate check to forget, and ids can't be \
                           probed.",
                 },

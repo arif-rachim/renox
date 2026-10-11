@@ -5,7 +5,7 @@
       {% block seo %}{{ seo(title="…", description="…") }}{% endblock %} -#}
   {% block seo %}{{ seo() }}{% endblock %}
   {% include "layouts/_head.html" %}
-  {#- What pages and components push: {% call push('head') %}…{% endcall %} -#}
+  {#- What pages and components push: <rx-push stack="head">…</rx-push> -#}
   {{ stack('head') }}
 </head>
 {#- The public layout: the kit's navbar, the page, a footer, stacked by a CSS

@@ -298,7 +298,8 @@ async fn an_invitation_makes_a_member_of_staff_once() {
     )
     .await
     .assert_redirect("/login");
-    let noa = User::where_eq("email", "new@example.com")
+    let noa = User::query()
+        .where_eq("email", "new@example.com")
         .first(app.db())
         .await
         .unwrap()
@@ -411,7 +412,8 @@ async fn staff_must_turn_on_two_factor_login_at_login() {
         .state()
         .cache
         .get(&bikeshop::app::staff::two_factor::note_key(
-            User::where_eq("email", "cleo@example.com")
+            User::query()
+                .where_eq("email", "cleo@example.com")
                 .first(app.db())
                 .await
                 .unwrap()
@@ -549,7 +551,8 @@ async fn the_admin_panel_edits_the_catalogue_by_permission() {
         ],
     )
     .await;
-    let product = Product::where_eq("slug", "velo-sprint")
+    let product = Product::query()
+        .where_(Product::SLUG.eq("velo-sprint"))
         .first(db)
         .await
         .unwrap()

@@ -26,8 +26,9 @@ pub const OPEN: [WorkStatus; 6] = [
 /// open one (then the note is added to it).
 pub async fn open_repair(state: &AppState, event: &FleetRepairNeeded) -> Result<WorkOrder> {
     let bike = RentalBike::find_or_404(&state.db, event.bike_id).await?;
-    if let Some(mut open) = WorkOrder::where_eq("rental_bike_id", bike.id)
-        .where_in("status", OPEN)
+    if let Some(mut open) = WorkOrder::query()
+        .where_(WorkOrder::RENTAL_BIKE_ID.eq(bike.id))
+        .where_(WorkOrder::STATUS.is_in(OPEN))
         .first(&state.db)
         .await?
     {
