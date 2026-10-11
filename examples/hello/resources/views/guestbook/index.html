@@ -1,28 +1,25 @@
-{% extends "layouts/app.html" %}
-{#- At the top, so the `entries` block sees them when htmx asks for it alone. -#}
-{% from "renox/ui.html" import card, input, textarea, file, button, list, thumbnail, empty, page_header %}
-
-{% block content %}
-{{ page_header(t('guestbook.title')) }}
+{#- The kit has no tag for `thumbnail` or `pagination`, so they stay macros, imported
+    inside the `entries` block so htmx can ask for that block alone. -#}
+<rx-page layout="layouts/app.html" :title="t('guestbook.title')">
+<rx-page-header :title="t('guestbook.title')"/>
 
 {#- htmx sends the form and swaps in the new list; errors show next to the
     fields (422). The kit's button shows a spinner while it's sent; Alpine
     clears the form after a success, with its logic in `Alpine.data` below so
     the page also works under CSP=strict (whose Alpine build refuses
     statements in attributes). -#}
-<form method="post" action="{{ route('guestbook.store') }}" enctype="multipart/form-data"
+<rx-form route="guestbook.store" enctype="multipart/form-data"
       hx-post="{{ route('guestbook.store') }}" hx-target="#entries" hx-swap="outerHTML"
       x-data="guestbookForm" @htmx:after-request="clearOnSuccess" novalidate>
-  {{ csrf_field() }}
-  {% call card() %}
-    {{ input("name", t('guestbook.name'), value=(auth.user.name if auth.check else none), required=true, autocomplete="name") }}
-    {{ textarea("message", t('guestbook.message'), rows=3, required=true) }}
-    {{ file("photo", t('guestbook.photo'), accept="image/*", preview=true) }}
-    <div class="rx-card__footer">{{ button(t('guestbook.send')) }}</div>
-  {% endcall %}
-</form>
+  <rx-card>
+    <rx-input name="name" :label="t('guestbook.name')" :value="auth.user.name if auth.check else none" required autocomplete="name"/>
+    <rx-textarea name="message" :label="t('guestbook.message')" :rows="3" required/>
+    <rx-file name="photo" :label="t('guestbook.photo')" accept="image/*" preview/>
+    <div class="rx-card__footer"><rx-button :label="t('guestbook.send')"/></div>
+  </rx-card>
+</rx-form>
 
-{% call push('scripts', once='guestbook-form') %}
+<rx-push stack="scripts" once="guestbook-form">
 <script nonce="{{ csp_nonce() }}">
   document.addEventListener("alpine:init", function () {
     Alpine.data("guestbookForm", function () {
@@ -34,24 +31,20 @@
     });
   });
 </script>
-{% endcall %}
+</rx-push>
 
 {% block entries %}
+{% from "renox/ui.html" import thumbnail %}
 <section id="entries" class="rx-stack" hx-boost="true" hx-target="#entries" hx-select="#entries" hx-swap="outerHTML">
-  {% if entries.items %}
-  {% call list(label=t('guestbook.title')) %}
-    {% for entry in entries.items %}
-    <li>
+  <rx-list rx-if="entries.items" :label="t('guestbook.title')">
+    <li rx-for="entry in entries.items">
       {% if entry.photo %}{{ thumbnail(storage_url(entry.photo)) }}{% endif %}
       <span class="rx-list__main"><strong>{{ entry.name }}</strong>: {{ entry.message }}</span>
     </li>
-    {% endfor %}
-  {% endcall %}
-  {% else %}
-  {{ empty(t('guestbook.empty')) }}
-  {% endif %}
+  </rx-list>
+  <rx-empty rx-else :title="t('guestbook.empty')"/>
   {% from "renox/pagination.html" import pagination %}
   {{ pagination(entries) }}
 </section>
 {% endblock %}
-{% endblock %}
+</rx-page>
