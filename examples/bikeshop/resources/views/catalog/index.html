@@ -3,18 +3,16 @@
     results (/search?q=). One page, three scopes (src/app/catalog/browse.rs).
     Macros are imported at the top, so the `results` block sees them when
     htmx asks for it alone. -#}
-{% from "renox/ui.html" import page_header, card_grid, media_card, empty, button, link_button, checkbox_list, select, checkbox, input %}
 {% from "renox-blocks/blocks.html" import range_slider %}
 {% from "layouts/_category_icon.html" import category_icon %}
 {% block seo %}{{ seo(title=title ~ " · " ~ t('shop.name'), description=description, canonical=reset) }}{% endblock %}
 
 {% block content %}
-{% call push('head') %}<link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}">{% endcall %}
+<rx-push stack="head"><link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}"></rx-push>
 {%- set parent = breadcrumbs[-2] if breadcrumbs | length > 1 else none %}
-{{ page_header(title,
-               subtitle=(t('catalog.search.lead') if search else description),
-               back=(("/shop/" ~ parent.slug) if parent else (route('catalog.index') if category else none)),
-               back_label=(parent.name if parent else t('catalog.all.title'))) }}
+<rx-page-header :title="title" :subtitle="t('catalog.search.lead') if search else description"
+                :back="('/shop/' ~ parent.slug) if parent else (route('catalog.index') if category else none)"
+                :back-label="parent.name if parent else t('catalog.all.title')"/>
 
 <div class="bs-catalog">
   {#- The filters: a plain GET form (shareable addresses, works without
@@ -43,18 +41,18 @@
       {%- endif %}
 
       {# [explain:catalog.index.form] #}
-      <form id="catalog-filters" class="bs-catalog__form" method="get" action="{{ path }}" role="search" aria-label="{{ t('catalog.filters.title') }}"
+      <rx-form id="catalog-filters" class="bs-catalog__form" method="GET" :action="path" role="search" aria-label="{{ t('catalog.filters.title') }}"
             hx-get="{{ path }}" hx-target="#results" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace"
             hx-trigger="change delay:250ms, submit" hx-indicator="#results">
         {%- if search %}
-        {{ input("q", t('catalog.search.label'), type="search", value=filters.q, id="filter-q", attrs={"autocomplete": "off", "hx-trigger": "none"}) }}
+        <rx-input name="q" :label="t('catalog.search.label')" type="search" :value="filters.q" id="filter-q" autocomplete="off" hx-trigger="none"/>
         {%- endif %}
-        {{ select("sort", t('catalog.sort.label'), sorts, selected=filters.sort, id="filter-sort") }}
+        <rx-select name="sort" :label="t('catalog.sort.label')" :options="sorts" :selected="filters.sort" id="filter-sort"/>
         {%- if facets.fits %}
-        {{ select("fits", t('catalog.fits.label'), facets.fits, selected=filters.fits, placeholder=t('catalog.fits.off'), hint=t('catalog.fits.hint'), id="filter-fits") }}
+        <rx-select name="fits" :label="t('catalog.fits.label')" :options="facets.fits" :selected="filters.fits" :placeholder="t('catalog.fits.off')" :hint="t('catalog.fits.hint')" id="filter-fits"/>
         {%- endif %}
         {%- if facets.brands %}
-        {{ checkbox_list("brand", t('catalog.filters.brand'), facets.brands, selected=filters.brands, id="filter-brand") }}
+        <rx-checkbox-list name="brand" :label="t('catalog.filters.brand')" :options="facets.brands" :selected="filters.brands" id="filter-brand"/>
         {%- endif %}
         {%- if facets.price_high > facets.price_low %}
         {{ range_slider("price_min", "price_max", facets.price_low, facets.price_high, step=facets.price_step,
@@ -62,23 +60,23 @@
         {%- endif %}
       {# [/explain:catalog.index.form] #}
         {%- if facets.sizes %}
-        {{ checkbox_list("size", t('catalog.filters.size'), facets.sizes, selected=filters.sizes, inline=true, id="filter-size") }}
+        <rx-checkbox-list name="size" :label="t('catalog.filters.size')" :options="facets.sizes" :selected="filters.sizes" inline id="filter-size"/>
         {%- endif %}
         {%- if facets.wheels | length > 1 %}
-        {{ select("wheels", t('catalog.filters.wheels'), facets.wheels, selected=filters.wheels, placeholder=t('catalog.filters.any'), id="filter-wheels") }}
+        <rx-select name="wheels" :label="t('catalog.filters.wheels')" :options="facets.wheels" :selected="filters.wheels" :placeholder="t('catalog.filters.any')" id="filter-wheels"/>
         {%- endif %}
         {%- if facets.frames | length > 1 %}
-        {{ select("frame", t('catalog.filters.frame'), facets.frames, selected=filters.frame, placeholder=t('catalog.filters.any'), id="filter-frame") }}
+        <rx-select name="frame" :label="t('catalog.filters.frame')" :options="facets.frames" :selected="filters.frame" :placeholder="t('catalog.filters.any')" id="filter-frame"/>
         {%- endif %}
         {%- if facets.ebikes %}
-        {{ checkbox("ebike", t('catalog.filters.ebike'), checked=filters.ebike, value="1", switch=true, id="filter-ebike") }}
+        <rx-checkbox name="ebike" :label="t('catalog.filters.ebike')" :checked="filters.ebike" value="1" switch id="filter-ebike"/>
         {%- endif %}
-        {{ select("store", t('catalog.filters.store'), facets.stores, selected=(filters.store | string if filters.store is not none else none), placeholder=t('catalog.filters.any_store'), id="filter-store") }}
+        <rx-select name="store" :label="t('catalog.filters.store')" :options="facets.stores" :selected="filters.store | string if filters.store is not none else none" :placeholder="t('catalog.filters.any_store')" id="filter-store"/>
         <div class="bs-catalog__actions">
-          {{ button(t('catalog.filters.apply'), variant="primary", attrs={"data-bs-apply": ""}) }}
-          {{ link_button(reset ~ (("?q=" ~ (filters.q | urlencode)) if search and filters.q else ""), t('catalog.filters.clear'), variant="plain") }}
+          <rx-button :label="t('catalog.filters.apply')" variant="primary" data-bs-apply=""/>
+          <rx-link-button :href="reset ~ (('?q=' ~ (filters.q | urlencode)) if search and filters.q else '')" :label="t('catalog.filters.clear')" variant="plain"/>
         </div>
-      </form>
+      </rx-form>
     </div>
   </details>
 
@@ -97,19 +95,19 @@
     </div>
     {%- if cards %}
     <div data-bs-reveal>
-    {% call card_grid() %}
+    <rx-card-grid>
       {%- for c in cards %}
-      {{ media_card(route('catalog.show', c.slug), c.name, image=c.photo, image_alt=c.photo_alt,
-                    subtitle=(t('catalog.price_from', price=(c.price_from | money)) if c.variants | length > 1 and c.price_from is not none else (c.price_from | money if c.price_from is not none else none)),
-                    note=(c.brand.name if c.brand else none)) }}
+      <rx-media-card :href="route('catalog.show', c.slug)" :title="c.name" :image="c.photo" :image-alt="c.photo_alt"
+                     :subtitle="t('catalog.price_from', price=(c.price_from | money)) if c.variants | length > 1 and c.price_from is not none else (c.price_from | money if c.price_from is not none else none)"
+                     :note="c.brand.name if c.brand else none"/>
       {%- endfor %}
-    {% endcall %}
+    </rx-card-grid>
     </div>
   {# [/explain:catalog.index.results] #}
     {%- else %}
-    <div class="rx-card">
-      {{ empty(t('catalog.empty.title'), t('catalog.empty.search', q=filters.q) if search and filters.q else t('catalog.empty.text'), reset, t('catalog.filters.clear'), icon="search") }}
-    </div>
+    <rx-card>
+      <rx-empty :title="t('catalog.empty.title')" :message="t('catalog.empty.search', q=filters.q) if search and filters.q else t('catalog.empty.text')" :action-href="reset" :action-label="t('catalog.filters.clear')" icon="search"/>
+    </rx-card>
     {%- endif %}
     {# [explain:catalog.index.results] #}
     <div class="bs-catalog__pages" hx-boost="true" hx-target="#results" hx-select="#results" hx-swap="outerHTML">

@@ -99,11 +99,11 @@ pub fn entries() -> Vec<Explanation> {
                 NO_N_PLUS_ONE,
                 RANGE_SLIDER,
                 Feature {
-                    api: "UI kit: card_grid + media_card",
-                    why: "Each product is the kit's `media_card` (photo, name, \"from\" price, \
-                          brand) in a `card_grid`, a CSS grid that fits as many columns as \
-                          the screen holds; the filter fields are the kit's `checkbox_list`, \
-                          `select` and `checkbox(switch=true)`.",
+                    api: "UI kit tags: rx-card-grid + rx-media-card",
+                    why: "Each product is the kit's `<rx-media-card>` (photo, name, \"from\" price, \
+                          brand) in an `<rx-card-grid>`, a CSS grid that fits as many columns as \
+                          the screen holds; the filter fields are the kit's `<rx-checkbox-list>`, \
+                          `<rx-select>` and `<rx-checkbox switch>`.",
                 },
                 ETAG,
                 SEO,
@@ -314,9 +314,9 @@ pub fn entries() -> Vec<Explanation> {
                           see it and the page is a 404: no `if deleted` check to forget.",
                 },
                 Feature {
-                    api: "UI kit: infolist + entry",
+                    api: "UI kit tags: rx-infolist + rx-entry",
                     why: "The specifications (frame, wheels, gears, motor…) are an \
-                          `infolist` of `entry`s in two columns, labels and values marked up \
+                          `<rx-infolist>` of `<rx-entry>`s in two columns, labels and values marked up \
                           by the kit rather than a hand-made table; the brand entry links to \
                           the brand's site.",
                 },
