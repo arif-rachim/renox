@@ -1,6 +1,6 @@
 /* "About this page" (src/explain.rs): the panel docked beside every page on
-   wide screens (about/_dock.html), the same content in the kit's sheet on
-   narrower ones (about/_panel.html), and the code samples' colours. On the
+   wide screens (components/about_dock.html), the same content in the kit's sheet on
+   narrower ones (components/about_panel.html), and the code samples' colours. On the
    kit's tokens (--rx-*), in light and dark mode. */
 
 :root {

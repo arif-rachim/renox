@@ -1,28 +1,3 @@
-{#- The monthly report's runs (src/app/reports/monthly.rs `runs`): each batch's progress from
-    `job_batches` (the kit's `progress`), and its workbooks once it finished. Rendered in
-    the page and alone by `reports.monthly.runs`, which the widget polls. -#}
-{%- if runs %}
-<rx-list id="report-runs" :label="t('reports.monthly.runs')">
-  {%- for run in runs %}
-  <li>
-    <div class="rx-list__main bs-run">
-      <strong>{{ run.month_name }}</strong>
-      <span class="rx-subtitle">{{ t('reports.monthly.started_at', at=(run.started_at | date('%Y-%m-%d %H:%M'))) }}</span>
-      <rx-progress :value="run.done" :max="run.total" :label="t('reports.monthly.progress', month=run.month_name)"/>
-      {%- if run.finished and run.failed == 0 and not run.cancelled %}
-      <div class="bs-run__files">
-        {%- for store in run.stores %}
-        <rx-link-button :href="route('reports.monthly.file', run.month, store.id)" :label="store.name" size="small" icon="download"/>
-        {%- endfor %}
-      </div>
-      {%- endif %}
-    </div>
-    {%- if run.cancelled or run.failed > 0 %}<rx-badge :text="t('reports.monthly.failed')" kind="error"/>
-    {%- elif run.finished %}<rx-badge :text="t('reports.monthly.done')" kind="success"/>
-    {%- else %}<rx-badge :text="t('reports.monthly.running')" kind="info"/>{% endif %}
-  </li>
-  {%- endfor %}
-</rx-list>
-{%- else %}
-<rx-empty :title="t('reports.monthly.empty')" :message="t('reports.monthly.empty_text')" icon="file-text"/>
-{%- endif %}
+{#- The monthly report's runs alone, for `reports.monthly.runs` (src/app/reports/monthly.rs
+    `runs_fragment`), which the page's widget polls. -#}
+<app-reports-runs :runs="runs"/>

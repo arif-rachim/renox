@@ -195,10 +195,44 @@ pub async fn search(
     let timeline = day_timeline(&state, store_id, start_local, &query).await?;
     let lang = state.current_lang();
     let problem = problem.map(|key| lang.t(key, &[]));
+    // The selects' options: [value, label] pairs, and for the bikes [value, label, hint].
+    let store_options: Vec<_> = stores.iter().map(|s| json!([s.id, s.name])).collect();
+    let mut type_options = vec![json!(["", lang.t("rentals.search.any_type", &[])])];
+    type_options.extend(categories.iter().map(|c| json!([c.id, c.name])));
+    let mut size_options = vec![json!(["", lang.t("rentals.search.any_size", &[])])];
+    size_options.extend(sizes.iter().map(|s| json!([s, s])));
+    let deposit_label = lang.t("rentals.fields.deposit", &[]);
+    let bike_options: Vec<_> = offers
+        .iter()
+        .map(|o| {
+            let mut hint = format!(
+                "{} · {} {} · {}",
+                money(&state, o.quote.price),
+                deposit_label,
+                money(&state, o.quote.deposit),
+                o.frame_number
+            );
+            if o.placed_here {
+                hint.push_str(&format!(
+                    " · {}",
+                    lang.t("rentals.search.placed_by", &[("store", &o.owner_store)])
+                ));
+            }
+            let label = match o.size.as_deref().filter(|s| !s.is_empty()) {
+                Some(size) => format!("{} ({size})", o.model),
+                None => o.model.clone(),
+            };
+            json!([o.id, label, hint])
+        })
+        .collect();
     Ok(view(
         "rentals/search.html",
         context! {
             stores,
+            store_options,
+            type_options,
+            size_options,
+            bike_options,
             store_id,
             categories,
             sizes,

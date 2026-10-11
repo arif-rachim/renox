@@ -1,11 +1,9 @@
 {#- Monthly settlements between stores (#245), made on the 1st and confirmed by both stores. -#}
 <rx-page layout="layouts/staff.html" :title="t('multistore.settlements.title')">
-  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
-  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
-  {% from "renox/pagination.html" import pagination %}
+  <app-multistore-assets/>
   <rx-stack data-bs-reveal>
     <rx-page-header :title="t('multistore.settlements.title')" :subtitle="t('multistore.settlements.lead')" :back="route('multistore.books')" :back-label="t('multistore.books.title')"/>
-    {%- if rows %}
+    <template rx-if="rows">
     {# [explain:multistore.settlements.template] #}
     <rx-table :rows="rows" as="s" card :caption="t('multistore.settlements.title')">
       <rx-column :label="t('multistore.settlements.month')"><a class="rx-link" href="{{ route('multistore.settlements.show', s.id) }}">{{ s.period_start | date("%B %Y") }}</a></rx-column>
@@ -15,7 +13,8 @@
       <rx-column :label="t('multistore.settlements.status')"><rx-badge :kind="'success' if s.status == 'settled' else 'warning'">{{ t('multistore.settlements.status_' ~ s.status) }}</rx-badge></rx-column>
     </rx-table>
     {# [/explain:multistore.settlements.template] #}
-    {{ pagination(pages) }}
-    {%- else %}<rx-card><rx-empty :title="t('multistore.settlements.empty')" icon="book-open"/></rx-card>{% endif %}
+    <rx-pagination :page="pages"/>
+    </template>
+    <rx-card rx-else><rx-empty :title="t('multistore.settlements.empty')" icon="book-open"/></rx-card>
   </rx-stack>
 </rx-page>

@@ -3,15 +3,15 @@
     which report it is. The grid draws its toolbar (search, columns, groups, the advanced
     filter, exports), the heading filters, the sums and the cards on phones itself; only the
     books' "source" column is drawn here. -#}
-{% include "reports/_assets.html" %}
+<app-reports-assets/>
 <div class="rx-stack">
   <rx-page-header :title="t('reports.' ~ tab ~ '.title')" :subtitle="t('reports.' ~ tab ~ '.lead')">
     <rx-link-button route="reports.monthly" :label="t('reports.monthly.title')" icon="calendar"/>
   </rx-page-header>
-  {% include "reports/_tabs.html" %}
+  <app-reports-tabs/>
   {# [explain:reports.grid.template] #}
   <rx-grid :page="rows">
-    {%- if column.key == "source" %}{% if row.source_url %}<a class="rx-link" href="{{ row.source_url }}">{{ row.source_label }}</a>{% else %}{{ row.source_label }}{% endif %}{% endif %}
+    <template rx-if="column.key == 'source'"><a rx-if="row.source_url" class="rx-link" href="{{ row.source_url }}">{{ row.source_label }}</a><template rx-else>{{ row.source_label }}</template></template>
   </rx-grid>
   {# [/explain:reports.grid.template] #}
 </div>

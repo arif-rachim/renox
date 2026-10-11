@@ -628,6 +628,8 @@ impl Views {
             env.add_filter("markdown", crate::view_filters::markdown);
             env.add_function("chart", crate::chart::chart(currency.clone()));
             env.add_function("class_names", crate::view_filters::class_names);
+            env.add_function("rx_attr", crate::view_filters::rx_attr);
+            env.add_function("rx_attr_value", crate::view_filters::attr_value);
             // The app's own functions and filters (`App::templates`).
             let _scope = HookScope::enter(contracts.clone());
             for hook in hooks.iter() {
@@ -701,12 +703,14 @@ impl Views {
             }
         };
         let mut problems = Vec::new();
-        for name in names {
-            match env.get_template(&name) {
-                Err(err) => problems.push(problem(&name, &err)),
+        let known: std::collections::HashSet<&str> = names.iter().map(String::as_str).collect();
+        for name in &names {
+            match env.get_template(name) {
+                Err(err) => problems.push(problem(name, &err)),
                 // The framework's own templates show example names in their docs.
                 Ok(template) if !name.starts_with("renox/") => {
-                    check_route_names(&name, template.source(), routes, &mut problems);
+                    check_route_names(name, template.source(), routes, &mut problems);
+                    check_includes(name, template.source(), &known, &mut problems);
                 }
                 Ok(_) => {}
             }
@@ -899,7 +903,7 @@ pub(crate) struct RenderedView(pub String);
 
 /// The globals Renox gives each rendered page (see `globals`), which
 /// components reach through the environment.
-const REQUEST_GLOBALS: &[&str] = &[
+pub(crate) const REQUEST_GLOBALS: &[&str] = &[
     "app",
     "auth",
     "t",
@@ -1092,6 +1096,37 @@ fn check_route_names(
             template: template.to_owned(),
             line: Some(source[..offset].matches('\n').count() + 1),
             message: format!("unknown route \"{name}\"{hint}"),
+        });
+    }
+}
+
+/// Reports `{% include "name" %}` (what `<rx-include template="name"/>` compiles to) of a template
+/// that does not exist. An include with `ignore missing`, or whose name is worked out at run
+/// time, is not checked.
+fn check_includes(
+    template: &str,
+    source: &str,
+    known: &std::collections::HashSet<&str>,
+    problems: &mut Vec<ViewProblem>,
+) {
+    static INCLUDE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"\{%-?\s*include\s+["']([^"']+)["']\s*-?%\}"#).expect("valid regex")
+    });
+    for caps in INCLUDE.captures_iter(source) {
+        let name = &caps[1];
+        if known.contains(name) {
+            continue;
+        }
+        let hint = crate::components::suggest::did_you_mean(name, known.iter().copied())
+            .map(|x| format!("; did you mean \"{x}\"?"))
+            .unwrap_or_default();
+        let offset = caps.get(0).map_or(0, |m| m.start());
+        problems.push(ViewProblem {
+            template: template.to_owned(),
+            line: Some(source[..offset].matches('\n').count() + 1),
+            message: format!(
+                "<rx-include> (or include) names a template that does not exist: \"{name}\"{hint}"
+            ),
         });
     }
 }

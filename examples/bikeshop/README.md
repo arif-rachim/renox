@@ -113,7 +113,7 @@ Paths are relative to this folder.
 | A walk-in customer claiming their record (signed URL) | `/claim/{customer}/{email}` | [src/app/accounts/claim.rs](src/app/accounts/claim.rs) |
 | Personal API tokens with abilities | `/account/api-tokens` | [src/app/api/tokens.rs](src/app/api/tokens.rs) |
 | Each store's own page on its own host: `Routes::domain`, `DomainParams`, a domain `fallback` | `north.localhost:3000/` | [src/app/home/stores.rs](src/app/home/stores.rs), [resources/views/home/store.html](resources/views/home/store.html), [layouts/store.html](resources/views/layouts/store.html) |
-| Every form input ↔ Rust ↔ SQLite ↔ PostgreSQL, a form that tries them all (files public and private, `Uuid` keys, the editors, live validation), read back on an infolist | `/about/fields` | [src/app/about/fields.rs](src/app/about/fields.rs), [resources/views/about/_fields_form.html](resources/views/about/_fields_form.html), [tests/fields.rs](tests/fields.rs) |
+| Every form input ↔ Rust ↔ SQLite ↔ PostgreSQL, a form that tries them all (files public and private, `Uuid` keys, the editors, live validation), read back on an infolist | `/about/fields` | [src/app/about/fields.rs](src/app/about/fields.rs), [resources/views/components/about_fields_form.html](resources/views/components/about_fields_form.html), [tests/fields.rs](tests/fields.rs) |
 | htmx recipes, live: a modal form, out-of-band swaps (`.also`), `HxRetarget`/`HxReswap`, inline edit, Alpine tabs, `HxRefresh`/`HxRedirect`, toasts, infinite scroll | `/about/htmx` | [src/app/about/htmx.rs](src/app/about/htmx.rs), [resources/views/about/htmx.html](resources/views/about/htmx.html), [tests/htmx.rs](tests/htmx.rs) |
 | The same checklist as a live component: a struct and a method per action, `rx-click`, `rx-model`, `rx-submit`, a signed snapshot | `/about/htmx/live` | [src/app/about/live.rs](src/app/about/live.rs), [resources/views/about/live/_checklist.html](resources/views/about/live/_checklist.html), [tests/htmx.rs](tests/htmx.rs) |
 
@@ -158,7 +158,7 @@ The live version has no routes, fragments or out-of-band parts of its own: `live
 | Feature | Where |
 |---|---|
 | The app: modules, plugins, layers, the reporter | [src/lib.rs](src/lib.rs) |
-| "About this page": `Explanation`, the registry, the docked panel and the sheet, `BIKESHOP_EXPLAIN` | [src/explain.rs](src/explain.rs), each area's `explain.rs`, [resources/views/about/_explain.html](resources/views/about/_explain.html), [_dock.html](resources/views/about/_dock.html), [_panel.html](resources/views/about/_panel.html), [public/explain.css](public/explain.css), [public/explain.js](public/explain.js) |
+| "About this page": `Explanation`, the registry, the docked panel and the sheet, `BIKESHOP_EXPLAIN` | [src/explain.rs](src/explain.rs), each area's `explain.rs`, [about_explain.html](resources/views/components/about_explain.html), [about_dock.html](resources/views/components/about_dock.html), [about_panel.html](resources/views/components/about_panel.html), [public/explain.css](public/explain.css), [public/explain.js](public/explain.js) |
 | Its code samples: regions marked in the source, cut out by `build.rs`, coloured on the server | [src/code.rs](src/code.rs), [build.rs](build.rs), [src/highlight.rs](src/highlight.rs) (a copy of the docs site's) |
 | Models and factories per area, migrations for SQLite and PostgreSQL, money as integers (US dollars in cents, `APP_CURRENCY=USD`; typed amounts converted in [src/money.rs](src/money.rs)) | `src/app/<area>/model.rs`, `src/app/<area>/factories.rs`, [migrations/](migrations/) |
 | Seeds (`db:seed`, the typed `demo:seed` command) and test fixtures | [src/seed/](src/seed/) |
@@ -193,7 +193,7 @@ for permissions there.
 | The permission catalogue (`rentals.checkout`, `stock.adjust`, `prices.change`…) and the roles: owner, manager, cashier, mechanic, staff | [src/app/access/catalogue.rs](src/app/access/catalogue.rs) |
 | `access::staff_routes(routes)`: login, the active store, `staff.access`; `POST /staff/store/{store}` switches | [src/app/access/active_store.rs](src/app/access/active_store.rs) |
 | `StoreAttr`, `StoreRecord`, `require` (404 when the record isn't visible, 403 when the action isn't allowed in the store that matters), `find`, `visible::<M>(permission)` | [src/app/access/policy.rs](src/app/access/policy.rs) |
-| The store switcher (the kit's `menu`) | [resources/views/layouts/_store_switcher.html](resources/views/layouts/_store_switcher.html) |
+| The store switcher (the kit's `menu`) | [resources/views/components/store_switcher.html](resources/views/components/store_switcher.html) |
 
 A staff page looks like this:
 
@@ -241,7 +241,7 @@ corners, and real photos. It lives in [public/theme.css](public/theme.css), load
 `--rx-radius-*`, `--rx-type-title`, pill `--rx-button-radius` on public and sign-in pages), so
 every kit component follows in light and dark mode, plus four tokens of the shop's
 (`--bs-clay`, `--bs-sand`, `--bs-hero`, `--bs-section`) and the public pages' parts: the hero
-([layouts/_hero.html](resources/views/layouts/_hero.html), on the home, rent and plans pages),
+([components/hero.html](resources/views/components/hero.html), on the home, rent and plans pages),
 category chips and photo tiles, service tiles, the stores strip, product cards as photos with
 their text under them, the sign-in pages' photo. The phone's floating tab bar is the kit's
 (`navbar(…, tabs=…)`, #346). This relaxes
@@ -261,8 +261,8 @@ The epic's rule was that a missing basic component stops the page and goes to th
 the kit didn't have were built here first, as **blocks**, written like a small library so they
 could move to a crate. They since have (#347): eleven of them are the
 [renox-blocks](../../crates/renox-blocks) plugin (guide: [docs/blocks.md](../../docs/blocks.md)),
-which the app adds with `.module(renox_blocks::Blocks::new())` and a page imports like a kit
-component (`{% from "renox-blocks/blocks.html" import gallery %}`). Their classes are `rx-` ones
+which the app adds with `.module(renox_blocks::Blocks::new())` and a page uses like a kit
+component (a tag such as `<rx-gallery …/>`). Their classes are `rx-` ones
 on the kit's tokens, and the crate's script loads a block's code only on pages that have it
 (Web Animations on `transform`, nothing under `prefers-reduced-motion`, no inline handlers, so
 `CSP=strict` works).

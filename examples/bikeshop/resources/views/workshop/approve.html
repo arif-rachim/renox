@@ -1,7 +1,6 @@
 {#- Extra work, approved or refused through a signed link (#236): no login. -#}
 <rx-page layout="layouts/app.html" title="{{ t('workshop.approve.title') }}">
-  {% from "workshop/_parts.html" import styles %}
-  {{ styles() }}
+  <app-workshop-assets/>
   <rx-push stack="head"><meta name="robots" content="noindex"></rx-push>
   <rx-stack data-bs-reveal>
     <rx-page-header title="{{ t('workshop.approve.title') }}" subtitle="{{ t('workshop.approve.lead', number=order.id, store=(store.name if store else '')) }}"/>
@@ -9,18 +8,18 @@
     <rx-card :title="bike.name if bike else t('workshop.fields.bike')">
       <p>{{ extra.description }}</p>
       <dl class="bs-lines">
-        {%- for item in extra.items %}<dt>{{ item.name }}{% if item.kind == "part" %} <small>× {{ item.quantity }}</small>{% endif %}</dt><dd>{{ item.price | money }}</dd>{% endfor %}
+        <template rx-for="item in extra.items"><dt>{{ item.name }}<template rx-if="item.kind == 'part'"> <small>× {{ item.quantity }}</small></template></dt><dd>{{ item.price | money }}</dd></template>
         <dt><strong>{{ t('workshop.fields.extra_total') }}</strong></dt><dd><strong>{{ extra.total | money }}</strong></dd>
       </dl>
       {# [explain:workshop.extra.show.template] #}
-      {%- if pending %}
+      <template rx-if="pending">
       <p class="rx-hint">{{ t('workshop.approve.until', time=(extra.expires_at | date('%d %b %H:%M'))) }}</p>
       <form method="post" action="{{ action }}" class="bs-board__filters">
         {{ csrf_field() }}
         <rx-button name="decision" value="approve" icon="check">{{ t('workshop.approve.yes') }}</rx-button>
         <rx-button variant="secondary" name="decision" value="refuse">{{ t('workshop.approve.no') }}</rx-button>
       </form>
-      {%- endif %}
+      </template>
       {# [/explain:workshop.extra.show.template] #}
     </rx-card>
   </rx-stack>

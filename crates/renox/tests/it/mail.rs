@@ -91,6 +91,94 @@ async fn mail_views_render_html_and_text() {
     );
 }
 
+/// #509: a mail written with `<rx-mail>` and its parts is the same HTML, byte for byte, as the
+/// `{% extends %}` version, and the framework's own auth mails (written with the tags) are
+/// the same as they were with `{% extends %}`.
+#[tokio::test]
+async fn tagged_mails_render_byte_for_byte_like_the_template_statements() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("mail")).unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    write(
+        "mail/old.html",
+        r#"{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import button, panel, table, divider %}
+{% block title %}Order {{ number }}{% endblock %}
+{% block content %}
+<p>Hi {{ name }}</p>
+{{ button(link, "View") }}
+{% call panel() %}Ships soon{% endcall %}
+{{ table(rows, head=["Item", "Price"], total=["Total", "$3"]) }}
+{{ divider() }}
+{% endblock %}
+{% block footer %}Bye{% endblock %}"#,
+    );
+    write(
+        "mail/new.html",
+        r#"<rx-mail subject="Order {{ number }}">
+<p>Hi {{ name }}</p>
+<rx-mail-button :url="link" label="View"/>
+<rx-mail-panel>Ships soon</rx-mail-panel>
+<rx-mail-table :rows="rows" :head="['Item', 'Price']" :total="['Total', '$3']"/>
+<rx-mail-divider/>
+<rx-slot name="footer">Bye</rx-slot></rx-mail>"#,
+    );
+    // The auth mails as they were before the tags.
+    write(
+        "mail/old-verify.html",
+        r#"{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/button.html" import button %}
+{% block content %}
+<p>{{ text.mail_verify_intro }}</p>
+{{ button(link, text.verify_title) }}
+<p>{{ text.mail_verify_outro }}</p>
+{% endblock %}
+"#,
+    );
+    write(
+        "mail/old-reset.html",
+        r#"{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/button.html" import button %}
+{% block content %}
+<p>{{ text.mail_reset_intro }}</p>
+{{ button(link, text.mail_reset_subject) }}
+<p>{{ text.mail_reset_outro }}</p>
+{% endblock %}
+"#,
+    );
+    let kernel = kernel_with(config(dir.path())).await;
+    let state = kernel.state();
+    let ctx = context! {
+        number => 7, name => "Ben", link => "https://shop.test/o/7",
+        rows => vec![vec!["Coffee", "$1"], vec!["Tea", "$2"]],
+        text => context! {
+            mail_verify_intro => "Verify it", verify_title => "Verify",
+            mail_verify_outro => "Thanks", mail_reset_intro => "Reset it",
+            mail_reset_subject => "Reset", mail_reset_outro => "Bye",
+        },
+    };
+    let html = |view: &str| {
+        state
+            .mail_view("a@b.test", "s", view, ctx.clone())
+            .unwrap()
+            .html
+            .unwrap()
+    };
+    let new = html("mail/new");
+    assert_eq!(new, html("mail/old"));
+    assert!(new.contains("<title>Order 7</title>"), "{new}");
+    assert!(new.contains("Bye"), "{new}");
+    assert_eq!(
+        html("renox/mail/auth/verify-email"),
+        html("mail/old-verify")
+    );
+    assert_eq!(
+        html("renox/mail/auth/reset-password"),
+        html("mail/old-reset")
+    );
+    assert!(html("renox/mail/auth/verify-email").contains(r#"href="https://shop.test/o/7""#));
+}
+
 #[tokio::test]
 async fn queued_mail_is_sent_by_a_worker() {
     let dir = views();
@@ -680,4 +768,51 @@ async fn an_unregistered_channel_is_an_error() {
         let err = format!("{:?}", result.unwrap_err());
         assert!(err.contains("no `pigeon` notification channel"), "{err}");
     }
+}
+
+/// #521: a text mail written with `<rx-mail-text>` renders byte for byte what the template
+/// statements did, with `&` and `<` left alone like in any `.txt` view.
+#[tokio::test]
+async fn tagged_text_mails_render_byte_for_byte_like_the_template_statements() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("mail")).unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    for name in ["old", "new"] {
+        write(&format!("mail/{name}.html"), "<p>{{ title }}</p>");
+    }
+    write(
+        "mail/old.txt",
+        "{{ title }}\n\n{{ body }}\n{% for row in rows %}\n{{ row.label }}: {{ row.value }}{% endfor %}\n{% if url %}\n{{ action }}: {{ url }}{% endif %}\n",
+    );
+    write(
+        "mail/new.txt",
+        "<rx-mail-text>\n{{ title }}\n\n{{ body }}\n<template rx-for=\"row in rows\">\n{{ row.label }}: {{ row.value }}</template>\n<template rx-if=\"url\">\n{{ action }}: {{ url }}</template>\n</rx-mail-text>\n",
+    );
+    let kernel = kernel_with(config(dir.path())).await;
+    let state = kernel.state();
+    let text = |view: &str, url: Option<&str>| {
+        state
+            .mail_view(
+                "a@b.test",
+                "s",
+                view,
+                context! {
+                    title => "Q&A <now>", body => "It's \"here\"",
+                    rows => vec![
+                        context! { label => "Store", value => "A & B" },
+                        context! { label => "Items", value => "3" },
+                    ],
+                    url => url, action => "Open",
+                },
+            )
+            .unwrap()
+            .text
+    };
+    for url in [Some("https://shop.test/n/1?a=1&b=2"), None] {
+        assert_eq!(text("mail/new", url), text("mail/old", url));
+    }
+    assert_eq!(
+        text("mail/new", Some("https://x.test")),
+        "Q&A <now>\n\nIt's \"here\"\n\nStore: A & B\nItems: 3\n\nOpen: https://x.test"
+    );
 }

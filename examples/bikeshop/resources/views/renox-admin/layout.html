@@ -7,50 +7,47 @@
 <!doctype html>
 <html lang="{{ app.locale }}">
 <head>
-  <title>{% block title %}{{ tr(admin.title) }}{% endblock %}</title>
-  {% include "layouts/_head.html" %}
-  {{ stack('head') }}
+  <title><rx-block name="title">{{ tx(admin.title) }}</rx-block></title>
+  <app-head/>
+  <rx-outlet stack="head"/>
 </head>
-{%- set about = about_page(request.route, request.path) if explain_panels else none %}
-<body class="rx-page rx-shell{% if about %} bs-docked{% if about.rail %} bs-docked--rail{% endif %}{% endif %}">
-  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
-  {% from "layouts/_text.html" import tx as tr %}
-  {% call sidebar(tr(admin.title), href=admin.home, label=t('admin_panel.navigation')) %}
-    {{ sidebar_link(admin.home, t('admin_panel.dashboard'), active=admin.dashboard) }}
-    {%- for group in admin.nav %}
-    {%- if group.title %}{{ sidebar_section(tr(group.title)) }}{% endif %}
-    {%- for item in group.items %}
-    {{ sidebar_link(item.url, tr(item.label), active=item.active) }}
-    {%- endfor %}
-    {%- endfor %}
-    {{ sidebar_section(t('nav.shop')) }}
-    {{ sidebar_link(route('staff.dashboard'), t('staff.nav.back_office')) }}
-    {{ sidebar_link(route('about.pages'), t('about.index_link')) }}
-  {% endcall %}
+<rx-let name="about" :value="about_page(request.route, request.path) if explain_panels else none"/>
+<body class="rx-page rx-shell{{ ' bs-docked' if about }}{{ ' bs-docked--rail' if about and about.rail }}">
+  <rx-sidebar :brand="tx(admin.title)" :href="admin.home" :label="t('admin_panel.navigation')">
+    <rx-sidebar-link :href="admin.home" :label="t('admin_panel.dashboard')" :active="admin.dashboard"/>
+    <template rx-for="group in admin.nav">
+      <rx-sidebar-section rx-if="group.title" :title="tx(group.title)"/>
+      <rx-sidebar-link rx-for="item in group.items" :href="item.url" :label="tx(item.label)" :active="item.active"/>
+    </template>
+    <rx-sidebar-section :title="t('nav.shop')"/>
+    <rx-sidebar-link :href="route('staff.dashboard')" :label="t('staff.nav.back_office')"/>
+    <rx-sidebar-link :href="route('about.pages')" :label="t('about.index_link')"/>
+  </rx-sidebar>
   <div class="rx-shell__main">
-    {% call navbar(none, width="full", skip=false, label=t('nav.account')) %}
-      {% include "layouts/_store_switcher.html" ignore missing %}
+    <rx-navbar width="full" :skip="false" :label="t('nav.account')">
+      <app-store-switcher :switcher="store_switcher"/>
       <span class="rx-spacer"></span>
-      {%- if about %}{{ open_button("about-page", t('about.button'), variant="plain", size="small") }}{% endif %}
-      {%- if auth.check %}
-      {% call menu(auth.user.name, id="rx-admin-account", variant="plain") %}
-        {%- if admin.account_url %}
-        {{ menu_link(admin.account_url, t('nav.account')) }}
-        {{ menu_separator() }}
-        {%- endif %}
-        {%- if admin.logout_url %}{{ menu_action(admin.logout_url, t('nav.logout')) }}{% endif %}
-      {% endcall %}
-      {%- endif %}
-    {% endcall %}
+      <rx-open-button rx-if="about" id="about-page" :label="t('about.button')" variant="plain" size="small"/>
+      <rx-menu rx-if="auth.check" :label="auth.user.name" id="rx-admin-account" variant="plain">
+        <template rx-if="admin.account_url">
+          <rx-menu-link :href="admin.account_url" :label="t('nav.account')"/>
+          <rx-menu-separator/>
+        </template>
+        <rx-menu-action rx-if="admin.logout_url" :action="admin.logout_url" :label="t('nav.logout')"/>
+      </rx-menu>
+    </rx-navbar>
     <main class="rx-shell__content" id="main">
-      {% block content %}{% endblock %}
+      <rx-block name="content"/>
     </main>
   </div>
   {#- "About this page": docked beside the page on wide screens, a sheet on
-      narrower ones (about/_dock.html, about/_panel.html). -#}
-  {%- if about %}{% include "about/_dock.html" %}{% include "about/_panel.html" %}{% endif %}
-  {{ toasts() }}
-  {% include "layouts/_scripts.html" %}
-  {{ stack('scripts') }}
+      narrower ones (<app-about-dock>, <app-about-panel>). -#}
+  <template rx-if="about">
+    <app-about-dock :about="about"/>
+    <app-about-panel :about="about"/>
+  </template>
+  <rx-toasts/>
+  <app-scripts/>
+  <rx-outlet stack="scripts"/>
 </body>
 </html>

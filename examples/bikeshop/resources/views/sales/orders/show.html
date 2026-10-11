@@ -1,8 +1,8 @@
 {#- The customer's order page (src/app/sales/orders.rs `show`): where the
     order stands, its lines, totals and payments. -#}
 <rx-page layout="layouts/app.html" :title="t('sales.orders.title', number=page.number) ~ ' · ' ~ t('shop.name')">
-  {% include "sales/_assets.html" %}
-  {%- set o = page %}
+  <app-sales-assets/>
+  <rx-let name="o" :value="page"/>
   {# [explain:orders.show.template] #}
   <rx-page-header :title="t('sales.orders.title', number=o.number)" :subtitle="t('sales.orders.placed', date=(o.placed_at | date('%Y-%m-%d %H:%M')))" :badge="t('sales.status.' ~ o.status)" :badge-kind="'success' if o.status in ['paid', 'ready', 'completed'] else ('warning' if o.status == 'pending' else none)">
     <rx-link-button :href="route('orders.invoice', o.id)" label="{{ t('sales.orders.invoice') }}"/>
@@ -15,29 +15,23 @@
       <rx-alert rx-if="o.status == 'cancelled'" kind="error" message="{{ t('sales.orders.cancelled_note') }}"/>
       <rx-card title="{{ t('sales.orders.lines') }}">
         <rx-table :rows="o.lines" as="line" caption="{{ t('sales.orders.lines') }}">
-          <rx-column label="{{ t('sales.orders.product') }}">{% if line.slug %}<a class="rx-link" href="{{ route('catalog.show', line.slug) }}">{{ line.name }}</a>{% else %}{{ line.name }}{% endif %}<br><span class="rx-subtitle">{{ line.sku }}{% if line.variant %} · {{ line.variant }}{% endif %}</span></rx-column>
+          <rx-column label="{{ t('sales.orders.product') }}"><a rx-if="line.slug" class="rx-link" href="{{ route('catalog.show', line.slug) }}">{{ line.name }}</a><template rx-else>{{ line.name }}</template><br><span class="rx-subtitle">{{ line.sku }}<template rx-if="line.variant"> · {{ line.variant }}</template></span></rx-column>
           <rx-column label="{{ t('sales.orders.quantity') }}" align="num">{{ line.quantity }}</rx-column>
           <rx-column label="{{ t('sales.orders.price') }}" align="num">{{ line.unit_price | money }}</rx-column>
           <rx-column label="{{ t('sales.orders.line_total') }}" align="num">{{ line.total | money }}</rx-column>
         </rx-table>
-        {% include "sales/orders/_totals.html" %}
+        <app-sales-totals :o="o"/>
       </rx-card>
       <rx-card rx-if="page.payments" title="{{ t('sales.orders.payments') }}">
         <ul class="bs-plain-list" role="list">
-          {%- for p in page.payments %}
-          <li><span>{{ t('sales.payment_status.' ~ p.status) }} · {{ t('sales.method.' ~ p.method) }}{% if p.paid_at %} · {{ p.paid_at | date("%Y-%m-%d %H:%M") }}{% endif %}</span><span class="rx-num">{{ p.amount | money }}</span></li>
-          {%- endfor %}
+          <li rx-for="p in page.payments"><span>{{ t('sales.payment_status.' ~ p.status) }} · {{ t('sales.method.' ~ p.method) }}<template rx-if="p.paid_at"> · {{ p.paid_at | date("%Y-%m-%d %H:%M") }}</template></span><span class="rx-num">{{ p.amount | money }}</span></li>
         </ul>
       </rx-card>
     </div>
     {# [explain:orders.show.template] #}
     <aside class="bs-order__side">
       <rx-card title="{{ t('sales.orders.progress') }}">
-        {# `history` is the example's own block: it has no tag. #}
-        {% from "renox-blocks/blocks.html" import history %}
-        {%- set ns = namespace(items=[]) %}
-        {%- for step in steps %}{% if step.done %}{% set ns.items = ns.items + [{"time": step.at, "title": t('sales.step.' ~ step.key), "kind": ("error" if step.key == "cancelled" else ("info" if step.key == "refunded" else "success"))}] %}{% endif %}{% endfor %}
-        {{ history(ns.items, label=t('sales.orders.progress')) }}
+        <rx-history :items="progress" label="{{ t('sales.orders.progress') }}"/>
       </rx-card>
     {# [/explain:orders.show.template] #}
       <rx-card title="{{ t('sales.orders.details') }}">

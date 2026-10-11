@@ -2,13 +2,12 @@
     each), as cards on a grid (src/app/staff/stores.rs). `cards`: store,
     address (one line), fee_percent; `can_fees`. -#}
 <rx-page layout="layouts/staff.html" :title="t('staff.stores.title')">
-  {% include "staff/_styles.html" %}
+  <app-staff-styles/>
   <rx-stack data-bs-reveal>
     <rx-page-header :title="t('staff.stores.title')" :subtitle="t('staff.stores.lead')"/>
-    {%- if cards %}
-    <div class="bs-tiles" id="stores">
+    <div rx-if="cards" class="bs-tiles" id="stores">
       {# [explain:staff.stores.index.template] #}
-      {%- for c in cards %}
+      <template rx-for="c in cards">
       <rx-card :title="c.store.name" :subtitle="c.address">
         <rx-infolist columns="2">
           <rx-entry :label="t('staff.stores.phone')" :value="c.store.phone"/>
@@ -21,10 +20,8 @@
         <div class="rx-card__footer"><rx-link-button :href="route('staff.stores.edit', c.store.id)" :label="t('staff.stores.edit')" icon="edit"/></div>
       </rx-card>
       {# [/explain:staff.stores.index.template] #}
-      {%- endfor %}
+      </template>
     </div>
-    {%- else %}
-    <rx-card><rx-empty :title="t('staff.stores.none')" icon="store"/></rx-card>
-    {%- endif %}
+    <rx-card rx-else><rx-empty :title="t('staff.stores.none')" icon="store"/></rx-card>
   </rx-stack>
 </rx-page>

@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 {% block content %}
 {#- #427: `@event` on components, under CSP=strict: the logic lives in Alpine.data. -#}
+<rx-event-stream/>
 <div x-data="eventsTags">
   <p id="flags">saved=<span id="saved" x-text="saved"></span> tab=<span id="tab" x-text="tab"></span> outer=<span id="outer" x-text="outer"></span></p>
 

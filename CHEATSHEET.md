@@ -324,11 +324,17 @@ and `rnx view:check` names a wrong one with its file and line.
    <rx-link-tabs :items current>, <rx-progress value="42"/> #}
 {# Phones: <rx-navbar :tabs="[{'href': …, 'label': 'Shop', 'icon': 'shopping-bag', 'active': route_is('shop.*')}, {'open': 'menu-sheet', 'label': 'Menu', 'icon': 'menu'}]"> = a bottom tab bar under 36rem;
    <rx-nav-search><form role="search">…</form></rx-nav-search> = search behind a button there; rx-hide-narrow leaves the phone's bar #}
-{# Icons (Lucide, docs/ui.md#icons) have no tag: {% from "renox/ui.html" import icon %} {{ icon("bike") }} {{ icon("truck", size=16) }};
-   hidden from screen readers unless {{ icon("lock", label="Private") }}; the same names in icon="…" on buttons and menus #}
+{# Icons (Lucide, docs/ui.md#icons): <rx-icon name="bike"/> <rx-icon name="truck" size="16"/>;
+   hidden from screen readers unless <rx-icon name="lock" label="Private"/>; the same names in icon="…" on buttons and menus #}
 {# A back office: <body class="rx-page rx-shell">, then <rx-sidebar brand="{{ app.name }}"><rx-sidebar-section title="Sales"/><rx-sidebar-link route="…" label="…"/></rx-sidebar>
    and <div class="rx-shell__main"><rx-navbar width="full" :skip="false"/><main class="rx-shell__content" id="main">…</main></div>.
-   Macros with no tag: thumbnail(src), menu_button(label) in a menu. hide-label on rx-input, rx-textarea,
+   <rx-thumbnail :src="p.image"/>, <rx-columns count="2">, <rx-menu-button hx-get="{{ url }}">Edit</rx-menu-button> in a menu,
+   <rx-action-group>, <rx-wizard-action> + <rx-wizard-step>, <rx-import-action route="…">, <rx-event-stream/>.
+   Tabs from data: <rx-tabs id="t" :items="[['a', 'A']]"><rx-tab-panel rx-for=… id="t" :key=… :selected=…>; <rx-link-tabs><rx-link-tab rx-for="v in views" :href :current>label</rx-link-tab></rx-link-tabs>.
+   A table written by hand with a total: <rx-simple-table :head="['Item', ['Qty', 'num']]"><tr rx-for=…>…</tr><rx-slot name="footer"><tr>…</tr></rx-slot></rx-simple-table>
+   (<rx-table> has the same footer slot). A text mail: <rx-mail-text>…{{ x }}…<template rx-for="r in rows">…</template></rx-mail-text>.
+   Mails: <rx-mail subject="…"> + <rx-mail-button :url label/>, <rx-mail-panel>, <rx-mail-table :rows :head :total/>, <rx-mail-divider/>
+   (<rx-slot name="footer"> replaces the footer). hide-label on rx-input, rx-textarea,
    rx-select or rx-checkbox (label kept for screen readers; the other fields don't take it),
    <body class="rx-page rx-page--fill"> for a page that fills the window.
    Themes: the editorial default (teal, cream, pill buttons; Inter + Poppins, served by Renox);
@@ -413,10 +419,22 @@ and `rnx view:check` names a wrong one with its file and line.
    rx-menu / rx-menu-link / rx-menu-action / rx-menu-separator, rx-tabs / rx-tab, rx-empty.
    Macros with no tag: group, tab_panel. renox_ui(styles=false) loads only the script (styles published with ui:publish). #}
 
+{# The layout's plumbing as tags: <rx-head/> {{ renox_head() }}, <rx-ui/> {{ renox_ui() }} (<rx-ui :styles="false"/>),
+   <rx-toasts/> {{ toasts() }}, <rx-outlet stack="scripts"/> {{ stack('scripts') }}; <rx-block name="content"/> a block
+   a page fills; <rx-pagination :page="products"/> the page links. #}
+
+{# Control flow: rx-if / rx-elif / rx-else / rx-for on any element or component; <template rx-if="a">text and siblings</template>
+   <template rx-else>…</template> and <template rx-for="x in xs">…</template> write their children with no wrapper.
+   <rx-let name="label" :value="a ~ b"/> names a value for the rest of its element (a {% with %}; the name must be free).
+   <rx-include template="parts/card.html"/> / <rx-include :template="name" optional/> draws another template ({% include %}; optional = ignore missing).
+   ?name="expr" is an attribute that is left out when expr is false / none, bare for true, name="text" otherwise:
+   <a href="/x" ?aria-current="'page' if current">, <li ?data-done="step.done">; works on plain elements and on the kit's tags.
+   <rx-script>…</rx-script> / <rx-style>…</rx-style> are <script> / <style> with nonce="{{ csp_nonce() }}". #}
+
 {# Stacks: the layout has {{ stack('head') }} in <head> and {{ stack('scripts') }} before
    </body>; any page, block or component adds to them, even after the head was rendered
    (<rx-push>; `prepend` has no tag, so it stays a macro): #}
-<rx-push stack="scripts" once="chart"><script src="{{ asset('chart.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+<rx-push stack="scripts" once="chart"><rx-script src="{{ asset('chart.js') }}"></rx-script></rx-push>   {# <rx-script>/<rx-style> add nonce="{{ csp_nonce() }}" #}
 {% call prepend('head') %}<meta name="robots" content="noindex">{% endcall %}
 ```
 
@@ -503,7 +521,7 @@ classes keep working next to the utilities.
   <rx-open-button id="note" label="Add note"/><rx-sheet id="note" title="Note">…</rx-sheet>
   <rx-stats columns="3"><rx-stat label="Revenue" :value="revenue | money" :delta="change"/></rx-stats>
   <rx-chart kind="line" :labels="labels" :series="series" title="Sales" id="sales"/>   {# calls chart(...) #}
-  <rx-grid :page="orders">{% if column.key == "actions" %}…{% endif %}</rx-grid>        {# row, column in the content #}
+  <rx-grid :page="orders"><template rx-if="column.key == 'actions'">…</template></rx-grid>        {# row, column in the content #}
   <li rx-for="p in products" rx-if="p.active">{{ p.name }}</li>   {# rx-else on the next sibling #}
   <app-price-tag :amount="p.price"/>                              {# components/price_tag.html, starts with <rx-props amount> #}
 </rx-page>

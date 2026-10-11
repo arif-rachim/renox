@@ -3,8 +3,7 @@
     also `request_line` and `template`). -#}
 <rx-page layout="layouts/app.html">
 <rx-slot name="seo"><title>{{ status }} {{ reason }} · {{ app.name }}</title></rx-slot>
-{% set fallback = t('errors.not_found') if status == 404 else t('errors.failed') %}
 <div class="rx-card">
-  <rx-empty :title="reason" :message="detail or fallback" action-href="/" :action-label="t('errors.home')"/>
+  <rx-empty :title="reason" :message="detail or (t('errors.not_found') if status == 404 else t('errors.failed'))" action-href="/" :action-label="t('errors.home')"/>
 </div>
 </rx-page>

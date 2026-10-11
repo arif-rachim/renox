@@ -5,7 +5,7 @@
 <div class="rx-stack" data-bs-reveal>
   <rx-page-header :title="t('htmx.live.title')" :subtitle="t('htmx.live.lead')"/>
   <rx-card :title="t('htmx.checklist.title')" :subtitle="t('htmx.live.card')">
-    {% set component = checklist %}{% include "renox/live.html" %}
+    <live-checklist :component="checklist"/>
   </rx-card>
   <rx-card :title="t('htmx.live.left_out.title')">
     <p class="rx-subtitle">{{ t('htmx.live.left_out.body') }}</p>

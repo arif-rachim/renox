@@ -371,6 +371,48 @@ fn safe_url(url: pulldown_cmark::CowStr<'_>) -> pulldown_cmark::CowStr<'_> {
     }
 }
 
+/// The value of a conditional attribute (`?name="expr"` in a template, #518): `false`, `none`
+/// and an undefined name leave the attribute out (`none`), `true` writes it bare (`true`), and
+/// anything else is its text.
+pub(crate) fn attr_value(value: Value) -> Value {
+    if value.is_undefined() || value.is_none() {
+        return Value::from(());
+    }
+    if let minijinja::value::ValueKind::Bool = value.kind() {
+        return if value.is_true() {
+            Value::from(true)
+        } else {
+            Value::from(())
+        };
+    }
+    Value::from(value.to_string())
+}
+
+/// `rx_attr("name", value)`: ` name`, ` name="text"` (escaped) or nothing, by [`attr_value`].
+/// What `?name="expr"` compiles to on an HTML element.
+pub(crate) fn rx_attr(name: String, value: Value) -> Value {
+    let value = attr_value(value);
+    if value.is_none() {
+        return Value::from_safe_string(String::new());
+    }
+    if matches!(value.kind(), minijinja::value::ValueKind::Bool) {
+        return Value::from_safe_string(format!(" {name}"));
+    }
+    let mut out = format!(" {name}=\"");
+    for c in value.to_string().chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    Value::from_safe_string(out)
+}
+
 /// `class_names('btn', {'btn-active': active, 'hidden': not shown})`: the
 /// strings given, plus the keys of maps whose value is true, joined with
 /// spaces (Blade's `@class`). Empty strings and `none` are skipped.

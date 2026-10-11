@@ -204,6 +204,8 @@ pub struct CartView {
     pub subtotal: i64,
     pub store: Option<Store>,
     pub stores: Vec<Store>,
+    /// The stores as a select's options: `[id as text, name]`.
+    pub store_options: Vec<[String; 2]>,
     /// Some lines were lowered (or taken out) because the store has fewer.
     pub changed: bool,
 }
@@ -298,6 +300,10 @@ impl CartView {
             subtotal: lines.iter().map(|l| l.total).sum(),
             lines,
             store,
+            store_options: stores
+                .iter()
+                .map(|s| [s.id.to_string(), s.name.clone()])
+                .collect(),
             stores,
             changed,
         })

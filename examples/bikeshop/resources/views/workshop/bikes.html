@@ -1,34 +1,25 @@
 {#- The customer's bikes (#236): each with its last service, and the form to add one. -#}
 <rx-page layout="layouts/app.html" title="{{ t('workshop.bikes.title') }}">
-  {% from "workshop/_parts.html" import styles, status %}
-  {{ styles() }}
+  <app-workshop-assets/>
   <rx-stack data-bs-reveal>
     <rx-page-header title="{{ t('workshop.bikes.title') }}" subtitle="{{ t('workshop.bikes.lead') }}"/>
-    {%- if rows %}
-    <div class="bs-bikes" id="my-bikes">
-      {%- for row in rows %}
-      <article class="rx-card rx-stack">
+    <div rx-if="rows" class="bs-bikes" id="my-bikes">
+      <article rx-for="row in rows" class="rx-card rx-stack">
         <h2 class="rx-card__title"><a class="rx-link" href="{{ route('workshop.bikes.show', row.bike.id) }}">{{ row.bike.name }}</a></h2>
-        <p class="rx-subtitle">{{ row.bike.frame_number or t('workshop.bikes.no_frame') }}{% if row.bike.size %} · {{ row.bike.size }}{% endif %}</p>
-        {%- if row.last %}
-        <p>{{ t('workshop.bikes.last', date=(row.last.at | date('%d %b %Y'))) }} {{ status(row.last.status) }}</p>
-        {%- else %}<p class="rx-subtitle">{{ t('workshop.bikes.never') }}</p>{% endif %}
+        <p class="rx-subtitle">{{ row.bike.frame_number or t('workshop.bikes.no_frame') }}<template rx-if="row.bike.size"> · {{ row.bike.size }}</template></p>
+        <p rx-if="row.last">{{ t('workshop.bikes.last', date=(row.last.at | date('%d %b %Y'))) }} <app-workshop-status :status="row.last.status"/></p>
+        <p rx-else class="rx-subtitle">{{ t('workshop.bikes.never') }}</p>
         <rx-link-button :href="route('workshop.book', bike=row.bike.id)" label="{{ t('workshop.book.title') }}" size="small"/>
       </article>
-      {%- endfor %}
     </div>
-    {%- else %}
-    <div class="rx-card"><rx-empty title="{{ t('workshop.bikes.none') }}" message="{{ t('workshop.bikes.none_text') }}" icon="bike"/></div>
-    {%- endif %}
+    <div rx-else class="rx-card"><rx-empty title="{{ t('workshop.bikes.none') }}" message="{{ t('workshop.bikes.none_text') }}" icon="bike"/></div>
     {# [explain:workshop.bikes.template] #}
     <form method="post" action="{{ route('workshop.bikes.store') }}" enctype="multipart/form-data" id="add-bike" novalidate>
       {{ csrf_field() }}
       <rx-card title="{{ t('workshop.bikes.add') }}">
         <rx-form-errors/>
-        {%- set opts = namespace(list=[["", t('workshop.bikes.other_model')]]) %}
-        {%- for m in models %}{% set opts.list = opts.list + [[m[0], m[1]]] %}{% endfor %}
         <rx-form-grid columns="2">
-          <rx-select name="product" label="{{ t('workshop.bikes.model') }}" :options="opts.list" searchable hint="{{ t('workshop.bikes.model_hint') }}"/>
+          <rx-select name="product" label="{{ t('workshop.bikes.model') }}" :options="[['', t('workshop.bikes.other_model')]] + models" searchable hint="{{ t('workshop.bikes.model_hint') }}"/>
           <rx-input name="name" label="{{ t('workshop.bikes.name') }}" required placeholder="{{ t('workshop.bikes.name_hint') }}"/>
           <rx-input name="brand" label="{{ t('workshop.bikes.brand') }}"/>
           <rx-input name="frame_number" label="{{ t('workshop.bikes.frame') }}"/>

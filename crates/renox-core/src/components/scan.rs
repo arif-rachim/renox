@@ -1,6 +1,6 @@
 //! The tag scanner: template source in, text / start tags / end tags out. It does not understand
 //! HTML; it only finds tags, and treats MiniJinja syntax, comments, `{% raw %}` and the content
-//! of `<script>` and `<style>` as opaque text.
+//! of `<script>`, `<style>`, `<rx-script>` and `<rx-style>` as opaque text.
 
 use std::ops::Range;
 
@@ -284,7 +284,13 @@ pub(crate) fn scan(src: &str) -> Result<Vec<Token<'_>>, CompileError> {
                             name,
                             self_closing: false,
                             ..
-                        } if name == "script" || name == "style" => Some(name.clone()),
+                        } if matches!(
+                            name.as_str(),
+                            "script" | "style" | "rx-script" | "rx-style"
+                        ) =>
+                        {
+                            Some(name.clone())
+                        }
                         _ => None,
                     };
                     out.push(token);
@@ -398,6 +404,18 @@ mod tests {
         assert_eq!(
             kinds("<style>a>b{}</STYLE><p>"),
             ["open style", "text", "close style", "open p"]
+        );
+    }
+
+    #[test]
+    fn rx_script_and_rx_style_are_opaque() {
+        assert_eq!(
+            kinds("<rx-script>if (a<b && c) {}</rx-script><p>"),
+            ["open rx-script", "text", "close rx-script", "open p"]
+        );
+        assert_eq!(
+            kinds("<rx-style>a>b{}</rx-style>"),
+            ["open rx-style", "text", "close rx-style"]
         );
     }
 

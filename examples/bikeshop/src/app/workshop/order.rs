@@ -209,14 +209,53 @@ pub async fn show(
     .map(key)
     .collect();
     let fits = bike_product(db, &order).await?.is_some();
+    // The checklist's choices (id, name, minutes and price) and the ticked ones.
+    let task_options: Vec<(i64, String, String)> = tasks
+        .iter()
+        .map(|t| {
+            (
+                t.id,
+                t.name.clone(),
+                format!("{} min · {}", t.minutes, money(&state, t.price)),
+            )
+        })
+        .collect();
+    let done_tasks: Vec<i64> = tasks.iter().filter(|t| t.done).map(|t| t.id).collect();
+    // The notes as the timeline's items; a photo is a link in the text.
+    let lang = state.current_lang();
+    let mut note_history = Vec::new();
+    for n in &notes {
+        let kind = match n.kind {
+            NoteKind::Note => "note",
+            NoteKind::Before => "before",
+            NoteKind::After => "after",
+        };
+        let mut body = n.body.clone().unwrap_or_default();
+        if n.photo_path.is_some() {
+            let url = state.url("workshop.order.photo", &[&order.id, &n.id])?;
+            body.push_str(&format!(
+                " [{}]({url})",
+                lang.t("workshop.order.photo_link", &[])
+            ));
+        }
+        note_history.push(json!({
+            "time": n.created_at,
+            "title": lang.t(&format!("workshop.notes.{kind}"), &[]),
+            "body": body,
+            "kind": if kind == "note" { "info" } else { "success" },
+        }));
+    }
     Ok(view(
         "workshop/order.html",
         context! {
             status => key(order.status),
             source => match order.source { WorkSource::WalkIn => "walk_in", WorkSource::Booking => "booking", WorkSource::Plan => "plan", WorkSource::Fleet => "fleet" },
             tasks,
+            task_options,
+            done_tasks,
             parts,
             notes => note_rows,
+            note_history,
             extras,
             all_tasks,
             bike_name,

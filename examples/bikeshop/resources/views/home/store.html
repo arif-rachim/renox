@@ -4,17 +4,15 @@
     shop's pages as absolute addresses (shop_url, rent_url, service_url,
     catalog_url). Only the kit and the shop's hero macro. -#}
 <rx-page layout="layouts/store.html" title="{{ t('home.stores.store', name=site.store.name) }}" description="{{ t('stores.site.lead', name=site.store.name) }}">
-{% from "renox/ui.html" import columns %}
-{% from "layouts/_hero.html" import page_hero %}
-{% set store = site.store %}
+<rx-let name="store" :value="site.store"/>
 <rx-stack data-bs-reveal>
-  {% call page_hero(t('home.stores.store', name=store.name), lead=t('stores.site.lead', name=store.name),
-                    eyebrow=site.address, photo="/images/site/store-" ~ store.slug ~ ".webp", compact=true) %}
+  <app-hero :title="t('home.stores.store', name=store.name)" :lead="t('stores.site.lead', name=store.name)"
+            :eyebrow="site.address" :photo="'/images/site/store-' ~ store.slug ~ '.webp'" compact>
     <p class="bs-hero__actions">
       <rx-link-button :href="rent_url" label="{{ t('stores.site.rent') }}" variant="primary"/>
       <rx-link-button :href="service_url" label="{{ t('stores.site.service') }}"/>
     </p>
-  {% endcall %}
+  </app-hero>
 
   {# [explain:stores.template] #}
   <rx-stats columns="3">
@@ -24,7 +22,7 @@
   </rx-stats>
   {# [/explain:stores.template] #}
 
-  {% call columns(2) %}
+  <rx-columns count="2">
     <rx-card title="{{ t('stores.site.visit') }}">
       <rx-infolist>
         <rx-entry label="{{ t('stores.site.address') }}" :value="site.address"/>
@@ -39,6 +37,6 @@
         <rx-slot name="empty"><p class="rx-subtitle">{{ t('stores.site.closed') }}</p></rx-slot>
       </rx-table>
     </rx-card>
-  {% endcall %}
+  </rx-columns>
 </rx-stack>
 </rx-page>

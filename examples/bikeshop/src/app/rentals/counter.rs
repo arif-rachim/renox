@@ -265,6 +265,16 @@ pub async fn desk(
         .await?
         .pop()
         .ok_or(Error::NotFound)?;
+    let lang = state.current_lang();
+    let checklist_options: Vec<[String; 2]> = CHECKLIST
+        .iter()
+        .map(|item| {
+            [
+                item.to_string(),
+                lang.t(&format!("rentals.checklist.{item}"), &[]),
+            ]
+        })
+        .collect();
     Ok(view(
         "rentals/desk.html",
         context! {
@@ -280,6 +290,7 @@ pub async fn desk(
             photos,
             stores,
             checklist => CHECKLIST,
+            checklist_options,
             row,
         },
     ))

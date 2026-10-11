@@ -263,7 +263,7 @@ pub fn entries() -> Vec<Explanation> {
                 MINE,
                 MODEL,
                 "examples/bikeshop/resources/views/plans/mine.html",
-                "examples/bikeshop/resources/views/plans/_parts.html",
+                "examples/bikeshop/resources/views/components/plans_status.html",
                 TESTS,
             ],
             code: &[

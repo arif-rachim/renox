@@ -171,7 +171,11 @@ pub struct NewQuery {
 // [explain:multistore.help.create.handler]
 /// `GET /staff/help/new` (`multistore.help.create`): ask another store for
 /// someone: who, with which role here, from when to when, and why.
-pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Result<View> {
+pub async fn create(
+    State(db): State<Db>,
+    Query(query): Query<NewQuery>,
+    lang: Lang,
+) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let others: Vec<Store> = Store::all_by_name(&db)
         .await?
@@ -195,12 +199,17 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .filter_map(|s| users.get(&s.user_id).map(|u| (s.id, u.name.clone())))
         .collect();
     people.sort_by(|a, b| a.1.cmp(&b.1));
-    let roles: Vec<(&str, &str)> = roles();
+    // The roles with their label in the page's language (`tx` for handlers).
+    let role_options: Vec<(&str, String)> = roles()
+        .into_iter()
+        .map(|(name, label)| (name, crate::app::staff::team::translated(&lang, label)))
+        .collect();
+    let store_options: Vec<(i64, String)> = others.iter().map(|s| (s.id, s.name.clone())).collect();
     // [explain:multistore.help.create.handler]
     let today = crate::seed::today();
     Ok(view(
         "multistore/help/new.html",
-        context! { others, lending, people, roles, today },
+        context! { store_options, lending, people, role_options, today },
     ))
 }
 // [/explain:multistore.help.create.handler]

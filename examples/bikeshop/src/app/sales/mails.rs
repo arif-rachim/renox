@@ -91,6 +91,7 @@ pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
             subject.clone(),
             &format!("mail/sales/{}", moment.key()),
             context! {
+                table => order.mail_table(&lang, &state.config.currency),
                 order => order.clone(),
                 url => "https://bikeshop.example/orders/1/view?signature=…",
                 refund => Some(3_999),

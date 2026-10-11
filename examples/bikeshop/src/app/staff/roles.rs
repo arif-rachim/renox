@@ -39,6 +39,8 @@ pub struct Row {
     pub description: &'static str,
     /// The area, for the group headings (`rentals` of `rentals.checkout`).
     pub group: &'static str,
+    /// Whether this row starts a new group (its heading is drawn above it).
+    pub new_group: bool,
     /// One per role, in the columns' order.
     pub cells: Vec<Cell>,
 }
@@ -73,6 +75,15 @@ fn locked(role: &str, permission: &str) -> bool {
     is_global(role) && [ROLES_MANAGE, STAFF_ACCESS].contains(&permission)
 }
 
+/// Marks the rows that start a group, whose heading the page draws above.
+fn mark_groups(rows: &mut [Row]) {
+    let mut previous = "";
+    for row in rows {
+        row.new_group = row.group != previous;
+        previous = row.group;
+    }
+}
+
 // [explain:staff.roles.index.handler]
 /// `GET /staff/roles`: the matrix. Two queries (Renox's `permissions::roles`).
 pub async fn index(State(db): State<Db>) -> Result<View> {
@@ -90,12 +101,13 @@ pub async fn index(State(db): State<Db>) -> Result<View> {
             }
         })
         .collect();
-    let rows: Vec<Row> = PERMISSIONS
+    let mut rows: Vec<Row> = PERMISSIONS
         .iter()
         .map(|p| Row {
             name: p.name,
             description: p.description,
             group: p.name.split('.').next().unwrap_or(p.name),
+            new_group: false,
             cells: roles
                 .iter()
                 .map(|(role, granted)| Cell {
@@ -106,6 +118,7 @@ pub async fn index(State(db): State<Db>) -> Result<View> {
                 .collect(),
         })
         .collect();
+    mark_groups(&mut rows);
     Ok(view("staff/roles/index.html", context! { columns, rows }))
 }
 // [/explain:staff.roles.index.handler]

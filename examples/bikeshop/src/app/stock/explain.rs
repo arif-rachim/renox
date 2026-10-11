@@ -13,7 +13,10 @@ const IMPORT: &str = "examples/bikeshop/src/app/stock/import.rs";
 const REORDER: &str = "examples/bikeshop/src/app/stock/reorder.rs";
 const FLEET: &str = "examples/bikeshop/src/app/stock/fleet.rs";
 const NOTIFY: &str = "examples/bikeshop/src/app/stock/notify.rs";
-const PARTS: &str = "examples/bikeshop/resources/views/stock/_parts.html";
+const ASSETS: &str = "examples/bikeshop/resources/views/components/stock_assets.html";
+const SHIPMENT_STATUS: &str =
+    "examples/bikeshop/resources/views/components/stock_shipment_status.html";
+const STEPS: &str = "examples/bikeshop/resources/views/components/stock_steps.html";
 const BOOKS: &str = "examples/bikeshop/src/app/multistore/books.rs";
 const AUDIT: &str = "examples/bikeshop/src/app/multistore/audit.rs";
 const POLICY: &str = "examples/bikeshop/src/app/access/policy.rs";
@@ -107,10 +110,11 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "push + stack, csp_nonce()",
                     why: "The stock pages add their script with `<rx-push stack=\"scripts\" \
-                          once=\"stock-js\">` from `stock/_parts.html`: the layout prints it \
-                          where its `stack('scripts')` is, once however many parts ask for it, \
-                          and only on the pages that use it. The tag carries `nonce=\"{{ \
-                          csp_nonce() }}\"`, so it runs under `CSP=strict` too.",
+                          once=\"stock-js\">` from `<app-stock-assets/>` \
+                          (`components/stock_assets.html`): the layout prints it where its \
+                          `<rx-outlet stack=\"scripts\"/>` is, once however many parts ask \
+                          for it, and only on the pages that use it. The `<rx-script>` inside \
+                          carries the page's nonce, so it runs under `CSP=strict` too.",
                 },
             ],
             under_hood: "One request: the tab's query (`access::visible` then the active store's \
@@ -129,6 +133,7 @@ pub fn entries() -> Vec<Explanation> {
                 MODEL,
                 VIEW_MIGRATION,
                 "examples/bikeshop/resources/views/stock/index.html",
+                ASSETS,
                 TESTS,
                 BROWSER,
             ],
@@ -284,6 +289,7 @@ pub fn entries() -> Vec<Explanation> {
                 NOTIFY,
                 AUDIT,
                 "examples/bikeshop/resources/views/stock/take.html",
+                "examples/bikeshop/resources/views/components/stock_take_rows.html",
                 TESTS,
                 BROWSER,
             ],
@@ -297,7 +303,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "stock.take.apply",
                 },
                 Code {
-                    title: "Template: a macro writes the nested field names",
+                    title: "Template: a component writes the nested field names",
                     region: "stock.take.template",
                 },
             ],
@@ -324,7 +330,7 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "UI kit: link_tabs + table",
                     why: "Open / in transit / all as links, the list as the kit's table with \
-                          status badges (`shipment_status` in `stock/_parts.html`) whose \
+                          status badges (`<app-stock-shipment-status>`) whose \
                           colour and word agree, so the colour is never the only clue.",
                 },
             ],
@@ -341,7 +347,7 @@ pub fn entries() -> Vec<Explanation> {
                 CONSIGNMENT,
                 MODEL,
                 "examples/bikeshop/resources/views/stock/consignments/index.html",
-                PARTS,
+                SHIPMENT_STATUS,
                 TESTS,
             ],
             code: &[
@@ -450,7 +456,7 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Bike shop blocks",
                     why: "The kit has no stepper or timeline: the steps are an ordered list \
-                          styled as a stepper (the `steps` macro in `stock/_parts.html`, the \
+                          styled as a stepper (`<app-stock-steps>`, the \
                           current step marked `aria-current`; the done steps slide in through \
                           Motion, not under reduced motion), and the dated events are the \
                           `history` block of renox-blocks.",
@@ -473,7 +479,8 @@ pub fn entries() -> Vec<Explanation> {
                 LEDGER,
                 MODEL,
                 "examples/bikeshop/resources/views/stock/consignments/show.html",
-                PARTS,
+                SHIPMENT_STATUS,
+                STEPS,
                 "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/public/areas/stock.js",
                 TESTS,
@@ -817,6 +824,7 @@ pub fn entries() -> Vec<Explanation> {
                 PURCHASING,
                 "examples/bikeshop/src/app/workshop/model.rs",
                 "examples/bikeshop/resources/views/stock/purchase_orders/new.html",
+                "examples/bikeshop/resources/views/components/stock_po_line.html",
                 TESTS,
                 BROWSER,
             ],
@@ -830,7 +838,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "stock.purchasing.needs",
                 },
                 Code {
-                    title: "Template: a macro for one line with its reasons",
+                    title: "Template: a component for one line with its reasons",
                     region: "stock.purchasing.create.template",
                 },
             ],

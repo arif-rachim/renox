@@ -353,6 +353,8 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
     let supplier = query
         .supplier
         .and_then(|id| suppliers.iter().find(|s| s.id == id).cloned());
+    let supplier_options: Vec<(i64, String)> =
+        suppliers.iter().map(|s| (s.id, s.name.clone())).collect();
     let mut needs = needs(&db, store).await?;
     let mut rest = Vec::new();
     if let Some(supplier) = &supplier {
@@ -385,7 +387,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
     let needs: Vec<Need> = needs.into_values().collect();
     Ok(view(
         "stock/purchase_orders/new.html",
-        context! { suppliers, supplier, needs, rest },
+        context! { suppliers, supplier_options, supplier, needs, rest },
     ))
 }
 // [/explain:stock.purchasing.create.handler]
@@ -691,6 +693,18 @@ pub async fn send(
     if let Some(email) = supplier.email.as_deref().filter(|e| !e.is_empty()) {
         let store = Store::find_or_404(&state.db, order.store_id).await?;
         let lines = lines_of(&state.db, &order).await?;
+        let money =
+            |amount: i64| crate::money::format(amount, &state.config.currency, &lang.locale);
+        let mut table: Vec<[String; 2]> = lines
+            .iter()
+            .map(|l| {
+                [
+                    format!("{} × {} ({})", l.line.quantity, l.name, l.sku),
+                    money(l.total),
+                ]
+            })
+            .collect();
+        table.push([lang.t("stock.purchasing.total", &[]), money(order.total)]);
         let mail = state.mail_view(
             email,
             lang.t(
@@ -706,6 +720,7 @@ pub async fn send(
                 supplier => &supplier,
                 store => &store,
                 lines,
+                table,
                 url => print_link(&state, &order)?,
             },
         )?;

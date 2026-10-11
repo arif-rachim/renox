@@ -1,4 +1,0 @@
-{#- The sales pages' own styles and behaviour (public/sales/), pushed into
-    the layout's head and scripts stacks once. -#}
-<rx-push stack="head"><link rel="stylesheet" href="{{ asset('sales/sales.css') }}"></rx-push>
-<rx-push stack="scripts"><script src="{{ asset('sales/sales.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>

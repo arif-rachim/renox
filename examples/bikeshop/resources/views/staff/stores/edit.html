@@ -3,7 +3,7 @@
     closes) laid out on a CSS grid; the fee rate shows only with
     `settings.fees` in this store. -#}
 <rx-page layout="layouts/staff.html" :title="store.name">
-  {% include "staff/_styles.html" %}
+  <app-staff-styles/>
   <rx-stack data-bs-reveal>
     <rx-page-header :title="store.name" :subtitle="t('staff.stores.edit_lead')" :back="route('staff.stores.index')" :back-label="t('staff.stores.title')"/>
     <rx-form method="PUT" action="{{ route('staff.stores.update', store.id) }}" class="rx-stack" id="store-form" live>
@@ -17,14 +17,12 @@
           <rx-input name="line2" :label="t('accounts.contact.line2')" :value="address.line2"/>
           <rx-input name="postal_code" :label="t('accounts.contact.postal_code')" :value="address.postal_code"/>
           <rx-input name="workshop_minutes_per_day" :label="t('staff.stores.workshop')" type="number" :value="store.workshop_minutes_per_day" required min="0" max="1440" :suffix="t('staff.stores.minutes_unit')" :hint="t('staff.stores.workshop_hint')"/>
-          {%- if can_fees %}
-          <rx-input name="fee_percent" :label="t('staff.stores.fee')" type="number" :value="fee_percent" min="0" max="100" step="0.01" suffix="%" :hint="t('staff.stores.fee_hint')"/>
-          {%- endif %}
+          <rx-input rx-if="can_fees" name="fee_percent" :label="t('staff.stores.fee')" type="number" :value="fee_percent" min="0" max="100" step="0.01" suffix="%" :hint="t('staff.stores.fee_hint')"/>
         </rx-form-grid>
       </rx-card>
       {# [explain:staff.stores.edit.template] #}
       <rx-card :title="t('staff.stores.hours')" :subtitle="t('staff.stores.hours_lead')">
-        {%- set days = [["mon", t('staff.stores.days.mon')], ["tue", t('staff.stores.days.tue')], ["wed", t('staff.stores.days.wed')], ["thu", t('staff.stores.days.thu')], ["fri", t('staff.stores.days.fri')], ["sat", t('staff.stores.days.sat')], ["sun", t('staff.stores.days.sun')]] %}
+        <rx-let name="days" :value="[['mon', t('staff.stores.days.mon')], ['tue', t('staff.stores.days.tue')], ['wed', t('staff.stores.days.wed')], ['thu', t('staff.stores.days.thu')], ['fri', t('staff.stores.days.fri')], ['sat', t('staff.stores.days.sat')], ['sun', t('staff.stores.days.sun')]]"/>
         <rx-repeater name="hours" :label="t('staff.stores.hours')" :rows="hours" :item-label="t('staff.stores.day')" :add-label="t('staff.stores.add_day')" max="7">
           <div class="bs-hours">
             <rx-select name="{{ prefix }}[day]" :label="t('staff.stores.day')" :options="days" :selected="row.day" required/>

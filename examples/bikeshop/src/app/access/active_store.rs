@@ -131,7 +131,7 @@ async fn default_store(user: &User) -> Option<i64> {
     }
 }
 
-/// What the store switcher (`layouts/_store_switcher.html`) shows: the
+/// What the store switcher (`components/store_switcher.html`) shows: the
 /// active store and the stores the user may switch to. Shared with every
 /// view as `store_switcher` (see [`super::Access`]); `None` for people
 /// with no staff role, so customers' pages run no query for it.

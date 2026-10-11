@@ -99,6 +99,7 @@ pub fn entries() -> Vec<Explanation> {
                 KIOSK,
                 CUSTOMER,
                 "examples/bikeshop/resources/views/api/about.html",
+                "examples/bikeshop/resources/views/components/api_endpoint.html",
                 TESTS,
             ],
             code: &[
@@ -167,7 +168,7 @@ pub fn entries() -> Vec<Explanation> {
                 TOKENS,
                 MOD,
                 "examples/bikeshop/resources/views/api/tokens.html",
-                "examples/bikeshop/resources/views/api/_parts.html",
+                "examples/bikeshop/resources/views/components/api_token_form.html",
                 TESTS,
             ],
             code: &[
@@ -180,7 +181,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "api.tokens.rules",
                 },
                 Code {
-                    title: "Template: the new token with the kit's copy button, the form",
+                    title: "Template: the form, one tick per ability a customer may have",
                     region: "api.tokens.template",
                 },
             ],
@@ -233,7 +234,7 @@ pub fn entries() -> Vec<Explanation> {
                 MOD,
                 "examples/bikeshop/src/app/access/active_store.rs",
                 "examples/bikeshop/resources/views/api/kiosks.html",
-                "examples/bikeshop/resources/views/api/_parts.html",
+                "examples/bikeshop/resources/views/components/api_token_form.html",
                 "examples/bikeshop/migrations/20260103001100_create_kiosks_table.up.sql",
                 TESTS,
             ],
@@ -247,7 +248,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "api.kiosks.test",
                 },
                 Code {
-                    title: "Template: the same parts as the customers' token page",
+                    title: "Template: the same form as the customers' token page",
                     region: "api.tokens.template",
                 },
             ],

@@ -268,7 +268,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/catalog/model.rs",
                 "examples/bikeshop/migrations/20260101000410_search_products.sqlite.up.sql",
                 "examples/bikeshop/migrations/20260101000410_search_products.postgres.up.sql",
-                "examples/bikeshop/resources/views/layouts/_nav_search.html",
+                "examples/bikeshop/resources/views/components/nav_search.html",
                 "examples/bikeshop/resources/views/catalog/_suggest.html",
                 "examples/bikeshop/public/catalog/catalog.js",
                 "examples/bikeshop/tests/catalog.rs",

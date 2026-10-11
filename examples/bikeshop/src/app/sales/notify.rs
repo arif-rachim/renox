@@ -126,6 +126,47 @@ impl OrderView {
     }
 }
 
+impl OrderView {
+    /// The order's lines and totals as the data of the mail kit's table
+    /// (`rows`, `head`, `total`), every amount written in `lang`'s locale
+    /// as the `money` filter does.
+    pub fn mail_table(&self, lang: &Lang, currency: &str) -> renox::serde_json::Value {
+        let money = |amount: i64| crate::money::format(amount, currency, &lang.locale);
+        let mut rows: Vec<[String; 2]> = self
+            .lines
+            .iter()
+            .map(|line| {
+                let variant = if line.variant.is_empty() {
+                    String::new()
+                } else {
+                    format!(" · {}", line.variant)
+                };
+                [
+                    format!("{} × {}{}", line.item.quantity, line.name, variant),
+                    money(line.item.total),
+                ]
+            })
+            .collect();
+        if self.order.discount > 0 {
+            rows.push([
+                lang.t("sales.orders.discount", &[]),
+                format!("− {}", money(self.order.discount)),
+            ]);
+        }
+        if self.delivery {
+            rows.push([
+                lang.t("sales.checkout.delivery_fee", &[]),
+                money(self.order.delivery_fee),
+            ]);
+        }
+        renox::serde_json::json!({
+            "rows": rows,
+            "head": [lang.t("sales.orders.product", &[]), lang.t("sales.orders.line_total", &[])],
+            "total": [lang.t("sales.orders.total", &[]), money(self.order.total)],
+        })
+    }
+}
+
 /// The moments a customer hears about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Moment {
@@ -193,7 +234,13 @@ pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Optio
             email,
             subject.clone(),
             &format!("mail/sales/{}", moment.key()),
-            context! { order => view, url, refund, name => customer.name.clone() },
+            context! {
+                table => view.mail_table(&lang, &state.config.currency),
+                order => view,
+                url,
+                refund,
+                name => customer.name.clone(),
+            },
         )?;
         state.queue_mail(mail).await?;
     }

@@ -47,7 +47,7 @@ impl Module for Access {
     }
 
     fn register(&self, app: &mut Registry) {
-        // The store switcher in the staff layout (`layouts/_store_switcher.html`).
+        // The store switcher in the staff layout (`components/store_switcher.html`).
         app.share(
             "store_switcher",
             |ctx: renox::view::ViewContext| async move {

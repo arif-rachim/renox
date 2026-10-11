@@ -5,7 +5,7 @@
     <rx-page-header :title="t('staff.audit.title')" :subtitle="t('staff.audit.lead')"/>
     {# [explain:staff.audit.index.template] #}
     <rx-grid :page="entries">
-      {%- if column.key == "data" and row.data and row.data != "{}" %}<code>{{ row.data[:120] }}{% if row.data | length > 120 %}…{% endif %}</code>{% endif %}
+      <code rx-if="column.key == 'data' and row.data and row.data != '{}'">{{ row.data[:120] }}<template rx-if="row.data | length > 120">…</template></code>
     </rx-grid>
     {# [/explain:staff.audit.index.template] #}
   </rx-stack>

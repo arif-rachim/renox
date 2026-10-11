@@ -3,8 +3,7 @@
     queues the webhook a gateway would send, signed, to this app's own
     /billing/webhooks/demo. -#}
 <rx-page layout="layouts/app.html" title="{{ t('plans.demo.title') }}">
-{% from "plans/_parts.html" import assets %}
-{{ assets() }}
+<app-plans-assets/>
 <div class="bs-demo-billing" data-bs-reveal>
   <rx-alert kind="warning" title="{{ t('plans.demo.notice_title') }}" message="{{ t('plans.demo.notice') }}"/>
   <rx-card title="{{ t('plans.demo.title') }}" subtitle="{{ t('plans.demo.merchant', shop=t('shop.name')) }}">

@@ -5,6 +5,10 @@
       "name": "rx-if"
     },
     {
+      "description": "Renders the element when the preceding rx-if (or rx-elif) was false and this expression is true.",
+      "name": "rx-elif"
+    },
+    {
       "description": "Renders the element when the preceding rx-if was false.",
       "name": "rx-else"
     },
@@ -180,6 +184,116 @@
     {
       "attributes": [
         {
+          "description": "(required) The block's name: letters, digits and underscores; plain text.",
+          "name": "name",
+          "values": []
+        }
+      ],
+      "description": "A named block of the layout: `{% block name %}`; self-closing it leaves one for pages to fill.",
+      "name": "rx-block"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The page: a `Paginated` (numbered links) or a `SimplePage` (previous / next).",
+          "name": ":page",
+          "values": []
+        }
+      ],
+      "description": "Page links for a page of rows (`Paginated` or `SimplePage`).",
+      "name": "rx-pagination"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The name: letters, digits and underscores; plain text.",
+          "name": "name",
+          "values": []
+        },
+        {
+          "description": "(required) The value: text, or `:value=\"expression\"` for data.",
+          "name": "value",
+          "values": []
+        }
+      ],
+      "description": "A local name for the rest of the enclosing element: `{% with name = value %}`.",
+      "name": "rx-let"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The template's name: text, or `:template=\"expression\"` for a name worked out at run time.",
+          "name": "template",
+          "values": []
+        },
+        {
+          "description": "Shows nothing when the template does not exist (`ignore missing`).",
+          "name": "optional",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "Another template, drawn here with the page's variables: `{% include %}`.",
+      "name": "rx-include"
+    },
+    {
+      "attributes": [],
+      "description": "An inline `<script>` that carries the page's CSP nonce.",
+      "name": "rx-script"
+    },
+    {
+      "attributes": [],
+      "description": "An inline `<style>` that carries the page's CSP nonce.",
+      "name": "rx-style"
+    },
+    {
+      "attributes": [],
+      "description": "The head tags Renox adds: assets, CSRF meta, analytics (`renox_head()`).",
+      "name": "rx-head"
+    },
+    {
+      "attributes": [
+        {
+          "description": "Set to false to leave out the stylesheet (an app that builds its own).",
+          "name": "styles",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "The UI kit's script and stylesheet tags (`renox_ui()`).",
+      "name": "rx-ui"
+    },
+    {
+      "attributes": [],
+      "description": "The toast region (`toasts()`).",
+      "name": "rx-toasts"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The stack's name.",
+          "name": "stack",
+          "values": []
+        }
+      ],
+      "description": "Where a stack's content is written: `stack('name')`; `<rx-push>` adds to it.",
+      "name": "rx-outlet"
+    },
+    {
+      "attributes": [
+        {
           "description": "(required) The wizard's id; its steps build theirs from it.",
           "name": "id",
           "values": []
@@ -259,6 +373,11 @@
           "values": []
         },
         {
+          "description": "The tabs as data, a list of [key, label] pairs, instead of `<rx-tab>` children; the panels are then `<rx-tab-panel>` tags.",
+          "name": ":items",
+          "values": []
+        },
+        {
           "description": "Runs when the component sends changed.",
           "name": "@changed",
           "values": []
@@ -325,6 +444,22 @@
       ],
       "description": "A table written as columns; the rows are looped and a page of rows gets its links.",
       "name": "rx-table"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The heading cells: text, or [text, \"num\"] to align figures to the end.",
+          "name": ":head",
+          "values": []
+        },
+        {
+          "description": "A caption for screen readers.",
+          "name": "caption",
+          "values": []
+        }
+      ],
+      "description": "The kit's table around rows written by hand (`<tr>` under `rx-for`), with an optional footer.",
+      "name": "rx-simple-table"
     },
     {
       "attributes": [
@@ -3428,12 +3563,12 @@
     {
       "attributes": [
         {
-          "description": "(required) A list of [href, label] pairs.",
+          "description": "A list of [href, label] pairs; or write `<rx-link-tab>` children instead.",
           "name": ":items",
           "values": []
         },
         {
-          "description": "The href shown as chosen.",
+          "description": "With `items`: the href shown as chosen.",
           "name": "current",
           "values": []
         },
@@ -3443,8 +3578,36 @@
           "values": []
         }
       ],
-      "description": "Links that look like a segmented control, for switching between pages.",
+      "description": "Links that look like a segmented control, for switching between pages; from data (`items`) or from `<rx-link-tab>` children.",
       "name": "rx-link-tabs"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) Where the link goes.",
+          "name": "href",
+          "values": []
+        },
+        {
+          "description": "The link's text; or give it as content.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "Draws the link as the chosen one (`aria-current=\"page\"`).",
+          "name": "current",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "One link of `<rx-link-tabs>`; the label is its content or `label`.",
+      "name": "rx-link-tab"
     },
     {
       "attributes": [
@@ -3668,6 +3831,527 @@
       "attributes": [],
       "description": "The frame of a back office: a sidebar and the main column beside it.",
       "name": "rx-shell"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The icon's name (docs/ui.md lists them).",
+          "name": "name",
+          "values": []
+        },
+        {
+          "description": "The size in pixels (20 by default).",
+          "name": "size",
+          "values": []
+        },
+        {
+          "description": "Makes the icon mean something to screen readers; without it the icon is decoration.",
+          "name": "label",
+          "values": []
+        }
+      ],
+      "description": "One of the kit's icons, drawn inline in the text's colour.",
+      "name": "rx-icon"
+    },
+    {
+      "attributes": [
+        {
+          "description": "How many columns (2 by default).",
+          "name": "count",
+          "values": []
+        }
+      ],
+      "description": "Children side by side from tablet width up, one column on phones.",
+      "name": "rx-columns"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The picture's URL.",
+          "name": "src",
+          "values": []
+        },
+        {
+          "description": "The picture's alt text; empty by default.",
+          "name": "alt",
+          "values": []
+        },
+        {
+          "description": "Makes the picture a link.",
+          "name": "href",
+          "values": []
+        }
+      ],
+      "description": "A small square picture, for example in a table row.",
+      "name": "rx-thumbnail"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The tabs' id.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "(required) The key of the tab this panel belongs to.",
+          "name": "key",
+          "values": []
+        },
+        {
+          "description": "Shows the panel at first.",
+          "name": "selected",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "One panel for a `tabs(...)` control written as a macro; with tags use `<rx-tabs>` and `<rx-tab>`.",
+      "name": "rx-tab-panel"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The label; or give it as content.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "An icon's name.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "Draws the item as a dangerous action.",
+          "name": "danger",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "A menu item that is a plain button, for what its attributes make it do (htmx).",
+      "name": "rx-menu-button"
+    },
+    {
+      "attributes": [
+        {
+          "description": "The button's text; without it an icon button named \"Actions\".",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "The menu list's id.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "An icon's name.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "The look.",
+          "name": "variant",
+          "values": [
+            {
+              "name": "primary"
+            },
+            {
+              "name": "secondary"
+            },
+            {
+              "name": "plain"
+            },
+            {
+              "name": "danger"
+            },
+            {
+              "name": "plain-danger"
+            }
+          ]
+        },
+        {
+          "description": "The size.",
+          "name": "size",
+          "values": [
+            {
+              "name": "small"
+            }
+          ]
+        }
+      ],
+      "description": "Several actions behind one button; its content is the menu items.",
+      "name": "rx-action-group"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The sheet's id.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "(required) The button's label.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "(required) The address the file is sent to; or use route.",
+          "name": "action",
+          "values": []
+        },
+        {
+          "description": "(required) The sheet's heading.",
+          "name": "title",
+          "values": []
+        },
+        {
+          "description": "A line under the heading.",
+          "name": "description",
+          "values": []
+        },
+        {
+          "description": "The file's column names, shown to the reader.",
+          "name": ":columns",
+          "values": []
+        },
+        {
+          "description": "A link to an empty file to fill in (`renox::import::template`).",
+          "name": "template-url",
+          "values": []
+        },
+        {
+          "description": "The submit button's text.",
+          "name": "submit-label",
+          "values": []
+        },
+        {
+          "description": "The file types the field takes.",
+          "name": "accept",
+          "values": []
+        },
+        {
+          "description": "The file field's name (file by default).",
+          "name": "name",
+          "values": []
+        },
+        {
+          "description": "The button's look.",
+          "name": "variant",
+          "values": [
+            {
+              "name": "primary"
+            },
+            {
+              "name": "secondary"
+            },
+            {
+              "name": "plain"
+            },
+            {
+              "name": "danger"
+            },
+            {
+              "name": "plain-danger"
+            }
+          ]
+        },
+        {
+          "description": "The button's size.",
+          "name": "size",
+          "values": [
+            {
+              "name": "small"
+            }
+          ]
+        },
+        {
+          "description": "The button's icon (upload by default).",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "A keyboard shortcut.",
+          "name": "key",
+          "values": []
+        },
+        {
+          "description": "Whether to draw the opening button.",
+          "name": "button",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        }
+      ],
+      "description": "A button that opens a sheet to import a CSV file; the handler answers with an `ImportReport`.",
+      "name": "rx-import-action"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The sheet's id.",
+          "name": "id",
+          "values": []
+        },
+        {
+          "description": "(required) The button's label.",
+          "name": "label",
+          "values": []
+        },
+        {
+          "description": "(required) The address the form is sent to; or use route.",
+          "name": "action",
+          "values": []
+        },
+        {
+          "description": "(required) The sheet's heading.",
+          "name": "title",
+          "values": []
+        },
+        {
+          "description": "The last step's submit button.",
+          "name": "submit-label",
+          "values": []
+        },
+        {
+          "description": "A line under the heading.",
+          "name": "description",
+          "values": []
+        },
+        {
+          "description": "The HTTP method.",
+          "name": "method",
+          "values": [
+            {
+              "name": "POST"
+            },
+            {
+              "name": "PUT"
+            },
+            {
+              "name": "PATCH"
+            },
+            {
+              "name": "DELETE"
+            }
+          ]
+        },
+        {
+          "description": "The button's look.",
+          "name": "variant",
+          "values": [
+            {
+              "name": "primary"
+            },
+            {
+              "name": "secondary"
+            },
+            {
+              "name": "plain"
+            },
+            {
+              "name": "danger"
+            },
+            {
+              "name": "plain-danger"
+            }
+          ]
+        },
+        {
+          "description": "The button's size.",
+          "name": "size",
+          "values": [
+            {
+              "name": "small"
+            }
+          ]
+        },
+        {
+          "description": "The button's icon.",
+          "name": "icon",
+          "values": []
+        },
+        {
+          "description": "A keyboard shortcut.",
+          "name": "key",
+          "values": []
+        },
+        {
+          "description": "Slides in from the side.",
+          "name": "slide-over",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "The width.",
+          "name": "width",
+          "values": [
+            {
+              "name": "sm"
+            },
+            {
+              "name": "lg"
+            },
+            {
+              "name": "xl"
+            }
+          ]
+        },
+        {
+          "description": "Live validation (on by default); `:live=\"false\"` turns it off.",
+          "name": "live",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "A selector the answer is swapped into.",
+          "name": "target",
+          "values": []
+        },
+        {
+          "description": "How the answer is swapped in.",
+          "name": "swap",
+          "values": []
+        },
+        {
+          "description": "The form's encoding, for files.",
+          "name": "enctype",
+          "values": []
+        },
+        {
+          "description": "Whether to draw the opening button.",
+          "name": "button",
+          "values": [
+            {
+              "name": "true"
+            },
+            {
+              "name": "false"
+            }
+          ]
+        },
+        {
+          "description": "Runs when the component sends opened.",
+          "name": "@opened",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends closed.",
+          "name": "@closed",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends saved.",
+          "name": "@saved",
+          "values": []
+        },
+        {
+          "description": "Runs when the component sends failed.",
+          "name": "@failed",
+          "values": []
+        }
+      ],
+      "description": "A button that opens a sheet holding a wizard; each `<rx-wizard-step>` inside is one step.",
+      "name": "rx-wizard-action"
+    },
+    {
+      "attributes": [],
+      "description": "Opens the notifications stream on a page without the bell, so `state.broadcast(...)` events arrive as DOM events.",
+      "name": "rx-event-stream"
+    },
+    {
+      "attributes": [
+        {
+          "description": "The mail's title (the layout's `<title>`).",
+          "name": "subject",
+          "values": []
+        },
+        {
+          "description": "The layout's file name; renox/mail/layout.html by default. Plain text.",
+          "name": "layout",
+          "values": []
+        }
+      ],
+      "description": "A mail's layout: `{% extends %}` of the mail layout, with its content and footer.",
+      "name": "rx-mail"
+    },
+    {
+      "attributes": [],
+      "description": "A mail's plain-text version (a `.txt` view): the text as written, with `{{ }}`, `rx-if` and `rx-for` (on a `<template>`).",
+      "name": "rx-mail-text"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) Where the button goes.",
+          "name": "url",
+          "values": []
+        },
+        {
+          "description": "(required) The label; or give it as content.",
+          "name": "label",
+          "values": []
+        }
+      ],
+      "description": "A button for a mail, with its address written under it for clients that hide buttons.",
+      "name": "rx-mail-button"
+    },
+    {
+      "attributes": [],
+      "description": "A highlighted box in a mail.",
+      "name": "rx-mail-panel"
+    },
+    {
+      "attributes": [
+        {
+          "description": "(required) The rows: a list of lists of cells.",
+          "name": ":rows",
+          "values": []
+        },
+        {
+          "description": "The heading cells.",
+          "name": ":head",
+          "values": []
+        },
+        {
+          "description": "The last row's cells, drawn in bold.",
+          "name": ":total",
+          "values": []
+        }
+      ],
+      "description": "A table for a mail: rows of cells, an optional heading and an optional total row.",
+      "name": "rx-mail-table"
+    },
+    {
+      "attributes": [],
+      "description": "A thin line between parts of a mail.",
+      "name": "rx-mail-divider"
     }
   ],
   "version": 1.1

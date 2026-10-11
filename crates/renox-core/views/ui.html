@@ -22,12 +22,12 @@
 {%- macro _key(name) -%}{{ name | replace("][", ".") | replace("[", ".") | replace("]", "") | trim(".") }}{%- endmacro -%}
 
 {%- macro _attrs(attrs) -%}
-{%- for key, value in attrs | items %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endfor -%}
+{%- for key, value in attrs | items %}{% if value is not none and value is not false %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endif %}{% endfor -%}
 {%- endmacro -%}
 
 {#- The attributes of a component's root, except `class`, which the macro merges into its own. -#}
 {%- macro _root_attrs(attrs) -%}
-{%- for key, value in attrs | items %}{% if key != "class" %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endif %}{% endfor -%}
+{%- for key, value in attrs | items %}{% if key != "class" and value is not none and value is not false %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endif %}{% endfor -%}
 {%- endmacro -%}
 
 {%- macro _label(id, label, required, hidden=false) -%}
@@ -1008,8 +1008,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endmacro %}
 
 {#- `{% call table(["Name", ["Price", "num"]]) %}<tr>…</tr>{% endcall %}`: a
-    heading can be [text, class] ("num" right-aligns figures). -#}
-{% macro table(head, caption=none) -%}
+    heading can be [text, class] ("num" right-aligns figures). `foot` holds
+    the rows of a `<tfoot>` (a total), after the body. -#}
+{% macro table(head, caption=none, foot=none) -%}
 <div class="rx-table-wrap">
   <table class="rx-table">
     {%- if caption %}<caption class="rx-visually-hidden">{{ caption }}</caption>{% endif %}
@@ -1019,6 +1020,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
       {%- endfor %}
     </tr></thead>
     <tbody>{{ caller() }}</tbody>
+    {%- if foot %}<tfoot>{{ foot }}</tfoot>{% endif %}
   </table>
 </div>
 {%- endmacro %}

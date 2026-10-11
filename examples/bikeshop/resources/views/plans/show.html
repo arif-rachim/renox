@@ -1,9 +1,7 @@
 {#- One bike's plan (#237): the upcoming visits (a month calendar and a list
     with Skip and Move), the past ones, the invoices; changes on the side. -#}
 <rx-page layout="layouts/app.html" title="{{ t('plans.show.title', bike=bike.name) }}">
-{% from "renox-blocks/blocks.html" import month_calendar %}
-{% from "plans/_parts.html" import assets, status as status_badge, visit_status %}
-{{ assets() }}
+<app-plans-assets/>
 <rx-stack>
   <rx-page-header title="{{ t('plans.show.title', bike=bike.name) }}" :subtitle="plan.name ~ ' · ' ~ (store.name if store else '')" :back="route('plans.mine')" back-label="{{ t('plans.mine.title') }}"/>
   <rx-alert rx-if="status == 'pending'" kind="info" title="{{ t('plans.status.pending') }}" message="{{ t('plans.show.pending') }}"/>
@@ -15,79 +13,61 @@
     <div class="bs-plan-page__main">
       {# [explain:plans.show.template] #}
       <rx-card title="{{ t('plans.show.upcoming') }}">
-        {%- if upcoming %}
-        {{ month_calendar(month, events, today=today, label=t('plans.show.upcoming'), heading="h3", id="plan-calendar") }}
+        <template rx-if="upcoming">
+        <rx-month-calendar :month="month" :events="events" :today="today" :label="t('plans.show.upcoming')" heading="h3" id="plan-calendar"/>
         <ul class="rx-list bs-visits" id="upcoming-visits" data-bs-reveal>
-          {%- for row in upcoming %}
-          <li class="bs-visit" data-bs-visit="{{ row.visit.id }}">
+          <li rx-for="row in upcoming" class="bs-visit" data-bs-visit="{{ row.visit.id }}">
             <div class="bs-visit__when">
               <strong>{{ (row.day | date('%a %d %b')) if row.day else (row.visit.due_on | date('%a %d %b')) }}</strong>
-              <span class="rx-subtitle">{% if row.time %}{{ row.time }}{% endif %}{% if row.day and row.day != (row.visit.due_on | string) %} · {{ t('plans.show.due', day=(row.visit.due_on | date('%d %b'))) }}{% endif %}</span>
+              <span class="rx-subtitle"><template rx-if="row.time">{{ row.time }}</template><template rx-if="row.day and row.day != (row.visit.due_on | string)"> · {{ t('plans.show.due', day=(row.visit.due_on | date('%d %b'))) }}</template></span>
             </div>
-            <div class="bs-visit__status">{{ visit_status(row.status) }}</div>
-            {%- if row.changeable %}
-            <div class="bs-visit__actions">
+            <div class="bs-visit__status"><app-plans-visit-status :key="row.status"/></div>
+            <div rx-if="row.changeable" class="bs-visit__actions">
               <rx-action-sheet :id="'move-' ~ row.visit.id" label="{{ t('plans.show.move') }}" :action="route('plans.visits.move', row.visit.id)" title="{{ t('plans.show.move_title') }}" description="{{ t('plans.show.move_text') }}" size="small">
                 <rx-date-picker name="day" label="{{ t('plans.fields.day') }}" :disabled-dates="full" :closed-weekdays="closed" :value="row.day" :min="min_day" :max="max_day" required :id="'move-day-' ~ row.visit.id"/>
               </rx-action-sheet>
               <rx-confirm :id="'skip-' ~ row.visit.id" label="{{ t('plans.show.skip') }}" :action="route('plans.visits.skip', row.visit.id)" title="{{ t('plans.show.skip_title') }}" message="{{ t('plans.show.skip_text') }}" confirm-label="{{ t('plans.show.skip') }}" cancel-label="{{ t('plans.show.keep') }}" method="POST" size="small" :modal-icon="none"/>
             </div>
-            {%- endif %}
           </li>
-          {%- endfor %}
         </ul>
-        {%- else %}
-        <rx-empty title="{{ t('plans.show.no_upcoming') }}" message="{{ t('plans.show.no_upcoming_text') }}" icon="calendar"/>
-        {%- endif %}
+        </template>
+        <rx-empty rx-else title="{{ t('plans.show.no_upcoming') }}" message="{{ t('plans.show.no_upcoming_text') }}" icon="calendar"/>
       </rx-card>
       {# [/explain:plans.show.template] #}
-      {%- if past %}
-      <rx-card title="{{ t('plans.show.past') }}">
+      <rx-card rx-if="past" title="{{ t('plans.show.past') }}">
         <ul class="rx-list bs-visits">
-          {%- for row in past %}
-          <li class="bs-visit">
+          <li rx-for="row in past" class="bs-visit">
             <div class="bs-visit__when"><strong>{{ (row.day or row.visit.due_on) | date('%a %d %b %Y') }}</strong></div>
-            <div class="bs-visit__status">{{ visit_status(row.status) }}</div>
-            {%- if row.work_order_id and row.status == "done" %}<a class="rx-link" href="{{ route('workshop.service.show', row.work_order_id) }}">{{ t('plans.show.work_order', number=row.work_order_id) }}</a>{% endif %}
+            <div class="bs-visit__status"><app-plans-visit-status :key="row.status"/></div>
+            <a rx-if="row.work_order_id and row.status == 'done'" class="rx-link" href="{{ route('workshop.service.show', row.work_order_id) }}">{{ t('plans.show.work_order', number=row.work_order_id) }}</a>
           </li>
-          {%- endfor %}
         </ul>
       </rx-card>
-      {%- endif %}
     </div>
     <div class="bs-plan-page__side">
       <rx-card title="{{ t('plans.show.details') }}">
         <rx-infolist>
-          <rx-entry label="{{ t('plans.fields.status') }}">{{ status_badge(status) }}</rx-entry>
+          <rx-entry label="{{ t('plans.fields.status') }}"><app-plans-status :key="status"/></rx-entry>
           <rx-entry label="{{ t('plans.fields.plan') }}" :value="plan.name"/>
           <rx-entry label="{{ t('plans.fields.monthly') }}"><strong>{{ monthly | money(currency=monthly_currency) }}</strong> / {{ t('blocks.plans.month') }}</rx-entry>
           <rx-entry label="{{ t('plans.fields.store') }}" :value="store.name if store else none"/>
           <rx-entry label="{{ t('plans.fields.weekday') }}" :value="t('plans.weekday.' ~ ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][sub.preferred_weekday - 1])"/>
           <rx-entry label="{{ t('plans.fields.discount') }}" :value="discount ~ ' %'"/>
-          {%- if billing %}
+          <template rx-if="billing">
           <rx-entry label="{{ t('plans.fields.gateway') }}" :value="t('plans.pay_with.' ~ billing.gateway, rate=rate)"/>
-          {%- if billing.ends_at %}<rx-entry label="{{ t('plans.fields.ends') }}" :value="billing.ends_at" format="date"/>{% else %}<rx-entry label="{{ t('plans.fields.renews') }}" :value="billing.renews_on" format="date"/>{% endif %}
-          {%- else %}
-          <rx-entry label="{{ t('plans.fields.gateway') }}" :value="t('plans.pay_with.counter')"/>
-          {%- endif %}
+          <rx-entry rx-if="billing.ends_at" label="{{ t('plans.fields.ends') }}" :value="billing.ends_at" format="date"/>
+          <rx-entry rx-else label="{{ t('plans.fields.renews') }}" :value="billing.renews_on" format="date"/>
+          </template>
+          <rx-entry rx-else label="{{ t('plans.fields.gateway') }}" :value="t('plans.pay_with.counter')"/>
         </rx-infolist>
         <div class="bs-plan-actions">
-          {%- if status in ['active', 'held', 'paused'] and others %}
-          <rx-action-sheet id="swap-plan" label="{{ t('plans.show.swap') }}" :action="route('plans.swap', sub.id)" title="{{ t('plans.show.swap_title') }}" description="{{ t('plans.show.swap_text') }}" size="small">
+          <rx-action-sheet rx-if="status in ['active', 'held', 'paused'] and others" id="swap-plan" label="{{ t('plans.show.swap') }}" :action="route('plans.swap', sub.id)" title="{{ t('plans.show.swap_title') }}" description="{{ t('plans.show.swap_text') }}" size="small">
             <rx-select name="plan" label="{{ t('plans.fields.plan') }}" :options="others" required id="swap-plan-select"/>
           </rx-action-sheet>
-          {%- endif %}
-          {%- if status == "active" %}
-          <rx-form :action="route('plans.pause', sub.id)"><rx-button label="{{ t('plans.show.pause') }}" variant="secondary" size="small"/></rx-form>
-          {%- elif status == "paused" %}
-          <rx-form :action="route('plans.unpause', sub.id)"><rx-button label="{{ t('plans.show.unpause') }}" variant="primary" size="small"/></rx-form>
-          {%- endif %}
-          {%- if status == "ending" and billing and billing.can_resume %}
-          <rx-form :action="route('plans.resume', sub.id)"><rx-button label="{{ t('plans.show.resume') }}" variant="primary" size="small"/></rx-form>
-          {%- endif %}
-          {%- if status in ['active', 'held', 'paused', 'pending'] %}
-          <rx-confirm id="cancel-plan" label="{{ t('plans.show.cancel') }}" :action="route('plans.cancel', sub.id)" title="{{ t('plans.show.cancel_title') }}" :message="t('plans.show.cancel_text' if sub.gateway else 'plans.show.cancel_now_text')" confirm-label="{{ t('plans.show.cancel') }}" cancel-label="{{ t('plans.show.keep_plan') }}" method="POST" size="small"/>
-          {%- endif %}
+          <rx-form rx-if="status == 'active'" :action="route('plans.pause', sub.id)"><rx-button label="{{ t('plans.show.pause') }}" variant="secondary" size="small"/></rx-form>
+          <rx-form rx-elif="status == 'paused'" :action="route('plans.unpause', sub.id)"><rx-button label="{{ t('plans.show.unpause') }}" variant="primary" size="small"/></rx-form>
+          <rx-form rx-if="status == 'ending' and billing and billing.can_resume" :action="route('plans.resume', sub.id)"><rx-button label="{{ t('plans.show.resume') }}" variant="primary" size="small"/></rx-form>
+          <rx-confirm rx-if="status in ['active', 'held', 'paused', 'pending']" id="cancel-plan" label="{{ t('plans.show.cancel') }}" :action="route('plans.cancel', sub.id)" title="{{ t('plans.show.cancel_title') }}" :message="t('plans.show.cancel_text' if sub.gateway else 'plans.show.cancel_now_text')" confirm-label="{{ t('plans.show.cancel') }}" cancel-label="{{ t('plans.show.keep_plan') }}" method="POST" size="small"/>
         </div>
       </rx-card>
       <rx-card title="{{ t('plans.show.invoices') }}">
@@ -98,14 +78,12 @@
           <rx-slot name="empty"><p class="rx-subtitle">{{ t('plans.show.no_invoices') }}</p></rx-slot>
         </rx-table>
       </rx-card>
-      {%- if demo and status != "cancelled" %}
-      <rx-card title="{{ t('plans.demo.renew_title') }}" subtitle="{{ t('plans.demo.renew_text') }}">
+      <rx-card rx-if="demo and status != 'cancelled'" title="{{ t('plans.demo.renew_title') }}" subtitle="{{ t('plans.demo.renew_text') }}">
         <div class="bs-plan-actions">
           <rx-form :action="route('plans.demo.renew', sub.id)"><input type="hidden" name="outcome" value="paid"><rx-button label="{{ t('plans.demo.renew_paid') }}" variant="secondary" size="small"/></rx-form>
           <rx-form :action="route('plans.demo.renew', sub.id)"><input type="hidden" name="outcome" value="failed"><rx-button label="{{ t('plans.demo.renew_failed') }}" variant="plain" size="small"/></rx-form>
         </div>
       </rx-card>
-      {%- endif %}
     </div>
   </div>
 </rx-stack>

@@ -2,7 +2,7 @@
     checked live, beside the order's summary. A change of pickup / delivery
     or of the city asks for the `summary` block again (the delivery fee). -#}
 <rx-page layout="layouts/app.html" :title="t('sales.checkout.title') ~ ' · ' ~ t('shop.name')">
-  {% include "sales/_assets.html" %}
+  <app-sales-assets/>
   <rx-page-header title="{{ t('sales.checkout.title') }}" subtitle="{{ t('sales.checkout.lead', minutes=30) }}" :back="route('cart.show')" back-label="{{ t('sales.cart.title') }}"/>
 
   <div class="bs-checkout">
@@ -42,27 +42,25 @@
 
         <rx-wizard-step key="review" title="{{ t('sales.checkout.step.review') }}">
           <ul class="bs-checkout__lines" role="list">
-            {%- for line in cart.lines %}
-            <li><span>{{ line.quantity }} × {{ line.product.name }}{% if line.variant.size %} · {{ line.variant.size }}{% endif %}{% if line.variant.colour %} · {{ line.variant.colour }}{% endif %}</span><span class="rx-num">{{ line.total | money }}</span></li>
-            {%- endfor %}
+            <li rx-for="line in cart.lines"><span>{{ line.quantity }} × {{ line.product.name }}<template rx-if="line.variant.size"> · {{ line.variant.size }}</template><template rx-if="line.variant.colour"> · {{ line.variant.colour }}</template></span><span class="rx-num">{{ line.total | money }}</span></li>
           </ul>
           <rx-alert kind="info" message="{{ t('sales.checkout.next', minutes=30) }}"/>
         </rx-wizard-step>
       </rx-wizard>
     </rx-form>
 
-    {% block summary %}
+    <rx-block name="summary">
     <aside id="summary" class="rx-card bs-checkout__summary" aria-labelledby="summary-title" aria-live="polite">
       <h2 class="rx-card__title" id="summary-title">{{ t('sales.checkout.summary') }}</h2>
       <dl class="bs-totals">
         <div><dt>{{ t('sales.cart.items', count=cart.count) }}</dt><dd class="rx-num">{{ totals.subtotal | money }}</dd></div>
-        {%- if totals.discount > 0 %}<div><dt>{{ t('sales.checkout.plan_discount', percent=discount_percent) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>{% endif %}
-        <div><dt>{{ t('sales.checkout.delivery_fee') }}</dt><dd class="rx-num">{% if delivery %}{{ totals.delivery_fee | money }}{% else %}{{ t('sales.checkout.free_pickup') }}{% endif %}</dd></div>
+        <div rx-if="totals.discount > 0"><dt>{{ t('sales.checkout.plan_discount', percent=discount_percent) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>
+        <div><dt>{{ t('sales.checkout.delivery_fee') }}</dt><dd class="rx-num"><template rx-if="delivery">{{ totals.delivery_fee | money }}</template><template rx-else>{{ t('sales.checkout.free_pickup') }}</template></dd></div>
         <div class="bs-totals__total"><dt>{{ t('sales.checkout.total') }}</dt><dd class="rx-num">{{ totals.total | money }}</dd></div>
       </dl>
-      {%- if plan and totals.discount == 0 %}<p class="rx-hint">{{ t('sales.checkout.plan_note', percent=discount_percent) }}</p>{% endif %}
-      {%- if cart.store %}<p class="rx-hint">{{ t('sales.checkout.from_store', store=cart.store.name) }}</p>{% endif %}
+      <p rx-if="plan and totals.discount == 0" class="rx-hint">{{ t('sales.checkout.plan_note', percent=discount_percent) }}</p>
+      <p rx-if="cart.store" class="rx-hint">{{ t('sales.checkout.from_store', store=cart.store.name) }}</p>
     </aside>
-    {% endblock %}
+    </rx-block>
   </div>
 </rx-page>

@@ -317,17 +317,44 @@ async fn page_data(db: &Db, order: Order) -> Result<OrderPage> {
 /// `GET /orders/{order}` (`orders.show`): the order's status, lines,
 /// totals, payments and what happens next.
 pub async fn show(
-    State(db): State<Db>,
+    State(state): State<AppState>,
     session: Session,
     user: Option<AuthUser>,
     Path(id): Path<i64>,
 ) -> Result<View> {
-    let order = visible(&db, &session, user.as_deref(), id).await?;
-    let page = page_data(&db, order).await?;
+    let db = &state.db;
+    let order = visible(db, &session, user.as_deref(), id).await?;
+    let page = page_data(db, order).await?;
     let steps = steps(&page.view.order);
-    Ok(view("sales/orders/show.html", context! { page, steps }))
+    let progress = progress(&state, &steps);
+    Ok(view(
+        "sales/orders/show.html",
+        context! { page, steps, progress },
+    ))
 }
 // [/explain:orders.show.handler]
+
+/// The timeline (the `history` block takes these): the steps reached, with
+/// their words and a tone.
+fn progress(state: &AppState, steps: &[Step]) -> Vec<renox::serde_json::Value> {
+    let lang = state.current_lang();
+    steps
+        .iter()
+        .filter(|step| step.done)
+        .map(|step| {
+            let kind = match step.key {
+                "cancelled" => "error",
+                "refunded" => "info",
+                _ => "success",
+            };
+            json!({
+                "time": step.at,
+                "title": lang.t(&format!("sales.step.{}", step.key), &[]),
+                "kind": kind,
+            })
+        })
+        .collect()
+}
 
 // [explain:orders.invoice.handler]
 /// `GET /orders/{order}/invoice` (`orders.invoice`): the printable invoice

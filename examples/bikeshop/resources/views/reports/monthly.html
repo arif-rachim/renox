@@ -2,10 +2,10 @@
 {#- The monthly report (src/app/reports/monthly.rs): start a run for a month, follow the runs.
     The runs' list is a kit `widget` that reloads itself from `reports.monthly.runs` every
     three seconds while a run is going. -#}
-{% include "reports/_assets.html" %}
+<app-reports-assets/>
 <div class="rx-stack" data-bs-reveal>
   <rx-page-header :title="t('reports.monthly.title')" :subtitle="t('reports.monthly.lead')"/>
-  {% include "reports/_tabs.html" %}
+  <app-reports-tabs/>
   <div class="bs-monthly">
     {# [explain:reports.monthly.template] #}
     <rx-card :title="t('reports.monthly.run_title')" :subtitle="t('reports.monthly.run_lead', stores=(reach.stores | map(attribute='name') | join(', ')))">
@@ -16,7 +16,7 @@
     </rx-card>
     <rx-dashboard columns="1">
       <rx-widget :title="t('reports.monthly.runs')" :description="t('reports.monthly.runs_hint')" :url="route('reports.monthly.runs') if running else none" :poll="3 if running else none" id="monthly-runs">
-        {% include "reports/_runs.html" %}
+        <app-reports-runs :runs="runs"/>
       </rx-widget>
     </rx-dashboard>
     {# [/explain:reports.monthly.template] #}

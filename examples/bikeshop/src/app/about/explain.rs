@@ -57,7 +57,7 @@ pub fn entries() -> Vec<Explanation> {
                       `about_page(request.route, request.path)` template function the app \
                       registers, so no handler passes anything for it: the layouts ask \
                       for it themselves. From 1200 px it is docked beside the page \
-                      (`about/_dock.html`: sticky, scrolling on its own, folding to a \
+                      (`<app-about-dock>`: sticky, scrolling on its own, folding to a \
                       rail); below, the navbar's button opens the same content in the \
                       kit's `sheet`. The fold is a plain cookie the browser writes and an \
                       app layer (`explain::dock_layer`) reads into `renox::context`, so a \
@@ -101,9 +101,9 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/about/mod.rs",
                 "examples/bikeshop/src/explain.rs",
                 "examples/bikeshop/resources/views/about/pages.html",
-                "examples/bikeshop/resources/views/about/_explain.html",
-                "examples/bikeshop/resources/views/about/_dock.html",
-                "examples/bikeshop/resources/views/about/_panel.html",
+                "examples/bikeshop/resources/views/components/about_explain.html",
+                "examples/bikeshop/resources/views/components/about_dock.html",
+                "examples/bikeshop/resources/views/components/about_panel.html",
                 "examples/bikeshop/src/code.rs",
                 "examples/bikeshop/build.rs",
                 "examples/bikeshop/src/highlight.rs",
@@ -146,8 +146,8 @@ pub fn entries() -> Vec<Explanation> {
                     why: "The kit has no gallery, kanban or calendar. They were built in \
                       this example first, then moved to the `renox-blocks` crate, a \
                       plugin like renox-editors: the app adds `Blocks::new()` and a page \
-                      imports a block like a kit component \
-                      (`{% from \"renox-blocks/blocks.html\" import gallery %}`). The \
+                      uses a block like a kit component \
+                      (a tag such as `<rx-gallery …/>`). The \
                       macros use `rx-` classes on the kit's `--rx-*` tokens and call the \
                       kit's own macros (`sheet`, `date_picker`); a page loads a block's \
                       script only when it has that block. The date picker with closed \
@@ -215,7 +215,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/about/blocks.rs",
                 "examples/bikeshop/resources/views/about/blocks.html",
-                "examples/bikeshop/resources/views/about/_variant.html",
+                "examples/bikeshop/resources/views/components/about_variant.html",
                 "crates/renox-blocks/views/blocks.html",
                 "crates/renox-blocks/assets/blocks.js",
                 "crates/renox-blocks/assets/parts/gallery.js",
@@ -335,9 +335,9 @@ fn htmx_page() -> Explanation {
         sources: &[
             "examples/bikeshop/src/app/about/htmx.rs",
             "examples/bikeshop/resources/views/about/htmx.html",
-            "examples/bikeshop/resources/views/about/htmx/_row.html",
+            "examples/bikeshop/resources/views/components/about_htmx_row.html",
             "examples/bikeshop/resources/views/about/htmx/_answer.html",
-            "examples/bikeshop/resources/views/about/htmx/_bikes.html",
+            "examples/bikeshop/resources/views/components/about_htmx_bikes.html",
             "examples/bikeshop/tests/htmx.rs",
             "tests/browser/bikeshop-htmx.test.mjs",
         ],
@@ -518,7 +518,7 @@ fn fields_page() -> Explanation {
         sources: &[
             "examples/bikeshop/src/app/about/fields.rs",
             "examples/bikeshop/resources/views/about/fields.html",
-            "examples/bikeshop/resources/views/about/_fields_form.html",
+            "examples/bikeshop/resources/views/components/about_fields_form.html",
             "examples/bikeshop/migrations/20260109000100_create_field_samples_table.up.sql",
             "examples/bikeshop/migrations/20260109000100_create_field_samples_table.postgres.up.sql",
             "examples/bikeshop/tests/fields.rs",
@@ -646,7 +646,7 @@ fn field_sample_edit_page() -> Explanation {
         sources: &[
             "examples/bikeshop/src/app/about/fields.rs",
             "examples/bikeshop/resources/views/about/fields_edit.html",
-            "examples/bikeshop/resources/views/about/_fields_form.html",
+            "examples/bikeshop/resources/views/components/about_fields_form.html",
             "examples/bikeshop/tests/fields.rs",
         ],
         code: &[

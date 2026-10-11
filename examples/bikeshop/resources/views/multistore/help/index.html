@@ -2,39 +2,7 @@
     is a role in the helped store between two dates (assign_role_in(…).from(…).until(…)); it
     ends by itself. -#}
 <rx-page layout="layouts/staff.html" :title="t('multistore.help.title')">
-  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
-  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
-  {% from "multistore/_parts.html" import help_status %}
-  {% from "layouts/_text.html" import tx %}
-  {% macro rows(items, id, label) -%}
-  <rx-list :id="id" :label="label">
-    {%- for r in items %}
-    <li>
-      <div class="rx-list__main">
-        <strong>{{ r.helper }}</strong> · {{ tx(r.role_label) }} {{ help_status(r) }}
-        <p class="rx-subtitle">{{ t('multistore.help.from_to', from=r.from, to=r.to) }} · {{ r.starts_at | date("%d %b") }} – {{ (r.ends_at) | date("%d %b %Y") }}{% if r.minutes %} · {{ t('multistore.help.hours_done', hours=(r.minutes / 60) | round(1)) }}{% endif %}</p>
-        <p class="rx-subtitle">{{ r.reason }}</p>
-      </div>
-      {# [explain:multistore.help.template] #}
-      <rx-row-actions>
-        {%- if r.can_decide %}
-        <rx-form :action="route('multistore.help.refuse', r.id)"><rx-button :label="t('multistore.help.refuse')" variant="secondary" size="small"/></rx-form>
-        <rx-form :action="route('multistore.help.approve', r.id)" :id="'approve-' ~ r.id"><rx-button :label="t('multistore.help.approve')" variant="primary" size="small" icon="check"/></rx-form>
-        {%- endif %}
-        <rx-form rx-if="r.can_withdraw" :action="route('multistore.help.withdraw', r.id)"><rx-button :label="t('multistore.help.withdraw')" variant="secondary" size="small"/></rx-form>
-        <rx-action-sheet rx-if="r.can_log" :id="'hours-' ~ r.id" :label="t('multistore.help.log')" :action="route('multistore.help.log', r.id)" :title="t('multistore.help.log_title', name=r.helper)" :description="t('multistore.help.log_lead')" size="small" icon="calendar">
-          <rx-date-picker name="worked_on" :label="t('multistore.help.worked_on')" required/>
-          <rx-input name="hours" :label="t('multistore.help.hours')" type="number" required min="0.5" max="16" step="0.5"/>
-          <rx-input name="note" :label="t('multistore.help.note')"/>
-        </rx-action-sheet>
-        <rx-confirm rx-if="r.can_end" :id="'end-' ~ r.id" :label="t('multistore.help.end')" :action="route('multistore.help.end', r.id)" :title="t('multistore.help.end_title', name=r.helper)" :message="t('multistore.help.end_text', store=r.to)" method="POST" size="small"/>
-      </rx-row-actions>
-      {# [/explain:multistore.help.template] #}
-    </li>
-    {%- endfor %}
-  </rx-list>
-  {%- endmacro %}
-
+  <app-multistore-assets/>
   <rx-stack>
     <rx-page-header :title="t('multistore.help.title')" :subtitle="t('multistore.help.lead')">
       <rx-link-button route="multistore.help.hours" :label="t('multistore.help.hours_title')"/>
@@ -43,12 +11,14 @@
     <div class="bs-split" data-bs-reveal>
       <div>
         <rx-card :title="t('multistore.help.asked_of_us')" :subtitle="t('multistore.help.asked_of_us_lead')">
-          {%- if asked_of_us %}{{ rows(asked_of_us, "help-of-us", t('multistore.help.asked_of_us')) }}{% else %}<rx-empty :title="t('multistore.help.none')"/>{% endif %}
+          <app-multistore-help-rows rx-if="asked_of_us" :items="asked_of_us" id="help-of-us" :label="t('multistore.help.asked_of_us')"/>
+          <rx-empty rx-else :title="t('multistore.help.none')"/>
         </rx-card>
       </div>
       <div>
         <rx-card :title="t('multistore.help.asked_by_us')" :subtitle="t('multistore.help.asked_by_us_lead')">
-          {%- if asked_by_us %}{{ rows(asked_by_us, "help-by-us", t('multistore.help.asked_by_us')) }}{% else %}<rx-empty :title="t('multistore.help.none')"/>{% endif %}
+          <app-multistore-help-rows rx-if="asked_by_us" :items="asked_by_us" id="help-by-us" :label="t('multistore.help.asked_by_us')"/>
+          <rx-empty rx-else :title="t('multistore.help.none')"/>
         </rx-card>
       </div>
     </div>

@@ -228,3 +228,22 @@ async fn the_models_and_views_are_sound() {
     app.assert_models_match_schema().await;
     app.assert_views_compile();
 }
+
+/// The templates are written with tags only: no `{% ... %}` statement is left.
+#[test]
+fn the_templates_have_no_raw_statements() {
+    fn scan(dir: &std::path::Path, found: &mut Vec<String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                scan(&path, found);
+            } else if std::fs::read_to_string(&path).is_ok_and(|text| text.contains("{%")) {
+                found.push(path.display().to_string());
+            }
+        }
+    }
+    let views = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/views");
+    let mut found = Vec::new();
+    scan(&views, &mut found);
+    assert!(found.is_empty(), "raw {{% %}} statements in: {found:?}");
+}

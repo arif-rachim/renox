@@ -1,5 +1,5 @@
 //! The tree: tokens turned into nodes. Only components (`rx-*`, `app-*`) and elements carrying
-//! `rx-if` / `rx-else` / `rx-for` become `Element`s; every other tag stays inside `Text` spans, so
+//! `rx-if` / `rx-elif` / `rx-else` / `rx-for` (and a conditional `?attr`) become `Element`s; every other tag stays inside `Text` spans, so
 //! unbalanced HTML elsewhere is never touched.
 
 use std::ops::Range;
@@ -8,7 +8,7 @@ use super::CompileError;
 use super::scan::{Attr, Token};
 
 /// Elements that never have an end tag.
-const VOID: &[&str] = &[
+pub(super) const VOID: &[&str] = &[
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
     "wbr",
 ];
@@ -41,9 +41,9 @@ pub(crate) fn is_component(name: &str) -> bool {
 }
 
 fn has_flow(attrs: &[Attr<'_>]) -> bool {
-    attrs
-        .iter()
-        .any(|a| matches!(a.name, "rx-if" | "rx-else" | "rx-for"))
+    attrs.iter().any(|a| {
+        matches!(a.name, "rx-if" | "rx-elif" | "rx-else" | "rx-for") || a.name.starts_with('?')
+    })
 }
 
 struct Frame<'a> {
