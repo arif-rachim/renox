@@ -373,7 +373,7 @@ fn back_office() -> Vec<Explanation> {
                     region: "staff.stores.index.handler",
                 },
                 Code {
-                    title: "Template: a card per store with the kit's `infolist`",
+                    title: "Template: a card per store with the kit's `<rx-infolist>`",
                     region: "staff.stores.index.template",
                 },
             ],
@@ -445,7 +445,7 @@ fn back_office() -> Vec<Explanation> {
                     region: "staff.stores.edit.fee",
                 },
                 Code {
-                    title: "Template: the opening hours as the kit's `repeater`",
+                    title: "Template: the opening hours as the kit's `<rx-repeater>`",
                     region: "staff.stores.edit.template",
                 },
             ],
@@ -493,7 +493,7 @@ fn back_office() -> Vec<Explanation> {
                     region: "staff.team.index.handler",
                 },
                 Code {
-                    title: "Template: the kit's `table` with role badges",
+                    title: "Template: the kit's `<rx-table>` with role badges",
                     region: "staff.team.index.template",
                 },
             ],

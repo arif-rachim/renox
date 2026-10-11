@@ -4,21 +4,20 @@
     `App::share`, computed only on `/`). A tile's photo is the category's
     first product photo (public/images/products/{slug}-1.webp). -#}
 {%- if storefront %}
-{% from "renox/ui.html" import card_grid, media_card %}
-{% call push('head') %}<link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}">{% endcall %}
+<rx-push stack="head"><link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}"></rx-push>
 <section class="bs-section" aria-labelledby="featured-title">
   <div class="bs-section__head">
     <h2 class="bs-section__title" id="featured-title">{{ t('home.popular.title') }} <em>{{ t('home.popular.accent') }}</em></h2>
     <a class="bs-section__more" href="{{ route('catalog.category', 'bikes') }}">{{ t('catalog.home.all_bikes') }} →</a>
   </div>
   <div data-bs-reveal>
-  {% call card_grid() %}
+  <rx-card-grid>
     {%- for c in storefront.featured %}
-    {{ media_card(route('catalog.show', c.slug), c.name, image=c.photo, image_alt=c.photo_alt,
-                  subtitle=(t('catalog.price_from', price=(c.price_from | money)) if c.price_from is not none else none),
-                  note=([c.brand.name if c.brand else none, c.category.name if c.category else none] | select | join(" · "))) }}
+    <rx-media-card :href="route('catalog.show', c.slug)" :title="c.name" :image="c.photo" :image-alt="c.photo_alt"
+                   :subtitle="t('catalog.price_from', price=(c.price_from | money)) if c.price_from is not none else none"
+                   :note="[c.brand.name if c.brand else none, c.category.name if c.category else none] | select | join(' · ')"/>
     {%- endfor %}
-  {% endcall %}
+  </rx-card-grid>
   </div>
 </section>
 <section class="bs-section" aria-labelledby="categories-title">

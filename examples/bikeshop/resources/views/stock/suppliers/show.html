@@ -1,51 +1,51 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, infolist, entry, link_button, import_action, table, empty, list, badge %}
-{% from "stock/_parts.html" import styles, order_status %}
-{% block seo %}{{ seo(title=supplier.name) }}{% endblock %}
-
 {#- A supplier (#240): contact, their price list (renox::import's sheet loads it from a CSV),
     and the active store's orders with them. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack">
-  {# [explain:stock.suppliers.show.template] #}
-  {% call page_header(supplier.name, subtitle=t('stock.suppliers.lead_time', days=supplier.lead_days), back=route('stock.suppliers'), back_label=t('stock.suppliers.title')) %}
-    {{ link_button(route('stock.suppliers.edit', supplier.id), t('stock.suppliers.edit'), icon="edit") }}
-    {{ import_action("price-list", t('stock.import.button'), route('stock.suppliers.import', supplier.id), t('stock.import.title', supplier=supplier.name), description=t('stock.import.lead', rows=200), columns=columns, template_url=route('stock.suppliers.template')) }}
-    {{ link_button(route('stock.purchasing.create', supplier=supplier.id), t('stock.purchasing.new'), variant="primary", icon="plus") }}
-  {% endcall %}
-  {# [/explain:stock.suppliers.show.template] #}
-  <div class="bs-split" data-bs-reveal>
-    <div>
-      {% call card(title=t('stock.suppliers.price_list'), subtitle=t('stock.suppliers.price_list_lead')) %}
-        {%- if items.items %}
-        {% call table([t('stock.fields.product'), t('stock.fields.sku'), [t('stock.suppliers.their_cost'), "num"], [t('stock.suppliers.our_price'), "num"]], caption=t('stock.suppliers.price_list')) %}
-          {%- for i in items.items %}
-          <tr><td>{{ i.name }}</td><td>{{ i.sku }}</td><td class="rx-num">{{ i.item.cost | money }}</td><td class="rx-num">{{ i.price | money }}</td></tr>
-          {%- endfor %}
-        {% endcall %}
-        {% from "renox/pagination.html" import pagination %}{{ pagination(items) }}
-        {%- else %}{{ empty(t('stock.suppliers.no_items'), icon="package") }}{% endif %}
-      {% endcall %}
+<rx-page layout="layouts/staff.html" :title="supplier.name">
+  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
+  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+  {% from "renox/ui.html" import import_action %}
+  {% from "stock/_parts.html" import order_status %}
+  {% from "renox/pagination.html" import pagination %}
+  <rx-stack>
+    {# [explain:stock.suppliers.show.template] #}
+    <rx-page-header :title="supplier.name" :subtitle="t('stock.suppliers.lead_time', days=supplier.lead_days)" :back="route('stock.suppliers')" :back-label="t('stock.suppliers.title')">
+      <rx-link-button :href="route('stock.suppliers.edit', supplier.id)" :label="t('stock.suppliers.edit')" icon="edit"/>
+      {{ import_action("price-list", t('stock.import.button'), route('stock.suppliers.import', supplier.id), t('stock.import.title', supplier=supplier.name), description=t('stock.import.lead', rows=200), columns=columns, template_url=route('stock.suppliers.template')) }}
+      <rx-link-button :href="route('stock.purchasing.create', supplier=supplier.id)" :label="t('stock.purchasing.new')" variant="primary" icon="plus"/>
+    </rx-page-header>
+    {# [/explain:stock.suppliers.show.template] #}
+    <div class="bs-split" data-bs-reveal>
+      <div>
+        <rx-card :title="t('stock.suppliers.price_list')" :subtitle="t('stock.suppliers.price_list_lead')">
+          {%- if items.items %}
+          <rx-table :rows="items.items" as="i" :caption="t('stock.suppliers.price_list')">
+            <rx-column :label="t('stock.fields.product')">{{ i.name }}</rx-column>
+            <rx-column :label="t('stock.fields.sku')">{{ i.sku }}</rx-column>
+            <rx-column :label="t('stock.suppliers.their_cost')" align="num">{{ i.item.cost | money }}</rx-column>
+            <rx-column :label="t('stock.suppliers.our_price')" align="num">{{ i.price | money }}</rx-column>
+          </rx-table>
+          {{ pagination(items) }}
+          {%- else %}<rx-empty :title="t('stock.suppliers.no_items')" icon="package"/>{% endif %}
+        </rx-card>
+      </div>
+      <div>
+        <rx-card :title="t('stock.suppliers.contact')">
+          <rx-infolist>
+            <rx-entry :label="t('stock.suppliers.email')" :value="supplier.email" copyable/>
+            <rx-entry :label="t('stock.suppliers.phone')" :value="supplier.phone"/>
+            <rx-entry :label="t('stock.suppliers.lead_days')" :value="supplier.lead_days" format="number"/>
+          </rx-infolist>
+        </rx-card>
+        <rx-card :title="t('stock.suppliers.orders')">
+          {%- if orders %}
+          <rx-list id="supplier-orders" :label="t('stock.suppliers.orders')">
+            {%- for o in orders %}
+            <li><div class="rx-list__main"><a class="rx-link" href="{{ route('stock.purchasing.show', o.id) }}">PO-{{ o.id }}</a><p class="rx-subtitle">{{ o.total | money }}</p></div>{{ order_status(o.status) }}</li>
+            {%- endfor %}
+          </rx-list>
+          {%- else %}<rx-empty :title="t('stock.suppliers.no_orders')" icon="clipboard-list"/>{% endif %}
+        </rx-card>
+      </div>
     </div>
-    <div>
-      {% call card(title=t('stock.suppliers.contact')) %}
-        {% call infolist() %}
-          {{ entry(t('stock.suppliers.email'), supplier.email, copyable=true) }}
-          {{ entry(t('stock.suppliers.phone'), supplier.phone) }}
-          {{ entry(t('stock.suppliers.lead_days'), supplier.lead_days, format="number") }}
-        {% endcall %}
-      {% endcall %}
-      {% call card(title=t('stock.suppliers.orders')) %}
-        {%- if orders %}
-        {% call list(id="supplier-orders", label=t('stock.suppliers.orders')) %}
-          {%- for o in orders %}
-          <li><div class="rx-list__main"><a class="rx-link" href="{{ route('stock.purchasing.show', o.id) }}">PO-{{ o.id }}</a><p class="rx-subtitle">{{ o.total | money }}</p></div>{{ order_status(o.status) }}</li>
-          {%- endfor %}
-        {% endcall %}
-        {%- else %}{{ empty(t('stock.suppliers.no_orders'), icon="clipboard-list") }}{% endif %}
-      {% endcall %}
-    </div>
-  </div>
-</div>
-{% endblock %}
+  </rx-stack>
+</rx-page>

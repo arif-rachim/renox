@@ -1,50 +1,45 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, select, input, button, empty, list, confirm, form_grid, form_errors %}
-{% from "stock/_parts.html" import styles %}
-{% block seo %}{{ seo(title=t('stock.fleet.title')) }}{% endblock %}
-
 {#- Bikes between sale stock and the rental fleet (#240): a new bike joins the fleet (a
     to_fleet movement and a rental_bikes row, one transaction); a fleet bike is retired to be
     sold as used (a from_fleet movement on its own used variant). The owner store decides. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack">
-  {{ page_header(t('stock.fleet.title'), subtitle=t('stock.fleet.lead'), back=route('stock.index'), back_label=t('stock.index.title')) }}
-  <div class="bs-split" data-bs-reveal>
-    <div>
-      {% call card(title=t('stock.fleet.to_fleet'), subtitle=t('stock.fleet.to_fleet_lead')) %}
-        {%- if options %}
-        {# [explain:stock.fleet.template] #}
-        <form method="post" action="{{ route('stock.fleet.store') }}" id="to-fleet-form" novalidate>
-          {{ csrf_field() }}
-          {{ form_errors() }}
-          {{ select("level", t('stock.fleet.bike'), options, required=true, searchable=true) }}
-          {% call form_grid(2) %}
-            {{ input("frame_number", t('stock.fleet.frame'), required=true) }}
-            {{ input("deposit", t('stock.fleet.deposit'), type="number", required=true, attrs={"min": 0, "step": money_step}, prefix=money_symbol) }}
-            {{ input("hourly_rate", t('stock.fleet.hourly'), type="number", required=true, attrs={"min": 0, "step": money_step}, prefix=money_symbol) }}
-            {{ input("daily_rate", t('stock.fleet.daily'), type="number", required=true, attrs={"min": 0, "step": money_step}, prefix=money_symbol) }}
-          {% endcall %}
-          {{ button(t('stock.fleet.add'), icon="plus") }}
-        </form>
-        {# [/explain:stock.fleet.template] #}
-        {%- else %}{{ empty(t('stock.fleet.no_bikes_in_stock'), icon="bike") }}{% endif %}
-      {% endcall %}
+<rx-page layout="layouts/staff.html" :title="t('stock.fleet.title')">
+  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
+  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+  <rx-stack>
+    <rx-page-header :title="t('stock.fleet.title')" :subtitle="t('stock.fleet.lead')" :back="route('stock.index')" :back-label="t('stock.index.title')"/>
+    <div class="bs-split" data-bs-reveal>
+      <div>
+        <rx-card :title="t('stock.fleet.to_fleet')" :subtitle="t('stock.fleet.to_fleet_lead')">
+          {%- if options %}
+          {# [explain:stock.fleet.template] #}
+          <rx-form :action="route('stock.fleet.store')" id="to-fleet-form" novalidate>
+            <rx-form-errors/>
+            <rx-select name="level" :label="t('stock.fleet.bike')" :options="options" required searchable/>
+            <rx-form-grid columns="2">
+              <rx-input name="frame_number" :label="t('stock.fleet.frame')" required/>
+              <rx-input name="deposit" :label="t('stock.fleet.deposit')" type="number" required min="0" :step="money_step" :prefix="money_symbol"/>
+              <rx-input name="hourly_rate" :label="t('stock.fleet.hourly')" type="number" required min="0" :step="money_step" :prefix="money_symbol"/>
+              <rx-input name="daily_rate" :label="t('stock.fleet.daily')" type="number" required min="0" :step="money_step" :prefix="money_symbol"/>
+            </rx-form-grid>
+            <rx-button :label="t('stock.fleet.add')" icon="plus"/>
+          </rx-form>
+          {# [/explain:stock.fleet.template] #}
+          {%- else %}<rx-empty :title="t('stock.fleet.no_bikes_in_stock')" icon="bike"/>{% endif %}
+        </rx-card>
+      </div>
+      <div>
+        <rx-card :title="t('stock.fleet.retire')" :subtitle="t('stock.fleet.retire_lead')">
+          {%- if bikes %}
+          <rx-list id="fleet-bikes" :label="t('stock.fleet.retire')">
+            {%- for b in bikes %}
+            <li>
+              <div class="rx-list__main"><strong>{{ b.name }}</strong><p class="rx-subtitle">{{ b.bike.frame_number }} · {{ t('stock.fleet.book_value', value=(b.bike.asset_value | money)) }}</p></div>
+              <rx-confirm :id="'retire-' ~ b.bike.id" :label="t('stock.fleet.retire_one')" :action="route('stock.fleet.retire', b.bike.id)" :title="t('stock.fleet.retire_title', frame=b.bike.frame_number)" :message="t('stock.fleet.retire_text')" method="POST" size="small"/>
+            </li>
+            {%- endfor %}
+          </rx-list>
+          {%- else %}<rx-empty :title="t('stock.fleet.no_fleet')" icon="bike"/>{% endif %}
+        </rx-card>
+      </div>
     </div>
-    <div>
-      {% call card(title=t('stock.fleet.retire'), subtitle=t('stock.fleet.retire_lead')) %}
-        {%- if bikes %}
-        {% call list(id="fleet-bikes", label=t('stock.fleet.retire')) %}
-          {%- for b in bikes %}
-          <li>
-            <div class="rx-list__main"><strong>{{ b.name }}</strong><p class="rx-subtitle">{{ b.bike.frame_number }} · {{ t('stock.fleet.book_value', value=(b.bike.asset_value | money)) }}</p></div>
-            {{ confirm("retire-" ~ b.bike.id, t('stock.fleet.retire_one'), route('stock.fleet.retire', b.bike.id), t('stock.fleet.retire_title', frame=b.bike.frame_number), t('stock.fleet.retire_text'), method="POST", size="small") }}
-          </li>
-          {%- endfor %}
-        {% endcall %}
-        {%- else %}{{ empty(t('stock.fleet.no_fleet'), icon="bike") }}{% endif %}
-      {% endcall %}
-    </div>
-  </div>
-</div>
-{% endblock %}
+  </rx-stack>
+</rx-page>
