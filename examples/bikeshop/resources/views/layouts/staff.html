@@ -65,7 +65,7 @@
       {%- endif %}
     </rx-navbar>
     <main class="rx-shell__content" id="main">
-      {% if flash.status %}{% from "renox/ui.html" import alert %}{{ alert(flash.status, kind="success") }}{% endif %}
+      <rx-alert rx-if="flash.status" :message="flash.status" kind="success"/>
       {% block content %}{% endblock %}
     </main>
   </div>

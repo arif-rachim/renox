@@ -1,5 +1,4 @@
 {#- Small pieces the stock and multi-store pages share. -#}
-{% from "renox/ui.html" import badge %}
 
 {#- The pages' stylesheet (public/areas/stock.css), once. -#}
 {% macro styles() -%}
@@ -27,11 +26,11 @@
 {#- A shipment's status as a badge. -#}
 {% macro shipment_status(key) -%}
 {%- set tones = {"requested": "info", "approved": "info", "refused": none, "sent": "warning", "partly_received": "warning", "received": "success", "recall_requested": "warning", "recall_sent": "warning", "recalled": none, "draft": none} %}
-{{ badge(t('stock.consignments.status.' ~ key), kind=tones[key]) }}
+<rx-badge :kind="tones[key]">{{ t('stock.consignments.status.' ~ key) }}</rx-badge>
 {%- endmacro %}
 
 {#- A purchase order's status as a badge. -#}
 {% macro order_status(key) -%}
 {%- set tones = {"draft": none, "ordered": "info", "partial": "warning", "received": "success", "cancelled": none} %}
-{{ badge(t('stock.purchasing.status.' ~ key), kind=tones[key]) }}
+<rx-badge :kind="tones[key]">{{ t('stock.purchasing.status.' ~ key) }}</rx-badge>
 {%- endmacro %}

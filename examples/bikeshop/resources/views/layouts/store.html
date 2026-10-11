@@ -13,18 +13,17 @@
     served on every host, so the page looks like the shop. -#}
 {%- set about = about_page(request.route, request.path) if explain_panels else none %}
 <body class="rx-page bs-public{% if about %} bs-docked{% if about.rail %} bs-docked--rail{% endif %}{% endif %}">
-  {% from "renox/ui.html" import navbar, nav_links, nav_link, link_button, icon_button %}
   {#- The panel's link to the index of every page goes to the shop's host. -#}
   {%- set about_base = shop_url | trim("/") %}
-  {% call navbar(t('shop.name'), href=shop_url, mark=true, width="full") %}
-    {% call nav_links() %}
-      {{ nav_link(catalog_url, t('nav.shop')) }}
-      {{ nav_link(rent_url, t('rentals.nav.rent')) }}
-      {{ nav_link(service_url, t('workshop.nav.book')) }}
-    {% endcall %}
+  <rx-navbar :brand="t('shop.name')" :href="shop_url" mark width="full">
+    <rx-nav-links>
+      <rx-nav-link :href="catalog_url" :label="t('nav.shop')"/>
+      <rx-nav-link :href="rent_url" :label="t('rentals.nav.rent')"/>
+      <rx-nav-link :href="service_url" :label="t('workshop.nav.book')"/>
+    </rx-nav-links>
     <span class="rx-spacer"></span>
-    {%- if about %}{{ icon_button("info", t('about.button'), attrs={"data-rx-open": "about-page", "aria-haspopup": "dialog"}) }}{% endif %}
-  {% endcall %}
+    <rx-icon-button rx-if="about" icon="info" :label="t('about.button')" data-rx-open="about-page" aria-haspopup="dialog"/>
+  </rx-navbar>
   <main class="rx-container rx-container--wide" id="main">
     <div class="rx-stack">{% block content %}{% endblock %}</div>
   </main>

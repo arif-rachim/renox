@@ -1,64 +1,61 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, select, radio, checkbox_list, textarea, button, form_errors, empty, link_button, date_picker, icon %}
-{% from "workshop/_parts.html" import styles %}
-{% block seo %}{{ seo(title=t('workshop.book.title'), description=t('workshop.book.lead')) }}{% endblock %}
-
 {#- Book a service (#236). The form posts to `workshop.book.store`; while it
     changes, htmx asks this page again (hx-get with the form's values) and
     swaps the day picker (full days depend on the store and the minutes) and
     the estimate. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack">
-  {{ page_header(t('workshop.book.title'), subtitle=t('workshop.book.lead'), back=route('workshop.bikes'), back_label=t('workshop.bikes.title')) }}
-  {#- What the workshop does, each on a photo (decoration: the words say it). -#}
-  <ul class="bs-photo-cards" role="list" aria-label="{{ t('workshop.book.what.label') }}">
-    {%- for key, photo, sign in [["repair", "workshop-1", "wrench"], ["care", "wash", "droplets"], ["tune", "fitting", "gauge"]] %}
-    <li class="bs-photo-card">
-      <div class="bs-photo-card__photo"><img src="/images/site/{{ photo }}.webp" alt="" width="1200" height="900" loading="lazy"></div>
-      <div class="bs-photo-card__body">
-        <span class="bs-icon-circle">{{ icon(sign) }}</span>
-        <span><b>{{ t('workshop.book.what.' ~ key ~ '.title') }}</b><span>{{ t('workshop.book.what.' ~ key ~ '.text') }}</span></span>
+<rx-page layout="layouts/app.html" title="{{ t('workshop.book.title') }}" description="{{ t('workshop.book.lead') }}">
+  {% from "renox/ui.html" import icon %}
+  {% from "workshop/_parts.html" import styles %}
+  {{ styles() }}
+  <rx-stack>
+    <rx-page-header title="{{ t('workshop.book.title') }}" subtitle="{{ t('workshop.book.lead') }}" :back="route('workshop.bikes')" back-label="{{ t('workshop.bikes.title') }}"/>
+    {#- What the workshop does, each on a photo (decoration: the words say it). -#}
+    <ul class="bs-photo-cards" role="list" aria-label="{{ t('workshop.book.what.label') }}">
+      {%- for key, photo, sign in [["repair", "workshop-1", "wrench"], ["care", "wash", "droplets"], ["tune", "fitting", "gauge"]] %}
+      <li class="bs-photo-card">
+        <div class="bs-photo-card__photo"><img src="/images/site/{{ photo }}.webp" alt="" width="1200" height="900" loading="lazy"></div>
+        <div class="bs-photo-card__body">
+          <span class="bs-icon-circle">{{ icon(sign) }}</span>
+          <span><b>{{ t('workshop.book.what.' ~ key ~ '.title') }}</b><span>{{ t('workshop.book.what.' ~ key ~ '.text') }}</span></span>
+        </div>
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- if not bikes %}
+    <div class="rx-card"><rx-empty title="{{ t('workshop.book.no_bike') }}" message="{{ t('workshop.book.no_bike_text') }}" route="workshop.bikes" action-label="{{ t('workshop.bikes.add') }}" icon="bike"/></div>
+    {%- else %}
+    {# [explain:workshop.book.template] #}
+    <form method="post" action="{{ route('workshop.book.store') }}" id="book-form" novalidate
+          hx-get="{{ route('workshop.book') }}" hx-trigger="change" hx-select="#booking-live" hx-target="#booking-live" hx-swap="outerHTML">
+      {{ csrf_field() }}
+      <div class="bs-booking">
+        <rx-card>
+          <rx-form-errors/>
+          <rx-select name="bike" label="{{ t('workshop.fields.bike') }}" :options="bikes" :selected="bike" required/>
+          <rx-select name="store" label="{{ t('workshop.fields.store') }}" :options="stores" :selected="store_id" required/>
+          {%- set pk = namespace(list=[["none", t('workshop.book.no_package')]]) %}
+          {%- for p in packages %}{% set pk.list = pk.list + [[p, t('workshop.packages.' ~ p ~ '.name'), t('workshop.packages.' ~ p ~ '.text')]] %}{% endfor %}
+          <rx-radio name="package" label="{{ t('workshop.book.package') }}" :options="pk.list" :selected="package or 'none'"/>
+          <rx-checkbox-list name="tasks" label="{{ t('workshop.book.tasks') }}" :options="task_options" :selected="ticked" columns="2" hint="{{ t('workshop.book.tasks_hint') }}"/>
+          <rx-textarea name="note" label="{{ t('workshop.book.note') }}" rows="3" hint="{{ t('workshop.book.note_hint') }}"/>
+        </rx-card>
+        <div id="booking-live" class="bs-booking__summary rx-stack" aria-live="polite" data-bs-reveal>
+          <rx-card title="{{ t('workshop.book.when') }}">
+            <rx-date-picker name="day" label="{{ t('workshop.fields.day') }}" :disabled-dates="full" :closed-weekdays="closed" :value="day" :min="min_day" :max="max_day" required hint="{{ t('workshop.book.day_hint', minutes=capacity or 0) }}"/>
+          </rx-card>
+    {# [/explain:workshop.book.template] #}
+          <rx-card title="{{ t('workshop.book.estimate') }}">
+            {%- if chosen %}
+            <dl class="bs-lines">
+              {%- for task in chosen %}<dt>{{ task.name }} <small>{{ task.minutes }} min</small></dt><dd>{{ task.price | money }}</dd>{% endfor %}
+              <dt><strong>{{ t('workshop.book.total', minutes=estimate.minutes) }}</strong></dt><dd><strong>{{ estimate.price | money }}</strong></dd>
+            </dl>
+            <p class="rx-hint">{{ t('workshop.book.estimate_hint') }}</p>
+            {%- else %}<p class="rx-subtitle">{{ t('workshop.book.pick') }}</p>{% endif %}
+            <rx-button icon="calendar-check" block>{{ t('workshop.book.submit') }}</rx-button>
+          </rx-card>
+        </div>
       </div>
-    </li>
-    {%- endfor %}
-  </ul>
-  {%- if not bikes %}
-  <div class="rx-card">{{ empty(t('workshop.book.no_bike'), t('workshop.book.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add'), icon="bike") }}</div>
-  {%- else %}
-  {# [explain:workshop.book.template] #}
-  <form method="post" action="{{ route('workshop.book.store') }}" id="book-form" novalidate
-        hx-get="{{ route('workshop.book') }}" hx-trigger="change" hx-select="#booking-live" hx-target="#booking-live" hx-swap="outerHTML">
-    {{ csrf_field() }}
-    <div class="bs-booking">
-      {% call card() %}
-        {{ form_errors() }}
-        {{ select("bike", t('workshop.fields.bike'), bikes, selected=bike, required=true) }}
-        {{ select("store", t('workshop.fields.store'), stores, selected=store_id, required=true) }}
-        {%- set pk = namespace(list=[["none", t('workshop.book.no_package')]]) %}
-        {%- for p in packages %}{% set pk.list = pk.list + [[p, t('workshop.packages.' ~ p ~ '.name'), t('workshop.packages.' ~ p ~ '.text')]] %}{% endfor %}
-        {{ radio("package", t('workshop.book.package'), pk.list, selected=(package or "none")) }}
-        {{ checkbox_list("tasks", t('workshop.book.tasks'), task_options, selected=ticked, columns=2, hint=t('workshop.book.tasks_hint')) }}
-        {{ textarea("note", t('workshop.book.note'), rows=3, hint=t('workshop.book.note_hint')) }}
-      {% endcall %}
-      <div id="booking-live" class="bs-booking__summary rx-stack" aria-live="polite" data-bs-reveal>
-        {% call card(title=t('workshop.book.when')) %}
-          {{ date_picker("day", t('workshop.fields.day'), disabled_dates=full, closed_weekdays=closed, value=day, min=min_day, max=max_day, required=true, hint=t('workshop.book.day_hint', minutes=capacity or 0)) }}
-        {% endcall %}
-  {# [/explain:workshop.book.template] #}
-        {% call card(title=t('workshop.book.estimate')) %}
-          {%- if chosen %}
-          <dl class="bs-lines">
-            {%- for task in chosen %}<dt>{{ task.name }} <small>{{ task.minutes }} min</small></dt><dd>{{ task.price | money }}</dd>{% endfor %}
-            <dt><strong>{{ t('workshop.book.total', minutes=estimate.minutes) }}</strong></dt><dd><strong>{{ estimate.price | money }}</strong></dd>
-          </dl>
-          <p class="rx-hint">{{ t('workshop.book.estimate_hint') }}</p>
-          {%- else %}<p class="rx-subtitle">{{ t('workshop.book.pick') }}</p>{% endif %}
-          {{ button(t('workshop.book.submit'), icon="calendar-check", block=true) }}
-        {% endcall %}
-      </div>
-    </div>
-  </form>
-  {%- endif %}
-</div>
-{% endblock %}
+    </form>
+    {%- endif %}
+  </rx-stack>
+</rx-page>

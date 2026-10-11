@@ -2,7 +2,7 @@
     /search, so Enter always works; while typing, htmx asks
     `catalog.suggest` for the best matches and shows them under the box.
     public/catalog/catalog.js adds the arrow keys and Escape. -#}
-{% call push('head') %}<link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}">{% endcall %}
+<rx-push stack="head"><link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}"></rx-push>
 <form class="bs-search" id="nav-search-form" role="search" method="get" action="{{ route('catalog.search') }}" data-bs-search>
   <label class="rx-visually-hidden" for="nav-search">{{ t('catalog.search.label') }}</label>
   <input class="rx-input bs-search__input" id="nav-search" type="search" name="q" autocomplete="off"

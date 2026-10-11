@@ -87,7 +87,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "workshop.bikes.form",
                 },
                 Code {
-                    title: "Template: a multipart form on the kit's `form_grid`",
+                    title: "Template: a multipart form on the kit's `<rx-form-grid>`",
                     region: "workshop.bikes.template",
                 },
             ],
@@ -320,7 +320,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "workshop.service.show.handler",
                 },
                 Code {
-                    title: "Template: pay, move the day in an `action_sheet`, or cancel",
+                    title: "Template: pay, move the day in an `<rx-action-sheet>`, or cancel",
                     region: "workshop.service.show.template",
                 },
             ],
@@ -504,7 +504,7 @@ pub fn entries() -> Vec<Explanation> {
             ],
             code: &[
                 Code {
-                    title: "Template: a known customer from a searchable select, or a new one",
+                    title: "Template: a known customer from a searchable `<rx-select>`, or a new one",
                     region: "workshop.walkin.template",
                 },
                 Code {
@@ -603,7 +603,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "workshop.order.part",
                 },
                 Code {
-                    title: "Template: the parts, with a searchable select fed by the server",
+                    title: "Template: the parts, with a searchable `<rx-select>` fed by the server",
                     region: "workshop.order.template",
                 },
             ],

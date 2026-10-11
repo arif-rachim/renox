@@ -1351,3 +1351,102 @@ async fn rx_sidebar_and_shell_match_the_macros() {
     )
     .await;
 }
+
+/// #383: `view:check` on page structs registered with `App::view_data` / `Registry::view_data`.
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "suppliers.html")]
+struct SupplierList {
+    suppliers: Vec<String>,
+    #[serde(rename = "total")]
+    count: usize,
+}
+
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "reports.html")]
+struct Reports {
+    rows: Vec<String>,
+}
+
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "gone.html")]
+struct Gone {}
+
+struct Typed;
+
+impl Module for Typed {
+    fn name(&self) -> &'static str {
+        "typed"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+    }
+
+    fn register(&self, registry: &mut Registry) {
+        registry.view_data::<Reports>();
+    }
+}
+
+fn view_check_problems(app: &TestApp) -> String {
+    let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        app.assert_views_compile();
+    }));
+    match failed {
+        Ok(_) => String::new(),
+        Err(panic) => panic.downcast_ref::<String>().cloned().unwrap_or_default(),
+    }
+}
+
+#[renox::test]
+async fn view_check_reports_variables_a_typed_page_lacks() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    // Fields, request globals, environment functions, a shared key, names the template
+    // defines, and a typo inside a component's body (checked after the rx-* compilation).
+    write(
+        "suppliers.html",
+        "<h1>{{ app.name }} {{ total }} {{ brand }}</h1>\n\
+         {% set shown = 1 %}{{ shown }}{{ csrf_field() }}{{ t('Suppliers') }}{{ auth.check }}\n\
+         {% for s in suppliers %}{{ loop.index }} {{ s | upper }}{% endfor %}{{ range(2) }}\n\
+         <rx-card title=\"Suppliers\">\n{{ suplliers }} {{ old('q') }}\n</rx-card>\n",
+    );
+    write(
+        "reports.html",
+        "{% for r in rows %}{{ r }}{% endfor %}{{ row_count }}",
+    );
+    // Not registered: nothing is checked against a struct.
+    write("loose.html", "{{ anything }}");
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new()
+            .module(Typed)
+            .view_data::<SupplierList>()
+            .view_data::<SupplierList>()
+            .share("brand", |_ctx| async { Ok("Velo") }),
+        move |c| c.views_path = path,
+    )
+    .await;
+    let message = view_check_problems(&app);
+    assert!(message.starts_with("2 template problem(s)"), "{message}");
+    assert!(
+        message.contains("suppliers.html:5: \"suplliers\" isn't a field of SupplierList"),
+        "{message}"
+    );
+    assert!(
+        message.contains("reports.html:1: \"row_count\" isn't a field of Reports"),
+        "{message}"
+    );
+}
+
+#[renox::test]
+async fn view_check_reports_a_typed_page_without_its_template() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().view_data::<Gone>(), move |c| c.views_path = path).await;
+    let message = view_check_problems(&app);
+    assert!(
+        message.contains("gone.html: not found, but Gone renders it"),
+        "{message}"
+    );
+}

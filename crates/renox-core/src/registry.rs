@@ -41,6 +41,7 @@ pub struct Registry {
     /// Seeders for `db:seed`: the app's (`App::seeder`), then the modules'.
     pub(crate) seeders: Vec<Seeder>,
     pub(crate) models: Vec<crate::db::schema::ModelInfo>,
+    pub(crate) view_data: Vec<crate::view::TypedView>,
 }
 
 /// A seeder registered with `App::seeder` or `Registry::seeder`.
@@ -62,6 +63,28 @@ impl Registry {
         let info = crate::db::schema::model_info::<M>();
         if !self.models.iter().any(|m| m.type_id == info.type_id) {
             self.models.push(info);
+        }
+        self
+    }
+
+    /// Tells `view:check` about a page struct ([`crate::ViewData`]), so the variables
+    /// its template uses that the struct lacks are reported. Registering it twice keeps
+    /// one.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// #[derive(serde::Serialize, ViewData)]
+    /// #[view(template = "reports/index.html")]
+    /// struct Reports { rows: Vec<String> }
+    ///
+    /// fn register(registry: &mut Registry) {
+    ///     registry.view_data::<Reports>();
+    /// }
+    /// ```
+    pub fn view_data<T: crate::ViewData>(&mut self) -> &mut Self {
+        let typed = crate::view::TypedView::of::<T>();
+        if !self.view_data.contains(&typed) {
+            self.view_data.push(typed);
         }
         self
     }

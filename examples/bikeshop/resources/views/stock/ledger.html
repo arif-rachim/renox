@@ -1,69 +1,60 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, infolist, entry, list, badge, table, empty, action_sheet, input, alert %}
-{% from "stock/_parts.html" import styles %}
-{% block seo %}{{ seo(title=t('stock.ledger.title', name=label)) }}{% endblock %}
-
 {#- One stock level and its ledger (#240): every movement that made the number, newest first,
     each linked to the document that caused it; what each store may do with these goods. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack" data-bs-reveal>
-  {% call page_header(label, subtitle=variant.sku, back=route('stock.index'), back_label=t('stock.index.title'), badge=(t('stock.ledger.consigned') if consigned else none), badge_kind="info") %}
-    {%- if can_write_off %}
-    {% call action_sheet("write-off", t('stock.ledger.write_off'), route('stock.write_off', level.id), t('stock.ledger.write_off'), description=t('stock.ledger.write_off_lead', owner=owner), danger=true, icon="trash") %}
-      {{ input("quantity", t('stock.fields.quantity'), type="number", required=true, attrs={"min": 1, "max": level.on_hand}) }}
-      {{ input("reason", t('stock.fields.reason'), required=true) }}
-    {% endcall %}
-    {%- endif %}
-  {% endcall %}
-  {%- if consigned %}{{ alert(t('stock.ledger.consigned_text', owner=owner, location=location), kind="info") }}{% endif %}
-  <div class="bs-split">
-    <div>
-      {% call card(title=t('stock.ledger.movements')) %}
-        {%- if movements.items %}
-        {% call table([t('stock.fields.when'), t('stock.fields.reason'), [t('stock.fields.change'), "num"], [t('stock.fields.after'), "num"], t('stock.fields.source'), t('stock.fields.by')], caption=t('stock.ledger.movements')) %}
-          {%- for m in movements.items %}
-          <tr>
-            <td>{{ m.created_at | date("%Y-%m-%d %H:%M") }}</td>
-            <td>{{ t('stock.reason.' ~ m.reason) }}{% if m.note %}<br><span class="rx-subtitle">{{ m.note }}</span>{% endif %}</td>
-            <td class="rx-num">{% set change %}{% if m.quantity > 0 %}+{% endif %}{{ m.quantity }}{% endset %}{% if m.reason in ["reserved", "released"] %}<span class="rx-subtitle">{{ change }}</span>{% else %}{{ change }}{% endif %}</td>
-            <td class="rx-num">{{ m.after }}</td>
-            <td>{% if m.source %}<a class="rx-link" href="{{ m.source[1] }}">{{ m.source[0] }}</a>{% else %}—{% endif %}</td>
-            <td>{{ m.by or "—" }}</td>
-          </tr>
-          {%- endfor %}
-        {% endcall %}
-        {% from "renox/pagination.html" import pagination %}{{ pagination(movements) }}
-        {%- else %}{{ empty(t('stock.ledger.empty'), icon="history") }}{% endif %}
-      {% endcall %}
+<rx-page layout="layouts/staff.html" :title="t('stock.ledger.title', name=label)">
+  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
+  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+  {% from "renox/pagination.html" import pagination %}
+  <rx-stack data-bs-reveal>
+    <rx-page-header :title="label" :subtitle="variant.sku" :back="route('stock.index')" :back-label="t('stock.index.title')" :badge="t('stock.ledger.consigned') if consigned else none" badge-kind="info">
+      <rx-action-sheet rx-if="can_write_off" id="write-off" :label="t('stock.ledger.write_off')" :action="route('stock.write_off', level.id)" :title="t('stock.ledger.write_off')" :description="t('stock.ledger.write_off_lead', owner=owner)" danger icon="trash">
+        <rx-input name="quantity" :label="t('stock.fields.quantity')" type="number" required min="1" :max="level.on_hand"/>
+        <rx-input name="reason" :label="t('stock.fields.reason')" required/>
+      </rx-action-sheet>
+    </rx-page-header>
+    <rx-alert rx-if="consigned" :message="t('stock.ledger.consigned_text', owner=owner, location=location)" kind="info"/>
+    <div class="bs-split">
+      <div>
+        <rx-card :title="t('stock.ledger.movements')">
+          {%- if movements.items %}
+          <rx-table :rows="movements.items" as="m" :caption="t('stock.ledger.movements')">
+            <rx-column :label="t('stock.fields.when')">{{ m.created_at | date("%Y-%m-%d %H:%M") }}</rx-column>
+            <rx-column :label="t('stock.fields.reason')">{{ t('stock.reason.' ~ m.reason) }}{% if m.note %}<br><span class="rx-subtitle">{{ m.note }}</span>{% endif %}</rx-column>
+            <rx-column :label="t('stock.fields.change')" align="num">{% set change %}{% if m.quantity > 0 %}+{% endif %}{{ m.quantity }}{% endset %}{% if m.reason in ["reserved", "released"] %}<span class="rx-subtitle">{{ change }}</span>{% else %}{{ change }}{% endif %}</rx-column>
+            <rx-column :label="t('stock.fields.after')" align="num">{{ m.after }}</rx-column>
+            <rx-column :label="t('stock.fields.source')">{% if m.source %}<a class="rx-link" href="{{ m.source[1] }}">{{ m.source[0] }}</a>{% else %}—{% endif %}</rx-column>
+            <rx-column :label="t('stock.fields.by')">{{ m.by or "—" }}</rx-column>
+          </rx-table>
+          {{ pagination(movements) }}
+          {%- else %}<rx-empty :title="t('stock.ledger.empty')" icon="history"/>{% endif %}
+        </rx-card>
+      </div>
+      <div>
+        <rx-card :title="t('stock.ledger.level')">
+          <rx-infolist>
+            <rx-entry :label="t('stock.fields.owner_store')" :value="(owner)" :hint="t('stock.ledger.owner_hint')"/>
+            <rx-entry :label="t('stock.fields.location_store')" :value="location" :hint="t('stock.ledger.location_hint')"/>
+            <rx-entry :label="t('stock.fields.on_hand')" :value="level.on_hand" format="number"/>
+            <rx-entry :label="t('stock.fields.reserved')" :value="level.reserved" format="number"/>
+            <rx-entry :label="t('stock.fields.available')" :value="available" format="number"/>
+            <rx-entry :label="t('stock.fields.reorder_level')" :value="variant.reorder_level" format="number"/>
+            <rx-entry :label="t('stock.fields.cost')" :value="variant.cost" format="money"/>
+            <rx-entry :label="t('stock.fields.value')" :value="value" format="money"/>
+          </rx-infolist>
+        </rx-card>
+        <rx-card :title="t('stock.abilities.title')" :subtitle="t('stock.abilities.lead')">
+          <rx-list id="abilities" :label="t('stock.abilities.title')">
+            {%- for a in abilities %}
+            <li>
+              <div class="rx-list__main">
+                <strong>{{ t(a.action) }}</strong>
+                <p class="rx-subtitle">{{ t('stock.abilities.checked_in', store=a.store, attribute=t('stock.fields.' ~ a.attribute)) }} · <code>{{ a.permission }}</code></p>
+              </div>
+              <rx-badge :kind="'success' if a.allowed else none">{{ t('stock.abilities.yes') if a.allowed else t('stock.abilities.no') }}</rx-badge>
+            </li>
+            {%- endfor %}
+          </rx-list>
+        </rx-card>
+      </div>
     </div>
-    <div>
-      {% call card(title=t('stock.ledger.level')) %}
-        {% call infolist() %}
-          {{ entry(t('stock.fields.owner_store'), owner, hint=t('stock.ledger.owner_hint')) }}
-          {{ entry(t('stock.fields.location_store'), location, hint=t('stock.ledger.location_hint')) }}
-          {{ entry(t('stock.fields.on_hand'), level.on_hand, format="number") }}
-          {{ entry(t('stock.fields.reserved'), level.reserved, format="number") }}
-          {{ entry(t('stock.fields.available'), available, format="number") }}
-          {{ entry(t('stock.fields.reorder_level'), variant.reorder_level, format="number") }}
-          {{ entry(t('stock.fields.cost'), variant.cost, format="money") }}
-          {{ entry(t('stock.fields.value'), value, format="money") }}
-        {% endcall %}
-      {% endcall %}
-      {% call card(title=t('stock.abilities.title'), subtitle=t('stock.abilities.lead')) %}
-        {% call list(id="abilities", label=t('stock.abilities.title')) %}
-          {%- for a in abilities %}
-          <li>
-            <div class="rx-list__main">
-              <strong>{{ t(a.action) }}</strong>
-              <p class="rx-subtitle">{{ t('stock.abilities.checked_in', store=a.store, attribute=t('stock.fields.' ~ a.attribute)) }} · <code>{{ a.permission }}</code></p>
-            </div>
-            {{ badge(t('stock.abilities.yes') if a.allowed else t('stock.abilities.no'), kind="success" if a.allowed else none) }}
-          </li>
-          {%- endfor %}
-        {% endcall %}
-      {% endcall %}
-    </div>
-  </div>
-</div>
-{% endblock %}
+  </rx-stack>
+</rx-page>

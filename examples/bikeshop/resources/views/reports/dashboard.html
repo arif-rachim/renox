@@ -1,12 +1,10 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import link_tabs, menu, menu_link, table %}
+<rx-page layout="layouts/staff.html" :title="t('reports.dashboard.title')">
+{% from "renox/ui.html" import table %}
 {% from "layouts/_avatar.html" import avatar %}
-{% block seo %}{{ seo(title=t('reports.dashboard.title')) }}{% endblock %}
 
 {#- The reports dashboard (src/app/reports/dashboard.rs): the period, books or work, the store;
     figures in the kit's `stats`, charts and lists in the kit's `dashboard` of `widget`s (a CSS
     grid: one column on phones). Everything here comes from `n` (src/app/reports/numbers.rs). -#}
-{% block content %}
 {% include "reports/_assets.html" %}
 <div class="rx-stack" data-bs-reveal>
   <rx-page-header :title="t('reports.dashboard.title')" :subtitle="t('reports.dashboard.lead_store', store=store_name) if store_name else t('reports.dashboard.lead')">
@@ -16,15 +14,11 @@
 
   <div class="bs-report-controls">
     <rx-period-filter :selected="period" :options="periods" :label="t('reports.period.label')"/>
-    {{ link_tabs([[query_with(by="work"), t('reports.by.work')], [query_with(by="books"), t('reports.by.books')]], current=query_with(by=by), label=t('reports.by.label')) }}
-    {%- if reach.stores | length > 1 %}
-    {% call menu(store_name or t('reports.all_stores'), id="report-store") %}
-      {{ menu_link(query_with(store=none), t('reports.all_stores')) }}
-      {%- for s in reach.stores %}
-      {{ menu_link(query_with(store=s.id), s.name) }}
-      {%- endfor %}
-    {% endcall %}
-    {%- endif %}
+    <rx-link-tabs :items="[[query_with(by='work'), t('reports.by.work')], [query_with(by='books'), t('reports.by.books')]]" :current="query_with(by=by)" :label="t('reports.by.label')"/>
+    <rx-menu rx-if="reach.stores | length > 1" :label="store_name or t('reports.all_stores')" id="report-store">
+      <rx-menu-link :href="query_with(store=none)" :label="t('reports.all_stores')"/>
+      <rx-menu-link rx-for="s in reach.stores" :href="query_with(store=s.id)" :label="s.name"/>
+    </rx-menu>
   </div>
   <p class="rx-subtitle">{{ t('reports.by.hint_' ~ by) }}</p>
 
@@ -139,4 +133,4 @@
     {%- endif %}
   </rx-dashboard>
 </div>
-{% endblock %}
+</rx-page>

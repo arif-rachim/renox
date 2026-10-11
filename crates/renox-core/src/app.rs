@@ -63,7 +63,7 @@ Commands:
   schedule:run <task>       Run one scheduled task now
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   route:list                List every route with its name, module and guards
-  view:check                Compile every template and check its route names
+  view:check                Compile every template; check route names and typed views
   view:data [--out P]       Write .vscode/renox-components.json for editor autocomplete
   db:shell                  Run SQL against the database (`.tables`, `.quit`)
   down [--secret S] [--retry N]
@@ -359,6 +359,23 @@ impl App {
         self
     }
 
+    /// Registers a page struct for `view:check`, which then reports the variables its
+    /// template uses that the struct lacks; see [`crate::ViewData`]. Registering it twice
+    /// keeps one.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// #[derive(serde::Serialize, ViewData)]
+    /// #[view(template = "suppliers/index.html")]
+    /// struct SupplierList { suppliers: Vec<String> }
+    ///
+    /// let app = App::new().view_data::<SupplierList>();
+    /// ```
+    pub fn view_data<T: crate::ViewData>(mut self) -> Self {
+        self.registry.view_data::<T>();
+        self
+    }
+
     /// Registers the live component `C` (see `renox::live_component`).
     pub fn live_component<C: crate::live_component::LiveComponent>(mut self) -> Self {
         self.registry.live_component::<C>();
@@ -586,6 +603,7 @@ impl App {
             provided: mut module_provided,
             seeders,
             models,
+            view_data,
         } = self.registry;
         // The app's own `App::provide` values win over the modules'.
         module_provided.extend(self.provided);
@@ -778,6 +796,10 @@ impl App {
             Arc::new(components.iter().map(|c| c.contract()).collect()),
             zone,
             versions,
+        )
+        .with_typed(
+            view_data,
+            shares.iter().map(|(key, _)| key.clone()).collect(),
         );
         let mut security = crate::security::Security::new(&config, &self.csp, &listing);
         security.xsrf_cookie = self.xsrf_cookie;

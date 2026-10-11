@@ -117,7 +117,7 @@ def main():
     # 3. A list page.
     write(mod_rs, "\n".join(module_lines(mod_rs)) + "\n" + block_after("below the `pub mod model;` line"))
     write(index_html, block_after("Replace `resources/views/bookmarks/index.html`:"))
-    nav = block_after("links inside the `navbar` call, before the spacer:").splitlines()
+    nav = block_after("links inside the `rx-navbar` tag, before the spacer:").splitlines()
     links = nav[1:nav.index(next(l for l in nav if "rx-spacer" in l))]
     layout = "resources/views/layouts/app.html"
     spacer = '    <span class="rx-spacer"></span>'
@@ -134,13 +134,10 @@ def main():
     if not old:
         fail("4: the module has no `.resource(\"/bookmarks\", …)` line to replace")
     write(mod_rs, text.replace(old.group(0), resource, 1))
-    import_line = block_after("import line, and put the form between").strip()
-    text = read(index_html)
-    write(index_html, re.sub(r'^\{% from "renox/ui.html" import [^\n]*%\}', import_line, text, count=1, flags=re.M))
-    form = block_after("import line, and put the form between", nth=1)
-    header = re.search(r"^ *\{\{ page_header\([^\n]*\n", read(index_html), re.M)
+    form = block_after("put the form between the `<rx-page-header>`")
+    header = re.search(r"^ *<rx-page-header [^\n]*/>\n", read(index_html), re.M)
     if not header:
-        fail("4: index.html has no page_header line to put the form under")
+        fail("4: index.html has no <rx-page-header/> line to put the form under")
     edit(index_html, header.group(0),
          header.group(0) + "\n" + "".join("  " + l + "\n" if l else "\n" for l in form.rstrip("\n").split("\n")), "4")
 
@@ -149,12 +146,9 @@ def main():
     write("src/app/bookmarks/policy.rs", block_after("Fill in `src/app/bookmarks/policy.rs`:"))
     write(mod_rs, "\n".join(module_lines(mod_rs)) + "\n" + block_after("Here is `src/app/bookmarks/mod.rs` with every action."))
     write("resources/views/bookmarks/edit.html", block_after("errors come back:"))
+    row = block_after("give each row its buttons. Replace the `<li>`:").rstrip("\n").split("\n")
     text = read(index_html)
-    write(index_html, re.sub(r'^(\{% from "renox/ui.html" import [^\n]*?) %\}',
-                             r"\1, row_actions, link_button, confirm %}", text, count=1, flags=re.M))
-    row = block_after("the import line, and replace the `<li>`:").rstrip("\n").split("\n")
-    text = read(index_html)
-    li = re.search(r"^( *)<li>\n.*?^ *</li>", text, re.M | re.S)
+    li = re.search(r"^( *)<li [^\n]*>\n.*?^ *</li>", text, re.M | re.S)
     if not li:
         fail("5: index.html has no <li> to replace")
     indent = li.group(1)

@@ -1,16 +1,15 @@
 {#- Small pieces the rental pages share. -#}
-{% from "renox/ui.html" import badge %}
 
 {#- The page's stylesheet (public/areas/rentals.css), once, through the layout's head stack. -#}
 {% macro styles() -%}
-{% call push('head', once='rentals-css') %}<link rel="stylesheet" href="{{ asset('areas/rentals.css') }}">{% endcall %}
+<rx-push stack="head" once="rentals-css"><link rel="stylesheet" href="{{ asset('areas/rentals.css') }}"></rx-push>
 {%- endmacro %}
 
 {#- A rental's status as a badge: the tone and the word agree. -#}
 {% macro status(rental, overdue=false) -%}
 {%- set tones = {"reserved": "info", "active": "success", "overdue": "error", "returned": none, "cancelled": none, "no_show": "warning"} %}
 {%- set key = "overdue" if overdue and rental.status == "active" else rental.status %}
-{{ badge(t('rentals.status.rental.' ~ key), kind=tones[key]) }}
+<rx-badge text="{{ t('rentals.status.rental.' ~ key) }}" :kind="tones[key]"/>
 {%- endmacro %}
 
 {#- One rental in a list (`row` is a RentalRow): the bike and its status on

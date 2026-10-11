@@ -407,9 +407,34 @@ export class Page {
     }[key] || { code: `Key${key.toUpperCase()}`, keyCode: key.toUpperCase().charCodeAt(0), text: key };
     const modifiers = shift ? 8 : 0;
     const base = { key, code: named.code, windowsVirtualKeyCode: named.keyCode, modifiers };
-    await this.send('Input.dispatchKeyEvent', { type: named.text ? 'keyDown' : 'rawKeyDown', ...base, text: named.text });
-    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
-    await sleep(30);
+    // #327's family for keys: now and then the page never sees the key
+    // (CI, a tab that is not in front). So check a `keydown` arrived; if not,
+    // bring the tab to the front and send it again (three tries, then say so).
+    for (let attempt = 1; ; attempt++) {
+      await this.eval((k) => {
+        window.__cdpKey = false;
+        window.addEventListener('keydown', () => (window.__cdpKey = true), { once: true, capture: true });
+      }, key);
+      await this.send('Input.dispatchKeyEvent', { type: named.text ? 'keyDown' : 'rawKeyDown', ...base, text: named.text });
+      await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+      await sleep(30);
+      let arrived = false;
+      for (let wait = 0; wait < 5 && !arrived; wait++) {
+        try {
+          arrived = (await this.eval(() => window.__cdpKey)) !== false;
+        } catch {
+          arrived = true; // the page navigated away
+        }
+        if (!arrived) await sleep(30);
+      }
+      if (arrived) return;
+      if (attempt >= 3) {
+        process.stderr.write(`cdp: the ${key} key never reached the page\n`);
+        return;
+      }
+      await this.send('Page.bringToFront');
+      await sleep(100 * attempt);
+    }
   }
 
   /** Text of the first match (trimmed), or null. */

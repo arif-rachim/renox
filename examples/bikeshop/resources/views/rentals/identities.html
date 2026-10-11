@@ -1,31 +1,27 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, list, empty, link_button, button, action_sheet, textarea %}
-{% block seo %}{{ seo(title=t('rentals.identities.title')) }}{% endblock %}
-
 {#- ID checks waiting (#235): each photo opens through a signed link that works for five minutes. -#}
-{% block content %}
-<div class="rx-stack" data-bs-reveal>
-  {{ page_header(t('rentals.identities.title'), subtitle=t('rentals.identities.lead')) }}
-  {%- if waiting %}
-  {# [explain:rentals.identities.template] #}
-  {% call list(id="identities", label=t('rentals.identities.title')) %}
-    {%- for w in waiting %}
-    <li>
-      <div class="rx-list__main">
-        <strong>{{ w.customer.name if w.customer else "?" }}</strong>
-        <p class="rx-subtitle">{{ w.masked or "" }} · {{ w.store or "" }} · {{ w.document.submitted_at | since }}</p>
-      </div>
-      {{ link_button(route('rentals.identities.photo', w.document.id), t('rentals.identities.open_photo'), size="small", new_tab=true) }}
-      <form method="post" action="{{ route('rentals.identities.approve', w.document.id) }}">{{ csrf_field() }}{{ button(t('rentals.identities.approve'), size="small", icon="check") }}</form>
-      {% call action_sheet("refuse-" ~ w.document.id, t('rentals.identities.refuse'), route('rentals.identities.refuse', w.document.id), t('rentals.identities.refuse_title'), size="small", danger=true) %}
-        {{ textarea("note", t('rentals.identities.note'), rows=3, required=true, id="refuse-note-" ~ w.document.id) }}
-      {% endcall %}
-    </li>
-    {%- endfor %}
-  {% endcall %}
-  {# [/explain:rentals.identities.template] #}
-  {%- else %}
-  <div class="rx-card">{{ empty(t('rentals.identities.none'), t('rentals.identities.none_text'), icon="id-card") }}</div>
-  {%- endif %}
-</div>
-{% endblock %}
+<rx-page layout="layouts/staff.html" title="{{ t('rentals.identities.title') }}">
+  <rx-stack data-bs-reveal>
+    <rx-page-header title="{{ t('rentals.identities.title') }}" subtitle="{{ t('rentals.identities.lead') }}"/>
+    {%- if waiting %}
+    {# [explain:rentals.identities.template] #}
+    <rx-list id="identities" label="{{ t('rentals.identities.title') }}">
+      {%- for w in waiting %}
+      <li>
+        <div class="rx-list__main">
+          <strong>{{ w.customer.name if w.customer else "?" }}</strong>
+          <p class="rx-subtitle">{{ w.masked or "" }} · {{ w.store or "" }} · {{ w.document.submitted_at | since }}</p>
+        </div>
+        <rx-link-button :href="route('rentals.identities.photo', w.document.id)" label="{{ t('rentals.identities.open_photo') }}" size="small" new-tab/>
+        <form method="post" action="{{ route('rentals.identities.approve', w.document.id) }}">{{ csrf_field() }}<rx-button size="small" icon="check">{{ t('rentals.identities.approve') }}</rx-button></form>
+        <rx-action-sheet id="refuse-{{ w.document.id }}" label="{{ t('rentals.identities.refuse') }}" :action="route('rentals.identities.refuse', w.document.id)" title="{{ t('rentals.identities.refuse_title') }}" size="small" danger>
+          <rx-textarea name="note" label="{{ t('rentals.identities.note') }}" rows="3" required id="refuse-note-{{ w.document.id }}"/>
+        </rx-action-sheet>
+      </li>
+      {%- endfor %}
+    </rx-list>
+    {# [/explain:rentals.identities.template] #}
+    {%- else %}
+    <div class="rx-card"><rx-empty title="{{ t('rentals.identities.none') }}" message="{{ t('rentals.identities.none_text') }}" icon="id-card"/></div>
+    {%- endif %}
+  </rx-stack>
+</rx-page>

@@ -69,8 +69,24 @@ async function openPanel(page, title, parts = ENGLISH) {
 /** Closes the sheet with Esc (a docked panel stays). */
 async function closePanel(page, docked) {
   if (docked) return;
-  await page.press('Escape');
-  await page.waitFor(() => !document.querySelector('#about-page').open, { message: 'Esc closes it' });
+  // Esc goes to the sheet; if a tab that just navigated swallowed it (#327's
+  // family), say what the page looked like and press it again.
+  for (let attempt = 1; ; attempt++) {
+    await page.press('Escape');
+    try {
+      await page.waitFor(() => !document.querySelector('#about-page').open, { timeout: 2000, message: 'Esc closes it' });
+      return;
+    } catch (error) {
+      const state = await page.eval(() => ({
+        focused: document.hasFocus(),
+        active: document.activeElement?.outerHTML.slice(0, 100),
+        visibility: document.visibilityState,
+      }));
+      process.stderr.write(`Esc did not close the sheet (try ${attempt}): ${JSON.stringify(state)}\n`);
+      if (attempt >= 3) throw error;
+      await page.send('Page.bringToFront');
+    }
+  }
 }
 
 for (const csp of ['relaxed', 'strict']) {

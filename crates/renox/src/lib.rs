@@ -28,7 +28,7 @@
 
 pub use renox_core::*;
 pub use renox_macros::{
-    DbEnum, FromRow, Model, Validate, embedded, live_component, migrations, test,
+    DbEnum, FromRow, Model, Validate, ViewData, embedded, live_component, migrations, test,
 };
 
 pub use axum;
@@ -48,11 +48,11 @@ pub mod prelude {
     pub use renox_core::{
         App, AppState, Back, Config, Environment, Error, Errors, Htmx, HxRedirect, HxRefresh,
         HxTrigger, Module, Resource, Result, Routes, Session, Toast, Valid, Validate,
-        ValidationError, Validator, View, context, view,
+        ValidationError, Validator, View, ViewData, context, view,
     };
     pub use renox_core::{AuthUser, ClientIp, KeyValues, Lang, Policy, Registry, Upload};
     pub use renox_core::{RedirectExt, abort, abort_if, abort_unless};
-    pub use renox_macros::{DbEnum, FromRow, Model, Validate};
+    pub use renox_macros::{DbEnum, FromRow, Model, Validate, ViewData};
 
     pub use axum::extract::{Form, Json, Query, State};
     pub use axum::http::StatusCode;
@@ -189,6 +189,20 @@ pub struct CheatSheet;
 /// # use renox::prelude::*;
 /// #[derive(serde::Deserialize, Validate)]
 /// struct Ok { #[validate(required, max = 10, same("again", &self.again))] name: String, again: String }
+/// ```
+///
+/// A `ViewData` page names its template:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(serde::Serialize, ViewData)]
+/// struct NoTemplate { title: String }
+/// ```
+/// …which this one does:
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(serde::Serialize, ViewData)]
+/// #[view(template = "page.html")]
+/// struct WithTemplate { title: String }
 /// ```
 ///
 /// `Validate` is derived for structs with named fields only:

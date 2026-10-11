@@ -1,10 +1,8 @@
-{% extends "layouts/app.html" %}
 {#- /about/blocks: every block working, with its macro's signature
     (src/app/about/blocks.rs builds the demo data). The blocks come from the
     renox-blocks crate (renox-blocks/blocks.html, docs/blocks.md). -#}
-{% from "renox/ui.html" import page_header, card, input, button, link_button, alert, form_errors %}
+<rx-page layout="layouts/app.html" :title="t('blocks.page.title')" :description="t('blocks.page.lead')">
 {% from "renox-blocks/blocks.html" import gallery, range_slider, quantity, keypad, kanban, month_calendar, availability, datetime_range, swatches, history, compare_plans %}
-{% block seo %}{{ seo(title=t('blocks.page.title'), description=t('blocks.page.lead')) }}{% endblock %}
 
 {%- macro signature(text) -%}
 <details class="bs-showcase__details">
@@ -13,9 +11,8 @@
 </details>
 {%- endmacro -%}
 
-{% block content %}
 <div class="rx-stack bs-showcase" data-bs-reveal>
-  {{ page_header(t('blocks.page.title'), subtitle=t('blocks.page.lead')) }}
+  <rx-page-header :title="t('blocks.page.title')" :subtitle="t('blocks.page.lead')"/>
 
   <nav aria-label="{{ t('blocks.page.contents') }}">
     <ul class="bs-showcase__toc" role="list">
@@ -26,21 +23,20 @@
   </nav>
 
   <div id="gallery">
-  {% call card("gallery", subtitle=t('blocks.page.gallery')) %}
+  <rx-card title="gallery" :subtitle="t('blocks.page.gallery')">
     <div class="bs-showcase__demo">
       {{ gallery(photos, id="demo-gallery", label="City 3") }}
       {{ signature('gallery(photos, id="rx-gallery", label=none, enlarge=true)
   photos: [{src, alt, thumb?, large?, caption?}]') }}
     </div>
-  {% endcall %}
+  </rx-card>
   </div>
 
   {# [explain:about.blocks.template] #}
   <div id="form">
-  {% call card(t('blocks.page.form_title'), subtitle=t('blocks.page.form_lead')) %}
-    <form class="rx-stack" method="post" action="{{ route('about.blocks.submit') }}" id="blocks-form">
-      {{ csrf_field() }}
-      {{ form_errors() }}
+  <rx-card :title="t('blocks.page.form_title')" :subtitle="t('blocks.page.form_lead')">
+    <rx-form class="rx-stack" route="about.blocks.submit" id="blocks-form">
+      <rx-form-errors/>
       <div class="bs-showcase__pair">
         <div class="bs-showcase__demo">
           {{ quantity("quantity", 1, min=1, max=5, label="Bikes") }}
@@ -49,7 +45,7 @@
          hide_label=false, attrs={}, hint=none, id=none, bag=none)') }}
         </div>
         <div class="bs-showcase__demo">
-          {{ input("paid", t('blocks.page.paid'), attrs={"inputmode": "numeric", "maxlength": "9", "autocomplete": "off"}, required=true) }}
+          <rx-input name="paid" :label="t('blocks.page.paid')" inputmode="numeric" maxlength="9" autocomplete="off" required/>
           {{ keypad("rx-paid", enter_label=t('blocks.page.send')) }}
           <p class="rx-hint">{{ t('blocks.page.keypad') }}</p>
           {{ signature('keypad(target, label=none, decimal=false, zeros=true, enter_label=none)') }}
@@ -75,71 +71,71 @@
   options: [{value, label, note?, color?, disabled?}]') }}
         </div>
       </div>
-      <div>{{ button(t('blocks.page.send')) }}</div>
-    </form>
-  {% endcall %}
+      <div><rx-button :label="t('blocks.page.send')"/></div>
+    </rx-form>
+  </rx-card>
   </div>
 
   <div id="filter">
-  {% call card(t('blocks.page.filter_title'), subtitle=t('blocks.page.filter_lead')) %}
-    <form class="rx-stack" method="get" action="{{ route('about.blocks') }}#filter">
+  <rx-card :title="t('blocks.page.filter_title')" :subtitle="t('blocks.page.filter_lead')">
+    <rx-form class="rx-stack" method="GET" :action="route('about.blocks') ~ '#filter'">
       {{ range_slider("price_min", "price_max", price_min, price_max, step=25000,
                       value_min=price_filter.low if price_filter else 100000, value_max=price_filter.high if price_filter else 500000,
                       label="Price", format="money") }}
-      <div>{{ button(t('blocks.page.filter'), variant="secondary") }}</div>
-    </form>
+      <div><rx-button :label="t('blocks.page.filter')" variant="secondary"/></div>
+    </rx-form>
     {%- if price_filter %}<p class="rx-subtitle" data-bs-filtering>{{ t('blocks.page.filtering', low=price_filter.low | money, high=price_filter.high | money) }}</p>{% endif %}
     <p class="rx-hint">{{ t('blocks.page.range') }}</p>
     {{ signature('range_slider(name_min, name_max, min, max, step=1, value_min=none, value_max=none,
              label=none, format=none, prefix=none, suffix=none, hint=none, id=none, bag=none)') }}
-  {% endcall %}
+  </rx-card>
   </div>
 
   <div id="kanban">
-  {% call card("kanban", subtitle=t('blocks.page.kanban')) %}
+  <rx-card title="kanban" :subtitle="t('blocks.page.kanban')">
     {{ kanban("workshop-board", columns, url=route('about.blocks.move'), label="Workshop jobs") }}
     {{ signature('kanban(id, columns, url, label=none, values={})
   columns: [{key, title, cards: [{id, title, subtitle?, badge?, badge_kind?, url?}]}]
 kanban_card(card)') }}
-  {% endcall %}
+  </rx-card>
   </div>
 
   {#- The calendar's arrows load the next month into this section only
       (hx-boost with hx-select), keeping the address in step. -#}
   <div id="calendar" hx-boost="true" hx-select="#calendar" hx-target="#calendar" hx-swap="outerHTML">
-  {% call card("month_calendar", subtitle=t('blocks.page.calendar')) %}
+  <rx-card title="month_calendar" :subtitle="t('blocks.page.calendar')">
     {{ month_calendar(month, events, url=route('about.blocks'), today=today, label="Service visits", heading="h3") }}
     {{ signature('month_calendar(month, events=[], url=none, param="month", today=none,
                first_day=1, label=none, heading="h2", id=none)
   events: [{date, title, time?, url?, kind?}]') }}
-  {% endcall %}
+  </rx-card>
   </div>
 
   <div id="availability">
-  {% call card("availability", subtitle=t('blocks.page.availability')) %}
-    {%- if slot %}{{ alert(t('blocks.page.booked', slot=slot), kind="info") }}{% endif %}
+  <rx-card title="availability" :subtitle="t('blocks.page.availability')">
+    <rx-alert rx-if="slot" :message="t('blocks.page.booked', slot=slot)" kind="info"/>
     {{ availability(hours, rows, label="Bikes free today", corner="Bike") }}
     {{ signature('availability(columns, rows, label=none, corner=none, id="rx-availability")
   rows: [{label, note?, slots: [{state, span?, title?, url?, action?, fields?}]}]') }}
-  {% endcall %}
+  </rx-card>
   </div>
 
   <div id="history">
-  {% call card("history", subtitle=t('blocks.page.history')) %}
+  <rx-card title="history" :subtitle="t('blocks.page.history')">
     {{ history(timeline, label="Service history of City 3", date_format="%H:%M") }}
     {{ signature('history(items, label=none, date_format="%Y-%m-%d %H:%M", id=none)
   items: [{time, title, body?, kind?, by?, when?}]') }}
-  {% endcall %}
+  </rx-card>
   </div>
 
   <div id="plans">
-  {% call card("compare_plans", subtitle=t('blocks.page.plans')) %}
+  <rx-card title="compare_plans" :subtitle="t('blocks.page.plans')">
     {{ compare_plans(plans, features, highlight="rider", label="Service plans") }}
     {{ signature('compare_plans(plans, features=[], highlight=none, highlight_label=none,
               label=none, table=true, id="rx-plans")
   plans: [{key, name, price, interval?, description?, perks?, url?, cta?, price_label?}]
   features: [{label, values: {plan key: true | false | text}}]') }}
-  {% endcall %}
+  </rx-card>
   </div>
 </div>
-{% endblock %}
+</rx-page>

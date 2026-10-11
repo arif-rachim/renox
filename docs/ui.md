@@ -26,6 +26,8 @@ full reload.
 
 - [Components](#components-see-the-request): your own reusable pieces, which can see the
   request (old input, errors, translations).
+- [Typed view contexts](#typed-view-contexts): a struct per page, checked against its
+  template by `view:check`.
 - [Components as tags](#components-as-tags): the kit written as `<rx-…>` HTML tags.
   Includes [editor autocomplete](#editor-autocomplete) for VS Code.
 - [The UI kit](#the-ui-kit) that ships with Renox (`renox/ui.html`):
@@ -114,7 +116,55 @@ The first line imports the macro. The second calls it, with the field's name and
 
 `rnx view:check` (or `app.assert_views_compile()` in a test) compiles every template and checks
 each literal `route('name')` against the route table, printing `template:line: message` per
-problem. See [the testing guide](testing.md#templates).
+problem. It also checks [typed view contexts](#typed-view-contexts). See
+[the testing guide](testing.md#templates).
+
+### Typed view contexts
+
+`view("x.html", context! { … })` hands the template whatever the map holds: a field renamed in
+the handler, or a typo in the template, only shows as an empty spot on the page. A **typed view
+context** is a struct for one page instead. It names its template, its fields are the
+template's variables, and `view:check` reports a variable the template uses that the struct
+lacks:
+
+```rust
+use renox::prelude::*;
+
+/// What `suppliers/index.html` gets.
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "suppliers/index.html")]
+struct SupplierList {
+    suppliers: Vec<String>,
+    #[serde(rename = "total")] // the template says `total`
+    count: usize,
+}
+
+async fn index() -> View {
+    let suppliers = vec!["Velo Parts".to_owned()];
+    // The template comes from the type.
+    View::typed(SupplierList { count: suppliers.len(), suppliers })
+}
+
+fn app() -> App {
+    // Registered, so `view:check` connects the template to the struct.
+    // In a module: `app.view_data::<SupplierList>()` in `register`.
+    App::new().view_data::<SupplierList>()
+}
+```
+
+With `{{ suplliers }}` in the template, `rnx view:check` prints
+`suppliers/index.html:4: "suplliers" isn't a field of SupplierList`. Besides the fields
+(their serialized names: `#[serde(rename)]` counts, `skip` fields don't), a template may use
+the request globals (`auth`, `request`, `t()`, `old()`…), every function and global of the
+environment (`route()`, `asset()`, your `App::templates` ones), the `App::share` keys, and
+the names it sets itself (`{% set %}`, loop variables, imports). `View::typed(page)` returns
+a normal `View`: `.fragment(…)`, `.also(…)` and `.status(…)` work as before.
+
+What the check can't see: it reads the page's own template as MiniJinja loads it (after the
+`<rx-…>` tags are compiled), so it doesn't follow `{% extends %}`, `{% include %}` or
+imported macros. A variable used only in the layout or a partial isn't checked, and a struct
+that isn't registered isn't checked at all. `#[serde(flatten)]` and `rename_all` are
+compile errors, since the derive couldn't list the names the template sees.
 
 ### Only once per page
 
@@ -167,7 +217,40 @@ Add the kit's stylesheet and script to the layout, and the toast region to the b
 
 ### A first form
 
-Then import what a page needs:
+You write the kit's components as `<rx-…>` tags, with nothing to import:
+
+```html
+<rx-form route="products.store" live novalidate>
+  <rx-card title="New product">
+    <rx-form-errors/>
+    <rx-input name="name" label="Name" required hint="Shown on the product list."/>
+    <rx-select name="size" label="Size" :options="[['s', 'Small'], ['m', 'Medium']]" selected="m"/>
+    <rx-checkbox name="featured" label="Feature it on the home page" switch/>
+    <div class="rx-card__footer">
+      <rx-link-button route="products.index" label="Cancel" variant="plain"/>
+      <rx-button label="Create product"/>
+    </div>
+  </rx-card>
+</rx-form>
+```
+
+What this page shows:
+
+- a card titled "New product";
+- a summary of errors at the top (only after a failed submit);
+- a name field with a hint under it, a size choice, and an on/off switch;
+- a Cancel link and a "Create product" button at the bottom.
+
+Each field comes with its label, its hint and its error message. You don't write that HTML
+yourself. `<rx-form>` writes the CSRF field (and the `_method` field) for you, and `live` turns
+on live validation.
+
+Every tag is compiled into a call of a kit macro when the template loads (see
+[Components as tags](#components-as-tags)). The same form, written as macros, which still work
+and mix with tags in one file:
+
+<details>
+<summary>The same form as macros</summary>
 
 ```html
 {% from "renox/ui.html" import card, input, select, checkbox, button, link_button, form_errors %}
@@ -186,24 +269,19 @@ Then import what a page needs:
 </form>
 ```
 
-What this page shows:
-
-- a card titled "New product";
-- a summary of errors at the top (only after a failed submit);
-- a name field with a hint under it, a size choice, and an on/off switch;
-- a Cancel link and a "Create product" button at the bottom.
-
-Each field comes with its label, its hint and its error message. You don't write that HTML
-yourself.
+</details>
 
 > [!TIP]
-> `{% call card(…) %} … {% endcall %}` passes everything between the two tags into the
-> component. The card puts it inside itself. Many kit components work this way.
+> A tag's content goes inside the component: the card puts what is between `<rx-card>` and
+> `</rx-card>` inside itself. In the macro form this is `{% call card(…) %} … {% endcall %}`.
+> Many kit components work this way.
 
 ### Form fields
 
-Here is every form field. The arguments with `=…` are optional: leave them out and the
-field uses a sensible default.
+Here is every form field, by its macro signature. Each is also a tag, `<rx-input name label …>`
+(the macro's name with `rx-` in front and dashes for underscores; the arguments become
+attributes). The arguments with `=…` are optional: leave them out and the field uses a
+sensible default.
 
 | Component | What it is |
 |---|---|
@@ -241,6 +319,24 @@ a radio group, too.
 Here are fields side by side, and a group with a title:
 
 ```html
+<rx-form-grid columns="2">
+  <rx-input name="price" label="Price" type="number" prefix="$" required step="0.01"/>
+  <rx-input name="weight" label="Weight" type="number" suffix="kg"/>
+  <rx-input name="city" label="City" :datalist="['Jakarta', 'Bandung', 'Surabaya']" span="full"/>
+</rx-form-grid>
+<rx-fieldset legend="Delivery">
+  <rx-radio name="speed" label="Speed" required selected="regular"
+            :options="[['regular', 'Regular', '2–3 days'], ['express', 'Express', 'Tomorrow']]"/>
+  <rx-checkbox-list name="extras" label="Extras" :options="[['gift', 'Gift wrap'], ['note', 'Card']]" inline/>
+</rx-fieldset>
+```
+
+The same, as macros:
+
+<details>
+<summary>Macro form</summary>
+
+```html
 {% from "renox/ui.html" import input, radio, checkbox_list, form_grid, fieldset %}
 {% call form_grid(2) %}
   {{ input("price", "Price", type="number", prefix="$", required=true, attrs={"step": "0.01"}) }}
@@ -254,13 +350,16 @@ Here are fields side by side, and a group with a title:
 {% endcall %}
 ```
 
+</details>
+
 Price and weight sit next to each other. City takes the whole row (`span="full"`) and
 suggests three cities. Below, a "Delivery" group asks for a speed (one choice) and extras
 (any number).
 
-The same fields as tags, for pages that use components (`name` and `label` are required;
-names with an underscore use a dash, so `current_name` is `current-name`; lists and other values
-are given with a colon, `:options="…"`):
+These fields as tags (`name` and `label` are required; names with an underscore use a dash, so
+`current_name` is `current-name`; lists and other values are given with a colon,
+`:options="…"`). `<rx-input>`, `<rx-textarea>`, `<rx-select>` and `<rx-checkbox>` follow the
+same rule, so the table lists the ones that take lists and dates:
 
 | Tag | Macro |
 |---|---|
@@ -492,7 +591,11 @@ When the full days come from the database, check them in the form's `after` hook
 
 ### Buttons, surfaces and other parts
 
-The rest of the kit's everyday components:
+The rest of the kit's everyday components. A page uses them as tags, for example
+`<rx-button label="Save" icon="check"/>`, `<rx-link-button route="products.index" label="Back"/>`,
+`<rx-alert kind="warning" message="Low stock"/>` or `<rx-empty title="No products yet"/>`;
+the table shows the macros the tags compile to, and the tag's attributes are the macro's
+arguments.
 
 | Component | What it is |
 |---|---|
@@ -567,6 +670,27 @@ renox-blocks for what the kit lacks. [examples/hello](../examples/hello) has a n
 A navigation bar on top looks like this:
 
 ```html
+<rx-navbar brand="{{ app.name }}" href="{{ route('home') }}" width="wide">
+  <rx-nav-links>
+    <rx-nav-link route="products.index" label="Products" :active="route_is('products.*')"/>
+    <rx-nav-link route="cart.show" label="Cart" :active="route_is('cart.*')" :badge="cart_count"/>
+  </rx-nav-links>
+  {# rx-spacer pushes what follows to the right end of the bar #}
+  <span class="rx-spacer"></span>
+  <rx-menu label="{{ auth.user.name }}" id="account-menu" variant="plain">
+    <rx-menu-link route="account.show" label="Account"/>
+    <rx-menu-action route="logout" label="Log out"/>
+  </rx-menu>
+</rx-navbar>
+<main class="rx-container rx-container--wide" id="main">…</main>
+```
+
+The same bar as macros:
+
+<details>
+<summary>Macro form</summary>
+
+```html
 <body class="rx-page">
   {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, link_button %}
   {% call navbar(app.name, href=route('home'), width="wide") %}
@@ -584,6 +708,8 @@ A navigation bar on top looks like this:
   <main class="rx-container rx-container--wide" id="main">…</main>
 </body>
 ```
+
+</details>
 
 The bar shows the app's name (a link home), two links (Products, and Cart with a count), and
 on the right a menu with the user's name. `active=route_is('products.*')` highlights
@@ -879,6 +1005,31 @@ A record's page (an order, a customer) is mostly labels and values: "Status: Pai
 So a page doesn't need to write that HTML by hand:
 
 ```html
+<rx-card title="Order #{{ order.id }}">
+  <rx-infolist columns="2">
+    <rx-entry label="Status" :value="order.status" :badge="{'paid': 'success', 'pending': 'warning'}"
+              :labels="{'paid': 'Paid', 'pending': 'Waiting for payment'}"/>
+    <rx-entry label="Placed" :value="order.created_at" format="since"/>
+    <rx-entry label="Total" :value="order.total" format="money"/>
+    <rx-entry label="Invoice" :value="order.invoice" copyable :url="route('invoices.show', order.id)"/>
+    <rx-entry label="Tags" :value="order.tags" :badge="true" :limit-list="3"/>
+    <rx-entry label="Note" :value="order.note" format="markdown" span="full" placeholder="No note"/>
+    <rx-entry label="Customer"><a class="rx-link" href="/customers/{{ order.customer_id }}">{{ order.customer }}</a></rx-entry>
+    <rx-repeatable label="Items" :items="order.lines" columns="3">
+      <rx-entry label="Product" :value="item.name"/>
+      <rx-entry label="Quantity" :value="item.quantity" format="number"/>
+      <rx-entry label="Subtotal" :value="item.price * item.quantity" format="money"/>
+    </rx-repeatable>
+  </rx-infolist>
+</rx-card>
+```
+
+The same page as macros:
+
+<details>
+<summary>Macro form</summary>
+
+```html
 {% from "renox/ui.html" import card, infolist, entry, repeatable %}
 {% call card(title="Order #" ~ order.id) %}
   {% call infolist(columns=2) %}
@@ -898,6 +1049,8 @@ So a page doesn't need to write that HTML by hand:
   {% endcall %}
 {% endcall %}
 ```
+
+</details>
 
 This card shows an order in two columns:
 

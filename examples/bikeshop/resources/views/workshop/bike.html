@@ -1,40 +1,37 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, infolist, entry, link_button, empty, columns, list %}
-{% from "renox-blocks/blocks.html" import history %}
-{% from "workshop/_parts.html" import styles, status %}
-{% block seo %}{{ seo(title=bike.name) }}{% endblock %}
-
 {#- A bike's service history (#236): the bike as an infolist, its work orders as a timeline. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack" data-bs-reveal>
-  {{ page_header(bike.name, subtitle=model, back=route('workshop.bikes'), back_label=t('workshop.bikes.title')) }}
-  {% call columns(2) %}
-    {% call card(title=t('workshop.bikes.details')) %}
-      {% call infolist() %}
-        {{ entry(t('workshop.bikes.model'), model) }}
-        {{ entry(t('workshop.bikes.brand'), bike.brand) }}
-        {{ entry(t('workshop.bikes.frame'), bike.frame_number, copyable=bike.frame_number is not none) }}
-        {{ entry(t('workshop.bikes.size'), bike.size) }}
-        {{ entry(t('workshop.bikes.bought'), bike.bought_on, format="date") }}
-        {{ entry(t('workshop.bikes.spent'), spent, format="money") }}
-        {%- if has_photo %}{% call entry(t('workshop.bikes.photo')) %}<a class="rx-link" href="{{ route('workshop.bikes.photo', bike.id) }}" target="_blank" rel="noopener">{{ t('workshop.bikes.open_photo') }}</a>{% endcall %}{% endif %}
-      {% endcall %}
-      <p>{{ link_button(route('workshop.book', bike=bike.id), t('workshop.book.title'), variant="primary") }}</p>
+<rx-page layout="layouts/app.html" :title="bike.name">
+  {% from "renox/ui.html" import columns %}
+  {% from "renox-blocks/blocks.html" import history %}
+  {% from "workshop/_parts.html" import styles, status %}
+  {{ styles() }}
+  <rx-stack data-bs-reveal>
+    <rx-page-header :title="bike.name" :subtitle="model" :back="route('workshop.bikes')" back-label="{{ t('workshop.bikes.title') }}"/>
+    {% call columns(2) %}
+      <rx-card title="{{ t('workshop.bikes.details') }}">
+        <rx-infolist>
+          <rx-entry label="{{ t('workshop.bikes.model') }}" :value="model"/>
+          <rx-entry label="{{ t('workshop.bikes.brand') }}" :value="bike.brand"/>
+          <rx-entry label="{{ t('workshop.bikes.frame') }}" :value="bike.frame_number" :copyable="bike.frame_number is not none"/>
+          <rx-entry label="{{ t('workshop.bikes.size') }}" :value="bike.size"/>
+          <rx-entry label="{{ t('workshop.bikes.bought') }}" :value="bike.bought_on" format="date"/>
+          <rx-entry label="{{ t('workshop.bikes.spent') }}" :value="spent" format="money"/>
+          <rx-entry rx-if="has_photo" label="{{ t('workshop.bikes.photo') }}"><a class="rx-link" href="{{ route('workshop.bikes.photo', bike.id) }}" target="_blank" rel="noopener">{{ t('workshop.bikes.open_photo') }}</a></rx-entry>
+        </rx-infolist>
+        <p><rx-link-button :href="route('workshop.book', bike=bike.id)" label="{{ t('workshop.book.title') }}" variant="primary"/></p>
+      </rx-card>
+      {# [explain:workshop.bikes.show.template] #}
+      <rx-card title="{{ t('workshop.bikes.open') }}">
+        {%- if open %}
+        <rx-list id="open-orders" label="{{ t('workshop.bikes.open') }}">
+          {%- for o in open %}<li><a class="rx-link rx-list__main" href="{{ route('workshop.service.show', o.id) }}">#{{ o.id }} · {{ o.scheduled_for | date('%d %b %Y') }}</a>{{ status(o.status) }}</li>{% endfor %}
+        </rx-list>
+        {%- else %}<rx-empty title="{{ t('workshop.bikes.nothing_open') }}" icon="circle-check"/>{% endif %}
+      </rx-card>
     {% endcall %}
-    {# [explain:workshop.bikes.show.template] #}
-    {% call card(title=t('workshop.bikes.open')) %}
-      {%- if open %}
-      {% call list(id="open-orders", label=t('workshop.bikes.open')) %}
-        {%- for o in open %}<li><a class="rx-link rx-list__main" href="{{ route('workshop.service.show', o.id) }}">#{{ o.id }} · {{ o.scheduled_for | date('%d %b %Y') }}</a>{{ status(o.status) }}</li>{% endfor %}
-      {% endcall %}
-      {%- else %}{{ empty(t('workshop.bikes.nothing_open'), icon="circle-check") }}{% endif %}
-    {% endcall %}
-  {% endcall %}
-  {% call card(title=t('workshop.bikes.history')) %}
-    {%- if events %}{{ history(events, label=t('workshop.bikes.history'), date_format="%d %b %Y") }}
-    {%- else %}{{ empty(t('workshop.bikes.never'), icon="wrench") }}{% endif %}
-  {% endcall %}
+    <rx-card title="{{ t('workshop.bikes.history') }}">
+      {%- if events %}{{ history(events, label=t('workshop.bikes.history'), date_format="%d %b %Y") }}
+      {%- else %}<rx-empty title="{{ t('workshop.bikes.never') }}" icon="wrench"/>{% endif %}
+    </rx-card>
     {# [/explain:workshop.bikes.show.template] #}
-</div>
-{% endblock %}
+  </rx-stack>
+</rx-page>
