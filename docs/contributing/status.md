@@ -372,6 +372,13 @@
   table, `make:component` writing `<rx-props>`); bikeshop's supplier and field pages use it; guide:
   docs/ui.md "Components as tags". Plugin templates are compiled too since e94a7e6e
   (`view::add_template`).
+- **#538, learn.renox.rs** (epic; Renoxium's decisions of 2026-10-11): a course that builds one
+  app (a product catalog with stock) stage by stage, as its own app `learn/` next to site/ and
+  www/ (not docs/: it needs images, videos and an editor; not examples/, which stays at two).
+  The course app will live in `learn/course/` (its own cargo workspace, one app per stage), the
+  editor is CodeMirror 6 with completions from Renox's API (extracted with `syn`) and
+  `view:data`, challenges are compiled and tested in a container sandbox, videos are recorded
+  by script and served from the server's disk. #523 is the skeleton (port 3100).
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social

@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "examples/*", "site", "www", "tests/browser/fixture", "tests/chaos"]
+members = ["crates/*", "examples/*", "site", "www", "learn", "tests/browser/fixture", "tests/chaos"]
+# The course app of learn.renox.rs is its own workspace, one app per stage (#525).
+exclude = ["learn/course"]
 
 [workspace.package]
 version = "1.1.0"
