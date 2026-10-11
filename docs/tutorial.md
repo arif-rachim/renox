@@ -358,51 +358,46 @@ A **view** (or template) is an HTML file with blanks. `{{ … }}` prints a value
 logic like `if` and `for`. Replace `resources/views/bookmarks/index.html`:
 
 ```html
-{% extends "layouts/app.html" %}
-{#- `extends`: this page goes inside the layout (the navigation bar and the rest).
-    The import below must stay at the top, outside every block, so that the
-    `bookmarks` block can use it when it's rendered on its own (step 4). -#}
-{% from "renox/ui.html" import page_header, list, empty %}
+<rx-page layout="layouts/app.html" title="Bookmarks">
+  <rx-stack>
+    <rx-page-header title="Bookmarks" subtitle="Links worth keeping."/>
 
-{% block seo %}{{ seo(title="Bookmarks") }}{% endblock %}
-
-{% block content %}
-<div class="rx-stack">
-  {{ page_header("Bookmarks", subtitle="Links worth keeping.") }}
-
-  {% block bookmarks %}
-  <section id="bookmarks" class="rx-stack">
-    {% if bookmarks.items %}
-      {% call list(label="Your bookmarks") %}
-        {% for bookmark in bookmarks.items %}
-        <li>
-          <span class="rx-list__main">
-            <a class="rx-link" href="{{ bookmark.url }}" target="_blank" rel="noopener">{{ bookmark.title }}</a>
-            {% if bookmark.note %}<br><span class="rx-subtitle">{{ bookmark.note }}</span>{% endif %}
-          </span>
-        </li>
-        {% endfor %}
-      {% endcall %}
-      {% from "renox/pagination.html" import pagination %}
-      {{ pagination(bookmarks) }}
-    {% else %}
-      {{ empty("No bookmarks yet", "Links you save show up here, newest first.") }}
-    {% endif %}
-  </section>
-  {% endblock %}
-</div>
-{% endblock %}
+    {% block bookmarks %}
+    <section id="bookmarks" class="rx-stack">
+      {% if bookmarks.items %}
+        <rx-list label="Your bookmarks">
+          <li rx-for="bookmark in bookmarks.items">
+            <span class="rx-list__main">
+              <a class="rx-link" href="{{ bookmark.url }}" target="_blank" rel="noopener">{{ bookmark.title }}</a>
+              {% if bookmark.note %}<br><span class="rx-subtitle">{{ bookmark.note }}</span>{% endif %}
+            </span>
+          </li>
+        </rx-list>
+        {% from "renox/pagination.html" import pagination %}
+        {{ pagination(bookmarks) }}
+      {% else %}
+        <rx-empty title="No bookmarks yet" message="Links you save show up here, newest first."/>
+      {% endif %}
+    </section>
+    {% endblock %}
+  </rx-stack>
+</rx-page>
 ```
 
 What's going on:
 
-- `{% extends "layouts/app.html" %}` puts this page inside the layout, and
-  `{% block content %}` is the part of the layout this page fills in.
-- `page_header`, `list` and `empty` come from Renox's **UI kit** (`renox/ui.html`): ready-made
+- `<rx-page layout="layouts/app.html" title="Bookmarks">` puts this page inside the layout (the
+  navigation bar and the rest), and sets the page's title for search engines. What is inside it
+  is the part of the layout this page fills in.
+- `<rx-page-header>`, `<rx-list>` and `<rx-empty>` are tags from Renox's **UI kit**: ready-made
   parts for a page's title, a list of rows and the "nothing here yet" message. They bring their
-  own look, dark mode and keyboard support, so you write no CSS. [ui.md](ui.md) lists them all.
-- `{% for bookmark in bookmarks.items %}` repeats the `<li>` for every bookmark, and
+  own look, dark mode and keyboard support, so you write no CSS. Each tag is a call of a kit
+  macro (`page_header`, `list`, `empty` in `renox/ui.html`) that Renox writes for you when the
+  page loads, so the macros stay available when you prefer them. [ui.md](ui.md) lists them all.
+- `rx-for="bookmark in bookmarks.items"` repeats the `<li>` for every bookmark, and
   `{{ bookmark.title }}` prints its title.
+- Pagination has no tag; it stays a macro, imported from `renox/pagination.html` inside the
+  block (so the block can also be rendered on its own, as step 4 does).
 - Values are **escaped**: a title with `<script>` in it shows up as text and never runs.
 - `{% block bookmarks %}` gives the list a name. In step 4, the app sends back just this part.
 
@@ -550,40 +545,38 @@ How it fits together:
 
 ### The form in the view
 
-In `resources/views/bookmarks/index.html`, add `card`, `input`, `textarea` and `button` to the
-import line, and put the form between the `page_header` and `{% block bookmarks %}`:
+In `resources/views/bookmarks/index.html`, put the form between the `<rx-page-header>` and
+`{% block bookmarks %}`:
 
 ```html
-{% from "renox/ui.html" import page_header, list, empty, card, input, textarea, button %}
-```
-
-```html
-<form method="post" action="{{ route('bookmarks.store') }}"
-      hx-post="{{ route('bookmarks.store') }}" hx-target="#bookmarks" hx-swap="outerHTML"
-      x-data @htmx:after-request="if ($event.detail.successful) $el.reset()" novalidate>
-  {{ csrf_field() }}
-  {% call card(title="Save a link") %}
-    {{ input("url", "Address", type="url", required=true, placeholder="https://…") }}
-    {{ input("title", "Title", required=true) }}
-    {{ textarea("note", "Note", rows=2, hint="Why it's worth reading.") }}
-    <div class="rx-card__footer">{{ button("Save") }}</div>
-  {% endcall %}
-</form>
+<rx-form route="bookmarks.store" hx-post="{{ route('bookmarks.store') }}"
+         hx-target="#bookmarks" hx-swap="outerHTML"
+         x-data="{}" @htmx:after-request="if ($event.detail.successful) $el.reset()" novalidate>
+  <rx-card title="Save a link">
+    <rx-input name="url" label="Address" type="url" required placeholder="https://…"/>
+    <rx-input name="title" label="Title" required/>
+    <rx-textarea name="note" label="Note" rows="2" hint="Why it's worth reading."/>
+    <div class="rx-card__footer"><rx-button label="Save"/></div>
+  </rx-card>
+</rx-form>
 ```
 
 Line by line:
 
-- `method="post"` and `action` make it a normal form, so it works even without JavaScript.
+- The form posts to `route="bookmarks.store"`, so it is a normal form and works even without
+  JavaScript.
 - `hx-post` makes htmx send it instead. `hx-target="#bookmarks"` and `hx-swap="outerHTML"`
   say what to do with the answer: replace the `<section id="bookmarks">` with it.
-- `{{ csrf_field() }}` adds a hidden security token. It proves the form came from your own
-  site, so another website can't post it in your name (this is called CSRF protection).
+- `<rx-form>` writes the `<form>` for you, with `method="post"` and the `action` of the named
+  route. It also adds a hidden security token (`csrf_field()` in a plain `<form>`). The token
+  proves the form came from your own site, so another website can't post it in your name (this
+  is called CSRF protection).
 - `x-data @htmx:after-request=…` is a little Alpine.js (it also comes with Renox): after a
   *successful* save, empty the form. When there are errors, what you typed stays.
 - `novalidate` turns off the browser's own checks, so the server's messages are the only ones,
   and they're the same everywhere.
-- `card`, `input`, `textarea` and `button` come from the UI kit. Each field has a label, and a
-  place under it where its error appears.
+- `<rx-card>`, `<rx-input>`, `<rx-textarea>` and `<rx-button>` come from the UI kit. Each field
+  has a label, and a place under it where its error appears.
 
 Try it. Press **Save** with the form empty: "The title field is required." appears under the
 title, the address gets its own message, and the page doesn't move. Fill it in properly and
@@ -813,62 +806,58 @@ Make `resources/views/bookmarks/edit.html`. It's a plain form, without htmx: whe
 wrong, the browser goes back to the form. That's the other way errors come back:
 
 ```html
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, input, textarea, button, link_button, form_errors %}
+<rx-page layout="layouts/app.html" title="Edit bookmark">
+  <rx-stack>
+    <rx-page-header title="Edit bookmark" :back="route('bookmarks.index')" back-label="Bookmarks"/>
 
-{% block content %}
-<div class="rx-stack">
-  {{ page_header("Edit bookmark", back=route('bookmarks.index'), back_label="Bookmarks") }}
-
-  <form method="post" action="{{ route('bookmarks.update', bookmark.id) }}" data-live-validate novalidate>
-    {{ csrf_field() }}
-    {{ method_field('PUT') }}
-    {% call card() %}
-      {{ form_errors() }}
-      {{ input("url", "Address", type="url", value=bookmark.url, required=true) }}
-      {{ input("title", "Title", value=bookmark.title, required=true) }}
-      {{ textarea("note", "Note", value=bookmark.note, rows=2) }}
-      <div class="rx-card__footer">
-        {{ link_button(route('bookmarks.index'), "Cancel", variant="plain") }}
-        {{ button("Save changes") }}
-      </div>
-    {% endcall %}
-  </form>
-</div>
-{% endblock %}
+    <rx-form :action="route('bookmarks.update', bookmark.id)" method="PUT" live novalidate>
+      <rx-card>
+        <rx-form-errors/>
+        <rx-input name="url" label="Address" type="url" :value="bookmark.url" required/>
+        <rx-input name="title" label="Title" :value="bookmark.title" required/>
+        <rx-textarea name="note" label="Note" :value="bookmark.note" rows="2"/>
+        <div class="rx-card__footer">
+          <rx-link-button route="bookmarks.index" label="Cancel" variant="plain"/>
+          <rx-button label="Save changes"/>
+        </div>
+      </rx-card>
+    </rx-form>
+  </rx-stack>
+</rx-page>
 ```
 
-- **`method_field('PUT')`**: browsers can only send forms as `GET` or `POST`. This adds a hidden
-  field that tells Renox "treat this as a `PUT`", so the form reaches `update`.
-- **`form_errors()`** lists all the errors at the top of the form. Each field also shows its
+- **`method="PUT"`**: browsers can only send forms as `GET` or `POST`. `<rx-form>` sends a
+  `POST` with a hidden field that tells Renox "treat this as a `PUT`", so the form reaches
+  `update` (`method_field('PUT')` in a plain form).
+- **`<rx-form-errors/>`** lists all the errors at the top of the form. Each field also shows its
   own, and keeps what was typed.
-- **`value=bookmark.url`** fills the field with the saved value. After a failed save, what you
-  typed wins over the saved value.
-- **`data-live-validate`** checks each field as soon as you leave it, using the same rules on the
+- **`:value="bookmark.url"`** fills the field with the saved value (a colon means the value is
+  an expression, not text). After a failed save, what you typed wins over the saved value.
+- **`live`** (`data-live-validate` in a plain form) checks each field as soon as you leave it, using the same rules on the
   server. Nothing is saved until you press **Save changes**.
 
-In `index.html`, give each row its buttons. Add `row_actions`, `link_button` and `confirm` to
-the import line, and replace the `<li>`:
+In `index.html`, give each row its buttons. Replace the `<li>`:
 
 ```html
-<li>
+<li rx-for="bookmark in bookmarks.items">
   <span class="rx-list__main">
     <a class="rx-link" href="{{ bookmark.url }}" target="_blank" rel="noopener">{{ bookmark.title }}</a>
     {% if bookmark.note %}<br><span class="rx-subtitle">{{ bookmark.note }}</span>{% endif %}
   </span>
-  {% call row_actions() %}
-    {{ link_button(route('bookmarks.edit', bookmark.id), "Edit", variant="plain", size="small") }}
-    {{ confirm("delete-" ~ bookmark.id, "Delete", route('bookmarks.destroy', bookmark.id),
-               "Delete “" ~ bookmark.title ~ "”?", "This can't be undone.", size="small") }}
-  {% endcall %}
+  <rx-row-actions>
+    <rx-link-button :href="route('bookmarks.edit', bookmark.id)" label="Edit" variant="plain" size="small"/>
+    <rx-confirm id="delete-{{ bookmark.id }}" label="Delete" :action="route('bookmarks.destroy', bookmark.id)"
+                title="Delete “{{ bookmark.title }}”?" message="This can't be undone." size="small"/>
+  </rx-row-actions>
 </li>
 ```
 
-- **`link_button`** is a link that looks like a button: **Edit** opens the edit page.
-- **`confirm`** is a **Delete** button that first asks "Delete …? This can't be undone." Only
+- **`<rx-link-button>`** is a link that looks like a button: **Edit** opens the edit page.
+- **`<rx-confirm>`** is a **Delete** button that first asks "Delete …? This can't be undone." Only
   the button in that question actually deletes (it sends a `DELETE` request).
-- `~` joins text together in a template (`"delete-" ~ bookmark.id` → `delete-7`).
-- **`row_actions`** puts the buttons at the end of the row; on a phone they shrink to icons.
+- `{{ … }}` inside an attribute prints a value into the text (`id="delete-{{ bookmark.id }}"`
+  → `delete-7`).
+- **`<rx-row-actions>`** puts the buttons at the end of the row; on a phone they shrink to icons.
 
 ### Where to land after logging in
 
