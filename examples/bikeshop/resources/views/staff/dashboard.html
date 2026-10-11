@@ -1,13 +1,10 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import empty, icon %}
-{% from "layouts/_avatar.html" import avatar %}
-{% block seo %}{{ seo(title=t('staff.dashboard.title')) }}{% endblock %}
-
 {#- The staff home: a welcome card with the active store's photo, the ways
     into the day's work (each behind its permission), then the store's last
     7 days (reports/_overview.html) for those who may see reports. -#}
-{% block content %}
-<div class="rx-stack" data-bs-reveal>
+<rx-page layout="layouts/staff.html" :title="t('staff.dashboard.title')">
+{% from "renox/ui.html" import icon %}
+{% from "layouts/_avatar.html" import avatar %}
+<rx-stack data-bs-reveal>
   {%- set store = store_switcher.current if store_switcher else none %}
   <section class="bs-welcome" aria-labelledby="page-title">
     <div class="bs-welcome__text">
@@ -42,9 +39,9 @@
   {%- if overview %}
   {% include "reports/_overview.html" %}
   {%- else %}
-  <div class="rx-card">
-    {{ empty(t('staff.dashboard.empty_title'), t('staff.dashboard.empty_text'), route('about.pages'), t('about.index_link'), icon="chart-column") }}
-  </div>
+  <rx-card>
+    <rx-empty :title="t('staff.dashboard.empty_title')" :message="t('staff.dashboard.empty_text')" route="about.pages" :action-label="t('about.index_link')" icon="chart-column"/>
+  </rx-card>
   {%- endif %}
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>

@@ -1,45 +1,39 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, list, badge, action_sheet, input, empty %}
-{% from "renox-blocks/blocks.html" import history %}
-{% from "stock/_parts.html" import styles %}
-{% block seo %}{{ seo(title=t('multistore.fees.title')) }}{% endblock %}
-
 {#- The stores' fee rates (#245): what a store earns for work done for another; only the owner
     changes them (`settings.fees`), every change audited; entries keep the rate they were
     booked with. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack">
-  {{ page_header(t('multistore.fees.title'), subtitle=t('multistore.fees.lead'), back=route('multistore.books'), back_label=t('multistore.books.title')) }}
-  <div class="bs-split" data-bs-reveal>
-    <div>
-      {% call card(title=t('multistore.fees.rates')) %}
-        {# [explain:multistore.fees.template] #}
-        {% call list(id="fee-rates", label=t('multistore.fees.rates')) %}
-          {%- for r in rates %}{% set s = r.store %}
-          <li>
-            <div class="rx-list__main"><strong>{{ s.name }}</strong><p class="rx-subtitle">{{ t('multistore.fees.earns', rate=r.percent) }}</p></div>
-            {%- if can_change %}
-            {% call action_sheet("fee-" ~ s.id, t('multistore.fees.change'), route('multistore.fees.update', s.id), t('multistore.fees.change_title', store=s.name), description=t('multistore.fees.change_lead'), size="small", icon="edit") %}
-              {{ input("percent", t('multistore.fees.percent'), type="number", value=r.value, required=true, suffix="%", attrs={"min": 0, "max": 50, "step": 0.01}) }}
-            {% endcall %}
-            {%- endif %}
-          </li>
-          {%- endfor %}
-        {% endcall %}
-        {# [/explain:multistore.fees.template] #}
-        {%- if not can_change %}<p class="rx-subtitle">{{ t('multistore.fees.owner_only') }}</p>{% endif %}
-      {% endcall %}
+<rx-page layout="layouts/staff.html" :title="t('multistore.fees.title')">
+  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
+  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+  {% from "renox-blocks/blocks.html" import history %}
+  <rx-stack>
+    <rx-page-header :title="t('multistore.fees.title')" :subtitle="t('multistore.fees.lead')" :back="route('multistore.books')" :back-label="t('multistore.books.title')"/>
+    <div class="bs-split" data-bs-reveal>
+      <div>
+        <rx-card :title="t('multistore.fees.rates')">
+          {# [explain:multistore.fees.template] #}
+          <rx-list id="fee-rates" :label="t('multistore.fees.rates')">
+            {%- for r in rates %}{% set s = r.store %}
+            <li>
+              <div class="rx-list__main"><strong>{{ s.name }}</strong><p class="rx-subtitle">{{ t('multistore.fees.earns', rate=r.percent) }}</p></div>
+              <rx-action-sheet rx-if="can_change" :id="'fee-' ~ s.id" :label="t('multistore.fees.change')" :action="route('multistore.fees.update', s.id)" :title="t('multistore.fees.change_title', store=s.name)" :description="t('multistore.fees.change_lead')" size="small" icon="edit">
+                <rx-input name="percent" :label="t('multistore.fees.percent')" type="number" :value="r.value" required suffix="%" min="0" max="50" step="0.01"/>
+              </rx-action-sheet>
+            </li>
+            {%- endfor %}
+          </rx-list>
+          {# [/explain:multistore.fees.template] #}
+          <p rx-if="not can_change" class="rx-subtitle">{{ t('multistore.fees.owner_only') }}</p>
+        </rx-card>
+      </div>
+      <div>
+        <rx-card :title="t('multistore.fees.history')">
+          {%- if changes %}
+          {%- set h = namespace(items=[]) %}
+          {%- for e in changes %}{% set h.items = h.items + [{"time": e.at, "title": t('multistore.fees.changed', store=e.store, from=e.from, to=e.to), "by": e.by, "kind": "info"}] %}{% endfor %}
+          {{ history(h.items, label=t('multistore.fees.history'), date_format="%d %b %Y %H:%M") }}
+          {%- else %}<rx-empty :title="t('multistore.fees.no_history')" icon="hand-coins"/>{% endif %}
+        </rx-card>
+      </div>
     </div>
-    <div>
-      {% call card(title=t('multistore.fees.history')) %}
-        {%- if changes %}
-        {%- set h = namespace(items=[]) %}
-        {%- for e in changes %}{% set h.items = h.items + [{"time": e.at, "title": t('multistore.fees.changed', store=e.store, from=e.from, to=e.to), "by": e.by, "kind": "info"}] %}{% endfor %}
-        {{ history(h.items, label=t('multistore.fees.history'), date_format="%d %b %Y %H:%M") }}
-        {%- else %}{{ empty(t('multistore.fees.no_history'), icon="hand-coins") }}{% endif %}
-      {% endcall %}
-    </div>
-  </div>
-</div>
-{% endblock %}
+  </rx-stack>
+</rx-page>

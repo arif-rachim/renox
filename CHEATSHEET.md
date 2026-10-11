@@ -307,115 +307,116 @@ fn typed_views(app: App) -> App {
 
 ## Components and the UI kit (details in docs/ui.md)
 
-The UI kit is a set of ready-made page parts: fields, buttons, menus, tables and more. Each
-part is a macro: you import it into a template, then call it like a function.
+The UI kit is a set of ready-made page parts: fields, buttons, menus, tables and more. **Write
+pages with `rx-*` tags** (the next section lists them); a kit macro is for the few parts that
+have no tag (marked below). Tag props are in `crates/renox-core/src/components/contracts.rs`,
+and `rnx view:check` names a wrong one with its file and line.
 
 ```html
 {# layout: {{ renox_head() }}{{ renox_ui() }} in <head>, <body class="rx-page">, {{ toasts() }} #}
-{# The page's frame (rnx new's layout uses navbar; a back office uses sidebar + rx-shell) #}
-{% from "renox/ui.html" import navbar, nav_links, nav_link, page_header, toolbar, row_actions, list, card_grid, media_card, link_tabs, progress, link_button %}
-{% call navbar(app.name, href=route('home')) %}
-  {% call nav_links() %}{{ nav_link(route('products.index'), "Products", active=route_is('products.*')) }}{% endcall %}
-{% endcall %}
-{{ page_header("Products", subtitle="All items", back=route('home')) }}
-{% call toolbar() %}{{ link_button(route('products.create'), "New product") }}{% endcall %} {# above a table #}
-{# in a table row: {% call row_actions() %}…icon buttons…{% endcall %}; also list(), card_grid() + media_card(href, title, image=…), link_tabs(items, current=…), progress(42) #}
-{# Phones: navbar(…, tabs=[{"href": …, "label": "Shop", "icon": "shopping-bag", "active": route_is('shop.*')}, {"open": "menu-sheet", "label": "Menu", "icon": "menu"}]) = a bottom tab bar under 36rem;
-   {% call nav_search() %}<form role="search">…</form>{% endcall %} = search behind a button there; rx-hide-narrow leaves the phone's bar #}
-{# Icons (Lucide, docs/ui.md#icons): {% from "renox/ui.html" import icon %} {{ icon("bike") }} {{ icon("truck", size=16) }}; hidden from screen readers unless {{ icon("lock", label="Private") }}; the same names in icon="…" on buttons and menus #}
-{# A back office: <body class="rx-page rx-shell">, then {% call sidebar(app.name) %}{{ sidebar_section("Sales") }}{{ sidebar_link(…) }}{% endcall %}
-   and <div class="rx-shell__main">{{ navbar(none, width="full", skip=false) }}<main class="rx-shell__content" id="main">…</main></div>.
-   Also thumbnail(src), menu_button(label) in a menu, hide_label=true on input, textarea,
-   select or checkbox (label kept for screen readers; the other fields don't take it),
+{# The page's frame (rnx new's layout uses rx-navbar; a back office uses rx-sidebar + rx-shell) #}
+<rx-navbar brand="{{ app.name }}" :href="route('home')">
+  <rx-nav-links><rx-nav-link route="products.index" label="Products" :active="route_is('products.*')"/></rx-nav-links>
+</rx-navbar>
+<rx-page-header title="Products" subtitle="All items" :back="route('home')"/>
+<rx-toolbar><rx-link-button route="products.create" label="New product"/></rx-toolbar>   {# above a table #}
+{# in a table row: <rx-row-actions>…<rx-icon-button/>…</rx-row-actions>; also <rx-list>, <rx-card-grid> + <rx-media-card href title image>,
+   <rx-link-tabs :items current>, <rx-progress value="42"/> #}
+{# Phones: <rx-navbar :tabs="[{'href': …, 'label': 'Shop', 'icon': 'shopping-bag', 'active': route_is('shop.*')}, {'open': 'menu-sheet', 'label': 'Menu', 'icon': 'menu'}]"> = a bottom tab bar under 36rem;
+   <rx-nav-search><form role="search">…</form></rx-nav-search> = search behind a button there; rx-hide-narrow leaves the phone's bar #}
+{# Icons (Lucide, docs/ui.md#icons) have no tag: {% from "renox/ui.html" import icon %} {{ icon("bike") }} {{ icon("truck", size=16) }};
+   hidden from screen readers unless {{ icon("lock", label="Private") }}; the same names in icon="…" on buttons and menus #}
+{# A back office: <body class="rx-page rx-shell">, then <rx-sidebar brand="{{ app.name }}"><rx-sidebar-section title="Sales"/><rx-sidebar-link route="…" label="…"/></rx-sidebar>
+   and <div class="rx-shell__main"><rx-navbar width="full" :skip="false"/><main class="rx-shell__content" id="main">…</main></div>.
+   Macros with no tag: thumbnail(src), menu_button(label) in a menu. hide-label on rx-input, rx-textarea,
+   rx-select or rx-checkbox (label kept for screen readers; the other fields don't take it),
    <body class="rx-page rx-page--fill"> for a page that fills the window.
    Themes: the editorial default (teal, cream, pill buttons; Inter + Poppins, served by Renox);
    data-rx-theme="warm" (indigo, before 1.1) or "classic" (the first look) on <html>; tokens
    --rx-accent-2, --rx-tint, --rx-accent-soft, --rx-ink, --rx-type-hero, --rx-type-section; your CSS uses the type scale: font: var(--rx-type-heading) (also -display,
    -title, -lead, -body, -label, -note, -caption) and the brand token --rx-accent. #}
-{% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, tags_input, key_value, repeater, form_grid, button, confirm, table, form_errors %}
-{# Several steps: {% call wizard("id", [["a", "First"], ["b", "Second"]], submit_label="Save") %} with wizard_step("id", "a") blocks #}
-<form method="post" action="/products" data-live-validate novalidate>{{ csrf_field() }}
-  {% call card(title="New product") %}
-    {{ form_errors() }}
-    {{ input("name", "Name", required=true, hint="Shown on the list") }}
-    {{ select("size", "Size", [["s", "Small"], ["m", "Medium"]]) }}
-    {{ checkbox("featured", "Featured", switch=true) }}
-    {% call form_grid(2) %}
-      {{ input("price", "Price", type="number", prefix="$", attrs={"step": "0.01"}) }}
-      {{ radio("unit", "Unit", ["pcs", "kg"], selected="pcs", inline=true) }}
-    {% endcall %}
-    {{ checkbox_list("tags", "Tags", [["new", "New"], ["sale", "On sale"]]) }} {# Vec + #[serde(default)] #}
-    {{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pickup"]], selected="courier") }}
-    {% call show_when("delivery", "courier") %}{{ input("address", "Address") }}{% endcall %} {# required_if #}
-    {{ date_picker("ships_on", "Ships on") }} {# NaiveDate #}
-    {{ date_picker("visit_on", "Visit", disabled_dates=full_days, closed_weekdays=[0]) }} {# 0 = Sunday; also none_of on the server #}
-    {{ file("photo", "Photo", accept="image/*", preview=true) }} {# enctype="multipart/form-data" #}
-    {{ input("api_key", "API key", value=key, readonly=true, copyable=true) }}
-    {{ tags_input("keywords", "Keywords") }} {# Vec<String> + #[serde(default)] #}
-    {{ select("cats", "Categories", cats, multiple=true, searchable=true) }}
-    {{ select("customer_id", "Customer", [[c.id, c.name]], selected=c.id, options_url=route('customers.options'), editable=true) }} {# renox::select: GET ?q= / ?values=, POST label, PUT value+label #}
-    {{ key_value("specs", "Specs", value=product.specs) }} {# renox::KeyValues #}
-    {% call(row, prefix) repeater("lines", "Lines", rows=order.lines) %}
-      {{ input(prefix ~ "[name]", "Name", value=row.name) }} {# lines[0][name] → Vec<Line>, v.nested #}
-    {% endcall %}
-    {{ button("Create product") }}
-  {% endcall %}
-</form>
-{{ confirm("del-7", "Delete", "/products/7", "Delete “Coffee”?", "It goes to the trash.") }}
+{# Several steps: <rx-wizard id="signup" submit-label="Save"><rx-wizard-step key="a" title="First">…</rx-wizard-step>…</rx-wizard> #}
+<rx-form action="/products" live novalidate>        {# method post and csrf_field() are added; a file field needs enctype="multipart/form-data" #}
+  <rx-card title="New product">
+    <rx-form-errors/>
+    <rx-input name="name" label="Name" required hint="Shown on the list"/>
+    <rx-select name="size" label="Size" :options="[['s', 'Small'], ['m', 'Medium']]"/>
+    <rx-checkbox name="featured" label="Featured" switch/>
+    <rx-form-grid columns="2">
+      <rx-input name="price" label="Price" type="number" prefix="$" :attrs="{'step': '0.01'}"/>
+      <rx-radio name="unit" label="Unit" :options="['pcs', 'kg']" selected="pcs" inline/>
+    </rx-form-grid>
+    <rx-checkbox-list name="tags" label="Tags" :options="[['new', 'New'], ['sale', 'On sale']]"/>   {# Vec + #[serde(default)] #}
+    <rx-toggle-buttons name="delivery" label="Delivery" :options="[['courier', 'Courier'], ['pickup', 'Pickup']]" selected="courier"/>
+    <rx-show-when field="delivery" values="courier"><rx-input name="address" label="Address"/></rx-show-when>   {# required_if #}
+    <rx-date-picker name="ships_on" label="Ships on"/>                {# NaiveDate #}
+    <rx-date-picker name="visit_on" label="Visit" :disabled-dates="full_days" :closed-weekdays="[0]"/>   {# 0 = Sunday; also none_of on the server #}
+    <rx-file name="photo" label="Photo" accept="image/*" preview/>    {# the form needs enctype="multipart/form-data" #}
+    <rx-input name="api_key" label="API key" :value="key" readonly copyable/>
+    <rx-tags-input name="keywords" label="Keywords"/>                 {# Vec<String> + #[serde(default)] #}
+    <rx-select name="cats" label="Categories" :options="cats" multiple searchable/>
+    <rx-select name="customer_id" label="Customer" :options="[[c.id, c.name]]" :selected="c.id" options-url="{{ route('customers.options') }}" editable/>   {# renox::select: GET ?q= / ?values=, POST label, PUT value+label #}
+    <rx-key-value name="specs" label="Specs" :value="product.specs"/>   {# renox::KeyValues #}
+    <rx-repeater name="lines" label="Lines" :rows="order.lines">
+      <rx-input name="{{ prefix }}[name]" label="Name" :value="row.name"/>   {# lines[0][name] → Vec<Line>, v.nested #}
+    </rx-repeater>
+    <rx-button label="Create product"/>
+  </rx-card>
+</rx-form>
+<rx-confirm id="del-7" label="Delete" action="/products/7" title="Delete “Coffee”?" message="It goes to the trash."/>
 
 {# Actions: a form in a sheet, sent with htmx (422 → errors in the sheet, success → closes).
    The handler answers (Toast, HxRefresh), or a ValidationError for its own checks. #}
-{% from "renox/ui.html" import action_sheet, icon_button %}
-{% call action_sheet("stock-7", "Stock", route('products.stock', 7), "Adjust stock", method="PUT", icon="box") %}
-  {{ input("change", "Change", type="number", id="stock-change-7") }} {# slide_over=true, width="lg" #}
-{% endcall %}
-{{ icon_button("edit", "Edit Coffee", href="/products/7/edit") }}       {# label = aria-label + tooltip #}
-{{ button("Save", key="mod+s", icon="check") }}                        {# ⌘S / Ctrl+S; also badge=3 #}
-{{ button("Publish", disabled_reason="Add a photo first.") }}          {# focusable, reason as tooltip #}
-{# More actions behind one "⋯" button (label → a labelled button); menu_open opens a sheet made with button=false #}
-{% from "renox/ui.html" import action_group, menu_link, menu_open, wizard_action, wizard_step, import_action %}
+<rx-action-sheet id="stock-7" label="Stock" action="{{ route('products.stock', 7) }}" title="Adjust stock" method="PUT" icon="box">
+  <rx-input name="change" label="Change" type="number" id="stock-change-7"/>   {# slide-over, width="lg" #}
+</rx-action-sheet>
+<rx-icon-button icon="edit" label="Edit Coffee" href="/products/7/edit"/>     {# label = aria-label + tooltip #}
+<rx-button label="Save" key="mod+s" icon="check"/>                            {# ⌘S / Ctrl+S; also badge="3" #}
+<rx-button label="Publish" disabled-reason="Add a photo first."/>             {# focusable, reason as tooltip #}
+{# More actions behind one "⋯" button (label → a labelled button); menu_open opens a sheet made with button=false.
+   action_group, wizard_action and import_action have no tag: macros. #}
+{% from "renox/ui.html" import action_group, wizard_action, wizard_step, import_action %}
 {% call action_group() %}
-  {{ menu_link(route('products.replicate', 7), "Duplicate", icon="copy") }}
-  {{ menu_link(route('products.ledger', 7), "Export ledger", icon="download", download=true) }}
-  {{ menu_open("import-products", "Import…", icon="upload") }} {# also menu_action, menu_section(title) #}
+  <rx-menu-link href="{{ route('products.replicate', 7) }}" label="Duplicate" icon="copy"/>
+  <rx-menu-link href="{{ route('products.ledger', 7) }}" label="Export ledger" icon="download" download/>
+  <rx-menu-open id="import-products" label="Import…" icon="upload"/>   {# also <rx-menu-action>, <rx-menu-section title> #}
 {% endcall %}
 {{ import_action("import-products", "Import", route('products.import'), "Import products", columns=["sku", "name"], template_url=route('products.template'), button=false) }}
 {% call wizard_action("new-product", "New product", route('products.store'), "New product", [["a", "Details"], ["b", "Price"]], submit_label="Add") %}
-  {% call wizard_step("new-product", "a") %}{{ input("name", "Name", id="np-name") }}{% endcall %}
-  {% call wizard_step("new-product", "b") %}{{ input("price", "Price", type="number", id="np-price") }}{% endcall %}
+  {% call wizard_step("new-product", "a") %}<rx-input name="name" label="Name" id="np-name"/>{% endcall %}
+  {% call wizard_step("new-product", "b") %}<rx-input name="price" label="Price" type="number" id="np-price"/>{% endcall %}
 {% endcall %} {# a 422 opens the step with the error #}
 
 {# Read-only details (an infolist): labels and values, formatted #}
-{% from "renox/ui.html" import infolist, entry, repeatable %}
-{% call infolist(columns=2) %}
-  {{ entry("Number", order.number, copyable=true) }}
-  {{ entry("Status", order.status, badge={"paid": "success", "pending": "warning"}, labels={"paid": "Paid"}) }}
-  {{ entry("Placed", order.created_at, format="since") }} {# date, datetime, money, number, bool, color, image, markdown, key_value #}
-  {{ entry("Total", order.total, format="money") }}
-  {{ entry("Tags", order.tags, badge=true, limit_list=3) }} {# lists: list="lines" / "bullets" #}
-  {% call entry("Customer") %}<a href="{{ route('customers.show', order.customer_id) }}">{{ order.customer }}</a>{% endcall %}
-  {% call(line) repeatable("Items", order.lines, columns=3) %}{{ entry("Product", line.name) }}{% endcall %}
-  {# Buttons beside a value: url (a link), action (a posted form, method="DELETE"…) or attrs (htmx) #}
-  {{ entry("Email", user.email, suffix_actions=[{"label": "Edit", "icon": "edit", "url": route('users.edit', user.id)}]) }}
-{% endcall %}
+<rx-infolist columns="2">
+  <rx-entry label="Number" :value="order.number" copyable/>
+  <rx-entry label="Status" :value="order.status" :badge="{'paid': 'success', 'pending': 'warning'}" :labels="{'paid': 'Paid'}"/>
+  <rx-entry label="Placed" :value="order.created_at" format="since"/>   {# date, datetime, money, number, bool, color, image, markdown, key_value #}
+  <rx-entry label="Total" :value="order.total" format="money"/>
+  <rx-entry label="Tags" :value="order.tags" badge :limit-list="3"/>   {# lists: list="lines" / "bullets" #}
+  <rx-entry label="Customer"><a href="{{ route('customers.show', order.customer_id) }}">{{ order.customer }}</a></rx-entry>
+  <rx-repeatable label="Items" :items="order.lines" columns="3"><rx-entry label="Product" :value="line.name"/></rx-repeatable>
+  {# Buttons beside a value: :suffix-actions="[{'label': 'Edit', 'icon': 'edit', 'url': route('users.edit', user.id)}]" (url, or action for a posted form, or attrs for htmx) #}
+</rx-infolist>
 
 {# Rich text, Markdown and code editors, and a code entry: the renox-editors crate,
-   .module(renox_editors::Editors::new()) (docs/editors.md). Each sends a plain field. #}
+   .module(renox_editors::Editors::new()) (docs/editors.md). They have no tag yet: macros. Each sends a plain field. #}
 {% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor, code_entry %}
 {{ rich_editor("body", "Body", value=post.body, required=true) }}   {# HTML: read it as RichText #}
 {{ markdown_editor("notes", "Notes", value=post.notes) }}           {# toolbar + Preview #}
 {{ code_editor("config", "Config", value=post.config, language="json") }}
 {{ post.body | rich_text }}                                         {# stored HTML, cleaned again #}
 {{ code_entry("Payload", call.payload, language="json") }}          {# in an infolist: coloured, copyable #}
-{# Your own: rnx make:component price_tag -> components/price_tag.html, a macro that can use
+{# Your own: rnx make:component price_tag -> components/price_tag.html, used as <app-price-tag>; it can use
    old(), error(), t(), can(), auth, csrf_field() like the page. rnx make:component --ui copies
    the kit into the app. {% if once('x') %} renders once per page.
-   Also in the kit: textarea, link_button, group, alert, badge, sheet + open_button,
-   menu / menu_link / menu_action / menu_separator, tabs / tab_panel, empty.
-   renox_ui(styles=false) loads only the script (styles published with ui:publish). #}
+   Also tags: rx-textarea, rx-link-button, rx-alert, rx-badge, rx-sheet + rx-open-button,
+   rx-menu / rx-menu-link / rx-menu-action / rx-menu-separator, rx-tabs / rx-tab, rx-empty.
+   Macros with no tag: group, tab_panel. renox_ui(styles=false) loads only the script (styles published with ui:publish). #}
 
 {# Stacks: the layout has {{ stack('head') }} in <head> and {{ stack('scripts') }} before
-   </body>; any page, block or component adds to them, even after the head was rendered: #}
+   </body>; any page, block or component adds to them, even after the head was rendered
+   (<rx-push stack="scripts" once="chart">…</rx-push>, or the macro form): #}
 {% call push('scripts', once='chart') %}<script src="{{ asset('chart.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}
 {% call prepend('head') %}<meta name="robots" content="noindex">{% endcall %}
 ```
@@ -644,7 +645,7 @@ async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redi
 }
 
 /// Two forms on one page with the same field names: this one's errors go in the `login` bag,
-/// shown by `error('email', bag='login')` / `{{ ui.input("email", "Email", bag="login") }}`.
+/// shown by `error('email', bag='login')` / `<rx-input name="email" label="Email" bag="login"/>`.
 #[derive(Deserialize, Validate)]
 #[validate(bag = "login")]
 struct SignIn {
@@ -1145,20 +1146,20 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
 ```
 
 ```html
-{% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
-{{ period_filter(period) }}                   {# links to ?period=…, keeping the query #}
-{# period_filter(selected, options=[["7d", "Week"], …], label=…, custom=true): selected is the handler's
+<rx-period-filter :selected="period"/>                   {# links to ?period=…, keeping the query #}
+{# <rx-period-filter :selected :options="[['7d', 'Week'], …]" label=… custom>: selected is the handler's
    Period; the default options are 7d, 30d, 90d, 12m and ytd; label names the nav for screen readers;
-   "Custom" opens two date fields sent as ?period=custom&from=…&to=… (custom=false hides it) #}
-{% call stats(4) %}
-  {{ stat("Revenue", revenue | money, delta=change, trend=sales.values, url="/orders") }} {# good="down" for costs #}
-{% endcall %}
-{% call dashboard(3) %}
-  {% call widget("Sales", description="Paid orders", span=2) %}
-    {{ chart("area", sales, format="money") }} {# line, area, bar (stacked=true), pie, doughnut #}
-  {% endcall %}
-  {{ widget("By status", url=route('dashboard.statuses'), poll=60) }} {# loaded after the page, every 60 s #}
-{% endcall %}
+   "Custom" opens two date fields sent as ?period=custom&from=…&to=… (:custom="false" hides it) #}
+<rx-stats columns="4">
+  <rx-stat label="Revenue" :value="revenue | money" :delta="change" :trend="sales.values" url="/orders"/>   {# good="down" for costs #}
+</rx-stats>
+<rx-dashboard columns="3">
+  <rx-widget title="Sales" description="Paid orders" span="2">
+    <rx-chart kind="area" :data="sales" format="money"/>   {# line, area, bar (stacked), pie, doughnut #}
+  </rx-widget>
+  <rx-widget title="By status" url="{{ route('dashboard.statuses') }}" :poll="60"/>   {# loaded after the page, every 60 s #}
+</rx-dashboard>
+{# the chart(...) function still works anywhere: {{ chart("bar", labels=…, values=…) }}; the tag is the same chart #}
 {{ chart("bar", labels=["Coffee", "Tea"], series=[{"name": "2025", "values": [3, 5]}, {"name": "2026", "values": [4, 6]}]) }}
 {# points: {x, y, size, label} maps, or [x, y] / [x, y, size]; several series: series=[{"name": …, "points": […]}] #}
 {{ chart("scatter", points=orders, x_title="Items", y_title="Total", format="money") }}
@@ -1198,8 +1199,8 @@ async fn index(request: GridRequest) -> Result<View> {
 }
 ```
 
-`{% from "renox/grid.html" import grid %}` then `{% call(row, column) grid(orders) %}…{% endcall %}`
-inside `<main class="rx-grid-fill">` (`grid(orders, tools=…)` puts HTML such as a "New" button in
+`<rx-grid :page="orders">…</rx-grid>` (the content draws `custom` columns, with `row` and `column`)
+inside `<main class="rx-grid-fill">` (`:tools="…"` puts HTML such as a "New" button in
 the toolbar); `{{ sparkline(row.trend) }}` draws a small chart, fed by
 `page.extend(|order| json!({ "trend": … }))`. Column kinds: `text`, `number`, `money`, `date`,
 `datetime`, `bool`, `select`, `tags`, `image`, `color`, `custom`; each takes `.hidden()`,
@@ -2012,7 +2013,7 @@ async fn ship(state: &AppState, user: &User) -> Result {
 ```
 
 The bell: `App::new().module(Auth::new().notifications())`, then in the layout's bar
-`{% from "renox/ui.html" import notification_bell %}{{ notification_bell(unread_notifications) }}`:
+`<rx-notification-bell :count="unread_notifications"/>`:
 a badge, a panel of the latest (mark read/unread, delete, mark all read, clear, open = read +
 follow `url`), new ones live over Server-Sent Events (a toast + the badge), and the page
 `notifications.index` without JavaScript. Behind nginx: `proxy_buffering off` for

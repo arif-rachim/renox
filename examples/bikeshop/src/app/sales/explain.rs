@@ -200,7 +200,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "checkout.show.place",
                 },
                 Code {
-                    title: "Template: the kit's `wizard`, checked live, the summary asked again",
+                    title: "Template: the kit's `<rx-wizard>`, checked live, the summary asked again",
                     region: "checkout.show.template",
                 },
             ],
@@ -473,7 +473,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "orders.invoice.handler",
                 },
                 Code {
-                    title: "Template: a print button and the kit's `table`",
+                    title: "Template: a print button and the kit's `<rx-table>`",
                     region: "orders.invoice.template",
                 },
                 Code {
@@ -541,7 +541,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "sales.orders.index.handler",
                 },
                 Code {
-                    title: "Template: `link_tabs` by status and the kit's `table`",
+                    title: "Template: `<rx-link-tabs>` by status and the kit's `<rx-table>`",
                     region: "sales.orders.index.template",
                 },
             ],
@@ -618,7 +618,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "sales.orders.show.handler",
                 },
                 Code {
-                    title: "Template: `action_sheet` and `confirm` only where the user may act",
+                    title: "Template: `<rx-action-sheet>` and `<rx-confirm>` only where the user may act",
                     region: "sales.orders.show.template",
                 },
             ],
@@ -707,7 +707,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "sales.counter.pay",
                 },
                 Code {
-                    title: "Template: a searchable `select` from the server and the `keypad`",
+                    title: "Template: a searchable `<rx-select>` from the server and the `keypad`",
                     region: "sales.counter.template",
                 },
             ],

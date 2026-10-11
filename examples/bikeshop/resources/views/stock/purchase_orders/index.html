@@ -1,40 +1,32 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, link_tabs, link_button, table, empty, badge %}
-{% from "stock/_parts.html" import styles, order_status %}
-{% block seo %}{{ seo(title=t('stock.purchasing.title')) }}{% endblock %}
-
 {#- The active store's purchase orders (#240). -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack" data-bs-reveal>
-  {% call page_header(t('stock.purchasing.title'), subtitle=t('stock.purchasing.lead')) %}
-    {{ link_button(route('stock.suppliers'), t('stock.suppliers.title')) }}
-    {{ link_button(route('stock.purchasing.create'), t('stock.purchasing.new'), variant="primary", icon="plus") }}
-  {% endcall %}
-  {# [explain:stock.purchasing.template] #}
-  {%- set ns = namespace(items=[]) %}
-  {%- for key in tabs %}{% set ns.items = ns.items + [[route('stock.purchasing', status=key), t('stock.purchasing.tab.' ~ key)]] %}{% endfor %}
-  {{ link_tabs(ns.items, current=route('stock.purchasing', status=tab), label=t('stock.purchasing.tabs')) }}
-  {# [/explain:stock.purchasing.template] #}
-  {%- if orders.items %}
-  <div class="rx-card">
-  {% call table([t('stock.purchasing.number'), t('stock.purchasing.supplier'), t('stock.fields.status'), t('stock.purchasing.expected'), [t('stock.purchasing.total'), "num"]], caption=t('stock.purchasing.title')) %}
+<rx-page layout="layouts/staff.html" :title="t('stock.purchasing.title')">
+  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
+  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+  {% from "stock/_parts.html" import order_status %}
+  {% from "renox/pagination.html" import pagination %}
+  <rx-stack data-bs-reveal>
+    <rx-page-header :title="t('stock.purchasing.title')" :subtitle="t('stock.purchasing.lead')">
+      <rx-link-button route="stock.suppliers" :label="t('stock.suppliers.title')"/>
+      <rx-link-button route="stock.purchasing.create" :label="t('stock.purchasing.new')" variant="primary" icon="plus"/>
+    </rx-page-header>
     {# [explain:stock.purchasing.template] #}
-    {%- for row in orders.items %}
-    <tr>
-      <td><a class="rx-link" href="{{ route('stock.purchasing.show', row.order.id) }}">PO-{{ row.order.id }}</a>{% if row.order.suggested %} {{ badge(t('stock.purchasing.suggested'), kind="info") }}{% endif %}</td>
-      <td>{{ row.supplier }}</td>
-      <td>{{ order_status(row.order.status) }}</td>
-      <td>{{ row.order.expected_on | date("%d %b %Y") if row.order.expected_on else "—" }}</td>
-      <td class="rx-num">{{ row.order.total | money }}</td>
-    </tr>
+    {%- set ns = namespace(items=[]) %}
+    {%- for key in tabs %}{% set ns.items = ns.items + [[route('stock.purchasing', status=key), t('stock.purchasing.tab.' ~ key)]] %}{% endfor %}
+    <rx-link-tabs :items="ns.items" :current="route('stock.purchasing', status=tab)" :label="t('stock.purchasing.tabs')"/>
     {# [/explain:stock.purchasing.template] #}
-    {%- endfor %}
-  {% endcall %}
-  </div>
-  {% from "renox/pagination.html" import pagination %}{{ pagination(orders) }}
-  {%- else %}
-  <div class="rx-card">{{ empty(t('stock.purchasing.empty'), icon="clipboard-list") }}</div>
-  {%- endif %}
-</div>
-{% endblock %}
+    {%- if orders.items %}
+    {# [explain:stock.purchasing.template] #}
+    <rx-table :rows="orders.items" as="row" card :caption="t('stock.purchasing.title')">
+      <rx-column :label="t('stock.purchasing.number')"><a class="rx-link" href="{{ route('stock.purchasing.show', row.order.id) }}">PO-{{ row.order.id }}</a>{% if row.order.suggested %} <rx-badge kind="info">{{ t('stock.purchasing.suggested') }}</rx-badge>{% endif %}</rx-column>
+      <rx-column :label="t('stock.purchasing.supplier')">{{ row.supplier }}</rx-column>
+      <rx-column :label="t('stock.fields.status')">{{ order_status(row.order.status) }}</rx-column>
+      <rx-column :label="t('stock.purchasing.expected')">{{ row.order.expected_on | date("%d %b %Y") if row.order.expected_on else "—" }}</rx-column>
+      <rx-column :label="t('stock.purchasing.total')" align="num">{{ row.order.total | money }}</rx-column>
+    </rx-table>
+    {# [/explain:stock.purchasing.template] #}
+    {{ pagination(orders) }}
+    {%- else %}
+    <rx-card><rx-empty :title="t('stock.purchasing.empty')" icon="clipboard-list"/></rx-card>
+    {%- endif %}
+  </rx-stack>
+</rx-page>

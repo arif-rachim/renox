@@ -1,36 +1,33 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import select, button, link_button, date_picker, icon %}
-{% from "renox-blocks/blocks.html" import kanban %}
-{% from "workshop/_parts.html" import styles %}
-{% block seo %}{{ seo(title=t('workshop.board.title')) }}{% endblock %}
-
 {#- The workshop board (#236): the kanban block, one column per status; each
     move is an htmx POST checked on the server. The board reloads itself every
     minute (hx-get on #workshop-board) so other mechanics' moves show up. -#}
-{% block content %}
-{{ styles() }}
-<div class="bs-board">
-  {#- The page's title over a photo of the workshop's tool wall (public/app.css, `bs-banner`). -#}
-  <header class="bs-banner">
-    <img src="/images/site/workshop-tools.webp" alt="" width="1200" height="900">
-    <p class="bs-banner__eyebrow">{{ icon("wrench", size=16) }}<span>{{ t('workshop.nav.board') }}</span></p>
-    <h1 class="bs-banner__title">{{ t('workshop.board.title') }}</h1>
-    <p class="bs-banner__lead">{{ t('workshop.board.lead', count=count) }}</p>
-  </header>
-  {# [explain:workshop.board.template] #}
-  <form class="bs-board__filters" method="get" action="{{ route('workshop.board') }}" aria-label="{{ t('workshop.board.filters') }}">
-    {%- set m = namespace(list=[["", t('workshop.board.everyone')], ["none", t('workshop.board.unassigned')]]) %}
-    {%- for x in mechanics %}{% set m.list = m.list + [[x[0], x[1]]] %}{% endfor %}
-    {{ select("by", t('workshop.board.mechanic'), m.list, selected=by) }}
-    {{ date_picker("day", t('workshop.fields.day'), value=(day or none)) }}
-    {{ button(t('workshop.board.filter'), variant="secondary") }}
-    {%- if by or day %}{{ link_button(route('workshop.board'), t('workshop.board.clear'), variant="plain") }}{% endif %}
-    <span class="rx-spacer"></span>
-    {% if can('workorders.update') %}{{ link_button(route('workshop.walkin'), t('workshop.walkin.title'), variant="primary", icon="plus") }}{% endif %}
-  </form>
-  <div id="workshop-board" class="bs-board__body" hx-get="{{ request.path }}{% if request.query %}?{{ request.query }}{% endif %}" hx-trigger="every 60s" hx-select="#workshop-board" hx-swap="outerHTML">
-    {{ kanban("workshop-kanban", columns, url=route('workshop.move'), label=t('workshop.board.title')) }}
+<rx-page layout="layouts/staff.html" title="{{ t('workshop.board.title') }}">
+  {% from "renox/ui.html" import icon %}
+  {% from "renox-blocks/blocks.html" import kanban %}
+  {% from "workshop/_parts.html" import styles %}
+  {{ styles() }}
+  <div class="bs-board">
+    {#- The page's title over a photo of the workshop's tool wall (public/app.css, `bs-banner`). -#}
+    <header class="bs-banner">
+      <img src="/images/site/workshop-tools.webp" alt="" width="1200" height="900">
+      <p class="bs-banner__eyebrow">{{ icon("wrench", size=16) }}<span>{{ t('workshop.nav.board') }}</span></p>
+      <h1 class="bs-banner__title">{{ t('workshop.board.title') }}</h1>
+      <p class="bs-banner__lead">{{ t('workshop.board.lead', count=count) }}</p>
+    </header>
+    {# [explain:workshop.board.template] #}
+    <form class="bs-board__filters" method="get" action="{{ route('workshop.board') }}" aria-label="{{ t('workshop.board.filters') }}">
+      {%- set m = namespace(list=[["", t('workshop.board.everyone')], ["none", t('workshop.board.unassigned')]]) %}
+      {%- for x in mechanics %}{% set m.list = m.list + [[x[0], x[1]]] %}{% endfor %}
+      <rx-select name="by" label="{{ t('workshop.board.mechanic') }}" :options="m.list" :selected="by"/>
+      <rx-date-picker name="day" label="{{ t('workshop.fields.day') }}" :value="day or none"/>
+      <rx-button variant="secondary">{{ t('workshop.board.filter') }}</rx-button>
+      <rx-link-button rx-if="by or day" route="workshop.board" label="{{ t('workshop.board.clear') }}" variant="plain"/>
+      <span class="rx-spacer"></span>
+      <rx-link-button rx-if="can('workorders.update')" route="workshop.walkin" label="{{ t('workshop.walkin.title') }}" variant="primary" icon="plus"/>
+    </form>
+    <div id="workshop-board" class="bs-board__body" hx-get="{{ request.path }}{% if request.query %}?{{ request.query }}{% endif %}" hx-trigger="every 60s" hx-select="#workshop-board" hx-swap="outerHTML">
+      {{ kanban("workshop-kanban", columns, url=route('workshop.move'), label=t('workshop.board.title')) }}
+    </div>
+    {# [/explain:workshop.board.template] #}
   </div>
-  {# [/explain:workshop.board.template] #}
-</div>
-{% endblock %}
+</rx-page>

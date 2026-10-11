@@ -1,32 +1,24 @@
 {#- `staff.team.index`: who works in the active store (home store here, or a
     role given here) (src/app/staff/team.rs). `store`, `members` (staff,
     name, email, home_store, roles). -#}
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, table, badge, link_button, empty %}
-{% from "layouts/_text.html" import tx %}
-{% block seo %}{{ seo(title=t('staff.team.title', store=store.name)) }}{% endblock %}
-
-{% block content %}
-<div class="rx-stack" data-bs-reveal>
-  {% call page_header(t('staff.team.title', store=store.name), subtitle=t('staff.team.lead')) %}
-    {{ link_button(route('staff.invitations.create'), t('staff.invitations.title'), variant="primary", icon="plus") }}
-  {% endcall %}
-  {%- if members %}
-  {# [explain:staff.team.index.template] #}
-  {% call table([t('staff.team.name'), t('staff.team.roles'), t('staff.team.home'), t('staff.team.status'), ""], caption=t('staff.team.title', store=store.name)) %}
-    {%- for m in members %}
-    <tr id="member-{{ m.staff.id }}">
-      <td><a class="rx-link" href="{{ route('staff.team.show', m.staff.id) }}">{{ m.name }}</a><br><span class="rx-subtitle">{{ m.email }}</span></td>
-      <td>{% for role in m.roles %}{{ badge(tx(role)) }} {% else %}<span class="rx-subtitle">{{ t('staff.team.no_role') }}</span>{% endfor %}</td>
-      <td>{{ m.home_store }}</td>
-      <td>{% if m.staff.active %}{{ badge(t('staff.team.active'), "success") }}{% else %}{{ badge(t('staff.team.inactive'), "warning") }}{% endif %}</td>
-      <td>{{ link_button(route('staff.team.show', m.staff.id), t('staff.team.open'), size="small") }}</td>
-    </tr>
-    {%- endfor %}
-  {% endcall %}
-  {# [/explain:staff.team.index.template] #}
-  {%- else %}
-  <div class="rx-card">{{ empty(t('staff.team.empty'), none, route('staff.invitations.create'), t('staff.invitations.title'), icon="users") }}</div>
-  {%- endif %}
-</div>
-{% endblock %}
+<rx-page layout="layouts/staff.html" :title="t('staff.team.title', store=store.name)">
+  {% from "layouts/_text.html" import tx %}
+  <rx-stack data-bs-reveal>
+    <rx-page-header :title="t('staff.team.title', store=store.name)" :subtitle="t('staff.team.lead')">
+      <rx-link-button route="staff.invitations.create" :label="t('staff.invitations.title')" variant="primary" icon="plus"/>
+    </rx-page-header>
+    {%- if members %}
+    {# [explain:staff.team.index.template] #}
+    <rx-table :rows="members" as="m" :key="m.staff.id" :caption="t('staff.team.title', store=store.name)">
+      <rx-column :label="t('staff.team.name')"><a class="rx-link" id="member-{{ m.staff.id }}" href="{{ route('staff.team.show', m.staff.id) }}">{{ m.name }}</a><br><span class="rx-subtitle">{{ m.email }}</span></rx-column>
+      <rx-column :label="t('staff.team.roles')">{% for role in m.roles %}<rx-badge>{{ tx(role) }}</rx-badge> {% else %}<span class="rx-subtitle">{{ t('staff.team.no_role') }}</span>{% endfor %}</rx-column>
+      <rx-column :label="t('staff.team.home')">{{ m.home_store }}</rx-column>
+      <rx-column :label="t('staff.team.status')"><rx-badge rx-if="m.staff.active" kind="success">{{ t('staff.team.active') }}</rx-badge><rx-badge rx-else kind="warning">{{ t('staff.team.inactive') }}</rx-badge></rx-column>
+      <rx-column label=""><rx-link-button :href="route('staff.team.show', m.staff.id)" :label="t('staff.team.open')" size="small"/></rx-column>
+    </rx-table>
+    {# [/explain:staff.team.index.template] #}
+    {%- else %}
+    <rx-card><rx-empty :title="t('staff.team.empty')" route="staff.invitations.create" :action-label="t('staff.invitations.title')" icon="users"/></rx-card>
+    {%- endif %}
+  </rx-stack>
+</rx-page>
