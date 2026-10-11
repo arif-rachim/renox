@@ -40,8 +40,8 @@ Add the crate next to `renox`, at the same version:
 
 ```toml
 [dependencies]
-renox = "1.0"
-renox-oauth = "1.0"
+renox = "1.1.0-rc.1"
+renox-oauth = "1.1.0-rc.1"
 ```
 
 Then add the module, next to the `Auth` module:

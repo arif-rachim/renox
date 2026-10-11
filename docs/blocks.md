@@ -50,8 +50,8 @@ Add the crate next to `renox`, at the same version:
 
 ```toml
 [dependencies]
-renox = "1.0"
-renox-blocks = "1.0"
+renox = "1.1.0-rc.1"
+renox-blocks = "1.1.0-rc.1"
 ```
 
 Then add its module:

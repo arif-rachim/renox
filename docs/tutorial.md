@@ -51,8 +51,11 @@ Web apps have their own words. Here are the ones this tutorial uses, in plain En
 First install `rnx`, Renox's command-line tool. It makes new apps and writes code for you:
 
 ```bash
-cargo install renox-cli
+cargo install renox-cli --version 1.1.0-rc.1
 ```
+
+(`1.1.0-rc.1` is a release candidate for 1.1, so Cargo only installs it when you name the version.
+Without `--version` you get 1.0.0, whose new apps differ from this tutorial where it uses the `rx-*` tags.)
 
 Then make the app and run it:
 

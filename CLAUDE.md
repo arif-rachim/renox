@@ -1438,9 +1438,10 @@ picks the build, not the terminal.
   after #492 ("Esc closes it" on the About sheet, phone): the Spanish staff test logged in by
   clicking the form, #354's trigger; it logs in with `logInWithFetch(…, { keepCookies: true })`
   now. Then the workspace was set to `1.1.0-rc.1` (the owner's choice: a release candidate
-  before 1.1.0; README's install/clone lines, the plugin guides' `"1.0"` and the landing
-  page's version stay on 1.0.0 until 1.1.0 itself). Published when the owner runs
-  `cargo publish`.
+  before 1.1.0). Published on 2026-10-11 (all ten crates, tag `v1.1.0-rc.1`); the landing
+  page, the plugin guides' dependency lines, the tutorial's install line and the
+  generated llms.txt name `1.1.0-rc.1` (#505), while README's install/clone lines stay the
+  owner's. At 1.1.0 itself, set them back to the plain `"1.1"` / `cargo install renox-cli`.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
