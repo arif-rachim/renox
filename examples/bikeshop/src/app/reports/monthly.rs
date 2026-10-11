@@ -200,26 +200,26 @@ pub async fn workbook(state: &AppState, store_id: i64, month: NaiveDate) -> Resu
         .map(|s| (s.id, s.name))
         .collect();
     let in_month = |q: renox::db::Query<RevenueLine>| {
-        q.where_op("booked_at", ">=", from)
-            .where_op("booked_at", "<", until)
-            .order_by("booked_at")
-            .order_by("id")
+        q.where_(RevenueLine::BOOKED_AT.gte(from))
+            .where_(RevenueLine::BOOKED_AT.lt(until))
+            .order_by(RevenueLine::BOOKED_AT)
+            .order_by(RevenueLine::ID)
     };
-    let books = in_month(RevenueLine::where_eq("owner_store_id", store_id))
+    let books = in_month(RevenueLine::query().where_(RevenueLine::OWNER_STORE_ID.eq(store_id)))
         .get(db)
         .await?;
-    let work = in_month(RevenueLine::where_eq("operating_store_id", store_id))
+    let work = in_month(RevenueLine::query().where_(RevenueLine::OPERATING_STORE_ID.eq(store_id)))
         .get(db)
         .await?;
     let entries = IntercompanyEntry::query()
         .where_any(|q| {
-            q.where_eq("debtor_store_id", store_id)
-                .where_eq("creditor_store_id", store_id)
+            q.where_(IntercompanyEntry::DEBTOR_STORE_ID.eq(store_id))
+                .where_(IntercompanyEntry::CREDITOR_STORE_ID.eq(store_id))
         })
-        .where_op("booked_at", ">=", from)
-        .where_op("booked_at", "<", until)
-        .order_by("booked_at")
-        .order_by("id")
+        .where_(IntercompanyEntry::BOOKED_AT.gte(from))
+        .where_(IntercompanyEntry::BOOKED_AT.lt(until))
+        .order_by(IntercompanyEntry::BOOKED_AT)
+        .order_by(IntercompanyEntry::ID)
         .get(db)
         .await?;
     let report = Report {

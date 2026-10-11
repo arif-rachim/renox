@@ -31,19 +31,21 @@ use crate::app::staff::model::Staff;
 /// (that could be retired to sale stock).
 pub async fn index(State(db): State<Db>) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
-    let shelf = StockRow::where_eq("owner_store_id", store)
-        .where_eq("location_store_id", store)
-        .where_eq("category_kind", CategoryKind::Bike)
-        .where_op("available", ">", 0)
+    let shelf = StockRow::query()
+        .where_(StockRow::OWNER_STORE_ID.eq(store))
+        .where_(StockRow::LOCATION_STORE_ID.eq(store))
+        .where_(StockRow::CATEGORY_KIND.eq(CategoryKind::Bike))
+        .where_(StockRow::AVAILABLE.gt(0))
         .where_raw("sku NOT LIKE ?", ["%-USED-%"])
-        .order_by("product")
-        .order_by("sku")
+        .order_by(StockRow::PRODUCT)
+        .order_by(StockRow::SKU)
         .get(&db)
         .await?;
-    let bikes = RentalBike::where_eq("owner_store_id", store)
-        .where_eq("location_store_id", store)
-        .where_in("status", [BikeStatus::Available, BikeStatus::Maintenance])
-        .order_by("frame_number")
+    let bikes = RentalBike::query()
+        .where_(RentalBike::OWNER_STORE_ID.eq(store))
+        .where_(RentalBike::LOCATION_STORE_ID.eq(store))
+        .where_(RentalBike::STATUS.is_in([BikeStatus::Available, BikeStatus::Maintenance]))
+        .order_by(RentalBike::FRAME_NUMBER)
         .get(&db)
         .await?;
     let names = ledger::variant_names(&db, bikes.iter().map(|b| b.variant_id).collect()).await?;
@@ -189,15 +191,13 @@ pub async fn retire(
     let mut bike = access::find::<RentalBike>(db, &user, id).await?;
     access::require(&user, catalogue::FLEET_MANAGE, StoreAttr::Owner, &bike)?;
     let lang = state.current_lang();
-    let booked = Rental::where_eq("rental_bike_id", bike.id)
-        .where_in(
-            "status",
-            [
-                RentalStatus::Reserved,
-                RentalStatus::Active,
-                RentalStatus::Overdue,
-            ],
-        )
+    let booked = Rental::query()
+        .where_(Rental::RENTAL_BIKE_ID.eq(bike.id))
+        .where_(Rental::STATUS.is_in([
+            RentalStatus::Reserved,
+            RentalStatus::Active,
+            RentalStatus::Overdue,
+        ]))
         .exists(db)
         .await?;
     if booked || !matches!(bike.status, BikeStatus::Available | BikeStatus::Maintenance) {

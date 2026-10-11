@@ -187,8 +187,9 @@ async fn a_bike_owned_by_north_rented_out_by_south_books_revenue_to_north_and_a_
         .assert_status(303);
     let back = Rental::find(db, rental.id).await.unwrap().unwrap();
     assert!(back.late_fee > 0);
-    let entries = IntercompanyEntry::where_eq("source_type", "rentals")
-        .where_eq("source_id", rental.id)
+    let entries = IntercompanyEntry::query()
+        .where_(IntercompanyEntry::SOURCE_TYPE.eq("rentals"))
+        .where_(IntercompanyEntry::SOURCE_ID.eq(rental.id))
         .get(db)
         .await
         .unwrap();
@@ -220,8 +221,9 @@ async fn a_bike_owned_by_north_rented_out_by_south_books_revenue_to_north_and_a_
     // Booked once, however often the event comes.
     books::rental(db, rental.id).await.unwrap();
     assert_eq!(
-        IntercompanyEntry::where_eq("source_id", rental.id)
-            .where_eq("source_type", "rentals")
+        IntercompanyEntry::query()
+            .where_(IntercompanyEntry::SOURCE_ID.eq(rental.id))
+            .where_(IntercompanyEntry::SOURCE_TYPE.eq("rentals"))
             .count(db)
             .await
             .unwrap(),
@@ -257,7 +259,8 @@ async fn a_fleet_repair_by_another_store_is_charged_to_the_owner() {
     status::set_status(w.app.state(), &mut order, WorkStatus::Completed)
         .await
         .unwrap();
-    let entries = IntercompanyEntry::where_eq("source_type", "work_orders")
+    let entries = IntercompanyEntry::query()
+        .where_(IntercompanyEntry::SOURCE_TYPE.eq("work_orders"))
         .get(db)
         .await
         .unwrap();
@@ -279,7 +282,8 @@ async fn consigned_sales_and_returns_book_both_ways_and_the_rate_in_force_is_cop
         .unwrap();
     tx.commit().await.unwrap();
     // The owner changes South's rate; the sale's entry keeps 20 %.
-    Store::where_eq("id", w.south.id)
+    Store::query()
+        .where_(Store::ID.eq(w.south.id))
         .update(db, &[("fee_rate_bp", &2_500)])
         .await
         .unwrap();
@@ -289,7 +293,7 @@ async fn consigned_sales_and_returns_book_both_ways_and_the_rate_in_force_is_cop
         .unwrap();
     tx.commit().await.unwrap();
     let entries = IntercompanyEntry::query()
-        .order_by("id")
+        .order_by(IntercompanyEntry::ID)
         .get(db)
         .await
         .unwrap();
@@ -724,7 +728,8 @@ async fn monthly_settlements_balance_per_pair_and_both_stores_confirm() {
     );
     // Each settlement holds exactly its pair's entries, and nets them.
     for settlement in &made {
-        let held = IntercompanyEntry::where_eq("settlement_id", settlement.id)
+        let held = IntercompanyEntry::query()
+            .where_(IntercompanyEntry::SETTLEMENT_ID.eq(settlement.id))
             .get(db)
             .await
             .unwrap();
@@ -742,7 +747,7 @@ async fn monthly_settlements_balance_per_pair_and_both_stores_confirm() {
     }
     assert_eq!(
         IntercompanyEntry::query()
-            .where_null("settlement_id")
+            .where_(IntercompanyEntry::SETTLEMENT_ID.is_null())
             .count(db)
             .await
             .unwrap(),

@@ -400,13 +400,12 @@ and `rnx view:check` names a wrong one with its file and line.
 </rx-infolist>
 
 {# Rich text, Markdown and code editors, and a code entry: the renox-editors crate,
-   .module(renox_editors::Editors::new()) (docs/editors.md). They have no tag yet: macros. Each sends a plain field. #}
-{% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor, code_entry %}
-{{ rich_editor("body", "Body", value=post.body, required=true) }}   {# HTML: read it as RichText #}
-{{ markdown_editor("notes", "Notes", value=post.notes) }}           {# toolbar + Preview #}
-{{ code_editor("config", "Config", value=post.config, language="json") }}
-{{ post.body | rich_text }}                                         {# stored HTML, cleaned again #}
-{{ code_entry("Payload", call.payload, language="json") }}          {# in an infolist: coloured, copyable #}
+   .module(renox_editors::Editors::new()) (docs/editors.md). Each sends a plain field. #}
+<rx-rich-editor name="body" label="Body" :value="post.body" required/>   {# HTML: read it as RichText #}
+<rx-markdown-editor name="notes" label="Notes" :value="post.notes"/>     {# toolbar + Preview #}
+<rx-code-editor name="config" label="Config" :value="post.config" language="json"/>
+{{ post.body | rich_text }}                                              {# stored HTML, cleaned again #}
+<rx-code-entry label="Payload" :value="call.payload" language="json"/>   {# in an infolist: coloured, copyable #}
 {# Your own: rnx make:component price_tag -> components/price_tag.html, used as <app-price-tag>; it can use
    old(), error(), t(), can(), auth, csrf_field() like the page. rnx make:component --ui copies
    the kit into the app. {% if once('x') %} renders once per page.
@@ -416,8 +415,8 @@ and `rnx view:check` names a wrong one with its file and line.
 
 {# Stacks: the layout has {{ stack('head') }} in <head> and {{ stack('scripts') }} before
    </body>; any page, block or component adds to them, even after the head was rendered
-   (<rx-push stack="scripts" once="chart">…</rx-push>, or the macro form): #}
-{% call push('scripts', once='chart') %}<script src="{{ asset('chart.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}
+   (<rx-push>; `prepend` has no tag, so it stays a macro): #}
+<rx-push stack="scripts" once="chart"><script src="{{ asset('chart.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
 {% call prepend('head') %}<meta name="robots" content="noindex">{% endcall %}
 ```
 
@@ -472,7 +471,7 @@ pub async fn replicate(State(db): State<Db>, Path(id): Path<i64>) -> Result<View
 /// A file of any query, outside a grid's page (the grid only names the columns).
 pub async fn export(Path(format): Path<ExportFormat>, request: GridRequest) -> Result<Response> {
     let grid = Grid::new("products").column(Column::text("sku", "SKU")).column(Column::text("name", "Name"));
-    grid.export_as(Product::query().order_by("name"), format, &request).await
+    grid.export_as(Product::query().order_by(Product::NAME), format, &request).await
 }
 ```
 
@@ -796,32 +795,27 @@ async fn queries(db: &Db) -> Result {
     tea.save(db).await?; // UPDATE; sets updated_at
     // Read the rows that match, sorted by name, at most 10.
     let cheap = Product::query()
-        .where_op("price", "<", 20_000)
-        .where_like("name", "%tea%") // ignores case
-        .order_by("name")
-        .limit(10)
-        .get(db)
-        .await?;
-    // The same with typed columns: a misspelt field is a compile error, and the value's type is checked.
-    let cheap_typed = Product::query()
-        .where_(Product::PRICE.lt(20_000))
+        .where_(Product::PRICE.lt(20_000)) // typed columns: a misspelt field is a compile error, the value's type is checked
+        .where_(Product::NAME.like("%tea%")) // ignores case
         .order_by(Product::NAME)
+        .limit(10)
         .get(db)
         .await?;
     let one = Product::find_or_404(db, tea.id).await?; // missing row -> 404 page
     let total = Product::query().count(db).await?;
     let q = "coffee";
     let found = Product::query()
-        .where_any(|any| any.where_like("name", format!("%{q}%")).where_op("price", "<", 5_000)) // (… OR …)
-        .when(!q.is_empty(), |query| query.where_not_null("user_id"))
-        .where_between("price", 1_000, 50_000)
+        .where_any(|any| any.where_(Product::NAME.like(&format!("%{q}%"))).where_(Product::PRICE.lt(5_000))) // (… OR …)
+        .when(!q.is_empty(), |query| query.where_(Product::USER_ID.is_not_null()))
+        .where_(Product::PRICE.gte(1_000))
+        .where_(Product::PRICE.lte(50_000))
         .get(db)
         .await?;
     let revenue = Product::query().sum::<i64, _>(db, "price").await?; // avg, min, max
-    let names: Vec<String> = Product::query().order_by("name").pluck(db, "name").await?;
-    Product::where_eq("user_id", 1).update(db, &[("price", &12_000)]).await?; // sets updated_at
-    Product::where_eq("id", tea.id).increment(db, "price", 500).await?;
-    let first = Product::where_eq("name", "Tea").first_or_404(db).await?;
+    let names: Vec<String> = Product::query().order_by(Product::NAME).pluck(db, Product::NAME).await?;
+    Product::query().where_(Product::USER_ID.eq(1)).update(db, &[("price", &12_000)]).await?; // sets updated_at
+    Product::query().where_(Product::ID.eq(tea.id)).increment(db, "price", 500).await?;
+    let first = Product::query().where_(Product::NAME.eq("Tea")).first_or_404(db).await?;
     Product::insert_many(db, vec![Product { name: "Coffee".into(), ..Default::default() }]).await?;
     tea.delete(db).await?; // soft delete; .with_trashed() / .only_trashed() / restore()
     let _ = (cheap, one, total, found, revenue, names, first);
@@ -839,19 +833,19 @@ async fn more_queries(db: &Db) -> Result {
         .having_raw("COUNT(*) > ?", [1])
         .select_as(db, "user_id, COUNT(*)")
         .await?;
-    let mut tea = Product::where_eq("name", "Tea")
+    let mut tea = Product::query().where_(Product::NAME.eq("Tea"))
         .update_or_create(db, || Product { name: "Tea".into(), ..Default::default() }, |p| p.price = 9_500)
         .await?; // also first_or_new
     tea.refresh(db).await?; // reload after someone else changed it
     let page = Product::query().simple_paginate(db, 1, 50).await?; // no COUNT: prev/next only
     let feed = Product::query().cursor_paginate(db, None, 50).await?; // .next_cursor for the next call
-    let (sql, values) = Product::where_eq("price", 1).to_sql(db.dialect())?; // debugging
+    let (sql, values) = Product::query().where_(Product::PRICE.eq(1)).to_sql(db.dialect())?; // debugging
     let moved = db
         .transaction_retrying(3, |tx| {
             // committed on Ok, rolled back on Err, retried on SQLite busy / PostgreSQL conflicts
             // A lock covers row-reading calls only (get, first, pluck, select_as, a page's items),
             // not count, exists, sum/avg/min/max, update, increment or delete.
-            Box::pin(async move { Product::where_eq("id", 1).lock_for_update().first(&mut *tx).await })
+            Box::pin(async move { Product::query().where_(Product::ID.eq(1)).lock_for_update().first(&mut *tx).await })
         })
         .await?;
     let _ = (today, per_owner, page, feed, sql, values, moved);
@@ -860,22 +854,22 @@ async fn more_queries(db: &Db) -> Result {
 
 async fn even_more_queries(db: &Db) -> Result {
     let picked = Product::query()
-        .where_in("id", [1, 2, 3]) // also where_not_in; an empty list matches nothing
+        .where_(Product::ID.is_in([1, 2, 3])) // an empty list matches nothing
         // (a list of over 1000 values is sent as one JSON array)
-        .where_null("deleted_at")
-        .where_any(|any| any.where_eq("price", 0).where_all(|all| all.where_op("price", ">", 100).where_not_null("user_id")))
-        .order_by_desc("price") // also latest(): created_at DESC, id DESC (id DESC without created_at)
+        .where_(Product::DELETED_AT.is_null())
+        .where_any(|any| any.where_(Product::PRICE.eq(0)).where_all(|all| all.where_(Product::PRICE.gt(100)).where_(Product::USER_ID.is_not_null())))
+        .order_by_desc(Product::PRICE) // also latest(): created_at DESC, id DESC (id DESC without created_at)
         .offset(20)
         .limit(10)
         .get(db)
         .await?;
     let of_big_sellers = Product::query() // also where_not_in_query
-        .where_in_query("user_id", Product::query().where_op("price", ">", 100_000), "user_id")
+        .where_in_query("user_id", Product::query().where_(Product::PRICE.gt(100_000)), "user_id")
         .get(db)
         .await?;
-    let any_free = Product::where_eq("price", 0).exists(db).await?;
+    let any_free = Product::query().where_(Product::PRICE.eq(0)).exists(db).await?;
     let some = Product::find_many(db, [1, 2, 3]).await?; // in id order; missing ids are skipped
-    let coffee = Product::where_eq("name", "Coffee")
+    let coffee = Product::query().where_(Product::NAME.eq("Coffee"))
         .first_or_create(db, || Product { name: "Coffee".into(), ..Default::default() })
         .await?;
     Product::upsert(db, vec![coffee.clone()], &["name"], &["price"]).await?; // needs a unique index on name
@@ -886,7 +880,7 @@ async fn even_more_queries(db: &Db) -> Result {
         })
         .await?;
     let mut tx = db.begin().await?;
-    let row = Product::where_eq("id", 1).shared_lock().first(&mut tx).await?; // FOR SHARE on PostgreSQL
+    let row = Product::query().where_(Product::ID.eq(1)).shared_lock().first(&mut tx).await?; // FOR SHARE on PostgreSQL
     tx.commit().await?;
     let mut gone = Product::query().only_trashed().first_or_404(db).await?;
     gone.restore(db).await?; // a soft-deleted row back
@@ -895,9 +889,10 @@ async fn even_more_queries(db: &Db) -> Result {
 }
 ```
 
-Prefer the typed columns (`Product::PRICE.lt(20_000)`, `order_by(Product::NAME)`): the derive makes
-one constant per field, in SHOUTY_SNAKE_CASE. `#[model(no_typed_columns)]` turns them off for a struct
-that has its own items of those names; the string forms keep working.
+Write queries with the typed columns (`Product::PRICE.lt(20_000)`, `order_by(Product::NAME)`): the
+derive makes one constant per field, in SHOUTY_SNAKE_CASE. `#[model(no_typed_columns)]` turns them
+off for a struct that has its own items of those names. Column names that are only known at run
+time (a sort chosen by the user) are passed as `&str`.
 
 The query builder checks every column name against the model's fields, and `where_op` takes only
 `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `like` and `not like`. Anything else (and an `update` that
@@ -947,7 +942,7 @@ Relations are explicit: a method for one related row, and loaders for a page of 
 customers, two queries), `Pivot` for many-to-many (two queries: the pivot rows, then the
 models), `count_many`/`sum_many` for counts and totals per row; the others take one query
 each, no N+1). Filter by related rows with
-`.where_has(Review::where_eq("stars", 5), "product_id")` / `.where_doesnt_have(…)`.
+`.where_has(Review::query().where_(Review::STARS.eq(5)), "product_id")` / `.where_doesnt_have(…)`.
 For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRow)]` or a tuple.
 See [docs/relations.md](docs/relations.md): pivot columns (`attach_with`, `load_with_pivot`,
 `toggle`) and polymorphic relations (`Morph`) are there too.
@@ -986,7 +981,7 @@ struct Search {
 async fn index(State(db): State<Db>, Page(page): Page, Query(s): Query<Search>) -> Result<View> {
     let q = s.q.unwrap_or_default(); // user input is safe: only its words are used
     let posts = Post::search(&q) // every word, prefixes ("cof" → coffee), word forms
-        .where_eq("published", true)
+        .where_(Post::PUBLISHED.eq(true))
         .latest() // ties: newest first
         .paginate(&db, page, 20)
         .await?;
@@ -1131,7 +1126,7 @@ struct Order { id: i64, total: i64, status: String, created_at: Option<renox::db
 // "2026-09-01..2026-09-30"). Per day up to 92 days, per week (Monday-based ISO weeks,
 // labelled by the Monday) for 12w, else per month; period.per(Bucket::Week) picks the step.
 async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View> {
-    let paid = || Order::where_eq("status", "paid");
+    let paid = || Order::query().where_(Order::STATUS.eq("paid"));
     let sales = Trend::of(paid(), "created_at").over(period).sum(&state, "total").await?; // or count / average
     let before = Trend::of(paid(), "created_at").over(period.previous()).sum(&state, "total").await?;
     Ok(view("dashboard.html", context! {
@@ -1512,7 +1507,7 @@ struct Project { id: i64, team_id: i64, name: String }
 
 fn team_only(query: renox::db::Query<Project>) -> renox::db::Query<Project> {
     match renox::context::get::<CurrentTeam>() { // this request's (or job's) value
-        Some(team) => query.where_eq("team_id", team.0),
+        Some(team) => query.where_(Project::TEAM_ID.eq(team.0)),
         None => query.none(), // no team, no rows
     }
 }
@@ -1726,10 +1721,10 @@ impl Cart {
     }
 }
 
-// App::new().live_component::<Cart>(); a page handler mounts it, and the template includes it.
+// App::new().live_component::<Cart>(); a page handler mounts it, and the template shows it with <live-cart :component="cart"/>.
 async fn cart_page(ctx: LiveContext) -> Result<View> {
     let cart = ctx.mount(Cart::default()).await?;
-    Ok(view("cart.html", context! { cart })) // {% with component = cart %}{% include "renox/live.html" %}{% endwith %}
+    Ok(view("cart.html", context! { cart }))
 }
 
 // In tests: let mut c = app.live(Cart::default()); c.call_with("add", json!([3])).await;

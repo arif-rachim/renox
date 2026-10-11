@@ -76,10 +76,12 @@ pub fn allowed(from: WorkStatus, to: WorkStatus) -> bool {
 
 /// Labour and parts added up again from the order's tasks and parts.
 pub async fn recompute(db: &Db, order: &mut WorkOrder) -> Result {
-    let labour: i64 = WorkOrderTask::where_eq("work_order_id", order.id)
+    let labour: i64 = WorkOrderTask::query()
+        .where_(WorkOrderTask::WORK_ORDER_ID.eq(order.id))
         .sum(db, "price")
         .await?;
-    let parts: i64 = WorkOrderPart::where_eq("work_order_id", order.id)
+    let parts: i64 = WorkOrderPart::query()
+        .where_(WorkOrderPart::WORK_ORDER_ID.eq(order.id))
         .sum(db, "total")
         .await?;
     order.labour = labour;

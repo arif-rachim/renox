@@ -51,8 +51,14 @@ Web apps have their own words. Here are the ones this tutorial uses, in plain En
 First install `rnx`, Renox's command-line tool. It makes new apps and writes code for you:
 
 ```bash
-cargo install renox-cli
+cargo install renox-cli --version 1.1.0-rc.1
 ```
+
+(`1.1.0-rc.1` is a release candidate for 1.1, so Cargo only installs it when you name the version.
+Without `--version` you get 1.0.0, whose new apps differ from this tutorial where it uses the `rx-*` tags.)
+
+If something doesn't work later, `rnx doctor` says what this machine or app is missing (a
+linker, a database, a setting).
 
 Then make the app and run it:
 
@@ -245,15 +251,23 @@ use serde::{Deserialize, Serialize};
 /// and queries). `Serialize` lets templates read its fields. `Default`
 /// makes an empty bookmark to start from.
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
-#[model(table = "bookmarks")]
+#[model(table = "bookmarks", form)]
 pub struct Bookmark {
     /// The row's number. `0` means "not saved yet".
     pub id: i64,
-    /// The user who saved it.
+    /// The user who saved it. The app sets it, so it is not in the form.
+    #[form(skip)]
     pub user_id: i64,
+    /// Must be filled in, at most 200 characters.
+    #[form(validate(required, max = 200))]
     pub title: String,
+    /// Must be a web address (`http://` or `https://`). The label makes the
+    /// error say "The address field…" instead of "The url field…".
+    #[form(validate(required, url, max = 2000, label = "address"))]
     pub url: String,
     /// `Option` because the column may be empty (`NULL`): `None` means no note.
+    /// When it's there, at most 1000 characters.
+    #[form(validate(max = 1000))]
     pub note: Option<String>,
     /// Filled in by Renox when the bookmark is first saved.
     pub created_at: Option<DateTime>,
@@ -265,16 +279,35 @@ pub struct Bookmark {
 With `#[derive(Model)]`, you can now write things like:
 
 - `Bookmark::find(&db, 7)`: get bookmark number 7;
-- `Bookmark::where_eq("user_id", 7).latest().get(&db)`: user 7's bookmarks, newest first;
+- `Bookmark::query().where_(Bookmark::USER_ID.eq(7)).latest().get(&db)`: user 7's bookmarks,
+  newest first;
 - `bookmark.save(&db)` and `bookmark.delete(&db)`.
 
-A field name that doesn't exist is a compile error, so a typo is caught before the app even
-runs. Loading related rows (say, a bookmark's owner) is done explicitly, one query per page of
+`Bookmark::USER_ID` is a **typed column**: the derive writes one constant per field, and it
+knows the field's Rust type. A column that doesn't exist, or a value of the wrong type
+(`Bookmark::USER_ID.eq("seven")`), is a compile error, so a typo is caught before the app even
+runs.
+
+`form` in `#[model(table = "bookmarks", form)]` makes a second struct, `BookmarkForm`, from the
+model: the fields people type in (every field except `id`, the dates and any marked
+`#[form(skip)]`), with the rules written in `#[form(validate(…))]`. Step 4 uses it, so a new
+field is added in one place. Loading related rows (say, a bookmark's owner) is done explicitly, one query per page of
 rows; see [relations.md](relations.md).
 
 Save the files. `rnx serve` notices and runs the new migration (or run `rnx migrate`
 yourself; `rnx migrate:status` shows what has run). Curious? `rnx db:shell` opens a SQL prompt
 on the database.
+
+Now check that the model and the table agree:
+
+```bash
+rnx db:check
+```
+
+`make:model` registered the model with the app (`app.model::<…>()`, which step 3 keeps), and
+`db:check` compares its fields with the table the migrations build. Misspell a column in the
+SQL and it tells you which one. Later, when you add a field to a model, `rnx make:migration
+--auto add_something` writes the SQL for the difference, ready for you to read and run.
 
 > [!NOTE]
 > **Coming from Laravel:** a model is a plain struct, not an Eloquent class with magic
@@ -309,6 +342,13 @@ impl Module for Bookmarks {
         "bookmarks"
     }
 
+    /// Tells the app about this module's model (for `rnx db:check`) and the
+    /// page's data (for `rnx view:check`).
+    fn register(&self, app: &mut Registry) {
+        app.model::<Bookmark>();
+        app.view_data::<BookmarkList>();
+    }
+
     /// `GET /bookmarks` shows the list (the `index` handler). Only for
     /// people who are logged in.
     fn routes(&self) -> Routes {
@@ -316,6 +356,13 @@ impl Module for Bookmarks {
             .resource("/bookmarks", "bookmarks", Resource::new().index(index))
             .require_auth()
     }
+}
+
+/// What `bookmarks/index.html` gets: its fields are the template's variables.
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "bookmarks/index.html")]
+struct BookmarkList {
+    bookmarks: Paginated<Bookmark>,
 }
 
 /// Shows one page of the logged-in user's bookmarks.
@@ -326,12 +373,16 @@ impl Module for Bookmarks {
 async fn index(State(db): State<Db>, user: AuthUser, Page(page): Page) -> Result<View> {
     let bookmarks = page_of(&db, user.id, page).await?;
     // Fill in the template with the bookmarks and send the page.
-    Ok(view("bookmarks/index.html", context! { bookmarks }))
+    Ok(View::typed(BookmarkList { bookmarks }))
 }
 
 /// One page (20 rows) of the user's bookmarks, newest first.
 async fn page_of(db: &Db, user_id: i64, page: u32) -> Result<Paginated<Bookmark>> {
-    Bookmark::where_eq("user_id", user_id).latest().paginate(db, page, 20).await
+    Bookmark::query()
+        .where_(Bookmark::USER_ID.eq(user_id))
+        .latest()
+        .paginate(db, page, 20)
+        .await
 }
 # }
 ```
@@ -348,6 +399,10 @@ Let's go through it:
   request. `State(db): State<Db>` is the database, `AuthUser` the logged-in user (`user.id`,
   `user.name`, `user.email`), `Page(page)` the page number.
 - **`paginate`** gets one page of rows, plus the total, so the template can show page links.
+- **`BookmarkList`** is the page's data as a struct (`#[derive(ViewData)]`): it names its
+  template, and `View::typed` sends it. A template that uses a variable the struct lacks is
+  reported by `rnx view:check`, instead of silently showing an empty spot.
+- **`register`** tells the app about the model (`rnx db:check`) and about `BookmarkList`.
 - **`Result<View>`**: the function returns either a page or an error. `?` means "if this
   failed, stop here and return the error". Renox then shows an error page (with the details
   while you develop, and without them for visitors).
@@ -392,12 +447,12 @@ What's going on:
 - `<rx-page-header>`, `<rx-list>` and `<rx-empty>` are tags from Renox's **UI kit**: ready-made
   parts for a page's title, a list of rows and the "nothing here yet" message. They bring their
   own look, dark mode and keyboard support, so you write no CSS. Each tag is a call of a kit
-  macro (`page_header`, `list`, `empty` in `renox/ui.html`) that Renox writes for you when the
-  page loads, so the macros stay available when you prefer them. [ui.md](ui.md) lists them all.
+  tag or attribute that doesn't exist, or a route name that doesn't, is reported with the file
+  and line when the page loads. [ui.md](ui.md) lists them all.
 - `rx-for="bookmark in bookmarks.items"` repeats the `<li>` for every bookmark, and
   `{{ bookmark.title }}` prints its title.
-- Pagination has no tag; it stays a macro, imported from `renox/pagination.html` inside the
-  block (so the block can also be rendered on its own, as step 4 does).
+- The page links are the one part without a tag: `pagination` is imported from
+  `renox/pagination.html` inside the block (so the block can also be rendered on its own, as step 4 does).
 - Values are **escaped**: a title with `<script>` in it shows up as text and never runs.
 - `{% block bookmarks %}` gives the list a name. In step 4, the app sends back just this part.
 
@@ -419,7 +474,9 @@ links inside the `rx-navbar` tag, before the spacer:
 `auth.user.name` is their name. `route_is('bookmarks.*')` highlights the link on every
 bookmarks page.
 
-Reload the browser: **Bookmarks** in the bar leads to an empty list. Now log out and open
+Check the pages: `rnx view:check` loads every template and checks its tags, its route names
+and `BookmarkList`'s fields; it prints nothing wrong here, and `cargo test` runs the same check
+(`rnx new` made that test). Reload the browser: **Bookmarks** in the bar leads to an empty list. Now log out and open
 <http://127.0.0.1:3000/bookmarks>: you're sent to the login page, and back after logging in.
 
 ## 4. A form that saves without a reload
@@ -428,10 +485,11 @@ Next, a form above the list to save a new link. It's sent with **htmx**: instead
 whole new page, the browser gets back only the updated list and swaps it in. You write no
 JavaScript for this; htmx comes with Renox.
 
-### The form and its rules
+### The handler
 
-Add this to `src/app/bookmarks/mod.rs`, with `use renox::Toast;` and
-`use serde::Deserialize;` next to the other `use` lines:
+Add this to `src/app/bookmarks/mod.rs`, with `use renox::Toast;` next to the other `use` lines,
+and `BookmarkForm` next to `Bookmark` in `use model::Bookmark;` (so it reads
+`use model::{Bookmark, BookmarkForm};`):
 
 ```rust
 # fn main() {}
@@ -439,39 +497,32 @@ Add this to `src/app/bookmarks/mod.rs`, with `use renox::Toast;` and
 # pub mod model {
 #     use renox::prelude::*;
 #     #[derive(Model, serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
-#     #[model(table = "bookmarks")]
+#     #[model(table = "bookmarks", form)]
 #     pub struct Bookmark {
-#         pub id: i64, pub user_id: i64, pub title: String, pub url: String,
-#         pub note: Option<String>, pub created_at: Option<DateTime>, pub updated_at: Option<DateTime>,
+#         pub id: i64,
+#         #[form(skip)]
+#         pub user_id: i64,
+#         #[form(validate(required, max = 200))]
+#         pub title: String,
+#         #[form(validate(required, url, max = 2000, label = "address"))]
+#         pub url: String,
+#         #[form(validate(max = 1000))]
+#         pub note: Option<String>,
+#         pub created_at: Option<DateTime>, pub updated_at: Option<DateTime>,
 #     }
 # }
 # use renox::prelude::*;
 # use renox::Toast;
-# use serde::Deserialize;
-# use model::Bookmark;
+# use model::{Bookmark, BookmarkForm};
+# #[derive(serde::Serialize, ViewData)]
+# #[view(template = "bookmarks/index.html")]
+# struct BookmarkList { bookmarks: Paginated<Bookmark> }
 # async fn page_of(db: &Db, user_id: i64, page: u32) -> Result<Paginated<Bookmark>> {
-#     Bookmark::where_eq("user_id", user_id).latest().paginate(db, page, 20).await
+#     Bookmark::query().where_(Bookmark::USER_ID.eq(user_id)).latest().paginate(db, page, 20).await
 # }
-/// What the form sends, and the rules each field must pass.
-///
-/// `Deserialize` reads the form's fields into this struct; `Validate`
-/// turns each `#[validate(…)]` line into a check.
-#[derive(Deserialize, Validate)]
-struct BookmarkForm {
-    /// Must be filled in, at most 200 characters.
-    #[validate(required, max = 200)]
-    title: String,
-    /// Must be a web address (`http://` or `https://`). The label makes the
-    /// error say "The address field…" instead of "The url field…".
-    #[validate(required, url, max = 2000, label = "address")]
-    url: String,
-    /// May be left empty (`None`); when it's there, at most 1000 characters.
-    #[validate(max = 1000)]
-    note: Option<String>,
-}
-
 /// Saves a new bookmark from the form, then answers with the new list.
 ///
+/// `BookmarkForm` is the struct `#[model(form)]` made in step 2.
 /// `Valid(form)` only lets the function run when every rule passed, so
 /// `form` is always good input here. It must be the last argument.
 async fn store(
@@ -480,19 +531,11 @@ async fn store(
     htmx: Htmx,
     Valid(form): Valid<BookmarkForm>,
 ) -> Result<Response> {
-    // Make the row and save it. `..Default::default()` fills in the
-    // fields not named here (`id` and the dates).
-    let bookmark = Bookmark::create(
-        &db,
-        Bookmark {
-            user_id: user.id,
-            title: form.title,
-            url: form.url,
-            note: form.note,
-            ..Default::default()
-        },
-    )
-    .await?;
+    // Make the row: the owner is the logged-in user, and `fill` copies the
+    // form's fields onto it. Then save it.
+    let mut bookmark = Bookmark { user_id: user.id, ..Default::default() };
+    form.fill(&mut bookmark);
+    let bookmark = Bookmark::create(&db, bookmark).await?;
     // A small message that pops up on the page.
     let toast = Toast::success(format!("Saved “{}”.", bookmark.title));
 
@@ -500,7 +543,7 @@ async fn store(
         // htmx sent the form: answer with only the `bookmarks` block of
         // the page, which htmx swaps in.
         let bookmarks = page_of(&db, user.id, 1).await?;
-        let list = view("bookmarks/index.html", context! { bookmarks }).fragment("bookmarks");
+        let list = View::typed(BookmarkList { bookmarks }).fragment("bookmarks");
         return Ok((toast, list).into_response());
     }
     // Without JavaScript the form still works: go back to the list.
@@ -526,8 +569,11 @@ Now `POST /bookmarks` (named `bookmarks.store`) runs `store`.
 
 How it fits together:
 
-- **The rules** live on the form struct. `url` accepts only `http://` and `https://` addresses,
-  so nobody can save a `javascript:` link that would run code when clicked.
+- **The rules** live on the model's fields (`#[form(validate(…))]`, step 2), and `BookmarkForm`
+  carries them. `url` accepts only `http://` and `https://` addresses, so nobody can save a
+  `javascript:` link that would run code when clicked.
+- **`form.fill(&mut bookmark)`** copies the form's fields onto the row. Add a field to the
+  model and the form, the rules and `fill` all follow.
 - **`Valid<BookmarkForm>`** reads the form and checks the rules *before* your function runs.
   If something is wrong, `store` never runs, and the person sees what to fix:
   - with htmx, each error appears under its field and the page doesn't move;
@@ -540,7 +586,7 @@ How it fits together:
   redirect it waits for the next page, where `{{ toasts() }}` in the layout shows it.
 
 > [!NOTE]
-> **Coming from Laravel:** the struct with `#[validate(…)]` works like a Form Request, and
+> **Coming from Laravel:** the generated form struct works like a Form Request, and
 > `.fragment()` replaces the partial views you'd write for Livewire or htmx.
 
 ### The form in the view
@@ -568,7 +614,7 @@ Line by line:
 - `hx-post` makes htmx send it instead. `hx-target="#bookmarks"` and `hx-swap="outerHTML"`
   say what to do with the answer: replace the `<section id="bookmarks">` with it.
 - `<rx-form>` writes the `<form>` for you, with `method="post"` and the `action` of the named
-  route. It also adds a hidden security token (`csrf_field()` in a plain `<form>`). The token
+  route. It also adds a hidden security token. The token
   proves the form came from your own site, so another website can't post it in your name (this
   is called CSRF protection).
 - `x-data @htmx:after-request=…` is a little Alpine.js (it also comes with Renox): after a
@@ -643,10 +689,18 @@ Here is `src/app/bookmarks/mod.rs` with every action. The new parts are `edit`, 
 # pub mod model {
 #     use renox::prelude::*;
 #     #[derive(Model, serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
-#     #[model(table = "bookmarks")]
+#     #[model(table = "bookmarks", form)]
 #     pub struct Bookmark {
-#         pub id: i64, pub user_id: i64, pub title: String, pub url: String,
-#         pub note: Option<String>, pub created_at: Option<DateTime>, pub updated_at: Option<DateTime>,
+#         pub id: i64,
+#         #[form(skip)]
+#         pub user_id: i64,
+#         #[form(validate(required, max = 200))]
+#         pub title: String,
+#         #[form(validate(required, url, max = 2000, label = "address"))]
+#         pub url: String,
+#         #[form(validate(max = 1000))]
+#         pub note: Option<String>,
+#         pub created_at: Option<DateTime>, pub updated_at: Option<DateTime>,
 #     }
 #     impl Policy for Bookmark {
 #         fn allows(&self, user: &User, ability: &str) -> bool {
@@ -656,9 +710,8 @@ Here is `src/app/bookmarks/mod.rs` with every action. The new parts are `edit`, 
 # }
 use renox::Toast;
 use renox::prelude::*;
-use serde::Deserialize;
 
-use model::Bookmark;
+use model::{Bookmark, BookmarkForm};
 
 /// Everything about bookmarks.
 pub struct Bookmarks;
@@ -666,6 +719,12 @@ pub struct Bookmarks;
 impl Module for Bookmarks {
     fn name(&self) -> &'static str {
         "bookmarks"
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.model::<Bookmark>();
+        app.view_data::<BookmarkList>();
+        app.view_data::<BookmarkEdit>();
     }
 
     /// Every address of the bookmarks, for logged-in people only. The
@@ -686,21 +745,24 @@ impl Module for Bookmarks {
     }
 }
 
-/// What the form sends, and the rules each field must pass.
-#[derive(Deserialize, Validate)]
-struct BookmarkForm {
-    #[validate(required, max = 200)]
-    title: String,
-    #[validate(required, url, max = 2000, label = "address")]
-    url: String,
-    #[validate(max = 1000)]
-    note: Option<String>,
+/// What `bookmarks/index.html` gets.
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "bookmarks/index.html")]
+struct BookmarkList {
+    bookmarks: Paginated<Bookmark>,
+}
+
+/// What `bookmarks/edit.html` gets.
+#[derive(serde::Serialize, ViewData)]
+#[view(template = "bookmarks/edit.html")]
+struct BookmarkEdit {
+    bookmark: Bookmark,
 }
 
 /// Shows one page of the logged-in user's bookmarks.
 async fn index(State(db): State<Db>, user: AuthUser, Page(page): Page) -> Result<View> {
     let bookmarks = page_of(&db, user.id, page).await?;
-    Ok(view("bookmarks/index.html", context! { bookmarks }))
+    Ok(View::typed(BookmarkList { bookmarks }))
 }
 
 /// Saves a new bookmark from the form, then answers with the new list.
@@ -710,22 +772,14 @@ async fn store(
     htmx: Htmx,
     Valid(form): Valid<BookmarkForm>,
 ) -> Result<Response> {
-    let bookmark = Bookmark::create(
-        &db,
-        Bookmark {
-            user_id: user.id,
-            title: form.title,
-            url: form.url,
-            note: form.note,
-            ..Default::default()
-        },
-    )
-    .await?;
+    let mut bookmark = Bookmark { user_id: user.id, ..Default::default() };
+    form.fill(&mut bookmark);
+    let bookmark = Bookmark::create(&db, bookmark).await?;
     let toast = Toast::success(format!("Saved “{}”.", bookmark.title));
 
     if htmx.request {
         let bookmarks = page_of(&db, user.id, 1).await?;
-        let list = view("bookmarks/index.html", context! { bookmarks }).fragment("bookmarks");
+        let list = View::typed(BookmarkList { bookmarks }).fragment("bookmarks");
         return Ok((toast, list).into_response());
     }
     Ok((toast, Redirect::route("bookmarks.index", &[])?).into_response())
@@ -739,7 +793,7 @@ async fn store(
 async fn edit(user: AuthUser, Found(bookmark): Found<Bookmark>) -> Result<View> {
     // Not yours? Stop here with a 403 page.
     user.authorize("update", &bookmark)?;
-    Ok(view("bookmarks/edit.html", context! { bookmark }))
+    Ok(View::typed(BookmarkEdit { bookmark }))
 }
 
 /// Saves the edit form's changes, then goes back to the list.
@@ -751,9 +805,7 @@ async fn update(
 ) -> Result<(Toast, Redirect)> {
     // Check first, before changing anything.
     user.authorize("update", &bookmark)?;
-    bookmark.title = form.title;
-    bookmark.url = form.url;
-    bookmark.note = form.note;
+    form.fill(&mut bookmark);
     // Write the changes to the database (and set `updated_at`).
     bookmark.save(&db).await?;
     Ok((
@@ -778,7 +830,11 @@ async fn destroy(
 
 /// One page (20 rows) of the user's bookmarks, newest first.
 async fn page_of(db: &Db, user_id: i64, page: u32) -> Result<Paginated<Bookmark>> {
-    Bookmark::where_eq("user_id", user_id).latest().paginate(db, page, 20).await
+    Bookmark::query()
+        .where_(Bookmark::USER_ID.eq(user_id))
+        .latest()
+        .paginate(db, page, 20)
+        .await
 }
 # }
 ```
@@ -791,6 +847,8 @@ The new ideas:
 - **`authorize` comes first**, right after loading and before anything changes. Someone
   else's bookmark gets a 403 page, shown inside your layout
   (`resources/views/errors/default.html`).
+- **`form.fill(&mut bookmark)`** puts the form's values on the loaded row, so `update` doesn't
+  list the fields again.
 - **`save`** writes every field back to the row and updates `updated_at`; **`delete`** removes
   the row.
 - **`(Toast, Redirect)`**: a function can return several things at once. Here: a message, and
@@ -828,12 +886,12 @@ wrong, the browser goes back to the form. That's the other way errors come back:
 
 - **`method="PUT"`**: browsers can only send forms as `GET` or `POST`. `<rx-form>` sends a
   `POST` with a hidden field that tells Renox "treat this as a `PUT`", so the form reaches
-  `update` (`method_field('PUT')` in a plain form).
+  `update`.
 - **`<rx-form-errors/>`** lists all the errors at the top of the form. Each field also shows its
   own, and keeps what was typed.
 - **`:value="bookmark.url"`** fills the field with the saved value (a colon means the value is
   an expression, not text). After a failed save, what you typed wins over the saved value.
-- **`live`** (`data-live-validate` in a plain form) checks each field as soon as you leave it, using the same rules on the
+- **`live`** checks each field as soon as you leave it, using the same rules on the
   server. Nothing is saved until you press **Save changes**.
 
 In `index.html`, give each row its buttons. Replace the `<li>`:
@@ -952,8 +1010,9 @@ impl Job for SendDigest {
         // A week ago. `renox::db::now()` is "now" as the app sees it, which
         // tests can move forward (step 7).
         let since = renox::db::now() - TimeDelta::days(7);
-        let bookmarks = Bookmark::where_eq("user_id", user.id)
-            .where_op("created_at", ">=", since)
+        let bookmarks = Bookmark::query()
+            .where_(Bookmark::USER_ID.eq(user.id))
+            .where_(Bookmark::CREATED_AT.gte(since))
             .latest()
             .get(&state.db)
             .await?;
@@ -1030,8 +1089,8 @@ attachments and notifications.
 
 ### The schedule
 
-`make:job` also added a `register` method to the module, which tells the app about the job.
-Add the task to it, in `src/app/bookmarks/mod.rs`:
+`make:job` also added a line to the module's `register` method (the one from step 3), which
+tells the app about the job. Add the task to it, in `src/app/bookmarks/mod.rs`:
 
 ```rust
 # fn main() {}
@@ -1058,6 +1117,7 @@ impl Module for Bookmarks {
 
     /// Tells the app about this module's jobs and scheduled tasks.
     fn register(&self, app: &mut Registry) {
+        // … the model and the page data, as before
         // Workers can only run jobs they know about.
         app.job::<send_digest::SendDigest>();
         // Mondays at 08:00 (in APP_TIMEZONE), run `send_digests`. The task is
@@ -1359,6 +1419,9 @@ so change its `.assert_redirect("/")` to `.assert_redirect("/bookmarks")`.
 
 The test tools you used:
 
+- `cargo test` also runs the tests `rnx new` wrote: every template compiles
+  (`assert_views_compile`, the same check as `rnx view:check`), and the models match their tables (`assert_models_match_schema`, the same as `rnx db:check`), so a wrong tag or route name
+  fails the build of your CI, not a visitor's page.
 - `#[renox::test]` marks a function as a test (an `async` one).
 - `acting_as(&user)` logs that user in for the next requests; `htmx()` sends the next request
   the way htmx would.

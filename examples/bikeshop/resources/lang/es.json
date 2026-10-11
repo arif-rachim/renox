@@ -571,7 +571,7 @@
         "0": "Los datos de la bici como etiquetas y valores: la fecha de compra y el dinero gastado con el formato del kit (`format=\"date\"`, `\"money\"`), y el número de cuadro copiable para un formulario del seguro o de la policía.",
         "1": "El kit no tiene línea de tiempo; el bloque `history` del ejemplo dibuja los pedidos de taller como una lista ordenada con un marcador fechado cada uno (color **e** icono según el estado, nunca solo el color), con el cuerpo en Markdown (las tareas y piezas como lista, las notas como citas).",
         "2": "Las tareas, piezas y notas de todos los pedidos de taller llegan en una consulta cada una, y sus nombres y tiendas en unas pocas más (`belongs_to`), así que la página cuesta las mismas consultas con un servicio o con cincuenta.",
-        "3": "`own_bike` busca la bici por su id **y** por el cliente que ha iniciado sesión (dos `where_eq`), así que el id de otro cliente simplemente no se encuentra (404): no hay una comprobación aparte que olvidar y los ids no se pueden sondear."
+        "3": "`own_bike` busca la bici por su id **y** por el cliente que ha iniciado sesión (dos condiciones `eq` tipadas), así que el id de otro cliente simplemente no se encuentra (404): no hay una comprobación aparte que olvidar y los ids no se pueden sondear."
       }
     },
     "workshop.book": {
@@ -949,7 +949,7 @@
       "who": "Cajeros, tras una devolución; encargados que revisan un alquiler.",
       "under_hood": "El alquiler, sus pagos cobrados, la bici, la tienda donde estaba colocada (la última colocación que la movió, si no la dueña), las tres tiendas y luego `RentalRow::load`: unas diez consultas, sin escribir nada. Si la bici volvió a otra tienda, la página dice adónde enviarla.",
       "features": {
-        "0": "Los pagos son filas de la tabla compartida `payments` que apuntan al alquiler por `payable_type` + `payable_id` (la misma tabla que usan ventas y el taller), leídas con una consulta simple: `Payment::where_eq(…)` sobre las dos columnas y el estado pagado. Aquí solo hace falta un tipo de padre, así que no hace falta un cargador `Morph`.",
+        "0": "Los pagos son filas de la tabla compartida `payments` que apuntan al alquiler por `payable_type` + `payable_id` (la misma tabla que usan ventas y el taller), leídas con una consulta simple: `Payment::query().where_(Payment::PAYABLE_ID.eq(…))` sobre las dos columnas y el estado pagado. Aquí solo hace falta un tipo de padre, así que no hace falta un cargador `Morph`.",
         "1": "La contabilidad sigue a la tienda **dueña** copiada en el alquiler al reservar (así mover la bici después nunca la cambia): la dueña gana los ingresos y los recargos, la tienda operadora su comisión (`fee_rate_bp`, un 20 % por defecto) cuando son distintas. #245 escribe esos asientos con `RentalClosed`; el recibo muestra los mismos números.",
         "2": "Enteros en la unidad más pequeña, formateados en el idioma del visitante por `money` y `entry(…, format=\"money\")`, así ningún importe se formatea a mano."
       }
@@ -1125,7 +1125,7 @@
         "1": "La tabla filtra, suma y agrupa las columnas propias de un modelo, por eso las filas vienen de una vista de la base de datos, `stock_overview` (la existencia unida a su variante, producto y categoría, con `available` y `value_at_cost` ya calculados), leída con `#[derive(Model)] StockRow`: ninguna copia de los números que mantener al día. Los nombres de la tienda dueña y la de ubicación son columnas `Column::related`, leídas en la misma consulta de la página.",
         "2": "Las listas parten de `access::visible::<M>(permission)`: `scopes_with` de Renox convierte los roles de la persona en las tiendas donde puede verlo, y `Scopes::apply` arma la consulta \"tienda dueña en (…) **o** tienda de ubicación en (…)\", así la mercancía de North que está en South aparece para ambas tiendas y para nadie más. Un rol global (el dueño) lo ve todo, sin comprobar nunca el nombre de un rol.",
         "3": "Las cuatro vistas son enlaces (`?view=own|held|away|low`), así cada una es una dirección que se puede compartir y los filtros propios de la tabla quedan aparte; los recuentos de las pestañas son cuatro pequeñas consultas `count`, las mismas tenga lo que tenga la tienda.",
-        "4": "Las páginas de existencias añaden su script con `{% call push('scripts', once='stock-js') %}` desde `stock/_parts.html`: el diseño lo imprime donde está su `stack('scripts')`, una sola vez por muchas partes que lo pidan, y solo en las páginas que lo usan. La etiqueta lleva `nonce=\"{{ csp_nonce() }}\"`, así que también funciona con `CSP=strict`."
+        "4": "Las páginas de existencias añaden su script con `<rx-push stack=\"scripts\" once=\"stock-js\">` desde `stock/_parts.html`: el diseño lo imprime donde está su `stack('scripts')`, una sola vez por muchas partes que lo pidan, y solo en las páginas que lo usan. La etiqueta lleva `nonce=\"{{ csp_nonce() }}\"`, así que también funciona con `CSP=strict`."
       }
     },
     "stock.ledger": {
@@ -1161,7 +1161,7 @@
       "under_hood": "Tres consultas por página: el recuento, la página de envíos y todas las líneas de esos envíos a la vez (para las unidades y lo que está en tránsito), más una para los nombres de las tiendas. La prueba comprueba que el número no cambia con más envíos.",
       "features": {
         "0": "Las listas parten de `access::visible::<M>(permission)`: `scopes_with` de Renox convierte los roles de la persona en las tiendas donde puede verlo, y `Scopes::apply` arma la consulta \"tienda dueña en (…) **o** tienda de ubicación en (…)\", así la mercancía de North que está en South aparece para ambas tiendas y para nadie más. Un rol global (el dueño) lo ve todo, sin comprobar nunca el nombre de un rol.",
-        "1": "\"Nuestra o en nuestra tienda\": `where_any(|q| q.where_eq(\"owner_store_id\", store).where_eq(\"location_store_id\", store))` dentro de lo que `access::visible` permite, así el OR nunca amplía lo que la persona puede ver; las pestañas filtran por estado con `where_in`.",
+        "1": "\"Nuestra o en nuestra tienda\": `where_any(|q| q.where_(RentalBike::OWNER_STORE_ID.eq(store)).where_(RentalBike::LOCATION_STORE_ID.eq(store)))` dentro de lo que `access::visible` permite, así el OR nunca amplía lo que la persona puede ver; las pestañas filtran por estado con `where_in`.",
         "2": "Abiertos / en tránsito / todos como enlaces, y la lista como la tabla del kit con insignias de estado (`shipment_status` en `stock/_parts.html`) cuyo color y palabra coinciden, así el color nunca es la única pista."
       }
     },

@@ -120,10 +120,11 @@ pub async fn booked_minutes<'c, E: renox::db::Executor<'c>>(
     day: NaiveDate,
 ) -> Result<i64> {
     let (start, end) = day_bounds(config, day);
-    let minutes: i64 = WorkOrder::where_eq("store_id", store_id)
-        .where_op("status", "!=", WorkStatus::Cancelled)
-        .where_op("scheduled_for", ">=", start)
-        .where_op("scheduled_for", "<", end)
+    let minutes: i64 = WorkOrder::query()
+        .where_(WorkOrder::STORE_ID.eq(store_id))
+        .where_(WorkOrder::STATUS.ne(WorkStatus::Cancelled))
+        .where_(WorkOrder::SCHEDULED_FOR.gte(start))
+        .where_(WorkOrder::SCHEDULED_FOR.lt(end))
         .sum(db, "minutes")
         .await?;
     Ok(minutes)
@@ -143,10 +144,11 @@ pub async fn full_days(
     let last = today + Duration::days(BOOK_AHEAD_DAYS);
     let (from, _) = day_bounds(config, today);
     let (_, to) = day_bounds(config, last);
-    let orders: Vec<(DateTime, i64)> = WorkOrder::where_eq("store_id", store.id)
-        .where_op("status", "!=", WorkStatus::Cancelled)
-        .where_op("scheduled_for", ">=", from)
-        .where_op("scheduled_for", "<", to)
+    let orders: Vec<(DateTime, i64)> = WorkOrder::query()
+        .where_(WorkOrder::STORE_ID.eq(store.id))
+        .where_(WorkOrder::STATUS.ne(WorkStatus::Cancelled))
+        .where_(WorkOrder::SCHEDULED_FOR.gte(from))
+        .where_(WorkOrder::SCHEDULED_FOR.lt(to))
         .select_as(db, "scheduled_for, minutes")
         .await?;
     let mut per_day: std::collections::HashMap<NaiveDate, i64> = Default::default();
@@ -243,7 +245,8 @@ async fn book_in(
     config: &Config,
     new: &NewBooking,
 ) -> Result<std::result::Result<WorkOrder, DayProblem>> {
-    let store = Store::where_eq("id", new.store_id)
+    let store = Store::query()
+        .where_(Store::ID.eq(new.store_id))
         .lock_for_update()
         .first(&mut *tx)
         .await?
@@ -303,7 +306,8 @@ pub async fn move_booking(
     day: NaiveDate,
 ) -> Result<Option<DayProblem>> {
     let mut tx = db.begin_immediate().await?;
-    let store = Store::where_eq("id", order.store_id)
+    let store = Store::query()
+        .where_(Store::ID.eq(order.store_id))
         .lock_for_update()
         .first(&mut tx)
         .await?

@@ -156,8 +156,9 @@ pub struct KioskRow {
 pub async fn kiosks(State(db): State<Db>, session: Session) -> Result<View> {
     let store_id = crate::app::rentals::active_store()?;
     let store = Store::find_or_404(&db, store_id).await?;
-    let kiosks = Kiosk::where_eq("store_id", store_id)
-        .order_by_desc("id")
+    let kiosks = Kiosk::query()
+        .where_(Kiosk::STORE_ID.eq(store_id))
+        .order_by_desc(Kiosk::ID)
         .get(&db)
         .await?;
     let used: Vec<(i64, Option<DateTime>)> = renox::db::sql(

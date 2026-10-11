@@ -42,8 +42,8 @@ Add the crate next to `renox`:
 
 ```toml
 [dependencies]
-renox = "1.0"
-renox-admin = "1.0"
+renox = "1.1.0-rc.1"
+renox-admin = "1.1.0-rc.1"
 ```
 
 Then add the `Admin` module, after `Auth` (the panel is behind a login):
@@ -352,8 +352,8 @@ use renox_admin::Filter;
 /// The products resource's tabs.
 fn filters() -> Vec<Filter<Product>> {
     vec![
-        Filter::new("live", "Live", |q| q.where_eq("status", "live")),
-        Filter::new("low", "Low stock", |q| q.where_op("stock", "<", 5)),
+        Filter::new("live", "Live", |q| q.where_(Product::STATUS.eq("live"))),
+        Filter::new("low", "Low stock", |q| q.where_(Product::STOCK.lt(5))),
     ]
 }
 # let _ = filters();
@@ -382,7 +382,7 @@ fn publish() -> AdminAction<Product> {
     AdminAction::new("publish", "Publish", |products: Vec<Product>, cx| async move {
         let ids: Vec<i64> = products.iter().map(|p| p.id).collect();
         let n = Product::query()
-            .where_in("id", ids)
+            .where_(Product::ID.is_in(ids))
             .update(&cx.state.db, &[("status", &"live")])
             .await?;
         Ok(Toast::success(format!("{n} published.")))
@@ -416,7 +416,7 @@ fn reprice() -> AdminAction<Product> {
         for product in &products {
             let price = (product.price as f64 * (1.0 + percent / 100.0)).round() as i64;
             Product::query()
-                .where_eq("id", product.id)
+                .where_(Product::ID.eq(product.id))
                 .update(&cx.state.db, &[("price", &price)])
                 .await?;
         }
@@ -752,9 +752,8 @@ Grid columns of the `custom` kind are drawn by the page. The list includes
 
 ```html
 {#- resources/views/renox-admin/products/cells.html -#}
-{%- from "renox/ui.html" import badge -%}
 {%- if column.key == "level" -%}
-  {{ row.stock | number }} {% if row.stock < 5 %}{{ badge("Low", "warning") }}{% endif %}
+  {{ row.stock | number }} <rx-badge rx-if="row.stock < 5" kind="warning">Low</rx-badge>
 {%- endif -%}
 ```
 

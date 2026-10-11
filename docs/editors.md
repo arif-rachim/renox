@@ -4,11 +4,11 @@ Some fields need more than a text box: an article with bold words and links, not
 Markdown, a piece of JSON or a script. The `renox-editors` crate adds three form fields for
 them, and a way to show code on a detail page:
 
-- `rich_editor`: a word-processor-like editor (bold, italic, links, headings, quotes, lists)
+- `<rx-rich-editor>`: a word-processor-like editor (bold, italic, links, headings, quotes, lists)
   that sends HTML;
-- `markdown_editor`: a text area with a formatting toolbar and a **Preview** button;
-- `code_editor`: a code editor that colours the code as you type;
-- `code_entry`: code shown coloured and read-only in an infolist, with a copy button.
+- `<rx-markdown-editor>`: a text area with a formatting toolbar and a **Preview** button;
+- `<rx-code-editor>`: a code editor that colours the code as you type;
+- `<rx-code-entry>`: code shown coloured and read-only in an infolist, with a copy button.
 
 They're a separate crate, not part of the UI kit, because they bring JavaScript libraries
 (about 270 KB) that most pages don't need. A page loads them only when it uses one of these
@@ -47,8 +47,8 @@ Add the crate next to `renox`, at the same version:
 
 ```toml
 [dependencies]
-renox = "1.0"
-renox-editors = "1.0"
+renox = "1.1.0-rc.1"
+renox-editors = "1.1.0-rc.1"
 ```
 
 Then add its module:
@@ -62,7 +62,7 @@ pub fn app() -> App {
 }
 ```
 
-The module adds the fields' template macros (`renox-editors/editors.html`), the `rich_text`
+The module adds the fields' tags (`<rx-rich-editor>`, `<rx-markdown-editor>`, `<rx-code-editor>`, `<rx-code-entry>`), the `rich_text`
 filter, the route the Markdown preview uses (`POST /_renox/editors/preview`, named
 `editors.preview`) and the editors' scripts and styles under `/_renox/editors/`. The fields
 are built on the UI kit, so the page's layout needs `{{ renox_ui() }}` as for the kit's own
@@ -70,39 +70,35 @@ fields.
 
 ## The fields in a form
 
-Import the macros and use them like the kit's fields:
+Use the plugin's tags like the kit's fields:
 
 ```html
-{% from "renox/ui.html" import card, input, button %}
-{% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor %}
-
-<form method="post" action="{{ route('posts.store') }}" data-live-validate>
-  {{ csrf_field() }}
-  {% call card(title="New post") %}
-    {{ input("title", "Title", value=post.title, required=true) }}
-    {{ rich_editor("body", "Body", value=post.body, required=true) }}
-    {{ markdown_editor("notes", "Notes", value=post.notes, hint="Markdown") }}
-    {{ code_editor("settings", "Settings", value=post.settings, language="json") }}
-    {{ button("Save") }}
-  {% endcall %}
-</form>
+<rx-form route="posts.store" live>
+  <rx-card title="New post">
+    <rx-input name="title" label="Title" :value="post.title" required/>
+    <rx-rich-editor name="body" label="Body" :value="post.body" required/>
+    <rx-markdown-editor name="notes" label="Notes" :value="post.notes" hint="Markdown"/>
+    <rx-code-editor name="settings" label="Settings" :value="post.settings" language="json"/>
+    <rx-button label="Save"/>
+  </rx-card>
+</rx-form>
 ```
 
-The fields are also tags (the plugin registers them): `<rx-rich-editor name="body" label="Body" :value="post.body" required/>`,
-`<rx-markdown-editor …/>`, `<rx-code-editor … language="json"/>`, and `<rx-code-entry label="Settings" :value="post.settings" language="json"/>`
-for an infolist. They take the same arguments as the macros.
+`<rx-code-entry label="Settings" :value="post.settings" language="json"/>` shows code in an
+infolist (see below). The tags take the arguments listed under "Options"; the macros they call
+live in `renox-editors/editors.html`.
 
 Each one sends a plain form field named like its first argument:
 
 | Field | What it sends | Without JavaScript |
 |---|---|---|
-| `rich_editor("body", …)` | the HTML, in a hidden `body` input | not editable |
-| `markdown_editor("notes", …)` | the Markdown as typed, from a `notes` textarea | a plain textarea |
-| `code_editor("settings", …)` | the code as typed, from a `settings` textarea | a plain textarea |
+| `<rx-rich-editor name="body">` | the HTML, in a hidden `body` input | not editable |
+| `<rx-markdown-editor name="notes">` | the Markdown as typed, from a `notes` textarea | a plain textarea |
+| `<rx-code-editor name="settings">` | the code as typed, from a `settings` textarea | a plain textarea |
 
 So they behave like the kit's other fields: after a failed submit they show what was typed
-(`old`), their error appears under them, a `hint` goes under the label, `required=true` drops
-the "(optional)" note, and a form with `data-live-validate` checks them when you leave them.
+(`old`), their error appears under them, a `hint` goes under the label, `required` drops
+the "(optional)" note, and a `<rx-form live>` checks them when you leave them.
 
 ## Reading the form
 
@@ -179,19 +175,16 @@ Markdown as text, and templates escape code.
 ## Showing what was saved
 
 ```html
-{% from "renox/ui.html" import infolist, entry %}
-{% from "renox-editors/editors.html" import code_entry %}
-
 <article class="rx-prose">{{ post.body | rich_text }}</article>
 
-{% call infolist(columns=2) %}
-  {{ entry("Notes", post.notes, format="markdown", span="full") }}
-  {{ code_entry("Settings", post.settings, language="json") }}
-  {{ code_entry("Webhook payload", call.payload) }}
-{% endcall %}
+<rx-infolist columns="2">
+  <rx-entry label="Notes" :value="post.notes" format="markdown" span="full"/>
+  <rx-code-entry label="Settings" :value="post.settings" language="json"/>
+  <rx-code-entry label="Webhook payload" :value="call.payload"/>
+</rx-infolist>
 ```
 
-`code_entry` shows the code coloured, in a box that scrolls sideways for long lines, with a
+`<rx-code-entry>` shows the code coloured, in a box that scrolls sideways for long lines, with a
 copy button (`copyable=false` to leave it out). A value that isn't text, such as a map or a
 list from `json!`, is shown as indented JSON (and coloured as JSON unless you give a
 `language`). `max_height="20rem"` makes long code scroll inside the box; `placeholder` stands
@@ -205,10 +198,10 @@ All three fields take the kit's usual arguments: `value`, `hint`, `required`, `p
 
 | Field | Its own options |
 |---|---|
-| `rich_editor` | `rows` (the height in lines before it scrolls, 8) |
-| `markdown_editor` | `rows` (8), `readonly` |
-| `code_editor` | `language` (below), `rows` (10), `tab` (what Tab inserts: two spaces), `readonly` |
-| `code_entry` | `language`, `copyable` (true), `max_height`, `placeholder` ("—"), `hint`, `span` ("full"), `hide_label`, `id` |
+| `<rx-rich-editor>` | `rows` (the height in lines before it scrolls, 8) |
+| `<rx-markdown-editor>` | `rows` (8), `readonly` |
+| `<rx-code-editor>` | `language` (below), `rows` (10), `tab` (what Tab inserts: two spaces), `readonly` |
+| `<rx-code-entry>` | `language`, `copyable` (true), `max_height`, `placeholder` ("—"), `hint`, `span` ("full"), `hide_label`, `id` |
 
 Languages: `rust`, `json`, `javascript`, `typescript`, `html`, `css`, `sql`, `bash`, `python`,
 `yaml`, `toml`, `markdown`, `diff` and `go`; `none` (the default) for plain text.

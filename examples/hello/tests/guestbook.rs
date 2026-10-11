@@ -221,3 +221,10 @@ fn the_release_build_embeds_every_resource() {
             .all(|v| !v.split('/').any(|part| part.starts_with('.')))
     );
 }
+
+#[renox::test]
+async fn the_models_and_views_are_sound() {
+    let app = app().await;
+    app.assert_models_match_schema().await;
+    app.assert_views_compile();
+}

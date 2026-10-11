@@ -125,7 +125,7 @@ impl Product {
     ///
     /// The product's reviews, best first.
     pub async fn reviews(&self, db: &Db) -> Result<Vec<Review>> {
-        Review::where_eq("product_id", self.id).order_by_desc("stars").get(db).await
+        Review::query().where_(Review::PRODUCT_ID.eq(self.id)).order_by_desc(Review::STARS).get(db).await
     }
 }
 ```
@@ -176,11 +176,11 @@ struct ProductCard {
 
 /// A page of 20 products, each with its category, reviews and tags: 6 queries in all.
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
-    let products = Product::query().order_by("name").paginate(&db, page, 20).await?; // 2 queries
+    let products = Product::query().order_by(Product::NAME).paginate(&db, page, 20).await?; // 2 queries
     // The categories of all 20 products, keyed by category id.
     let mut categories = belongs_to::<Category, _, _>(&db, &products.items, |p| p.category_id).await?; // 1
     // The reviews of all 20 products, grouped by product id, best first.
-    let mut reviews = has_many(&db, &products.items, Review::query().order_by_desc("stars"),
+    let mut reviews = has_many(&db, &products.items, Review::query().order_by_desc(Review::STARS),
                                "product_id", |r| r.product_id).await?; // 1
     // The tags of all 20 products, grouped by product id.
     let mut tags = PRODUCT_TAGS.load_for::<Tag, _>(&db, &products.items).await?; // 2
@@ -481,10 +481,10 @@ active category, and (when there is a search text) whose name matches it or whos
 # #[derive(Model, serde::Serialize, Default)] #[model(table = "products")] struct Product { id: i64, category_id: Option<i64>, name: String, price: i64 }
 # async fn demo(db: Db, q: String) -> Result {
 let products = Product::query()
-    .where_in_query("category_id", Category::where_eq("active", true), "id") // IN (SELECT id FROM categories …)
+    .where_in_query("category_id", Category::query().where_(Category::ACTIVE.eq(true)), "id") // IN (SELECT id FROM categories …)
     // Only when `q` isn't empty: the name contains `q`, OR the price is under 10,000.
     .when(!q.is_empty(), |query| {
-        query.where_any(|any| any.where_like("name", format!("%{q}%")).where_op("price", "<", 10_000))
+        query.where_any(|any| any.where_(Product::NAME.like(&format!("%{q}%"))).where_(Product::PRICE.lt(10_000)))
     })
     .get(&db)
     .await?;
@@ -500,6 +500,8 @@ What's going on:
 - `%` in `where_like` means "any text", so `%{q}%` finds `q` anywhere in the name.
 
 ## More of the query builder
+
+Where a column is named, `Model::COLUMN` (`Product::PRICE.lt(10_000)`, `.order_by(Product::NAME)`) is checked by the compiler; a string name still works. See [types.md](types.md#typed-columns).
 
 The query builder is the chain of methods you call on `Model::query()` (or `where_eq` and
 friends) to say which rows you want. This table lists more of it. The left column has

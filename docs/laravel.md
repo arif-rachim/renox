@@ -158,6 +158,7 @@ rnx make:module products --resource --fields "name:string price:money active:boo
                                   # make:model -mfc + resource controller + views + tests
 rnx make:model Product --module products --migration
 rnx make:migration add_sku_to_products
+rnx make:migration --auto add_sku     # SQL written from the models' changes (db:diff); rnx db:check compares models and tables
 rnx make:job SendReceipt --module products   # also make:mail, make:notification, make:policy,
                                              # make:command, make:event, make:rule, make:test, …
 rnx migrate                       # migrate:rollback, migrate:fresh --seed, migrate:status, db:seed
@@ -220,7 +221,7 @@ impl Module for Products {
 
 /// `State<Db>` hands the handler the database; there is no global connection.
 async fn index(State(db): State<Db>) -> Result<View> {
-    let products = Product::query().order_by("name").get(&db).await?;
+    let products = Product::query().order_by(Product::NAME).get(&db).await?;
     Ok(view("products/index.html", context! { products }))
 }
 
@@ -575,7 +576,7 @@ use renox::prelude::*;
 impl Post {
     /// A local scope (scopePublished) is a function returning a query.
     fn published() -> Query<Post> {
-        Post::where_eq("status", Status::Published)
+        Post::query().where_(Post::STATUS.eq(Status::Published))
     }
 }
 
@@ -583,11 +584,10 @@ impl Post {
 async fn queries(db: &Db) -> Result {
     let latest = Post::published().latest().limit(10).get(db).await?; // ->latest()->take(10)->get()
     let post = Post::find_or_404(db, 1).await?;                        // findOrFail → 404 page
-    let popular = Post::where_eq("user_id", 7).where_op("views", ">", 100).count(db).await?;
     let popular = Post::query().where_(Post::USER_ID.eq(7)).where_(Post::VIEWS.gt(100)).count(db).await?; // typed columns: checked at compile time
-    let titles: Vec<String> = Post::published().pluck(db, "title").await?;
+    let titles: Vec<String> = Post::published().pluck(db, Post::TITLE).await?;
     let page = Post::published().paginate(db, 1, 20).await?;          // ->paginate(20)
-    Post::where_eq("user_id", 7).update(db, &[("status", &Status::Draft)]).await?; // mass update
+    Post::query().where_(Post::USER_ID.eq(7)).update(db, &[("status", &Status::Draft)]).await?; // mass update
     // Change one model and save it.
     let mut post = post;
     post.title = "New title".into();
@@ -658,7 +658,7 @@ struct PostCard {
 
 /// `with(['author', 'comments'])`: one query per relation for the whole page.
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
-    let posts = Post::query().order_by_desc("id").paginate(&db, page, 20).await?;
+    let posts = Post::query().order_by_desc(Post::ID).paginate(&db, page, 20).await?;
     // One query for all the page's authors, one for all their comments.
     let mut authors = belongs_to::<Author, _, _>(&db, &posts.items, |p| p.author_id).await?;
     let mut comments = has_many(&db, &posts.items, Comment::query(), "post_id", |c| c.post_id).await?;

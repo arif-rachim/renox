@@ -92,12 +92,12 @@ pub async fn move_page(
 ) -> Result<View> {
     let chosen = selection(&state, &user, &token).await?;
     let products = Product::query()
-        .where_in("id", chosen.products)
-        .order_by("name")
+        .where_(Product::ID.is_in(chosen.products))
+        .order_by(Product::NAME)
         .get(&state.db)
         .await?;
     let categories: Vec<(String, String)> = Category::query()
-        .order_by("name")
+        .order_by(Category::NAME)
         .get(&state.db)
         .await?
         .into_iter()
@@ -126,7 +126,7 @@ pub async fn move_products(
 ) -> Result<(Toast, Redirect)> {
     let chosen = selection(&state, &user, &token).await?;
     let moved = Product::query()
-        .where_in("id", chosen.products.clone())
+        .where_(Product::ID.is_in(chosen.products.clone()))
         .update(&state.db, &[("category_id", &form.category_id)])
         .await?;
     state.cache.forget(&key(&token)).await?;
@@ -189,7 +189,7 @@ pub async fn fits(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
             "category_id IN (SELECT id FROM categories WHERE kind = ?)",
             vec![renox::db::ToDbValue::to_db_value(&other)],
         )
-        .order_by("name")
+        .order_by(Product::NAME)
         .get(&db)
         .await?
         .into_iter()

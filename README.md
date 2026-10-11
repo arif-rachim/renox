@@ -45,7 +45,7 @@ SQLite; on Linux `build-essential` or your distribution's equivalent, on macOS
 `xcode-select --install`).
 
 ```bash
-cargo install renox-cli       # installs `rnx`, Renox's command-line tool
+cargo install renox-cli --version 1.1.0-rc.1   # installs `rnx`, Renox's command-line tool
 rnx new blog && cd blog       # or: --starter, --database postgres, --tailwind
 rnx serve                     # http://127.0.0.1:3000
 ```
@@ -54,7 +54,10 @@ An app's name uses lowercase letters, digits, `-` and `_`, and starts with a let
 `coffee-shop`). Rust keywords and the names of crates the app uses (`renox`, `serde`, `tokio`,
 `std`, `test`, …) are refused, so `rnx new MyApp` and `rnx new test` fail.
 
-For the latest `main` instead of the release: `cargo install --locked --git
+`1.1.0-rc.1` is the release candidate for 1.1, so Cargo installs it only when you name the version;
+without `--version` you get the stable 1.0.0, which doesn't have the `rx-*` tags this README uses.
+
+For the latest `main` instead: `cargo install --locked --git
 https://github.com/arif-rachim/renox renox-cli`.
 
 Then, in the app:
@@ -127,7 +130,7 @@ pages. Run `cargo test`, `rnx db:check` and `rnx view:check` after changes.
    instead of fetching or guessing:
 
    ```bash
-   git clone --depth 1 --branch v1.0.0 https://github.com/arif-rachim/renox ~/src/renox
+   git clone --depth 1 --branch v1.1.0-rc.1 https://github.com/arif-rachim/renox ~/src/renox
    claude --add-dir ~/src/renox     # or, inside a session: /add-dir ~/src/renox
    ```
 
@@ -301,11 +304,11 @@ type in Rust, templates or the terminal.
 - `asset('app.css')` adds a content hash (`?v=…`) that changes when the file changes, so
   browsers can keep (cache) assets for a year and still get new versions.
 - Stacks: a page or component pushes a script or a `<meta>` into the layout's
-  `{{ stack('scripts') }}` / `{{ stack('head') }}`, once if asked (`{% call push('scripts', once='chart') %}`).
+  `{{ stack('scripts') }}` / `{{ stack('head') }}`, once if asked (`<rx-push stack="scripts" once="chart">`).
 - Tailwind CSS without Node: `rnx new --tailwind`, and `rnx serve` / `rnx build` run Tailwind's
   standalone CLI (downloaded once, checked by SHA-256).
 - Components see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit ships with
-  Renox, as tags or as the macros underneath them (`renox/ui.html`), with an editorial default
+  Renox, written as `rx-*` tags, with an editorial default
   theme (Inter and Poppins bundled, a type scale that puts the important figure first; `warm`
   and `classic` themes too):
   - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
@@ -546,7 +549,7 @@ Sentry or a chat channel. Error pages use the app's layout. While developing,
 | Jobs | Queue in your database (SQLite or PostgreSQL), run inside the same binary | Queue in Redis, PostgreSQL or SQLite, or in-process tasks | Up to you |
 | Auth, mail, uploads, i18n | Built in, with pages and translations | Mailers and storage built in; auth comes with the SaaS starter | Assemble from crates |
 | Deploy | One binary with its assets + `.env`; Dockerfile, systemd, Litestream generated | Binary + config; Dockerfile, nginx or AWS Lambda generated | Up to you |
-| Maturity | 1.0 on crates.io, one maintainer | Released on crates.io, larger community | Mature, widely used |
+| Maturity | 1.0.0 stable and a 1.1 release candidate on crates.io, one maintainer | Released on crates.io, larger community | Mature, widely used |
 
 Choose **Loco** if you prefer Rails conventions, SeaORM or a JavaScript front end. Choose
 **Axum on its own** if you want to assemble every piece yourself. Choose **Renox** if you want
@@ -610,7 +613,7 @@ Two examples, both on the UI kit:
 | `View::share` | `App::share` |
 | Tinker | `rnx db:shell` and your own commands (`App::command`) |
 | Artisan commands (`$signature`, `$this->ask()`, `confirm()`, `secret()`, `choice()`) | `impl AppCommand` on a clap struct, `renox::prompt::{ask, confirm, secret, choice}` |
-| `@push` / `@stack` | `{% call push('scripts') %}…{% endcall %}` / `{{ stack('scripts') }}` |
+| `@push` / `@stack` | `<rx-push stack="scripts">…</rx-push>` / `{{ stack('scripts') }}` |
 | Vite + Tailwind | `rnx new --tailwind` (the standalone CLI, no Node) |
 | Livewire | live components (`impl LiveComponent`, `rx-click`, `rx-model`) ([docs/live.md](docs/live.md)), or htmx and Alpine.js with handlers that return fragments |
 | Migrations written from the schema builder | `rnx make:migration --auto` from the models, `rnx db:check` |
@@ -640,12 +643,12 @@ change on `main`. The landing page and blog are [renox.rs](https://renox.rs) ([`
 - Plugins: [the admin panel](docs/admin.md), [billing](docs/billing.md),
   [social login](docs/oauth.md), [editors](docs/editors.md), [UI blocks](docs/blocks.md).
 - [llms.txt](llms.txt): a map of the docs and examples for coding agents.
-- The API reference: [docs.rs/renox](https://docs.rs/renox).
+- The API reference: [docs.rs/renox](https://docs.rs/renox/1.1.0-rc.1/renox/) (docs.rs shows a release candidate only at its own version address).
 - [ROADMAP.md](ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Status
 
-Renox **1.0.0** is on crates.io: `renox`, `renox-core`, `renox-macros`, `renox-cli`, and the
+Renox **1.1.0-rc.1** and the stable **1.0.0** are on crates.io: `renox`, `renox-core`, `renox-macros`, `renox-cli`, and the
 plugins `renox-2fa`, `renox-editors`, `renox-blocks`, `renox-oauth`, `renox-admin` and
 `renox-billing`. From here Renox follows semver ([docs/stability.md](docs/stability.md)). The [Laravel parity review](docs/audit/2026-10-laravel-parity.md)
 compares it with Laravel and Filament feature by feature, as of October 2026. Since the first

@@ -125,6 +125,14 @@ impl Module for Workshop {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::workshop::model::CustomerBike>()
+            .model::<crate::app::workshop::model::ServiceTask>()
+            .model::<crate::app::workshop::model::WorkOrder>()
+            .model::<crate::app::workshop::model::WorkOrderTask>()
+            .model::<crate::app::workshop::model::WorkOrderPart>()
+            .model::<crate::app::workshop::model::WorkOrderNote>()
+            .model::<crate::app::workshop::model::ExtraWork>();
         // A damaged or worn rental bike: a fleet work order, billed to its owner store.
         app.listen(|event: FleetRepairNeeded, state: AppState| async move {
             fleet::open_repair(&state, &event).await?;

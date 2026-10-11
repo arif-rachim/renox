@@ -179,7 +179,7 @@ async fn customer_of(db: &Db, user: Option<&User>) -> Result<Option<Customer>> {
 
 /// The city options, "City, Country", by country then city (two queries).
 async fn city_options(db: &Db) -> Result<Vec<(String, String)>> {
-    let cities = City::query().order_by("name").get(db).await?;
+    let cities = City::query().order_by(City::NAME).get(db).await?;
     let countries: HashMap<i64, Country> =
         belongs_to::<Country, _, _>(db, &cities, |c| c.country_id).await?;
     let mut options: Vec<(String, String, String)> = cities
@@ -322,8 +322,9 @@ pub async fn place(
     let mut customer = match customer_of(db, user).await? {
         Some(c) => c,
         None => match user {
-            None => Customer::where_eq("email", &form.email)
-                .where_null("user_id")
+            None => Customer::query()
+                .where_(Customer::EMAIL.eq(form.email.as_str()))
+                .where_(Customer::USER_ID.is_null())
                 .first(db)
                 .await?
                 .unwrap_or_default(),

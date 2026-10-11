@@ -28,7 +28,7 @@ pub async fn mechanics(db: &Db, store_id: i64) -> Result<Vec<(i64, String)>> {
     let users = staff_with_permission(db, catalogue::WORKORDERS_UPDATE, store_id).await?;
     let names: HashMap<i64, String> = users.iter().map(|u| (u.id, u.name.clone())).collect();
     let staff = Staff::query()
-        .where_in("user_id", users.iter().map(|u| u.id).collect::<Vec<_>>())
+        .where_(Staff::USER_ID.is_in(users.iter().map(|u| u.id).collect::<Vec<_>>()))
         .get(db)
         .await?;
     let mut list: Vec<(i64, String)> = staff
@@ -138,20 +138,28 @@ pub struct BoardQuery {
 pub async fn index(State(state): State<AppState>, Query(query): Query<BoardQuery>) -> Result<View> {
     let store = active_store()?;
     let db = &state.db;
-    let mut orders = WorkOrder::where_eq("store_id", store).where_in("status", BOARD);
+    let mut orders = WorkOrder::query()
+        .where_(WorkOrder::STORE_ID.eq(store))
+        .where_(WorkOrder::STATUS.is_in(BOARD));
     match query.by.as_str() {
         "" => {}
-        "none" => orders = orders.where_null("mechanic_id"),
-        id => orders = orders.where_eq("mechanic_id", id.parse::<i64>().unwrap_or_default()),
+        "none" => orders = orders.where_(WorkOrder::MECHANIC_ID.is_null()),
+        id => {
+            orders = orders.where_(WorkOrder::MECHANIC_ID.eq(id.parse::<i64>().unwrap_or_default()))
+        }
     }
     let day = NaiveDate::parse_from_str(&query.day, "%Y-%m-%d").ok();
     if let Some(day) = day {
         let (from, to) = capacity::day_bounds(&state.config, day);
         orders = orders
-            .where_op("scheduled_for", ">=", from)
-            .where_op("scheduled_for", "<", to);
+            .where_(WorkOrder::SCHEDULED_FOR.gte(from))
+            .where_(WorkOrder::SCHEDULED_FOR.lt(to));
     }
-    let orders = orders.order_by("scheduled_for").limit(300).get(db).await?;
+    let orders = orders
+        .order_by(WorkOrder::SCHEDULED_FOR)
+        .limit(300)
+        .get(db)
+        .await?;
     let cards = cards(&state, &orders).await?;
     // [/explain:workshop.board.handler]
     let lang = state.current_lang();
@@ -234,18 +242,18 @@ pub async fn customer_options(
 ) -> Result<Json<Vec<SelectOption>>> {
     let customers = if query.is_lookup() {
         Customer::query()
-            .where_in("id", query.values_as::<i64>())
+            .where_(Customer::ID.is_in(query.values_as::<i64>()))
             .get(&db)
             .await?
     } else {
         let q = query.q.trim().to_owned();
         Customer::query()
             .where_any(|any| {
-                any.where_like("name", format!("%{q}%"))
-                    .where_like("email", format!("%{q}%"))
-                    .where_like("phone", format!("%{q}%"))
+                any.where_(Customer::NAME.like(&format!("%{q}%")))
+                    .where_(Customer::EMAIL.like(&format!("%{q}%")))
+                    .where_(Customer::PHONE.like(&format!("%{q}%")))
             })
-            .order_by("name")
+            .order_by(Customer::NAME)
             .limit(20)
             .get(&db)
             .await?
@@ -273,7 +281,7 @@ pub async fn customer_options(
 pub async fn walk_in(State(state): State<AppState>) -> Result<View> {
     let store = active_store()?;
     let tasks: Vec<(i64, String)> = ServiceTask::query()
-        .order_by("name")
+        .order_by(ServiceTask::NAME)
         .get(&state.db)
         .await?
         .into_iter()
@@ -372,8 +380,9 @@ pub async fn walk_in_store(
     };
     // [/explain:workshop.walkin.store]
     let bike_name = form.bike.clone().unwrap_or_default();
-    let bike = match CustomerBike::where_eq("customer_id", customer.id)
-        .where_eq("name", bike_name.trim())
+    let bike = match CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .where_(CustomerBike::NAME.eq(bike_name.trim()))
         .first(db)
         .await?
     {

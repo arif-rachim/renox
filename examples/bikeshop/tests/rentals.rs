@@ -179,7 +179,8 @@ async fn touching_periods_are_fine_overlapping_ones_are_refused() {
     .unwrap();
     assert_eq!(elsewhere.unwrap_err(), Refusal::Gone);
     // The rental copies the owner store and the operating store.
-    let rentals = Rental::where_eq("rental_bike_id", w.bike.id)
+    let rentals = Rental::query()
+        .where_(Rental::RENTAL_BIKE_ID.eq(w.bike.id))
         .get(w.app.db())
         .await
         .unwrap();
@@ -241,7 +242,8 @@ async fn reserving_online_shows_the_price_then_holds_the_bike_once_paid() {
     let fields: Vec<(&str, &str)> = form.iter().map(|(k, v)| (*k, v.as_str())).collect();
     let res = w.app.post("/rent", &fields).await;
     res.assert_status(303);
-    let rental = Rental::where_eq("customer_id", c.id)
+    let rental = Rental::query()
+        .where_(Rental::CUSTOMER_ID.eq(c.id))
         .first(w.app.db())
         .await
         .unwrap()
@@ -272,8 +274,9 @@ async fn reserving_online_shows_the_price_then_holds_the_bike_once_paid() {
         .post(&format!("/rentals/{}/pay", rental.reservation_code), &[])
         .await;
     res.assert_status(303);
-    let payment = Payment::where_eq("payable_type", PAYABLE_RENTAL)
-        .where_eq("payable_id", rental.id)
+    let payment = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq(PAYABLE_RENTAL))
+        .where_(Payment::PAYABLE_ID.eq(rental.id))
         .first(w.app.db())
         .await
         .unwrap()
@@ -355,7 +358,8 @@ async fn customers_send_their_id_once_and_only_the_right_staff_see_the_photo() {
         )
         .await
         .assert_redirect("/rentals/identity");
-    let document = IdentityDocument::where_eq("customer_id", c.id)
+    let document = IdentityDocument::query()
+        .where_(IdentityDocument::CUSTOMER_ID.eq(c.id))
         .first(w.app.db())
         .await
         .unwrap()
@@ -378,7 +382,8 @@ async fn customers_send_their_id_once_and_only_the_right_staff_see_the_photo() {
 
     // With the ID sent, the reservation goes through; pick-up still needs it checked.
     w.app.post("/rent", &form).await.assert_status(303);
-    let rental = Rental::where_eq("customer_id", c.id)
+    let rental = Rental::query()
+        .where_(Rental::CUSTOMER_ID.eq(c.id))
         .first(w.app.db())
         .await
         .unwrap()
@@ -501,9 +506,10 @@ async fn a_bike_owned_by_north_rented_out_by_south_comes_back_late_and_damaged_a
         RentalBike::find(db, bike.id).await.unwrap().unwrap().status,
         BikeStatus::Rented
     );
-    let paid: i64 = Payment::where_eq("payable_type", PAYABLE_RENTAL)
-        .where_eq("payable_id", rental.id)
-        .where_eq("status", PaymentStatus::Paid)
+    let paid: i64 = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq(PAYABLE_RENTAL))
+        .where_(Payment::PAYABLE_ID.eq(rental.id))
+        .where_(Payment::STATUS.eq(PaymentStatus::Paid))
         .sum(db, "amount")
         .await
         .unwrap();
@@ -556,7 +562,8 @@ async fn a_bike_owned_by_north_rented_out_by_south_comes_back_late_and_damaged_a
     assert_eq!(bike_after.status, BikeStatus::Maintenance);
     assert_eq!(bike_after.ridden_hours, bike.ridden_hours + 5);
     // A fleet work order at West, billed to North.
-    let order = WorkOrder::where_eq("rental_bike_id", bike.id)
+    let order = WorkOrder::query()
+        .where_(WorkOrder::RENTAL_BIKE_ID.eq(bike.id))
         .first(db)
         .await
         .unwrap()
@@ -739,7 +746,8 @@ async fn bikes_due_for_service_get_a_work_order() {
     assert_eq!(tasks::service_due(w.app.state()).await.unwrap(), 1);
     let bike = RentalBike::find(db, bike.id).await.unwrap().unwrap();
     assert_eq!(bike.status, BikeStatus::Maintenance);
-    let order = WorkOrder::where_eq("rental_bike_id", bike.id)
+    let order = WorkOrder::query()
+        .where_(WorkOrder::RENTAL_BIKE_ID.eq(bike.id))
         .first(db)
         .await
         .unwrap()
@@ -933,7 +941,8 @@ async fn a_walk_in_rental_is_booked_at_the_counter() {
         )
         .await;
     res.assert_status(303);
-    let rental = Rental::where_eq("customer_id", c.id)
+    let rental = Rental::query()
+        .where_(Rental::CUSTOMER_ID.eq(c.id))
         .first(w.app.db())
         .await
         .unwrap()

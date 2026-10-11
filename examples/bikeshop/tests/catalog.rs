@@ -347,7 +347,8 @@ async fn pages_keep_the_filters_and_never_overlap() {
     let app = TestApp::new(bikeshop::app()).await;
     let s = shop(&app).await;
     let db = app.db();
-    let road = Category::where_eq("slug", "road-bikes")
+    let road = Category::query()
+        .where_(Category::SLUG.eq("road-bikes"))
         .first(db)
         .await
         .unwrap()
@@ -697,10 +698,10 @@ async fn catalogue_pages_use_a_fixed_number_of_queries_on_the_large_seed() {
     let bike = Product::query()
         .where_in_query(
             "category_id",
-            Category::where_eq("kind", CategoryKind::Bike),
+            Category::query().where_(Category::KIND.eq(CategoryKind::Bike)),
             "id",
         )
-        .order_by("id")
+        .order_by(Product::ID)
         .first(db)
         .await
         .unwrap()
@@ -708,10 +709,10 @@ async fn catalogue_pages_use_a_fixed_number_of_queries_on_the_large_seed() {
     let part = Product::query()
         .where_in_query(
             "category_id",
-            Category::where_eq("kind", CategoryKind::Part),
+            Category::query().where_(Category::KIND.eq(CategoryKind::Part)),
             "id",
         )
-        .order_by("id")
+        .order_by(Product::ID)
         .first(db)
         .await
         .unwrap()
@@ -763,7 +764,7 @@ async fn each_store_has_its_own_page_on_its_own_host() {
 }
 
 #[renox::test]
-async fn the_catalog_models_match_the_schema() {
+async fn the_models_match_the_schema() {
     TestApp::new(bikeshop::app())
         .await
         .assert_models_match_schema()

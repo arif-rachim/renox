@@ -83,6 +83,11 @@ impl renox::Module for Sales {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::sales::model::Order>()
+            .model::<crate::app::sales::model::OrderItem>()
+            .model::<crate::app::sales::model::Payment>()
+            .model::<crate::app::sales::model::SavedCart>();
         app.webhook::<gateway::Midtrans>()
             .job::<gateway::DemoNotify>()
             // The payments contract's events, for orders.
@@ -97,8 +102,9 @@ impl renox::Module for Sales {
                 let Some(user) = User::find(&state.db, event.user_id).await? else {
                     return Ok(());
                 };
-                let guests = Customer::where_eq("email", user.email.clone())
-                    .where_null("user_id")
+                let guests = Customer::query()
+                    .where_(Customer::EMAIL.eq(user.email.clone()))
+                    .where_(Customer::USER_ID.is_null())
                     .get(&state.db)
                     .await?;
                 for guest in guests {

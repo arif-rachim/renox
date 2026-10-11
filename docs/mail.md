@@ -512,11 +512,10 @@ in the layout (the starter kit, `rnx new --starter`, always has it). In an exist
 the bell in your layout's navigation bar (the kit's `navbar`, see [ui.md](ui.md)):
 
 ```html
-{% from "renox/ui.html" import navbar, notification_bell %}
-{% call navbar(app.name, href=route('home')) %}
+<rx-navbar brand="{{ app.name }}" href="{{ route('home') }}">
   <span class="rx-spacer"></span>
-  {{ notification_bell(unread_notifications) }} {# nothing for guests #}
-{% endcall %}
+  <rx-notification-bell :count="unread_notifications" /> {# nothing for guests #}
+</rx-navbar>
 ```
 
 What you get:

@@ -91,8 +91,9 @@ pub async fn show(
 ) -> Result<View> {
     let db = &state.db;
     let order = access::find::<WorkOrder>(db, &user, id).await?;
-    let tasks = WorkOrderTask::where_eq("work_order_id", order.id)
-        .order_by("id")
+    let tasks = WorkOrderTask::query()
+        .where_(WorkOrderTask::WORK_ORDER_ID.eq(order.id))
+        .order_by(WorkOrderTask::ID)
         .get(db)
         .await?;
     let names = belongs_to::<ServiceTask, _, _>(db, &tasks, |t| t.service_task_id).await?;
@@ -109,8 +110,9 @@ pub async fn show(
             done: t.done,
         })
         .collect();
-    let parts = WorkOrderPart::where_eq("work_order_id", order.id)
-        .order_by("id")
+    let parts = WorkOrderPart::query()
+        .where_(WorkOrderPart::WORK_ORDER_ID.eq(order.id))
+        .order_by(WorkOrderPart::ID)
         .get(db)
         .await?;
     let part_names = variant_names(db, parts.iter().map(|p| p.variant_id).collect()).await?;
@@ -130,8 +132,9 @@ pub async fn show(
             }
         })
         .collect();
-    let notes = WorkOrderNote::where_eq("work_order_id", order.id)
-        .order_by("id")
+    let notes = WorkOrderNote::query()
+        .where_(WorkOrderNote::WORK_ORDER_ID.eq(order.id))
+        .order_by(WorkOrderNote::ID)
         .get(db)
         .await?;
     let note_rows: Vec<renox::serde_json::Value> = notes
@@ -146,12 +149,13 @@ pub async fn show(
             })
         })
         .collect();
-    let extras = ExtraWork::where_eq("work_order_id", order.id)
-        .order_by_desc("id")
+    let extras = ExtraWork::query()
+        .where_(ExtraWork::WORK_ORDER_ID.eq(order.id))
+        .order_by_desc(ExtraWork::ID)
         .get(db)
         .await?;
     let all_tasks: Vec<(i64, String)> = ServiceTask::query()
-        .order_by("name")
+        .order_by(ServiceTask::NAME)
         .get(db)
         .await?
         .into_iter()
@@ -248,11 +252,13 @@ pub async fn tasks(
 ) -> Result<(Toast, Redirect)> {
     let order = workable(&state.db, &user, id).await?;
     let mut tx = state.db.begin().await?;
-    WorkOrderTask::where_eq("work_order_id", order.id)
+    WorkOrderTask::query()
+        .where_(WorkOrderTask::WORK_ORDER_ID.eq(order.id))
         .update(&mut tx, &[("done", &false)])
         .await?;
-    WorkOrderTask::where_eq("work_order_id", order.id)
-        .where_in("id", form.done)
+    WorkOrderTask::query()
+        .where_(WorkOrderTask::WORK_ORDER_ID.eq(order.id))
+        .where_(WorkOrderTask::ID.is_in(form.done))
         .update(&mut tx, &[("done", &true)])
         .await?;
     tx.commit().await?;
@@ -323,8 +329,9 @@ pub async fn photo(
     Path((id, note)): Path<(i64, i64)>,
 ) -> Result<Redirect> {
     let order = access::find::<WorkOrder>(&state.db, &user, id).await?;
-    let note = WorkOrderNote::where_eq("id", note)
-        .where_eq("work_order_id", order.id)
+    let note = WorkOrderNote::query()
+        .where_(WorkOrderNote::ID.eq(note))
+        .where_(WorkOrderNote::WORK_ORDER_ID.eq(order.id))
         .first_or_404(&state.db)
         .await?;
     let path = note.photo_path.ok_or(Error::NotFound)?;
@@ -349,44 +356,44 @@ pub async fn part_options(
     let order = access::find::<WorkOrder>(db, &user, id).await?;
     let variants = if query.is_lookup() {
         ProductVariant::query()
-            .where_in("id", query.values_as::<i64>())
+            .where_(ProductVariant::ID.is_in(query.values_as::<i64>()))
             .get(db)
             .await?
     } else {
         let products: Vec<i64> = match bike_product(db, &order).await? {
             Some(bike) => FITTING_PARTS.ids(db, bike).await?,
             None => {
-                let parts: Vec<i64> = Category::where_eq("kind", CategoryKind::Part)
-                    .pluck(db, "id")
+                let parts: Vec<i64> = Category::query()
+                    .where_(Category::KIND.eq(CategoryKind::Part))
+                    .pluck(db, Category::ID)
                     .await?;
                 Product::query()
-                    .where_in("category_id", parts)
-                    .pluck(db, "id")
+                    .where_(Product::CATEGORY_ID.is_in(parts))
+                    .pluck(db, Product::ID)
                     .await?
             }
         };
         let q = query.q.trim().to_owned();
         let named: Vec<i64> = Product::query()
-            .where_in("id", products)
-            .when(!q.is_empty(), |p| p.where_like("name", format!("%{q}%")))
+            .where_(Product::ID.is_in(products))
+            .when(!q.is_empty(), |p| {
+                p.where_(Product::NAME.like(&format!("%{q}%")))
+            })
             .limit(40)
-            .pluck(db, "id")
+            .pluck(db, Product::ID)
             .await?;
         ProductVariant::query()
-            .where_in("product_id", named)
-            .order_by("sku")
+            .where_(ProductVariant::PRODUCT_ID.is_in(named))
+            .order_by(ProductVariant::SKU)
             .limit(40)
             .get(db)
             .await?
     };
     let names = variant_names(db, variants.iter().map(|v| v.id).collect()).await?;
     let stock = StockLevel::query()
-        .where_in(
-            "variant_id",
-            variants.iter().map(|v| v.id).collect::<Vec<_>>(),
-        )
-        .where_eq("owner_store_id", order.store_id)
-        .where_eq("location_store_id", order.store_id)
+        .where_(StockLevel::VARIANT_ID.is_in(variants.iter().map(|v| v.id).collect::<Vec<_>>()))
+        .where_(StockLevel::OWNER_STORE_ID.eq(order.store_id))
+        .where_(StockLevel::LOCATION_STORE_ID.eq(order.store_id))
         .get(db)
         .await?;
     let lang = state.current_lang();
@@ -434,9 +441,10 @@ pub async fn take_part(
     let unit_price = crate::app::plans::part_price(db, order, variant.price).await?;
     // [explain:workshop.order.part]
     let mut tx = db.begin_immediate().await?;
-    let available = StockLevel::where_eq("variant_id", variant.id)
-        .where_eq("owner_store_id", order.store_id)
-        .where_eq("location_store_id", order.store_id)
+    let available = StockLevel::query()
+        .where_(StockLevel::VARIANT_ID.eq(variant.id))
+        .where_(StockLevel::OWNER_STORE_ID.eq(order.store_id))
+        .where_(StockLevel::LOCATION_STORE_ID.eq(order.store_id))
         .first(&mut tx)
         .await?
         .map(|l| l.available())
@@ -536,9 +544,10 @@ pub async fn take_waiting(
     Path((id, part)): Path<(i64, i64)>,
 ) -> Result<(Toast, Redirect)> {
     let mut order = workable(&state.db, &user, id).await?;
-    let line = WorkOrderPart::where_eq("id", part)
-        .where_eq("work_order_id", order.id)
-        .where_eq("status", PartStatus::Waiting)
+    let line = WorkOrderPart::query()
+        .where_(WorkOrderPart::ID.eq(part))
+        .where_(WorkOrderPart::WORK_ORDER_ID.eq(order.id))
+        .where_(WorkOrderPart::STATUS.eq(PartStatus::Waiting))
         .first_or_404(&state.db)
         .await?;
     let taken = take_part(
@@ -586,7 +595,7 @@ pub async fn propose(
     let lang = state.current_lang();
     let customer = status::customer_of(db, &order).await?;
     let mut items: Vec<ExtraItem> = ServiceTask::query()
-        .where_in("id", form.tasks.clone())
+        .where_(ServiceTask::ID.is_in(form.tasks.clone()))
         .get(db)
         .await?
         .into_iter()

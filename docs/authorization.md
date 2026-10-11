@@ -178,7 +178,7 @@ async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Resu
 /// The list of the user's invoices.
 async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
     // For `{% if can('update', invoice) %}` in the view, wrap each row with its answers.
-    let invoices: Vec<_> = Invoice::where_eq("user_id", user.id)
+    let invoices: Vec<_> = Invoice::query().where_(Invoice::USER_ID.eq(user.id))
         .get(&db)
         .await?
         .into_iter()
@@ -643,7 +643,7 @@ struct Project { id: i64, team_id: i64, name: String }
 /// The default scope: adds "only this team's rows" to every query of `Project`.
 fn team_only(query: renox::db::Query<Project>) -> renox::db::Query<Project> {
     match renox::context::get::<CurrentTeam>() {
-        Some(team) => query.where_eq("team_id", team.0),
+        Some(team) => query.where_(Project::TEAM_ID.eq(team.0)),
         None => query.none(), // no team, no rows: fail closed
     }
 }

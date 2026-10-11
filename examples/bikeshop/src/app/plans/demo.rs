@@ -318,7 +318,8 @@ pub async fn page(
 }
 
 async fn paying(state: &AppState, name: &str, key: &str) -> Result<Paying> {
-    let service = ServicePlan::where_eq("slug", slug_of(key))
+    let service = ServicePlan::query()
+        .where_(ServicePlan::SLUG.eq(slug_of(key)))
         .first(&state.db)
         .await?
         .ok_or(Error::NotFound)?;

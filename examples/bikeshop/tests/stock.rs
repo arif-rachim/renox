@@ -112,9 +112,10 @@ async fn put(db: &Db, variant: i64, owner: i64, location: i64, quantity: i64) ->
 }
 
 async fn level(db: &Db, variant: i64, owner: i64, location: i64) -> StockLevel {
-    StockLevel::where_eq("variant_id", variant)
-        .where_eq("owner_store_id", owner)
-        .where_eq("location_store_id", location)
+    StockLevel::query()
+        .where_(StockLevel::VARIANT_ID.eq(variant))
+        .where_(StockLevel::OWNER_STORE_ID.eq(owner))
+        .where_(StockLevel::LOCATION_STORE_ID.eq(location))
         .first(db)
         .await
         .unwrap()
@@ -268,7 +269,8 @@ async fn a_consignment_goes_from_request_to_recall_and_sales_at_b_are_booked_to_
         .assert_see(&format!("CS-{}", shipment.id));
 
     // South receives two now, the other three later: still North's.
-    let line = ConsignmentShipmentLine::where_eq("shipment_id", shipment.id)
+    let line = ConsignmentShipmentLine::query()
+        .where_(ConsignmentShipmentLine::SHIPMENT_ID.eq(shipment.id))
         .first(db)
         .await
         .unwrap()
@@ -653,7 +655,8 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
             .await
             .unwrap();
     assert_eq!(barcode.as_deref(), Some("8712345678901"));
-    let new = ProductVariant::where_eq("sku", "NEW-1")
+    let new = ProductVariant::query()
+        .where_(ProductVariant::SKU.eq("NEW-1"))
         .first(db)
         .await
         .unwrap()
@@ -664,14 +667,16 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
     );
     // The refused row left nothing behind (its savepoint rolled back).
     assert!(
-        ProductVariant::where_eq("sku", "NEW-2")
+        ProductVariant::query()
+            .where_(ProductVariant::SKU.eq("NEW-2"))
             .first(db)
             .await
             .unwrap()
             .is_none()
     );
     assert_eq!(
-        SupplierItem::where_eq("supplier_id", supplier.id)
+        SupplierItem::query()
+            .where_(SupplierItem::SUPPLIER_ID.eq(supplier.id))
             .count(db)
             .await
             .unwrap(),
@@ -770,8 +775,9 @@ async fn the_daily_reorder_check_suggests_an_order_and_a_consignment() {
                 .is_empty()
         );
     }
-    let drafts = PurchaseOrder::where_eq("store_id", w.south.id)
-        .where_eq("suggested", true)
+    let drafts = PurchaseOrder::query()
+        .where_(PurchaseOrder::STORE_ID.eq(w.south.id))
+        .where_(PurchaseOrder::SUGGESTED.eq(true))
         .get(db)
         .await
         .unwrap();
@@ -797,8 +803,9 @@ async fn the_daily_reorder_check_suggests_an_order_and_a_consignment() {
         .await
         .unwrap();
     assert_eq!(
-        PurchaseOrder::where_eq("store_id", w.south.id)
-            .where_eq("suggested", true)
+        PurchaseOrder::query()
+            .where_(PurchaseOrder::STORE_ID.eq(w.south.id))
+            .where_(PurchaseOrder::SUGGESTED.eq(true))
             .count(db)
             .await
             .unwrap(),
@@ -903,7 +910,8 @@ async fn bikes_move_between_sale_stock_and_the_fleet() {
         )
         .await
         .assert_redirect("/staff/stock/fleet");
-    let rental_bike = RentalBike::where_eq("frame_number", "FR-NEW-1")
+    let rental_bike = RentalBike::query()
+        .where_(RentalBike::FRAME_NUMBER.eq("FR-NEW-1"))
         .first(db)
         .await
         .unwrap()
@@ -964,7 +972,8 @@ async fn bikes_move_between_sale_stock_and_the_fleet() {
             .status,
         BikeStatus::Retired
     );
-    let used = ProductVariant::where_eq("sku", format!("{}-USED-{}", bike.sku, placed.id))
+    let used = ProductVariant::query()
+        .where_(ProductVariant::SKU.eq(format!("{}-USED-{}", bike.sku, placed.id)))
         .first(db)
         .await
         .unwrap()

@@ -46,15 +46,19 @@ pub struct Row {
 /// `PLAN_TASKS`), in three queries.
 // [explain:plans.index.query]
 pub async fn plans_with_tasks(db: &Db) -> Result<Vec<(ServicePlan, Vec<ServiceTask>)>> {
-    let plans = ServicePlan::where_eq("active", true)
-        .order_by("price")
+    let plans = ServicePlan::query()
+        .where_(ServicePlan::ACTIVE.eq(true))
+        .order_by(ServicePlan::PRICE)
         .get(db)
         .await?;
     let pairs: Vec<(i64, i64)> =
         renox::db::sql("SELECT service_plan_id, service_task_id FROM plan_tasks")
             .fetch_as::<(i64, i64)>(db)
             .await?;
-    let tasks = ServiceTask::query().order_by("name").get(db).await?;
+    let tasks = ServiceTask::query()
+        .order_by(ServiceTask::NAME)
+        .get(db)
+        .await?;
     let mut out: Vec<(ServicePlan, Vec<ServiceTask>)> = plans
         .into_iter()
         .map(|plan| {
@@ -211,12 +215,12 @@ pub fn first_visit(today: NaiveDate, weekday: i64) -> NaiveDate {
 /// The bikes of a customer that have a running plan already.
 pub async fn bikes_on_a_plan(db: &Db, bike_ids: Vec<i64>) -> Result<Vec<i64>> {
     PlanSubscription::query()
-        .where_in("customer_bike_id", bike_ids)
-        .where_in(
-            "status",
-            [SubscriptionStatus::Active, SubscriptionStatus::Paused],
+        .where_(PlanSubscription::CUSTOMER_BIKE_ID.is_in(bike_ids))
+        .where_(
+            PlanSubscription::STATUS
+                .is_in([SubscriptionStatus::Active, SubscriptionStatus::Paused]),
         )
-        .pluck(db, "customer_bike_id")
+        .pluck(db, PlanSubscription::CUSTOMER_BIKE_ID)
         .await
 }
 
@@ -230,8 +234,9 @@ pub async fn form(
 ) -> Result<View> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
-    let bikes = CustomerBike::where_eq("customer_id", customer.id)
-        .order_by("name")
+    let bikes = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .order_by(CustomerBike::NAME)
         .get(db)
         .await?;
     let taken = bikes_on_a_plan(db, bikes.iter().map(|b| b.id).collect()).await?;
@@ -240,8 +245,9 @@ pub async fn form(
         .filter(|b| !taken.contains(&b.id))
         .map(|b| (b.id, b.name.clone()))
         .collect();
-    let plans = ServicePlan::where_eq("active", true)
-        .order_by("price")
+    let plans = ServicePlan::query()
+        .where_(ServicePlan::ACTIVE.eq(true))
+        .order_by(ServicePlan::PRICE)
         .get(db)
         .await?;
     let chosen = query
@@ -347,8 +353,9 @@ impl Validate for SubscribeForm {
         };
         let customer = customer_of(db, user).await?;
         let bike = self.bike.unwrap_or_default();
-        let owns = CustomerBike::where_eq("id", bike)
-            .where_eq("customer_id", customer.id)
+        let owns = CustomerBike::query()
+            .where_(CustomerBike::ID.eq(bike))
+            .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
             .exists(db)
             .await?;
         if !owns {
@@ -358,8 +365,9 @@ impl Validate for SubscribeForm {
         }
         // [/explain:plans.subscribe.form]
         if let Some(slug) = &self.plan
-            && !ServicePlan::where_eq("slug", slug.as_str())
-                .where_eq("active", true)
+            && !ServicePlan::query()
+                .where_(ServicePlan::SLUG.eq(slug.as_str()))
+                .where_(ServicePlan::ACTIVE.eq(true))
                 .exists(db)
                 .await?
         {
@@ -397,7 +405,8 @@ pub async fn store(
     let db = &state.db;
     let bike = form.bike.unwrap_or_default();
     let slug = form.plan.clone().unwrap_or_default();
-    let plan = ServicePlan::where_eq("slug", slug.as_str())
+    let plan = ServicePlan::query()
+        .where_(ServicePlan::SLUG.eq(slug.as_str()))
         .first(db)
         .await?
         .ok_or(Error::NotFound)?;
@@ -410,8 +419,9 @@ pub async fn store(
     let today = visits::today(&state.config);
     // [explain:plans.subscribe.checkout]
     // An abandoned checkout of this bike is reused, not left behind.
-    let pending = PlanSubscription::where_eq("customer_bike_id", bike)
-        .where_eq("status", SubscriptionStatus::Pending)
+    let pending = PlanSubscription::query()
+        .where_(PlanSubscription::CUSTOMER_BIKE_ID.eq(bike))
+        .where_(PlanSubscription::STATUS.eq(SubscriptionStatus::Pending))
         .first(db)
         .await?;
     let mut sub = pending.unwrap_or_default();

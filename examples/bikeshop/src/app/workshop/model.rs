@@ -182,7 +182,7 @@ pub fn work_orders_of<'a>(
         CustomerBike::query(),
         "customer_id",
         |bike: &CustomerBike| bike.customer_id,
-        WorkOrder::query().order_by_desc("scheduled_for"),
+        WorkOrder::query().order_by_desc(WorkOrder::SCHEDULED_FOR),
         "customer_bike_id",
         |order: &WorkOrder| order.customer_bike_id,
     )

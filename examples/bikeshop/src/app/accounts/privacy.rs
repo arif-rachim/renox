@@ -123,8 +123,9 @@ pub async fn export(db: &Db, user: &User) -> Result<renox::serde_json::Value> {
             .map(|a| a.line()),
         None => None,
     };
-    let orders = Order::where_eq("customer_id", customer.id)
-        .order_by("id")
+    let orders = Order::query()
+        .where_(Order::CUSTOMER_ID.eq(customer.id))
+        .order_by(Order::ID)
         .get(db)
         .await?;
     let order_ids: Vec<i64> = orders.iter().map(|o| o.id).collect();
@@ -132,13 +133,14 @@ pub async fn export(db: &Db, user: &User) -> Result<renox::serde_json::Value> {
         Vec::new()
     } else {
         OrderItem::query()
-            .where_in("order_id", order_ids)
-            .order_by("id")
+            .where_(OrderItem::ORDER_ID.is_in(order_ids))
+            .order_by(OrderItem::ID)
             .get(db)
             .await?
     };
-    let bikes = CustomerBike::where_eq("customer_id", customer.id)
-        .order_by("id")
+    let bikes = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .order_by(CustomerBike::ID)
         .get(db)
         .await?;
     let bike_ids: Vec<i64> = bikes.iter().map(|b| b.id).collect();
@@ -147,13 +149,13 @@ pub async fn export(db: &Db, user: &User) -> Result<renox::serde_json::Value> {
     } else {
         (
             WorkOrder::query()
-                .where_in("customer_bike_id", bike_ids.clone())
-                .order_by("id")
+                .where_(WorkOrder::CUSTOMER_BIKE_ID.is_in(bike_ids.clone()))
+                .order_by(WorkOrder::ID)
                 .get(db)
                 .await?,
             PlanSubscription::query()
-                .where_in("customer_bike_id", bike_ids)
-                .order_by("id")
+                .where_(PlanSubscription::CUSTOMER_BIKE_ID.is_in(bike_ids))
+                .order_by(PlanSubscription::ID)
                 .get(db)
                 .await?,
         )
@@ -172,8 +174,8 @@ pub async fn export(db: &Db, user: &User) -> Result<renox::serde_json::Value> {
         "bikes": bikes,
         "orders": orders,
         "order_items": items,
-        "rentals": Rental::where_eq("customer_id", customer.id).order_by("id").get(db).await?,
-        "payments": Payment::where_eq("customer_id", customer.id).order_by("id").get(db).await?,
+        "rentals": Rental::query().where_(Rental::CUSTOMER_ID.eq(customer.id)).order_by(Rental::ID).get(db).await?,
+        "payments": Payment::query().where_(Payment::CUSTOMER_ID.eq(customer.id)).order_by(Payment::ID).get(db).await?,
         "work_orders": work_orders,
         "plan_subscriptions": plans,
     }))
@@ -213,7 +215,7 @@ pub async fn on_account_deleted(
 pub async fn erase(state: &AppState, id: i64) -> Result {
     let Some(customer) = Customer::query()
         .with_trashed()
-        .where_eq("id", id)
+        .where_(Customer::ID.eq(id))
         .first(&state.db)
         .await?
     else {
@@ -272,10 +274,9 @@ pub async fn erase(state: &AppState, id: i64) -> Result {
     // the workshop's slots are freed too.
     let running: Vec<crate::app::plans::model::PlanSubscription> =
         crate::app::plans::model::PlanSubscription::query()
-            .where_op(
-                "status",
-                "<>",
-                crate::app::plans::model::SubscriptionStatus::Cancelled,
+            .where_(
+                PlanSubscription::STATUS
+                    .ne(crate::app::plans::model::SubscriptionStatus::Cancelled),
             )
             .where_raw(
                 "customer_bike_id IN (SELECT id FROM customer_bikes WHERE customer_id = ?)",

@@ -99,18 +99,18 @@ pub fn rows_of(tab: &str, store: i64) -> renox::db::Query<StockRow> {
     let rows = access::visible::<StockRow>(catalogue::STOCK_VIEW);
     match tab {
         "held" => rows
-            .where_eq("location_store_id", store)
-            .where_op("owner_store_id", "!=", store),
+            .where_(StockRow::LOCATION_STORE_ID.eq(store))
+            .where_(StockRow::OWNER_STORE_ID.ne(store)),
         "away" => rows
-            .where_eq("owner_store_id", store)
-            .where_op("location_store_id", "!=", store),
+            .where_(StockRow::OWNER_STORE_ID.eq(store))
+            .where_(StockRow::LOCATION_STORE_ID.ne(store)),
         "low" => rows
-            .where_eq("location_store_id", store)
-            .where_op("reorder_level", ">", 0)
+            .where_(StockRow::LOCATION_STORE_ID.eq(store))
+            .where_(StockRow::REORDER_LEVEL.gt(0))
             .where_raw("available < reorder_level", Vec::<i64>::new()),
         _ => rows
-            .where_eq("owner_store_id", store)
-            .where_eq("location_store_id", store),
+            .where_(StockRow::OWNER_STORE_ID.eq(store))
+            .where_(StockRow::LOCATION_STORE_ID.eq(store)),
     }
 }
 // [/explain:stock.index.handler]
@@ -187,26 +187,26 @@ pub async fn show(
     let variant = names.get(&level.variant_id).cloned().unwrap_or_default();
     let stores = store_names(&db).await?;
     let store = |id: i64| stores.get(&id).cloned().unwrap_or_default();
-    let movements = StockMovement::where_eq("variant_id", level.variant_id)
-        .where_eq("owner_store_id", level.owner_store_id)
-        .where_eq("location_store_id", level.location_store_id)
-        .order_by_desc("id")
+    let movements = StockMovement::query()
+        .where_(StockMovement::VARIANT_ID.eq(level.variant_id))
+        .where_(StockMovement::OWNER_STORE_ID.eq(level.owner_store_id))
+        .where_(StockMovement::LOCATION_STORE_ID.eq(level.location_store_id))
+        .order_by_desc(StockMovement::ID)
         .paginate(&db, page, 25)
         .await?;
     // [/explain:stock.ledger.handler]
     // The level after each movement: from today's level, walking back.
-    let newer: i64 = StockMovement::where_eq("variant_id", level.variant_id)
-        .where_eq("owner_store_id", level.owner_store_id)
-        .where_eq("location_store_id", level.location_store_id)
+    let newer: i64 = StockMovement::query()
+        .where_(StockMovement::VARIANT_ID.eq(level.variant_id))
+        .where_(StockMovement::OWNER_STORE_ID.eq(level.owner_store_id))
+        .where_(StockMovement::LOCATION_STORE_ID.eq(level.location_store_id))
         .where_not_in(
             "reason",
             [MovementReason::Reserved, MovementReason::Released],
         )
         .when(!movements.items.is_empty(), |q| {
-            q.where_op(
-                "id",
-                ">",
-                movements.items.first().map(|m| m.id).unwrap_or_default(),
+            q.where_(
+                StockMovement::ID.gt(movements.items.first().map(|m| m.id).unwrap_or_default()),
             )
         })
         .sum(&db, "quantity")

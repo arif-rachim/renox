@@ -55,10 +55,11 @@ pub async fn watch(state: &AppState) -> Result {
 /// [`pricing::PAYMENT_WINDOW_MINUTES`] are called off.
 pub async fn lapse_unpaid(state: &AppState) -> Result<u64> {
     let before = renox::db::now() - Duration::minutes(pricing::PAYMENT_WINDOW_MINUTES);
-    let lapsed = Rental::where_eq("status", RentalStatus::Reserved)
-        .where_eq("deposit_status", DepositStatus::Unpaid)
-        .where_null("served_by")
-        .where_op("created_at", "<", before)
+    let lapsed = Rental::query()
+        .where_(Rental::STATUS.eq(RentalStatus::Reserved))
+        .where_(Rental::DEPOSIT_STATUS.eq(DepositStatus::Unpaid))
+        .where_(Rental::SERVED_BY.is_null())
+        .where_(Rental::CREATED_AT.lt(before))
         .get(&state.db)
         .await?;
     for mut rental in lapsed.iter().cloned() {
@@ -90,8 +91,9 @@ pub async fn lapse_unpaid(state: &AppState) -> Result<u64> {
 /// more than the deposit) and the rest is given back; the bike is free.
 pub async fn no_shows(state: &AppState) -> Result<u64> {
     let before = renox::db::now() - Duration::minutes(pricing::NO_SHOW_AFTER_MINUTES);
-    let missed = Rental::where_eq("status", RentalStatus::Reserved)
-        .where_op("starts_at", "<", before)
+    let missed = Rental::query()
+        .where_(Rental::STATUS.eq(RentalStatus::Reserved))
+        .where_(Rental::STARTS_AT.lt(before))
         .get(&state.db)
         .await?;
     for mut rental in missed.iter().cloned() {
@@ -103,8 +105,9 @@ pub async fn no_shows(state: &AppState) -> Result<u64> {
             rental.deposit_status = DepositStatus::Forfeited;
         }
         rental.save(&state.db).await?;
-        RentalBike::where_eq("id", rental.rental_bike_id)
-            .where_eq("status", BikeStatus::Reserved)
+        RentalBike::query()
+            .where_(RentalBike::ID.eq(rental.rental_bike_id))
+            .where_(RentalBike::STATUS.eq(BikeStatus::Reserved))
             .update(&state.db, &[("status", &BikeStatus::Available)])
             .await?;
         if let Some(customer) = Customer::find(&state.db, rental.customer_id).await? {
@@ -140,14 +143,11 @@ pub async fn no_shows(state: &AppState) -> Result<u64> {
 /// in-app notification, once.
 pub async fn reminders(state: &AppState) -> Result<u64> {
     let now = renox::db::now();
-    let due = Rental::where_eq("status", RentalStatus::Active)
-        .where_null("reminded_at")
-        .where_op("due_at", ">", now)
-        .where_op(
-            "due_at",
-            "<=",
-            now + Duration::minutes(pricing::REMIND_BEFORE_MINUTES),
-        )
+    let due = Rental::query()
+        .where_(Rental::STATUS.eq(RentalStatus::Active))
+        .where_(Rental::REMINDED_AT.is_null())
+        .where_(Rental::DUE_AT.gt(now))
+        .where_(Rental::DUE_AT.lte(now + Duration::minutes(pricing::REMIND_BEFORE_MINUTES)))
         .get(&state.db)
         .await?;
     for mut rental in due.iter().cloned() {
@@ -187,8 +187,8 @@ pub async fn reminders(state: &AppState) -> Result<u64> {
 pub async fn overdue(state: &AppState) -> Result<u64> {
     let now = renox::db::now();
     let late = Rental::query()
-        .where_in("status", [RentalStatus::Active, RentalStatus::Overdue])
-        .where_op("due_at", "<", now)
+        .where_(Rental::STATUS.is_in([RentalStatus::Active, RentalStatus::Overdue]))
+        .where_(Rental::DUE_AT.lt(now))
         .get(&state.db)
         .await?;
     let bike_ids: Vec<i64> = late.iter().map(|r| r.rental_bike_id).collect();
@@ -208,7 +208,8 @@ pub async fn overdue(state: &AppState) -> Result<u64> {
             continue;
         }
         newly += 1;
-        RentalBike::where_eq("id", rental.rental_bike_id)
+        RentalBike::query()
+            .where_(RentalBike::ID.eq(rental.rental_bike_id))
             .update(&state.db, &[("status", &BikeStatus::Overdue)])
             .await?;
         let url = super::link(state, "rentals.desk", Some(&rental.id))?;
@@ -266,19 +267,18 @@ pub async fn overdue(state: &AppState) -> Result<u64> {
 /// reserved one without is available again.
 pub async fn mark_reserved(state: &AppState) -> Result {
     let now = renox::db::now();
-    let soon: Vec<i64> = Rental::where_eq("status", RentalStatus::Reserved)
-        .where_op(
-            "starts_at",
-            "<",
-            now + Duration::minutes(pricing::RESERVED_AHEAD_MINUTES),
-        )
-        .pluck(&state.db, "rental_bike_id")
+    let soon: Vec<i64> = Rental::query()
+        .where_(Rental::STATUS.eq(RentalStatus::Reserved))
+        .where_(Rental::STARTS_AT.lt(now + Duration::minutes(pricing::RESERVED_AHEAD_MINUTES)))
+        .pluck(&state.db, Rental::RENTAL_BIKE_ID)
         .await?;
-    RentalBike::where_eq("status", BikeStatus::Available)
-        .where_in("id", soon.clone())
+    RentalBike::query()
+        .where_(RentalBike::STATUS.eq(BikeStatus::Available))
+        .where_(RentalBike::ID.is_in(soon.clone()))
         .update(&state.db, &[("status", &BikeStatus::Reserved)])
         .await?;
-    RentalBike::where_eq("status", BikeStatus::Reserved)
+    RentalBike::query()
+        .where_(RentalBike::STATUS.eq(BikeStatus::Reserved))
         .where_not_in("id", soon)
         .update(&state.db, &[("status", &BikeStatus::Available)])
         .await?;
@@ -289,7 +289,8 @@ pub async fn mark_reserved(state: &AppState) -> Result {
 /// interval go to the workshop: `maintenance`, and a work order through
 /// [`FleetRepairNeeded`] (the workshop area opens it).
 pub async fn service_due(state: &AppState) -> Result<u64> {
-    let bikes = RentalBike::where_eq("status", BikeStatus::Available)
+    let bikes = RentalBike::query()
+        .where_(RentalBike::STATUS.eq(BikeStatus::Available))
         .where_raw(
             "ridden_hours - serviced_at_hours >= ?",
             [pricing::SERVICE_EVERY_HOURS],
@@ -298,7 +299,8 @@ pub async fn service_due(state: &AppState) -> Result<u64> {
         .await?;
     let lang = state.current_lang();
     for bike in &bikes {
-        RentalBike::where_eq("id", bike.id)
+        RentalBike::query()
+            .where_(RentalBike::ID.eq(bike.id))
             .update(&state.db, &[("status", &BikeStatus::Maintenance)])
             .await?;
         let note = lang.t(

@@ -27,11 +27,12 @@ pub fn schedule(s: &mut Schedule) {
 pub async fn reminders(state: &AppState) -> Result<u64> {
     let tomorrow = to_local(&state.config, renox::db::now()).date() + Duration::days(1);
     let (from, to) = day_bounds(&state.config, tomorrow);
-    let orders = WorkOrder::where_eq("status", WorkStatus::Booked)
-        .where_op("source", "!=", WorkSource::Fleet)
-        .where_null("reminded_at")
-        .where_op("scheduled_for", ">=", from)
-        .where_op("scheduled_for", "<", to)
+    let orders = WorkOrder::query()
+        .where_(WorkOrder::STATUS.eq(WorkStatus::Booked))
+        .where_(WorkOrder::SOURCE.ne(WorkSource::Fleet))
+        .where_(WorkOrder::REMINDED_AT.is_null())
+        .where_(WorkOrder::SCHEDULED_FOR.gte(from))
+        .where_(WorkOrder::SCHEDULED_FOR.lt(to))
         .get(&state.db)
         .await?;
     for mut order in orders.iter().cloned() {

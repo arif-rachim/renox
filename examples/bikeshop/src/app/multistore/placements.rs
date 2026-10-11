@@ -46,13 +46,10 @@ fn movable(status: BikeStatus) -> bool {
 pub async fn homes(db: &Db, bikes: &[RentalBike]) -> Result<HashMap<i64, i64>> {
     let mut homes: HashMap<i64, i64> = bikes.iter().map(|b| (b.id, b.owner_store_id)).collect();
     let placements = BikePlacement::query()
-        .where_in(
-            "rental_bike_id",
-            bikes.iter().map(|b| b.id).collect::<Vec<_>>(),
-        )
-        .where_eq("status", PlacementStatus::Moved)
-        .order_by("moved_at")
-        .order_by("id")
+        .where_(BikePlacement::RENTAL_BIKE_ID.is_in(bikes.iter().map(|b| b.id).collect::<Vec<_>>()))
+        .where_(BikePlacement::STATUS.eq(PlacementStatus::Moved))
+        .order_by(BikePlacement::MOVED_AT)
+        .order_by(BikePlacement::ID)
         .get(db)
         .await?;
     for p in placements {
@@ -95,11 +92,11 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let placements = access::visible::<BikePlacement>(catalogue::FLEET_VIEW)
         .where_any(|q| {
-            q.where_eq("from_store_id", store)
-                .where_eq("to_store_id", store)
+            q.where_(BikePlacement::FROM_STORE_ID.eq(store))
+                .where_(BikePlacement::TO_STORE_ID.eq(store))
         })
-        .order_by_desc("requested_at")
-        .order_by_desc("id")
+        .order_by_desc(BikePlacement::REQUESTED_AT)
+        .order_by_desc(BikePlacement::ID)
         .limit(50)
         .get(&db)
         .await?;
@@ -116,10 +113,10 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
     // Bikes here or ours, standing somewhere other than their home.
     let around = access::visible::<RentalBike>(catalogue::FLEET_VIEW)
         .where_any(|q| {
-            q.where_eq("owner_store_id", store)
-                .where_eq("location_store_id", store)
+            q.where_(RentalBike::OWNER_STORE_ID.eq(store))
+                .where_(RentalBike::LOCATION_STORE_ID.eq(store))
         })
-        .where_in("status", [BikeStatus::Available, BikeStatus::Maintenance])
+        .where_(RentalBike::STATUS.is_in([BikeStatus::Available, BikeStatus::Maintenance]))
         .get(&db)
         .await?;
     let homes = homes(&db, &around).await?;
@@ -210,10 +207,11 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .or_else(|| others.first().map(|s| s.id))
         .unwrap_or_default();
     let owner = if direction == "place" { store } else { other };
-    let bikes = RentalBike::where_eq("owner_store_id", owner)
-        .where_eq("location_store_id", owner)
-        .where_eq("status", BikeStatus::Available)
-        .order_by("frame_number")
+    let bikes = RentalBike::query()
+        .where_(RentalBike::OWNER_STORE_ID.eq(owner))
+        .where_(RentalBike::LOCATION_STORE_ID.eq(owner))
+        .where_(RentalBike::STATUS.eq(BikeStatus::Available))
+        .order_by(RentalBike::FRAME_NUMBER)
         .limit(200)
         .get(&db)
         .await?;
@@ -388,8 +386,9 @@ pub async fn decide(
     };
     let staff = Staff::of_user(&state.db, user.id).await?.map(|s| s.id);
     let now = renox::db::now();
-    let moved = BikePlacement::where_eq("id", placement.id)
-        .where_eq("status", PlacementStatus::Requested)
+    let moved = BikePlacement::query()
+        .where_(BikePlacement::ID.eq(placement.id))
+        .where_(BikePlacement::STATUS.eq(PlacementStatus::Requested))
         .update(
             &state.db,
             &[
@@ -429,7 +428,8 @@ pub async fn move_bike(
 ) -> Result<(Toast, Redirect)> {
     let mut placement = owned(&state.db, &user, id).await?;
     let mut tx = state.db.begin_immediate().await?;
-    let bike = RentalBike::where_eq("id", placement.rental_bike_id)
+    let bike = RentalBike::query()
+        .where_(RentalBike::ID.eq(placement.rental_bike_id))
         .lock_for_update()
         .first(&mut tx)
         .await?
@@ -441,7 +441,8 @@ pub async fn move_bike(
     {
         return Err(conflict(&state, "multistore.placements.errors.busy"));
     }
-    RentalBike::where_eq("id", bike.id)
+    RentalBike::query()
+        .where_(RentalBike::ID.eq(bike.id))
         .update(&mut tx, &[("location_store_id", &placement.to_store_id)])
         .await?;
     placement.status = PlacementStatus::Moved;
@@ -470,15 +471,13 @@ pub async fn move_bike(
 /// Whether the bike has a rental not finished (booked, out, overdue), read
 /// in `tx` after its row was locked.
 async fn booked(tx: &mut renox::db::Transaction, bike: i64) -> Result<bool> {
-    Rental::where_eq("rental_bike_id", bike)
-        .where_in(
-            "status",
-            [
-                RentalStatus::Reserved,
-                RentalStatus::Active,
-                RentalStatus::Overdue,
-            ],
-        )
+    Rental::query()
+        .where_(Rental::RENTAL_BIKE_ID.eq(bike))
+        .where_(Rental::STATUS.is_in([
+            RentalStatus::Reserved,
+            RentalStatus::Active,
+            RentalStatus::Overdue,
+        ]))
         .exists(&mut *tx)
         .await
 }
@@ -498,7 +497,8 @@ pub enum Recall {
 /// after the other: the bike is never both rented out there and back here.
 pub async fn recall_bike(db: &Db, placement: &mut BikePlacement) -> Result<Recall> {
     let mut tx = db.begin_immediate().await?;
-    let bike = RentalBike::where_eq("id", placement.rental_bike_id)
+    let bike = RentalBike::query()
+        .where_(RentalBike::ID.eq(placement.rental_bike_id))
         .lock_for_update()
         .first(&mut tx)
         .await?
@@ -509,7 +509,8 @@ pub async fn recall_bike(db: &Db, placement: &mut BikePlacement) -> Result<Recal
     {
         return Ok(Recall::Busy);
     }
-    RentalBike::where_eq("id", bike.id)
+    RentalBike::query()
+        .where_(RentalBike::ID.eq(bike.id))
         .update(&mut tx, &[("location_store_id", &placement.from_store_id)])
         .await?;
     placement.status = PlacementStatus::Recalled;
@@ -572,7 +573,8 @@ pub async fn send_back(
         .unwrap_or(&bike.owner_store_id);
     let staff = Staff::of_user(db, user.id).await?.map(|s| s.id);
     let mut tx = db.begin_immediate().await?;
-    let locked = RentalBike::where_eq("id", bike.id)
+    let locked = RentalBike::query()
+        .where_(RentalBike::ID.eq(bike.id))
         .lock_for_update()
         .first(&mut tx)
         .await?
@@ -583,7 +585,8 @@ pub async fn send_back(
     {
         return Err(conflict(&state, "multistore.placements.errors.busy"));
     }
-    RentalBike::where_eq("id", bike.id)
+    RentalBike::query()
+        .where_(RentalBike::ID.eq(bike.id))
         .update(&mut tx, &[("location_store_id", &home)])
         .await?;
     let now = renox::db::now();

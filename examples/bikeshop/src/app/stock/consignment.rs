@@ -115,33 +115,30 @@ pub async fn index(
         "open".to_owned()
     };
     let shipments = access::visible::<ConsignmentShipment>(catalogue::STOCK_VIEW).where_any(|q| {
-        q.where_eq("owner_store_id", store)
-            .where_eq("location_store_id", store)
+        q.where_(ConsignmentShipment::OWNER_STORE_ID.eq(store))
+            .where_(ConsignmentShipment::LOCATION_STORE_ID.eq(store))
     });
     // [/explain:stock.consignments.handler]
     let shipments = match tab.as_str() {
-        "open" => shipments.where_in("status", open_statuses()),
-        "transit" => shipments.where_in(
-            "status",
-            [
-                ShipmentStatus::Sent,
-                ShipmentStatus::PartlyReceived,
-                ShipmentStatus::RecallSent,
-            ],
-        ),
+        "open" => shipments.where_(ConsignmentShipment::STATUS.is_in(open_statuses())),
+        "transit" => shipments.where_(ConsignmentShipment::STATUS.is_in([
+            ShipmentStatus::Sent,
+            ShipmentStatus::PartlyReceived,
+            ShipmentStatus::RecallSent,
+        ])),
         _ => shipments,
     };
     // [explain:stock.consignments.handler]
     let shipments = shipments
-        .order_by_desc("updated_at")
-        .order_by_desc("id")
+        .order_by_desc(ConsignmentShipment::UPDATED_AT)
+        .order_by_desc(ConsignmentShipment::ID)
         .paginate(&db, page, 25)
         .await?;
     // [/explain:stock.consignments.handler]
     let lines = ConsignmentShipmentLine::query()
-        .where_in(
-            "shipment_id",
-            shipments.items.iter().map(|s| s.id).collect::<Vec<_>>(),
+        .where_(
+            ConsignmentShipmentLine::SHIPMENT_ID
+                .is_in(shipments.items.iter().map(|s| s.id).collect::<Vec<_>>()),
         )
         .get(&db)
         .await?;
@@ -217,20 +214,21 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
     // [explain:stock.consignments.create.handler]
     let owner = if direction == "send" { store } else { other };
     let search = query.q.clone().unwrap_or_default();
-    let rows = StockRow::where_eq("owner_store_id", owner)
-        .where_eq("location_store_id", owner)
-        .where_op("available", ">", 0)
+    let rows = StockRow::query()
+        .where_(StockRow::OWNER_STORE_ID.eq(owner))
+        .where_(StockRow::LOCATION_STORE_ID.eq(owner))
+        .where_(StockRow::AVAILABLE.gt(0))
         .when(!search.trim().is_empty(), |q| {
             q.where_any(|any| {
-                any.where_like("product", format!("%{}%", search.trim()))
-                    .where_like("sku", format!("%{}%", search.trim()))
+                any.where_(StockRow::PRODUCT.like(&format!("%{}%", search.trim())))
+                    .where_(StockRow::SKU.like(&format!("%{}%", search.trim())))
             })
         })
         .when(query.variant.is_some(), |q| {
-            q.where_eq("variant_id", query.variant.unwrap_or_default())
+            q.where_(StockRow::VARIANT_ID.eq(query.variant.unwrap_or_default()))
         })
-        .order_by("category")
-        .order_by("product")
+        .order_by(StockRow::CATEGORY)
+        .order_by(StockRow::PRODUCT)
         .limit(100)
         .get(&db)
         .await?;
@@ -317,11 +315,12 @@ impl Validate for NewShipment {
             errors.add("lines", lang.t("stock.consignments.errors.empty", &[]));
             return Ok(());
         }
-        let levels: HashMap<i64, i64> = StockRow::where_eq("owner_store_id", owner)
-            .where_eq("location_store_id", owner)
-            .where_in(
-                "variant_id",
-                self.wanted().map(|(_, l)| l.variant).collect::<Vec<_>>(),
+        let levels: HashMap<i64, i64> = StockRow::query()
+            .where_(StockRow::OWNER_STORE_ID.eq(owner))
+            .where_(StockRow::LOCATION_STORE_ID.eq(owner))
+            .where_(
+                StockRow::VARIANT_ID
+                    .is_in(self.wanted().map(|(_, l)| l.variant).collect::<Vec<_>>()),
             )
             .get(&form.state.db)
             .await?
@@ -439,8 +438,9 @@ pub struct LineView {
 pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let shipment = access::find::<ConsignmentShipment>(&db, &user, id).await?;
     // [/explain:stock.consignments.show.handler]
-    let lines = ConsignmentShipmentLine::where_eq("shipment_id", shipment.id)
-        .order_by("id")
+    let lines = ConsignmentShipmentLine::query()
+        .where_(ConsignmentShipmentLine::SHIPMENT_ID.eq(shipment.id))
+        .order_by(ConsignmentShipmentLine::ID)
         .get(&db)
         .await?;
     let names = variant_names(&db, lines.iter().map(|l| l.variant_id).collect()).await?;
@@ -515,8 +515,9 @@ async fn advance(
     from: &[ShipmentStatus],
     to: ShipmentStatus,
 ) -> Result<bool> {
-    let moved = ConsignmentShipment::where_eq("id", shipment.id)
-        .where_in("status", from.to_vec())
+    let moved = ConsignmentShipment::query()
+        .where_(ConsignmentShipment::ID.eq(shipment.id))
+        .where_(ConsignmentShipment::STATUS.is_in(from.to_vec()))
         .update(&mut *tx, &[("status", &to)])
         .await?;
     if moved == 0 {
@@ -615,14 +616,16 @@ pub async fn ship(
     {
         return Err(conflict(&state));
     }
-    let lines = ConsignmentShipmentLine::where_eq("shipment_id", shipment.id)
+    let lines = ConsignmentShipmentLine::query()
+        .where_(ConsignmentShipmentLine::SHIPMENT_ID.eq(shipment.id))
         .get(&mut tx)
         .await?;
     let mut shipped = 0;
     for mut line in lines {
-        let available: i64 = StockRow::where_eq("variant_id", line.variant_id)
-            .where_eq("owner_store_id", owner)
-            .where_eq("location_store_id", owner)
+        let available: i64 = StockRow::query()
+            .where_(StockRow::VARIANT_ID.eq(line.variant_id))
+            .where_(StockRow::OWNER_STORE_ID.eq(owner))
+            .where_(StockRow::LOCATION_STORE_ID.eq(owner))
             .sum(&mut tx, "available")
             .await?;
         let send = line.quantity.min(available).max(0);
@@ -753,7 +756,8 @@ pub async fn receive(
         .map(|l| (l.line, l.received.unwrap_or(0)))
         .collect();
     let mut tx = state.db.begin().await?;
-    let lines = ConsignmentShipmentLine::where_eq("shipment_id", shipment.id)
+    let lines = ConsignmentShipmentLine::query()
+        .where_(ConsignmentShipmentLine::SHIPMENT_ID.eq(shipment.id))
         .get(&mut tx)
         .await?;
     let mut open = 0;
@@ -910,13 +914,15 @@ pub async fn send_back(
     {
         return Err(conflict(&state));
     }
-    let lines = ConsignmentShipmentLine::where_eq("shipment_id", shipment.id)
+    let lines = ConsignmentShipmentLine::query()
+        .where_(ConsignmentShipmentLine::SHIPMENT_ID.eq(shipment.id))
         .get(&mut tx)
         .await?;
     for mut line in lines {
-        let available: i64 = StockRow::where_eq("variant_id", line.variant_id)
-            .where_eq("owner_store_id", owner)
-            .where_eq("location_store_id", location)
+        let available: i64 = StockRow::query()
+            .where_(StockRow::VARIANT_ID.eq(line.variant_id))
+            .where_(StockRow::OWNER_STORE_ID.eq(owner))
+            .where_(StockRow::LOCATION_STORE_ID.eq(location))
             .sum(&mut tx, "available")
             .await?;
         let back = (line.received_quantity - line.returned_quantity).min(available);
@@ -974,7 +980,8 @@ pub async fn receive_back(
     {
         return Err(conflict(&state));
     }
-    let lines = ConsignmentShipmentLine::where_eq("shipment_id", shipment.id)
+    let lines = ConsignmentShipmentLine::query()
+        .where_(ConsignmentShipmentLine::SHIPMENT_ID.eq(shipment.id))
         .get(&mut tx)
         .await?;
     for line in lines.iter().filter(|l| l.returned_quantity > 0) {

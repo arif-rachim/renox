@@ -63,8 +63,9 @@ pub async fn form(
     // [/explain:workshop.book.handler]
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
-    let bikes: Vec<(i64, String)> = CustomerBike::where_eq("customer_id", customer.id)
-        .order_by("name")
+    let bikes: Vec<(i64, String)> = CustomerBike::query()
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
+        .order_by(CustomerBike::NAME)
         .get(db)
         .await?
         .into_iter()
@@ -77,7 +78,10 @@ pub async fn form(
         .or_else(|| stores.first())
         .cloned();
     // [explain:workshop.book.handler]
-    let all = ServiceTask::query().order_by("name").get(db).await?;
+    let all = ServiceTask::query()
+        .order_by(ServiceTask::NAME)
+        .get(db)
+        .await?;
     let tasks = chosen_tasks(&all, query.package.as_deref(), &query.tasks);
     let est = estimate(&tasks);
     let full = match &store {
@@ -142,8 +146,9 @@ impl Validate for BookForm {
             return Ok(());
         };
         let customer = customer_of(db, user).await?;
-        let owns = CustomerBike::where_eq("id", self.bike.unwrap_or_default())
-            .where_eq("customer_id", customer.id)
+        let owns = CustomerBike::query()
+            .where_(CustomerBike::ID.eq(self.bike.unwrap_or_default()))
+            .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
             .exists(db)
             .await?;
         if !owns {
@@ -255,8 +260,9 @@ pub async fn own_order(db: &Db, user: &User, id: i64) -> Result<WorkOrder> {
     let customer = customer_of(db, user).await?;
     let order = WorkOrder::find_or_404(db, id).await?;
     let bike_id = order.customer_bike_id.ok_or(Error::NotFound)?;
-    let owns = CustomerBike::where_eq("id", bike_id)
-        .where_eq("customer_id", customer.id)
+    let owns = CustomerBike::query()
+        .where_(CustomerBike::ID.eq(bike_id))
+        .where_(CustomerBike::CUSTOMER_ID.eq(customer.id))
         .exists(db)
         .await?;
     if owns {
@@ -289,13 +295,15 @@ pub async fn show(
     let db = &state.db;
     let order = own_order(db, &user, id).await?;
     // [/explain:workshop.service.show.handler]
-    let tasks = WorkOrderTask::where_eq("work_order_id", order.id)
+    let tasks = WorkOrderTask::query()
+        .where_(WorkOrderTask::WORK_ORDER_ID.eq(order.id))
         .get(db)
         .await?;
     let names =
         renox::db::relations::belongs_to::<ServiceTask, _, _>(db, &tasks, |t| t.service_task_id)
             .await?;
-    let parts = WorkOrderPart::where_eq("work_order_id", order.id)
+    let parts = WorkOrderPart::query()
+        .where_(WorkOrderPart::WORK_ORDER_ID.eq(order.id))
         .get(db)
         .await?;
     let part_names = crate::app::rentals::reserve::variant_names(
@@ -337,13 +345,15 @@ pub async fn show(
             done: p.status == super::model::PartStatus::Used,
         }
     }));
-    let notes = WorkOrderNote::where_eq("work_order_id", order.id)
-        .where_not_null("body")
-        .order_by("id")
+    let notes = WorkOrderNote::query()
+        .where_(WorkOrderNote::WORK_ORDER_ID.eq(order.id))
+        .where_(WorkOrderNote::BODY.is_not_null())
+        .order_by(WorkOrderNote::ID)
         .get(db)
         .await?;
-    let extras = ExtraWork::where_eq("work_order_id", order.id)
-        .order_by_desc("id")
+    let extras = ExtraWork::query()
+        .where_(ExtraWork::WORK_ORDER_ID.eq(order.id))
+        .order_by_desc(ExtraWork::ID)
         .get(db)
         .await?;
     let bike = match order.customer_bike_id {

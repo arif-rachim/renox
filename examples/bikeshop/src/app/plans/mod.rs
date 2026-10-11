@@ -99,6 +99,11 @@ impl Module for Plans {
     }
 
     fn register(&self, app: &mut Registry) {
+        // `rnx db:check` and the schema test compare these models with the tables.
+        app.model::<crate::app::plans::model::ServicePlan>()
+            .model::<crate::app::plans::model::PlanSubscription>()
+            .model::<crate::app::plans::model::PlanVisit>()
+            .model::<crate::app::plans::model::PlanInvoice>();
         app.job::<demo::DemoBillingNotify>();
         // renox-billing's events, mirrored into the bike's plan (src/app/plans/sync.rs).
         app.listen(

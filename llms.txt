@@ -9,6 +9,16 @@
 
 - https://docs.renox.rs: these files as a website with search (the latest `main`).
 
+- The 1.1 way (Renox 1.1.0-rc.1: `cargo install renox-cli --version 1.1.0-rc.1`, `renox = "1.1.0-rc.1"`),
+  and where each part is taught: pages as `<rx-*>` / `<app-*>` tags with `rx-if` / `rx-else` /
+  `rx-for` ([docs/ui.md](docs/ui.md#components-as-tags)); your own components with `<rx-props>`
+  ([docs/ui.md](docs/ui.md#your-own-components)); parts of a page with state as live components,
+  `<live-NAME :component="x"/>` ([docs/live.md](docs/live.md), the bike shop's `/about/htmx/live`);
+  typed columns (`Product::PRICE.lt(1)`) and `#[model(form)]` ([CHEATSHEET.md](CHEATSHEET.md));
+  typed view contexts (`#[derive(ViewData)]`, `View::typed`); mistakes found before a page opens
+  (`rnx db:check`, `rnx view:check`, `rnx make:migration --auto`, `rnx doctor`, `rnx view:data`);
+  moving a 1.0 template over: [docs/ui.md](docs/ui.md#upgrading-from-10). Copy from
+  `examples/hello` (the guestbook) and `examples/bikeshop` first.
 - [CHEATSHEET.md](CHEATSHEET.md): the common patterns, 5–20 lines each and compiled as doctests:
   `rnx` commands; modules, routes, path parameters, route groups and guards (auth, verified,
   guest, throttle); views, template globals and overriding built-in pages; `App::share` and
@@ -196,7 +206,7 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
   `gate_before`, token abilities, tenants with default scopes and `renox::context`, password
   confirmation, the audit log), mapped to Laravel's.
 - [docs/live.md](docs/live.md): live components (`LiveComponent`, `#[renox::live_component]`,
-  `rx-click`/`rx-submit`/`rx-model`, the signed snapshot, `TestApp::live`); example: the bike
+  `<live-NAME>`, `rx-click`/`rx-submit`/`rx-model`, the signed snapshot, `TestApp::live`); example: the bike
   shop's `/about/htmx/live` ([live.rs](examples/bikeshop/src/app/about/live.rs)).
 - [docs/testing.md](docs/testing.md): `TestApp` requests and assertions (JSON paths, views,
   session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
@@ -288,8 +298,11 @@ the guides themselves (doctests) and tested in `crates/renox/tests/it`.
 
 ## Where things are (for changing Renox itself)
 
-- [CLAUDE.md](CLAUDE.md) (same as AGENTS.md): the contributor and agent guide, including the
-  architecture, conventions, and problems already solved.
+- [CLAUDE.md](CLAUDE.md): the short contributor and agent guide (the rules that always apply).
+  The details are in [docs/contributing/](docs/contributing/): `layout.md` (every crate and file),
+  `architecture.md` (request pipeline, decisions, the database layer), `conventions.md`,
+  `workflow.md` (issues, PRs, CI), `config.md` (env vars), `traps.md` (problems already solved)
+  and `status.md` (what each milestone added).
 - [ROADMAP.md](ROADMAP.md): milestones and design decisions.
 - [docs/audit/2026-09-pre-1.0.md](docs/audit/2026-09-pre-1.0.md): known issues (IDs W*, D*, A*) from
   the pre-1.0 audit, with repro tests and fix directions; ROADMAP M13/M14 track them.

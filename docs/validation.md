@@ -247,8 +247,8 @@ struct SignIn {
 ```
 
 ```html
-{{ ui.input("email", "Email", bag="login") }}      {# the sign-in form #}
-{{ ui.input("email", "Your email") }}              {# the newsletter form #}
+<rx-input name="email" label="Email" bag="login" />       {# the sign-in form #}
+<rx-input name="email" label="Your email" />               {# the newsletter form #}
 ```
 
 What's going on:

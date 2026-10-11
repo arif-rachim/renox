@@ -106,18 +106,16 @@ pub async fn index(
             .and_hms_opt(0, 0, 0)
             .unwrap_or_default(),
     );
-    let mut rentals = Rental::where_eq("operating_store_id", store)
+    let mut rentals = Rental::query()
+        .where_(Rental::OPERATING_STORE_ID.eq(store))
         .where_any(|any| {
-            any.where_in("status", [RentalStatus::Active, RentalStatus::Overdue])
+            any.where_(Rental::STATUS.is_in([RentalStatus::Active, RentalStatus::Overdue]))
                 .where_all(|all| {
-                    all.where_eq("status", RentalStatus::Reserved).where_op(
-                        "starts_at",
-                        "<",
-                        tomorrow,
-                    )
+                    all.where_(Rental::STATUS.eq(RentalStatus::Reserved))
+                        .where_(Rental::STARTS_AT.lt(tomorrow))
                 })
         })
-        .order_by("starts_at")
+        .order_by(Rental::STARTS_AT)
         .limit(200)
         .get(db)
         .await?;
@@ -127,19 +125,19 @@ pub async fn index(
     if !q.is_empty() {
         let customers: Vec<i64> = Customer::query()
             .where_any(|any| {
-                any.where_like("name", format!("%{q}%"))
-                    .where_like("email", format!("%{q}%"))
+                any.where_(Customer::NAME.like(&format!("%{q}%")))
+                    .where_(Customer::EMAIL.like(&format!("%{q}%")))
             })
             .limit(20)
-            .pluck(db, "id")
+            .pluck(db, Customer::ID)
             .await?;
         let found = Rental::query()
             .where_any(|any| {
                 any.where_eq("reservation_code", q.to_uppercase())
-                    .where_in("customer_id", customers)
+                    .where_(Rental::CUSTOMER_ID.is_in(customers))
             })
-            .where_in("status", booking::HOLDING)
-            .order_by("starts_at")
+            .where_(Rental::STATUS.is_in(booking::HOLDING))
+            .order_by(Rental::STARTS_AT)
             .limit(20)
             .get(db)
             .await?;
@@ -182,9 +180,10 @@ pub async fn index(
 /// The store a bike goes back to after a return elsewhere: where it was
 /// placed (the latest placement that moved it), else its owner store.
 pub async fn home_store(db: &Db, bike: &RentalBike) -> Result<i64> {
-    Ok(BikePlacement::where_eq("rental_bike_id", bike.id)
-        .where_eq("status", PlacementStatus::Moved)
-        .order_by_desc("moved_at")
+    Ok(BikePlacement::query()
+        .where_(BikePlacement::RENTAL_BIKE_ID.eq(bike.id))
+        .where_(BikePlacement::STATUS.eq(PlacementStatus::Moved))
+        .order_by_desc(BikePlacement::MOVED_AT)
         .first(db)
         .await?
         .map(|p| p.to_store_id)
@@ -255,8 +254,9 @@ pub async fn desk(
         } else {
             0
         };
-    let photos = RentalPhoto::where_eq("rental_id", rental.id)
-        .order_by("id")
+    let photos = RentalPhoto::query()
+        .where_(RentalPhoto::RENTAL_ID.eq(rental.id))
+        .order_by(RentalPhoto::ID)
         .get(db)
         .await?;
     let stores = Store::all_by_name(db).await?;
@@ -378,7 +378,8 @@ pub async fn hand_over(
         rental.deposit_status = DepositStatus::Held;
     }
     rental.save(&mut tx).await?;
-    RentalBike::where_eq("id", rental.rental_bike_id)
+    RentalBike::query()
+        .where_(RentalBike::ID.eq(rental.rental_bike_id))
         .update(&mut tx, &[("status", &BikeStatus::Rented)])
         .await?;
     tx.commit().await?;
@@ -659,10 +660,11 @@ pub async fn receipt(
 ) -> Result<View> {
     let db = &state.db;
     let rental = counter_rental(db, &user, id).await?;
-    let payments = Payment::where_eq("payable_type", PAYABLE_RENTAL)
-        .where_eq("payable_id", rental.id)
-        .where_eq("status", PaymentStatus::Paid)
-        .order_by("id")
+    let payments = Payment::query()
+        .where_(Payment::PAYABLE_TYPE.eq(PAYABLE_RENTAL))
+        .where_(Payment::PAYABLE_ID.eq(rental.id))
+        .where_(Payment::STATUS.eq(PaymentStatus::Paid))
+        .order_by(Payment::ID)
         .get(db)
         .await?;
     // [/explain:rentals.receipt.handler]
@@ -724,8 +726,9 @@ pub async fn photo(
     Path((id, photo)): Path<(i64, i64)>,
 ) -> Result<Redirect> {
     let rental = counter_rental(&state.db, &user, id).await?;
-    let photo = RentalPhoto::where_eq("id", photo)
-        .where_eq("rental_id", rental.id)
+    let photo = RentalPhoto::query()
+        .where_(RentalPhoto::ID.eq(photo))
+        .where_(RentalPhoto::RENTAL_ID.eq(rental.id))
         .first_or_404(&state.db)
         .await?;
     let url = state
@@ -744,18 +747,18 @@ pub async fn customer_options(
 ) -> Result<Json<Vec<SelectOption>>> {
     let customers = if query.is_lookup() {
         Customer::query()
-            .where_in("id", query.values_as::<i64>())
+            .where_(Customer::ID.is_in(query.values_as::<i64>()))
             .get(&db)
             .await?
     } else {
         let q = query.q.trim().to_owned();
         Customer::query()
-            .where_not_null("id_verified_at")
+            .where_(Customer::ID_VERIFIED_AT.is_not_null())
             .where_any(|any| {
-                any.where_like("name", format!("%{q}%"))
-                    .where_like("email", format!("%{q}%"))
+                any.where_(Customer::NAME.like(&format!("%{q}%")))
+                    .where_(Customer::EMAIL.like(&format!("%{q}%")))
             })
-            .order_by("name")
+            .order_by(Customer::NAME)
             .limit(20)
             .get(&db)
             .await?

@@ -314,7 +314,8 @@ async fn customers_register_bikes_book_and_follow_the_work() {
         )
         .await
         .assert_status(303);
-    let added = CustomerBike::where_eq("name", "Red commuter")
+    let added = CustomerBike::query()
+        .where_(CustomerBike::NAME.eq("Red commuter"))
         .first(db)
         .await
         .unwrap()
@@ -343,7 +344,8 @@ async fn customers_register_bikes_book_and_follow_the_work() {
         )
         .await;
     res.assert_status(303);
-    let order = WorkOrder::where_eq("customer_bike_id", w.bike.id)
+    let order = WorkOrder::query()
+        .where_(WorkOrder::CUSTOMER_BIKE_ID.eq(w.bike.id))
         .first(db)
         .await
         .unwrap()
@@ -354,7 +356,8 @@ async fn customers_register_bikes_book_and_follow_the_work() {
         (60, 9_000, WorkStatus::Booked)
     );
     assert_eq!(
-        WorkOrderTask::where_eq("work_order_id", order.id)
+        WorkOrderTask::query()
+            .where_(WorkOrderTask::WORK_ORDER_ID.eq(order.id))
             .count(db)
             .await
             .unwrap(),
@@ -474,14 +477,16 @@ async fn parts_move_stock_and_a_missing_one_makes_the_order_wait() {
         .post(&order_path, &[("variant", &variant), ("quantity", "1")])
         .await
         .assert_status(303);
-    let level = StockLevel::where_eq("variant_id", chain.id)
+    let level = StockLevel::query()
+        .where_(StockLevel::VARIANT_ID.eq(chain.id))
         .first(db)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(level.on_hand, 1);
-    let movement = StockMovement::where_eq("variant_id", chain.id)
-        .where_eq("reason", MovementReason::Service)
+    let movement = StockMovement::query()
+        .where_(StockMovement::VARIANT_ID.eq(chain.id))
+        .where_(StockMovement::REASON.eq(MovementReason::Service))
         .first(db)
         .await
         .unwrap()
@@ -499,8 +504,9 @@ async fn parts_move_stock_and_a_missing_one_makes_the_order_wait() {
         .post(&order_path, &[("variant", &variant), ("quantity", "3")])
         .await
         .assert_status(303);
-    let waiting = WorkOrderPart::where_eq("work_order_id", order.id)
-        .where_eq("status", PartStatus::Waiting)
+    let waiting = WorkOrderPart::query()
+        .where_(WorkOrderPart::WORK_ORDER_ID.eq(order.id))
+        .where_(WorkOrderPart::STATUS.eq(PartStatus::Waiting))
         .first(db)
         .await
         .unwrap()
@@ -509,7 +515,8 @@ async fn parts_move_stock_and_a_missing_one_makes_the_order_wait() {
     assert_eq!(order.status, WorkStatus::WaitingParts);
     assert_eq!(order.parts, 2_500 * 4);
     assert_eq!(
-        StockLevel::where_eq("variant_id", chain.id)
+        StockLevel::query()
+            .where_(StockLevel::VARIANT_ID.eq(chain.id))
             .first(db)
             .await
             .unwrap()
@@ -549,7 +556,8 @@ async fn parts_move_stock_and_a_missing_one_makes_the_order_wait() {
         PartStatus::Used
     );
     assert_eq!(
-        StockLevel::where_eq("variant_id", chain.id)
+        StockLevel::query()
+            .where_(StockLevel::VARIANT_ID.eq(chain.id))
             .first(db)
             .await
             .unwrap()
@@ -578,7 +586,8 @@ async fn extra_work_is_approved_once_through_a_signed_link() {
         )
         .await
         .assert_status(303);
-    let extra = ExtraWork::where_eq("work_order_id", order.id)
+    let extra = ExtraWork::query()
+        .where_(ExtraWork::WORK_ORDER_ID.eq(order.id))
         .first(db)
         .await
         .unwrap()
@@ -644,8 +653,9 @@ async fn extra_work_is_approved_once_through_a_signed_link() {
         )
         .await
         .assert_status(303);
-    let second = ExtraWork::where_eq("work_order_id", order.id)
-        .where_eq("status", ExtraStatus::Pending)
+    let second = ExtraWork::query()
+        .where_(ExtraWork::WORK_ORDER_ID.eq(order.id))
+        .where_(ExtraWork::STATUS.eq(ExtraStatus::Pending))
         .first(db)
         .await
         .unwrap()
@@ -925,7 +935,8 @@ async fn only_who_works_on_work_orders_takes_a_walk_in() {
         .await
         .assert_forbidden();
     assert!(
-        WorkOrder::where_eq("source", WorkSource::WalkIn)
+        WorkOrder::query()
+            .where_(WorkOrder::SOURCE.eq(WorkSource::WalkIn))
             .first(w.app.db())
             .await
             .unwrap()
@@ -937,7 +948,8 @@ async fn only_who_works_on_work_orders_takes_a_walk_in() {
         .post("/staff/workshop/new", &form)
         .await
         .assert_status(303);
-    let walk = WorkOrder::where_eq("source", WorkSource::WalkIn)
+    let walk = WorkOrder::query()
+        .where_(WorkOrder::SOURCE.eq(WorkSource::WalkIn))
         .first(w.app.db())
         .await
         .unwrap()
@@ -989,7 +1001,8 @@ async fn every_workshop_page_answers() {
         )
         .await
         .assert_status(303);
-    let walk = WorkOrder::where_eq("source", WorkSource::WalkIn)
+    let walk = WorkOrder::query()
+        .where_(WorkOrder::SOURCE.eq(WorkSource::WalkIn))
         .first(w.app.db())
         .await
         .unwrap()

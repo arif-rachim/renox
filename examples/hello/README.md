@@ -41,6 +41,11 @@ Other things to try: `/hello/<name>`, `/language/en` and `/language/es` to switc
   fallback for other languages. Renox's own texts are English; `resources/lang/es.json`
   translates the ones the guestbook shows (`renox.validation.*`, `renox.auth.*`, `ui.*`).
 
+- **Pages written with tags.** The form, the entries list and the layout's menu and buttons are
+  `<rx-form>`, `<rx-list>`, `<rx-menu>`, `<rx-link-button>`, with `rx-if` / `rx-for` on plain
+  elements instead of `{% if %}` / `{% for %}` blocks. `rnx view:check` loads every template and
+  reports a wrong tag, attribute or route name with the file and line.
+
 - **The app is a library.** `app()` lives in `src/lib.rs` and `main.rs` only runs it, so
   `tests/` can boot the same app.
 - **One handler for htmx and plain posts.** `index` returns

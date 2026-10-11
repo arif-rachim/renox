@@ -122,7 +122,7 @@ async fn default_store(user: &User) -> Option<i64> {
     match scopes {
         Scopes::Only(ids) => ids.first().copied(),
         Scopes::All => Store::query()
-            .order_by("id")
+            .order_by(Store::ID)
             .first(&state.db)
             .await
             .ok()
@@ -161,7 +161,7 @@ pub async fn switcher(db: &Db) -> Result<Option<Switcher>> {
     }
     let stores: Vec<SwitcherStore> = scopes
         .apply(Store::query(), &["id"])
-        .order_by("name")
+        .order_by(Store::NAME)
         .get(db)
         .await?
         .into_iter()

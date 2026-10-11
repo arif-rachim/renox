@@ -154,9 +154,10 @@ impl Product {
             .bind(self.brand_id)
             .scalar_optional(db)
             .await?;
-        let skus: Vec<String> = ProductVariant::where_eq("product_id", self.id)
-            .order_by("sku")
-            .pluck(db, "sku")
+        let skus: Vec<String> = ProductVariant::query()
+            .where_(ProductVariant::PRODUCT_ID.eq(self.id))
+            .order_by(ProductVariant::SKU)
+            .pluck(db, ProductVariant::SKU)
             .await?;
         self.keywords = keywords(brand.as_deref().unwrap_or(""), &skus);
         self.save_only(db, &["keywords"]).await
@@ -199,7 +200,7 @@ impl ProductCard {
         let mut variants: HashMap<i64, Vec<ProductVariant>> = has_many(
             db,
             &products,
-            ProductVariant::query().order_by("price"),
+            ProductVariant::query().order_by(ProductVariant::PRICE),
             "product_id",
             |v| v.product_id,
         )

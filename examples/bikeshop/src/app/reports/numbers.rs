@@ -34,11 +34,11 @@ use super::scope::{By, Reach};
 use crate::app::accounts::model::Customer;
 use crate::app::catalog::model::{Category, Product};
 use crate::app::multistore::intercompany;
-use crate::app::multistore::model::IntercompanyEntry;
-use crate::app::plans::model::{PlanSubscription, ServicePlan};
-use crate::app::rentals::model::{Rental, RentalBike};
+use crate::app::multistore::model::{EntryKind, IntercompanyEntry};
+use crate::app::plans::model::{PlanSubscription, ServicePlan, SubscriptionStatus};
+use crate::app::rentals::model::{BikeStatus, Rental, RentalBike, RentalStatus};
 use crate::app::staff::model::{Staff, StaffHelpHour, Store};
-use crate::app::workshop::model::WorkOrder;
+use crate::app::workshop::model::{WorkOrder, WorkStatus};
 
 /// The cache key holding the generation number.
 pub const GENERATION_KEY: &str = "reports:generation";
@@ -216,8 +216,8 @@ impl Numbers {
         // Income per stream, now and before: two grouped queries.
         let totals = |from: DateTime, until: DateTime| {
             lines()
-                .where_op("booked_at", ">=", from)
-                .where_op("booked_at", "<", until)
+                .where_(RevenueLine::BOOKED_AT.gte(from))
+                .where_(RevenueLine::BOOKED_AT.lt(until))
                 .group_by("stream")
         };
         let count = "stream, CAST(SUM(amount) AS BIGINT), \
@@ -235,7 +235,7 @@ impl Numbers {
         // Per stream and bucket: `Trend` (one query per stream).
         n.revenue_trend = vec![0.0; n.labels.len()];
         for key in STREAMS {
-            let series = Trend::of(lines().where_eq("stream", key), "booked_at")
+            let series = Trend::of(lines().where_(RevenueLine::STREAM.eq(key)), "booked_at")
                 .over(period)
                 .sum(&state, "amount")
                 .await?;
@@ -269,12 +269,16 @@ impl Numbers {
         let fleet_until = end.min(now);
         let spans: Vec<(Option<DateTime>, Option<DateTime>)> = Rental::query()
             .where_in(rental_column, stores.clone())
-            .where_in("status", ["active", "overdue", "returned"])
-            .where_not_null("picked_up_at")
-            .where_op("picked_up_at", "<", end)
+            .where_(Rental::STATUS.is_in([
+                RentalStatus::Active,
+                RentalStatus::Overdue,
+                RentalStatus::Returned,
+            ]))
+            .where_(Rental::PICKED_UP_AT.is_not_null())
+            .where_(Rental::PICKED_UP_AT.lt(end))
             .where_any(|q| {
-                q.where_null("returned_at")
-                    .where_op("returned_at", ">", start)
+                q.where_(Rental::RETURNED_AT.is_null())
+                    .where_(Rental::RETURNED_AT.gt(start))
             })
             .select_as(db, "picked_up_at, returned_at")
             .await?;
@@ -296,7 +300,7 @@ impl Numbers {
         }
         n.fleet = RentalBike::query()
             .where_in(by.fleet_column(), stores.clone())
-            .where_op("status", "!=", "retired")
+            .where_(RentalBike::STATUS.ne(BikeStatus::Retired))
             .count(db)
             .await? as i64;
         let hours = (fleet_until - start).num_minutes().max(0) as f64 / 60.0;
@@ -318,18 +322,21 @@ impl Numbers {
         n.overdue = Rental::query()
             .where_in(rental_column, stores.clone())
             .where_any(|q| {
-                q.where_eq("status", "overdue")
-                    .where_all(|q| q.where_eq("status", "active").where_op("due_at", "<", now))
+                q.where_(Rental::STATUS.eq(RentalStatus::Overdue))
+                    .where_all(|q| {
+                        q.where_(Rental::STATUS.eq(RentalStatus::Active))
+                            .where_(Rental::DUE_AT.lt(now))
+                    })
             })
             .count(db)
             .await? as i64;
 
         // The workshop: work completed in the period and how long it took.
         let done: Vec<(DateTime, Option<DateTime>)> = WorkOrder::query()
-            .where_in("store_id", stores.clone())
-            .where_eq("status", "completed")
-            .where_op("completed_at", ">=", start)
-            .where_op("completed_at", "<", end)
+            .where_(WorkOrder::STORE_ID.is_in(stores.clone()))
+            .where_(WorkOrder::STATUS.eq(WorkStatus::Completed))
+            .where_(WorkOrder::COMPLETED_AT.gte(start))
+            .where_(WorkOrder::COMPLETED_AT.lt(end))
             .select_as(db, "scheduled_for, completed_at")
             .await?;
         n.work_done = done.len() as i64;
@@ -344,8 +351,8 @@ impl Numbers {
 
         // Plans: active now, what they bring a month, churn in the period.
         let active: Vec<(i64, i64)> = PlanSubscription::query()
-            .where_in("store_id", stores.clone())
-            .where_eq("status", "active")
+            .where_(PlanSubscription::STORE_ID.is_in(stores.clone()))
+            .where_(PlanSubscription::STATUS.eq(SubscriptionStatus::Active))
             .group_by("service_plan_id")
             .select_as(db, "service_plan_id, COUNT(*)")
             .await?;
@@ -365,9 +372,9 @@ impl Numbers {
             })
             .sum();
         let cancelled = PlanSubscription::query()
-            .where_in("store_id", stores.clone())
-            .where_op("cancelled_at", ">=", start)
-            .where_op("cancelled_at", "<", end)
+            .where_(PlanSubscription::STORE_ID.is_in(stores.clone()))
+            .where_(PlanSubscription::CANCELLED_AT.gte(start))
+            .where_(PlanSubscription::CANCELLED_AT.lt(end))
             .count(db)
             .await? as i64;
         let during = n.active_plans + cancelled;
@@ -380,12 +387,12 @@ impl Numbers {
             .map(|s| (s.id, s.name))
             .collect();
         let fees: Vec<(i64, i64, i64)> = IntercompanyEntry::query()
-            .where_in("kind", ["operating_fee", "selling_fee"])
-            .where_op("booked_at", ">=", start)
-            .where_op("booked_at", "<", end)
+            .where_(IntercompanyEntry::KIND.is_in([EntryKind::OperatingFee, EntryKind::SellingFee]))
+            .where_(IntercompanyEntry::BOOKED_AT.gte(start))
+            .where_(IntercompanyEntry::BOOKED_AT.lt(end))
             .where_any(|q| {
-                q.where_in("debtor_store_id", stores.clone())
-                    .where_in("creditor_store_id", stores.clone())
+                q.where_(IntercompanyEntry::DEBTOR_STORE_ID.is_in(stores.clone()))
+                    .where_(IntercompanyEntry::CREDITOR_STORE_ID.is_in(stores.clone()))
             })
             .group_by("debtor_store_id")
             .group_by("creditor_store_id")
@@ -404,14 +411,15 @@ impl Numbers {
         }
         let open: Vec<(i64, i64, i64)> = IntercompanyEntry::query()
             .where_any(|q| {
-                q.where_null("settlement_id").where_raw(
-                    "settlement_id IN (SELECT id FROM settlements WHERE status = ?)",
-                    ["open"],
-                )
+                q.where_(IntercompanyEntry::SETTLEMENT_ID.is_null())
+                    .where_raw(
+                        "settlement_id IN (SELECT id FROM settlements WHERE status = ?)",
+                        ["open"],
+                    )
             })
             .where_any(|q| {
-                q.where_in("debtor_store_id", stores.clone())
-                    .where_in("creditor_store_id", stores.clone())
+                q.where_(IntercompanyEntry::DEBTOR_STORE_ID.is_in(stores.clone()))
+                    .where_(IntercompanyEntry::CREDITOR_STORE_ID.is_in(stores.clone()))
             })
             .group_by("debtor_store_id")
             .group_by("creditor_store_id")
@@ -439,19 +447,19 @@ impl Numbers {
         let first_day = zone.local(start.timestamp()).date();
         let last_day = zone.local(end.timestamp()).date();
         let in_period = |q: renox::db::Query<StaffHelpHour>| {
-            q.where_op("worked_on", ">=", first_day)
-                .where_op("worked_on", "<", last_day)
+            q.where_(StaffHelpHour::WORKED_ON.gte(first_day))
+                .where_(StaffHelpHour::WORKED_ON.lt(last_day))
         };
         let received: i64 = in_period(StaffHelpHour::query())
-            .where_in("store_id", stores.clone())
+            .where_(StaffHelpHour::STORE_ID.is_in(stores.clone()))
             .sum(db, "minutes")
             .await?;
         let people: Vec<i64> = Staff::query()
-            .where_in("home_store_id", stores.clone())
-            .pluck(db, "id")
+            .where_(Staff::HOME_STORE_ID.is_in(stores.clone()))
+            .pluck(db, Staff::ID)
             .await?;
         let given: i64 = in_period(StaffHelpHour::query())
-            .where_in("staff_id", people)
+            .where_(StaffHelpHour::STAFF_ID.is_in(people))
             .sum(db, "minutes")
             .await?;
         n.help_received_hours = received as f64 / 60.0;
@@ -460,26 +468,26 @@ impl Numbers {
         // The best sellers, categories and customers.
         let in_period = || {
             lines()
-                .where_op("booked_at", ">=", start)
-                .where_op("booked_at", "<", end)
+                .where_(RevenueLine::BOOKED_AT.gte(start))
+                .where_(RevenueLine::BOOKED_AT.lt(end))
         };
         let ranked = "CAST(SUM(quantity) AS BIGINT), CAST(SUM(amount) AS BIGINT)";
         let products: Vec<(i64, i64, i64)> = in_period()
-            .where_eq("stream", "sales")
+            .where_(RevenueLine::STREAM.eq("sales"))
             .group_by("product_id")
             .order_by_raw("3 DESC")
             .limit(8)
             .select_as(db, &format!("product_id, {ranked}"))
             .await?;
         let categories: Vec<(i64, i64, i64)> = in_period()
-            .where_not_null("category_id")
+            .where_(RevenueLine::CATEGORY_ID.is_not_null())
             .group_by("category_id")
             .order_by_raw("3 DESC")
             .limit(8)
             .select_as(db, &format!("category_id, {ranked}"))
             .await?;
         let customers: Vec<(i64, i64, i64)> = in_period()
-            .where_not_null("customer_id")
+            .where_(RevenueLine::CUSTOMER_ID.is_not_null())
             .group_by("customer_id")
             .order_by_raw("3 DESC")
             .limit(8)

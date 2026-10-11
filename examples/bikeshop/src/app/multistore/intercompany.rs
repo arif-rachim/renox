@@ -136,7 +136,7 @@ pub async fn index(
         json!({ "source_url": source_url(&e.source_type, e.source_id), "source_label": format!("{} #{}", e.source_type, e.source_id) })
     });
     let open: Vec<(i64, i64, i64)> = entries()
-        .where_null("settlement_id")
+        .where_(IntercompanyEntry::SETTLEMENT_ID.is_null())
         .group_by("debtor_store_id")
         .group_by("creditor_store_id")
         .select_as(
@@ -238,7 +238,8 @@ pub async fn update_fee(
     }
     let rate = (form.percent.unwrap_or(0.0) * 100.0).round() as i64;
     let old = store.fee_rate_bp;
-    Store::where_eq("id", store.id)
+    Store::query()
+        .where_(Store::ID.eq(store.id))
         .update(&state.db, &[("fee_rate_bp", &rate)])
         .await?;
     audit::record(

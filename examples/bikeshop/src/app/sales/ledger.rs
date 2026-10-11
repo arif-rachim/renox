@@ -61,9 +61,10 @@ pub async fn levels_at(
     if variant_ids.is_empty() {
         return Ok(by_variant);
     }
-    for level in StockLevel::where_eq("location_store_id", store_id)
-        .where_in("variant_id", variant_ids.to_vec())
-        .order_by("id")
+    for level in StockLevel::query()
+        .where_(StockLevel::LOCATION_STORE_ID.eq(store_id))
+        .where_(StockLevel::VARIANT_ID.is_in(variant_ids.to_vec()))
+        .order_by(StockLevel::ID)
         .get(db)
         .await?
     {

@@ -22,7 +22,7 @@ async fn the_page_shows_the_checklist_and_loads_more_bikes_as_you_scroll() {
     let app = TestApp::new(bikeshop::app()).await;
     bikeshop::seed::run(app.state().clone()).await.unwrap();
     let ids: Vec<i64> = Product::query()
-        .order_by_desc("id")
+        .order_by_desc(Product::ID)
         .get(app.db())
         .await
         .unwrap()

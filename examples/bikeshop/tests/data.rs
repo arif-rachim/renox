@@ -192,7 +192,7 @@ async fn products_with_brand_category_and_variants_load_in_three_more_queries() 
     let mut counts = Vec::new();
     for limit in [5, 40] {
         let products = Product::query()
-            .order_by("id")
+            .order_by(Product::ID)
             .limit(limit)
             .get(&db)
             .await
@@ -224,7 +224,7 @@ async fn rentals_with_bike_customer_and_stores_load_in_five_queries() {
     let mut counts = Vec::new();
     for limit in [3, 30] {
         let rentals = Rental::query()
-            .order_by("id")
+            .order_by(Rental::ID)
             .limit(limit)
             .get(&db)
             .await
@@ -248,7 +248,7 @@ async fn search_finds_products_by_name_brand_and_sku() {
     let db = app.db();
     seed::run(app.state().clone()).await.unwrap();
     let product = Product::query()
-        .order_by("id")
+        .order_by(Product::ID)
         .first(db)
         .await
         .unwrap()
@@ -272,7 +272,7 @@ async fn customers_work_orders_load_through_their_bikes_in_two_queries() {
     let db = app.db().clone();
     seed::run(app.state().clone()).await.unwrap();
     let customers = Customer::query()
-        .order_by("id")
+        .order_by(Customer::ID)
         .limit(30)
         .get(&db)
         .await

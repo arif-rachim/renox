@@ -76,18 +76,18 @@ And these work in any template:
 - `page_url(3)`: this page's address with `page=3`, keeping the rest of the query (`?q=…`);
   `query_with(period="7d")` does the same for any keys.
 
-Here is a small component, a price field:
+Here is a small component, a price field. A file in `resources/views/components/` is a tag, and
+`<rx-props>` lists its parameters (more in [Your own components](#your-own-components)):
 
 ```html
 {# resources/views/components/price_field.html (rnx make:component price_field) #}
-{% macro price_field(name, label) -%}
+<rx-props name label>
 <div class="rx-field">
   <label class="rx-label" for="rx-{{ name }}">{{ label }}</label>
   <input class="rx-input" id="rx-{{ name }}" name="{{ name }}" inputmode="numeric" value="{{ old(name) }}"
     {%- if error(name) %} aria-invalid="true"{% endif %}>
   <p class="rx-error" data-error-for="{{ name }}">{{ error(name) }}</p>
 </div>
-{%- endmacro %}
 ```
 
 What it does:
@@ -100,17 +100,10 @@ What it does:
 `rnx make:component price_field` writes the empty file for you. A page uses it like this:
 
 ```html
-{% from "components/price_field.html" import price_field %}
-{{ price_field("price", "Price") }}
+<app-price-field name="price" label="Price"/>
 ```
 
-The first line imports the macro. The second calls it, with the field's name and its label.
-
-> [!WARNING]
-> An imported macro takes its name in the template: a value the handler passes under the same
-> name (`history` next to `import history`) is hidden by the macro. While debugging Renox logs
-> a warning naming both, and a page that then fails says why. Rename the value, or import the
-> macro under another name (`import history as history_list`).
+The tag's name is the file's name with dashes, and its attributes are the props.
 
 ### Checking templates
 
@@ -245,35 +238,11 @@ Each field comes with its label, its hint and its error message. You don't write
 yourself. `<rx-form>` writes the CSRF field (and the `_method` field) for you, and `live` turns
 on live validation.
 
-Every tag is compiled into a call of a kit macro when the template loads (see
-[Components as tags](#components-as-tags)). The same form, written as macros, which still work
-and mix with tags in one file:
-
-<details>
-<summary>The same form as macros</summary>
-
-```html
-{% from "renox/ui.html" import card, input, select, checkbox, button, link_button, form_errors %}
-<form method="post" action="{{ route('products.store') }}" data-live-validate novalidate>
-  {{ csrf_field() }}
-  {% call card(title="New product") %}
-    {{ form_errors() }}
-    {{ input("name", "Name", required=true, hint="Shown on the product list.") }}
-    {{ select("size", "Size", [["s", "Small"], ["m", "Medium"]], selected="m") }}
-    {{ checkbox("featured", "Feature it on the home page", switch=true) }}
-    <div class="rx-card__footer">
-      {{ link_button(route('products.index'), "Cancel", variant="plain") }}
-      {{ button("Create product") }}
-    </div>
-  {% endcall %}
-</form>
-```
-
-</details>
+Every tag is compiled when the template loads (see [Components as tags](#components-as-tags)).
 
 > [!TIP]
 > A tag's content goes inside the component: the card puts what is between `<rx-card>` and
-> `</rx-card>` inside itself. In the macro form this is `{% call card(…) %} … {% endcall %}`.
+> `</rx-card>` inside itself.
 > Many kit components work this way.
 
 ### Form fields
@@ -285,23 +254,23 @@ sensible default.
 
 | Component | What it is |
 |---|---|
-| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…, prefix=…, suffix=…, datalist=[…], disabled=…, readonly=…, span=…)` | A text field with its label, hint and error. After a failed submit it is filled in again with what was typed (but never for passwords). `id` tells two fields with the same name apart on one page. `prefix`/`suffix` put a short text before or after the field ("Rp", "kg"). `datalist` suggests values, but any value is accepted. |
-| `textarea(name, label, value=…, rows=4, hint=…, required=…, placeholder=…, attrs={…})` | The same, for longer text. |
-| `select(name, label, options, selected=…, hint=…, required=…, placeholder=…, attrs={…})` | The same, for a choice from a list. Each option is a value, or a `[value, label]` pair. |
-| `checkbox(name, label, checked=…, hint=…, value="on", switch=…, attrs={…})` | A checkbox, or (with `switch`) an iOS-style on/off switch for settings. The whole row can be clicked. After a failed submit it shows what was sent, so a box that was left unticked stays unticked. |
-| `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible at once. They sit in a `fieldset`, with the label as its title (`legend`). An option is a value, `[value, label]` or `[value, label, description]`. |
-| `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices. Each ticked option sends `name` once. So the form's field in Rust is a `Vec`, with `#[serde(default)]` (when nothing is ticked, nothing is sent). |
-| `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons; the pressed ones are filled and checked. Without `multiple`, one choice (a radio group underneath). With `multiple`, several (checkboxes underneath). |
-| `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` when the file is required, an `Option<Upload>` when it may be left out (an edit form keeping the current file), and a `Vec<Upload>` with `multiple`. |
-| `date_picker(name, label, value=…, min=…, max=…, placeholder="YYYY-MM-DD", readonly=…, disabled_dates=[…], closed_weekdays=[…])` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. `disabled_dates` and `closed_weekdays` are days that can't be chosen: see [Days that can't be chosen](#days-that-cant-be-chosen). Without JavaScript it is a plain text field. |
-| `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them. Check them on the server with `required_if`. Without JavaScript they stay visible. |
-| `select(…, multiple=true, searchable=true)` | Pick several values (a `Vec`), with a box to type in that filters the options. The chosen ones show as chips (small rounded labels). The browser's own select stays underneath: the form sends the same thing, and it works without JavaScript. |
-| `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long to put in the page. With `editable`, what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (with the pencil). See [Options from the server](#options-from-the-server) below. |
-| `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips. Enter or a comma adds one; Backspace in the empty box removes the last one. The Rust field is a `Vec<String>`. |
-| `repeater(name, label, rows=[…], min=…, max=…, item_label=…, add_label=…, reorderable=true)` with `{% call(row, prefix) %}` | Rows that people add, remove and move. `reorderable=false` keeps their order fixed. Each row has the fields of the call block, named `name[0][field]`, and they are renumbered when rows move. The Rust field is a `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
-| `key_value(name, label, value=…, key_label=…, value_label=…, add_label=…, hint=…)` | Pairs of text: a repeater with a key and a value on each row. `key_label` and `value_label` name the two columns, `add_label` the add button. The Rust field is `KeyValues`. |
-| `wizard(id, steps, submit_label, back_label=…, next_label=…)` + `wizard_step(id, key, title=…)` | A form in steps. Next checks the current step first: the browser's own rules, then the server's (with `data-live-validate`). After a failed submit, the first step with an error opens. Without JavaScript all steps show at once. |
-| `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | `form_grid` puts fields side by side from tablet width up (one column on phones). `fieldset` is a group of fields with a title, for long forms. A field's `span=2` or `span="full"` makes it wider. |
+| `<rx-input name label type value hint required autocomplete placeholder attrs id prefix suffix datalist disabled readonly span>` | A text field with its label, hint and error. After a failed submit it is filled in again with what was typed (but never for passwords). `id` tells two fields with the same name apart on one page. `prefix`/`suffix` put a short text before or after the field ("Rp", "kg"). `datalist` suggests values, but any value is accepted. |
+| `<rx-textarea name label value rows="4" hint required placeholder attrs>` | The same, for longer text. |
+| `<rx-select name label options selected hint required placeholder attrs>` | The same, for a choice from a list. Each option is a value, or a `[value, label]` pair. |
+| `<rx-checkbox name label checked hint value="on" switch attrs>` | A checkbox, or (with `switch`) an iOS-style on/off switch for settings. The whole row can be clicked. After a failed submit it shows what was sent, so a box that was left unticked stays unticked. |
+| `<rx-radio name label options selected inline columns>` | One choice out of a few, all visible at once. They sit in a `fieldset`, with the label as its title (`legend`). An option is a value, `[value, label]` or `[value, label, description]`. |
+| `<rx-checkbox-list name label options selected inline columns>` | Several choices. Each ticked option sends `name` once. So the form's field in Rust is a `Vec`, with `#[serde(default)]` (when nothing is ticked, nothing is sent). |
+| `<rx-toggle-buttons name label options selected multiple>` | The options as a row of buttons; the pressed ones are filled and checked. Without `multiple`, one choice (a radio group underneath). With `multiple`, several (checkboxes underneath). |
+| `<rx-file name label accept multiple preview current current-name>` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` when the file is required, an `Option<Upload>` when it may be left out (an edit form keeping the current file), and a `Vec<Upload>` with `multiple`. |
+| `<rx-date-picker name label value min max placeholder="YYYY-MM-DD" readonly disabled-dates closed-weekdays>` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. `disabled_dates` and `closed_weekdays` are days that can't be chosen: see [Days that can't be chosen](#days-that-cant-be-chosen). Without JavaScript it is a plain text field. |
+| `<rx-show-when field values>` + `<rx-hide-when field values>` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them. Check them on the server with `required_if`. Without JavaScript they stay visible. |
+| `<rx-select multiple searchable>` | Pick several values (a `Vec`), with a box to type in that filters the options. The chosen ones show as chips (small rounded labels). The browser's own select stays underneath: the form sends the same thing, and it works without JavaScript. |
+| `<rx-select options-url editable>` | The options come from the server as you type (`renox::select`), for lists too long to put in the page. With `editable`, what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (with the pencil). See [Options from the server](#options-from-the-server) below. |
+| `<rx-tags-input name label value suggestions>` | Free text as chips. Enter or a comma adds one; Backspace in the empty box removes the last one. The Rust field is a `Vec<String>`. |
+| `<rx-repeater name label rows min max item-label add-label reorderable>` | Rows that people add, remove and move. `:reorderable="false"` keeps their order fixed. Each row has the fields in the tag's content, named `name[0][field]`, and they are renumbered when rows move. The Rust field is a `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
+| `<rx-key-value name label value key-label value-label add-label hint>` | Pairs of text: a repeater with a key and a value on each row. `key_label` and `value_label` name the two columns, `add_label` the add button. The Rust field is `KeyValues`. |
+| `<rx-wizard id submit-label back-label next-label>` with `<rx-wizard-step key title>` children` | A form in steps. Next checks the current step first: the browser's own rules, then the server's (with `data-live-validate`). After a failed submit, the first step with an error opens. Without JavaScript all steps show at once. |
+| `<rx-form-grid columns="2">` + `<rx-fieldset legend hint columns>` | `rx-form-grid` puts fields side by side from tablet width up (one column on phones). `rx-fieldset` is a group of fields with a title, for long forms. A field's `span="2"` or `span="full"` makes it wider. |
 
 A few options work on many fields:
 
@@ -309,9 +278,9 @@ A few options work on many fields:
 - Every field but `repeater` and `key_value` takes `disabled` (the field isn't sent).
 - `input`, `textarea` and `date_picker` take `readonly`: the field is shaded and can't be
   changed, but it is still sent and can be read.
-- `input` takes `revealable=true`: a button that shows the password. Renox's own sign-in
+- `input` takes `revealable`: a button that shows the password. Renox's own sign-in
   pages use it.
-- `input` takes `copyable=true`: a button that copies the value, handy for keys and links.
+- `input` takes `copyable`: a button that copies the value, handy for keys and links.
 
 The error summary links to each field by its name. So it finds a field with its own `id`, and
 a radio group, too.
@@ -330,27 +299,6 @@ Here are fields side by side, and a group with a title:
   <rx-checkbox-list name="extras" label="Extras" :options="[['gift', 'Gift wrap'], ['note', 'Card']]" inline/>
 </rx-fieldset>
 ```
-
-The same, as macros:
-
-<details>
-<summary>Macro form</summary>
-
-```html
-{% from "renox/ui.html" import input, radio, checkbox_list, form_grid, fieldset %}
-{% call form_grid(2) %}
-  {{ input("price", "Price", type="number", prefix="$", required=true, attrs={"step": "0.01"}) }}
-  {{ input("weight", "Weight", type="number", suffix="kg") }}
-  {{ input("city", "City", datalist=["Jakarta", "Bandung", "Surabaya"], span="full") }}
-{% endcall %}
-{% call fieldset("Delivery") %}
-  {{ radio("speed", "Speed", [["regular", "Regular", "2–3 days"], ["express", "Express", "Tomorrow"]],
-           selected="regular", required=true) }}
-  {{ checkbox_list("extras", "Extras", [["gift", "Gift wrap"], ["note", "Card"]], inline=true) }}
-{% endcall %}
-```
-
-</details>
 
 Price and weight sit next to each other. City takes the whole row (`span="full"`) and
 suggests three cities. Below, a "Delivery" group asks for a speed (one choice) and extras
@@ -381,19 +329,7 @@ a repeater row per day, named `hours[0][day]`, `hours[0][opens]`…). In the exa
 each row's input is named `invites[0][email]`, `invites[1][email]`, and so on. `Valid` reads
 them into a `Vec`.
 
-```html
-{% from "renox/ui.html" import wizard, wizard_step, repeater, input %}
-{% call wizard("new-team", [["name", "Name"], ["members", "Members"]], submit_label="Create team") %}
-  {% call wizard_step("new-team", "name") %}{{ input("name", "Name", required=true) }}{% endcall %}
-  {% call wizard_step("new-team", "members") %}
-    {% call(row, prefix) repeater("invites", "Members", item_label="Member", max=10) %}
-      {{ input(prefix ~ "[email]", "Email", type="email", value=row.email, required=true) }}
-    {% endcall %}
-  {% endcall %}
-{% endcall %}
-```
-
-The same form as tags. `<rx-wizard>` takes the steps from its `<rx-wizard-step>` children
+`<rx-wizard>` takes the steps from its `<rx-wizard-step>` children
 (`key` is required, `title` is the name in the progress list) and gives its `id` to each step,
 so you do not repeat it. `<rx-repeater>` hands `row` and `prefix` to its content:
 
@@ -461,9 +397,9 @@ select over such a list asks the server as people type. It uses one URL for ever
 In the template, `options` only needs the option (or options) chosen now:
 
 ```html
-{{ select("category_id", "Category", [[product.category_id, category_name]] if product.category_id else [],
-          selected=product.category_id, placeholder="None",
-          options_url=route('admin.categories.options'), editable=true) }}
+<rx-select name="category_id" label="Category" :options="[[product.category_id, category_name]] if product.category_id else []"
+           :selected="product.category_id" placeholder="None"
+           options-url="{{ route('admin.categories.options') }}" editable/>
 ```
 
 Here is what the kit sends to that URL, and what the handler answers:
@@ -495,12 +431,12 @@ struct Category { id: i64, name: String }
 async fn options(State(db): State<Db>, query: OptionQuery) -> Result<Json<Vec<SelectOption>>> {
     // A lookup asks for options by their values (after a failed submit).
     let rows = if query.is_lookup() {
-        Category::query().where_in("id", query.values_as::<i64>()).get(&db).await?
+        Category::query().where_(Category::ID.is_in(query.values_as::<i64>())).get(&db).await?
     } else {
         // A search: the first 20 categories whose name contains what was typed.
         Category::query()
-            .where_op("name", "like", format!("%{}%", query.q))
-            .order_by("name")
+            .where_(Category::NAME.like(&format!("%{}%", query.q)))
+            .order_by(Category::NAME)
             .limit(20)
             .get(&db)
             .await?
@@ -521,13 +457,12 @@ checkout ([sales/checkout/show.html](../examples/bikeshop/resources/views/sales/
 for an address only for delivery, and requires it only then:
 
 ```html
-{% from "renox/ui.html" import toggle_buttons, show_when, textarea, date_picker %}
-{{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pick up"]],
-                  selected="courier", required=true) }}
-{% call show_when("delivery", "courier") %}
-  {{ textarea("address", "Address", required=true) }}
-  {{ date_picker("deliver_on", "Deliver on", min="2026-10-03") }}
-{% endcall %}
+<rx-toggle-buttons name="delivery" label="Delivery" :options="[['courier', 'Courier'], ['pickup', 'Pick up']]"
+                   selected="courier" required/>
+<rx-show-when field="delivery" values="courier">
+  <rx-textarea name="address" label="Address" required/>
+  <rx-date-picker name="deliver_on" label="Deliver on" min="2026-10-03"/>
+</rx-show-when>
 ```
 
 The address and the date show only while "Courier" is pressed. When "Pick up" is pressed,
@@ -553,9 +488,8 @@ A booking form shouldn't offer a day the shop is closed or already full. `date_p
 those days, and examples/bikeshop's workshop booking uses them:
 
 ```html
-{% from "renox/ui.html" import date_picker %}
-{{ date_picker("day", "Visit day", min="2026-10-06", max="2026-11-30", required=true,
-               disabled_dates=["2026-10-12", "2026-10-13"], closed_weekdays=[0]) }}
+<rx-date-picker name="day" label="Visit day" min="2026-10-06" max="2026-11-30" required
+                :disabled-dates="['2026-10-12', '2026-10-13']" :closed-weekdays="[0]"/>
 ```
 
 - `disabled_dates` is a list of days (`"YYYY-MM-DD"`, or `NaiveDate`s from the handler).
@@ -599,21 +533,21 @@ arguments.
 
 | Component | What it is |
 |---|---|
-| `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…}, icon=…, badge=…, key=…, disabled=…, disabled_reason=…)` | A button. Variants (styles): `primary`, `secondary`, `plain`, `danger` and `plain-danger`. It shows a spinner while its form or htmx request is being sent. For `icon`, `badge`, `key` and `disabled_reason`, see [Actions](#actions). |
-| `link_button(href, label, variant="secondary", size=…, attrs={…}, icon=…, badge=…, key=…, new_tab=…)` | A link that looks like a button. |
-| `icon_button(icon, label, href=…, variant="plain", type="button", size=…, attrs={…}, key=…, badge=…, disabled=…, disabled_reason=…, new_tab=…)` | A button that shows only an icon (or, with `href`, a link). `label` is the name screen readers say, and its tooltip. Variants: `plain`, `primary`, `danger`; also `size="small"`. |
+| `<rx-button label variant="primary" type="submit" name value size block attrs icon badge key disabled disabled-reason>` | A button. Variants (styles): `primary`, `secondary`, `plain`, `danger` and `plain-danger`. It shows a spinner while its form or htmx request is being sent. For `icon`, `badge`, `key` and `disabled_reason`, see [Actions](#actions). |
+| `<rx-link-button href label variant="secondary" size attrs icon badge key new-tab>` | A link that looks like a button. |
+| `<rx-icon-button icon label href variant="plain" type="button" size attrs key badge disabled disabled-reason new-tab>` | A button that shows only an icon (or, with `href`, a link). `label` is the name screen readers say, and its tooltip. Variants: `plain`, `primary`, `danger`; also `size="small"`. |
 | `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A card is a surface (a white box) for content. A group is an inset list of rows, like the iPhone's Settings. |
-| `alert(message, kind=…, title=…)`, `badge(text, kind=…)` | Kinds: `info`, `success`, `warning`, `error`. An alert has an icon for each kind, so colour is never the only sign. A badge is colour only, so its text must carry the meaning ("Paid", not "●"). |
-| `form_errors(title=…)` | Every error of the last submit, above the form. Each links to its field. |
-| `sheet(id, title, message=…, slide_over=…, width=…, icon=…)` + `open_button(id, label, variant="secondary", size=…, icon=…, key=…, badge=…)` | A sheet is a modal dialog: a box over the page that you must close before going on. It closes on Esc and on a click outside it (on the backdrop), and focus goes back to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height. `width` is `sm`, `md` (default), `lg` or `xl`. `icon` (`info`, `success`, `warning`, `error`) shows above the title. Any element with `data-rx-open="<sheet id>"` opens the sheet too, not only `open_button`. A button with `data-rx-close` inside the sheet closes it. |
-| `action_sheet(id, label, action, title, …)` | A button that opens a sheet with a form sent by htmx. See [Actions](#actions). |
-| `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…, icon=…, modal_icon="warning", key=…)` | A destructive action (like delete) that asks first, in a sheet. Cancel has the focus first, so pressing Enter by mistake does nothing harmful. `icon` goes on the button, `modal_icon` above the sheet's title (`none` for no icon). |
-| `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label, icon=…, download=…, new_tab=…)`, `menu_action(action, label, method="POST", danger=…, icon=…)`, `menu_open(id, label)`, `menu_section(title)`, `menu_separator()` | A drop-down menu of actions. The arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for methods other than POST); `menu_open` opens a sheet. |
+| `<rx-alert message kind title>` + `<rx-badge text kind>` | Kinds: `info`, `success`, `warning`, `error`. An alert has an icon for each kind, so colour is never the only sign. A badge is colour only, so its text must carry the meaning ("Paid", not "●"). |
+| `<rx-form-errors title>` | Every error of the last submit, above the form. Each links to its field. |
+| `<rx-sheet id title message slide-over width icon>` + `<rx-open-button id label variant="secondary" size icon key badge>` | A sheet is a modal dialog: a box over the page that you must close before going on. It closes on Esc and on a click outside it (on the backdrop), and focus goes back to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height. `width` is `sm`, `md` (default), `lg` or `xl`. `icon` (`info`, `success`, `warning`, `error`) shows above the title. Any element with `data-rx-open="<sheet id>"` opens the sheet too, not only `open_button`. A button with `data-rx-close` inside the sheet closes it. |
+| `<rx-action-sheet id label action title>` | A button that opens a sheet with a form sent by htmx. See [Actions](#actions). |
+| `<rx-confirm id label action title message confirm-label method="DELETE" size icon modal-icon="warning" key>` | A destructive action (like delete) that asks first, in a sheet. Cancel has the focus first, so pressing Enter by mistake does nothing harmful. `icon` goes on the button, `modal_icon` above the sheet's title (`none` for no icon). |
+| `<rx-menu label id variant="secondary" size="small">` + `<rx-menu-link href label icon download new-tab>` + `<rx-menu-action action label method="POST" danger icon>` + `<rx-menu-open id label>` + `<rx-menu-section title>` + `<rx-menu-separator>` | A drop-down menu of actions. The arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for methods other than POST); `menu_open` opens a sheet. |
 | `action_group(label=none, icon=none)`, `wizard_action(…)`, `import_action(…)` | Several actions behind one button, an action with steps, a CSV import. See [Actions](#action-groups). |
-| `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control: tabs that switch between panels on one page. The arrow keys, Home and End move between tabs. |
-| `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` lines its column up on the right (for numbers), and `["Slug", "hide-narrow"]` hides the column on phones. |
-| `empty(title, message=…, action_href=…, action_label=…, icon=…)` | What an empty list says; `icon` draws one of the kit's icons in a tinted circle above it. With `action_href` (and its `action_label`), it adds a link to add the first item. |
-| `notification_bell(count=none, id="rx-notifications")` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
+| `<rx-tabs id selected label>` with `<rx-tab key label>` children | A segmented control: tabs that switch between panels on one page; each panel is the content of its `<rx-tab>`. The arrow keys, Home and End move between tabs. |
+| `<rx-table :rows caption as key card>` with `<rx-column label align hide-narrow>` | A table in a card, one row per item of `rows`. `align="num"` lines a column up on the right (for numbers), and `hide-narrow` hides the column on phones. |
+| `<rx-empty title message action-href action-label icon>` | What an empty list says; `icon` draws one of the kit's icons in a tinted circle above it. With `action_href` (and its `action_label`), it adds a link to add the first item. |
+| `<rx-notification-bell count id="rx-notifications">` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 | `event_stream()` | Opens the same live stream on a page without the bell, so the app's events (`state.broadcast(…)`) arrive as DOM events. Nothing for guests. See [docs/mail.md](mail.md#your-own-live-events). |
 
 ### Icons
@@ -685,32 +619,6 @@ A navigation bar on top looks like this:
 <main class="rx-container rx-container--wide" id="main">…</main>
 ```
 
-The same bar as macros:
-
-<details>
-<summary>Macro form</summary>
-
-```html
-<body class="rx-page">
-  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, link_button %}
-  {% call navbar(app.name, href=route('home'), width="wide") %}
-    {% call nav_links() %}
-      {{ nav_link(route('products.index'), "Products", active=route_is('products.*')) }}
-      {{ nav_link(route('cart.show'), "Cart", active=route_is('cart.*'), badge=cart_count) }}
-    {% endcall %}
-    {# rx-spacer pushes what follows to the right end of the bar #}
-    <span class="rx-spacer"></span>
-    {% call menu(auth.user.name, id="account-menu", variant="plain") %}
-      {{ menu_link(route('account.show'), "Account") }}
-      {{ menu_action(route('logout'), "Log out") }}
-    {% endcall %}
-  {% endcall %}
-  <main class="rx-container rx-container--wide" id="main">…</main>
-</body>
-```
-
-</details>
-
 The bar shows the app's name (a link home), two links (Products, and Cart with a count), and
 on the right a menu with the user's name. `active=route_is('products.*')` highlights
 "Products" on every products page.
@@ -723,24 +631,23 @@ keeps one row while the sections become a tab bar floating at the bottom. exampl
 public pages work this way:
 
 ```html
-{% from "renox/ui.html" import navbar, nav_links, nav_link, nav_search, sheet, sidebar_link %}
 {%- set tabs = [
   {"href": route('home'), "label": "Home", "icon": "house", "active": route_is('home')},
   {"href": route('catalog.index'), "label": "Shop", "icon": "shopping-bag", "active": route_is('catalog.*')},
   {"href": route('orders.index'), "label": "Orders", "icon": "receipt", "active": route_is('orders.*'), "badge": open_orders},
   {"open": "site-menu", "label": "Menu", "icon": "menu"},
 ] %}
-{% call navbar(app.name, href=route('home'), width="wide", tabs=tabs) %}
-  {% call nav_links() %}…the same sections, for wider screens…{% endcall %}
+<rx-navbar :brand="app.name" href="{{ route('home') }}" width="wide" :tabs="tabs">
+  <rx-nav-links>…the same sections, for wider screens…</rx-nav-links>
   <span class="rx-spacer"></span>
-  {% call nav_search(label="Search") %}
+  <rx-nav-search label="Search">
     <form role="search" method="get" action="{{ route('catalog.search') }}">…</form>
-  {% endcall %}
-  <span class="rx-hide-narrow">{{ link_button(route('login'), "Log in", variant="plain", size="small") }}</span>
-{% endcall %}
-{% call sheet("site-menu", "Menu", slide_over=true, width="sm") %}
-  {{ sidebar_link(route('login'), "Log in") }}
-{% endcall %}
+  </rx-nav-search>
+  <span class="rx-hide-narrow"><rx-link-button route="login" label="Log in" variant="plain" size="small"/></span>
+</rx-navbar>
+<rx-sheet id="site-menu" title="Menu" slide-over width="sm">
+  <rx-sidebar-link route="login" label="Log in"/>
+</rx-sheet>
 ```
 
 - Each tab is a link (`href`, `label`, an [icon](#icons), `active`), or, with `open`, a button
@@ -765,15 +672,14 @@ A back office puts its sections down the side instead:
 
 ```html
 <body class="rx-page rx-shell">
-  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, notification_bell %}
-  {% call sidebar(company.name, href=route('home')) %}
-    {{ sidebar_link(route('home'), "Dashboard", active=route_is('home')) }}
-    {{ sidebar_link(route('invoices.index'), "Invoices", active=route_is('invoices.*')) }}
-    {{ sidebar_section("Admin") }}
-    {% if can('staff.manage') %}{{ sidebar_link(route('staff.index'), "Staff", active=route_is('staff.*')) }}{% endif %}
-  {% endcall %}
+  <rx-sidebar :brand="company.name">
+    <rx-sidebar-link route="home" label="Dashboard" :active="route_is('home')"/>
+    <rx-sidebar-link route="invoices.index" label="Invoices" :active="route_is('invoices.*')"/>
+    <rx-sidebar-section title="Admin"/>
+    <rx-sidebar-link rx-if="can('staff.manage')" route="staff.index" label="Staff" :active="route_is('staff.*')"/>
+  </rx-sidebar>
   <div class="rx-shell__main">
-    {% call navbar(none, width="full", skip=false) %}<span class="rx-spacer"></span>{{ notification_bell(unread_notifications) }}{% endcall %}
+    <rx-navbar width="full" :skip="false"><span class="rx-spacer"></span><rx-notification-bell :count="unread_notifications"/></rx-navbar>
     <main class="rx-shell__content" id="main">…</main>
   </div>
 </body>
@@ -785,33 +691,31 @@ top holds the notification bell, and the page's content goes under it.
 
 | Component | What it is |
 |---|---|
-| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true, tabs=[…], tabs_label=…)` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. `tabs`: a tab bar at the bottom on phones ([above](#tabs-at-the-bottom-on-phones)). |
-| `nav_search(label=…, id=…)` | A search form in the bar; on phones behind a search button that opens it on a row under the bar. |
-| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways (with `tabs`, the tab bar replaces them). |
-| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…, icon=…)`, `sidebar_section(title)` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
-| `page_header(title, subtitle=…, back=…, back_label=…, badge=…, badge_kind=…)` | A page's heading: the title (with a badge), a line under it, a link back (`back`), and the call block's buttons at the end of the row (under the title on phones). |
-| `toolbar()` | Filter fields side by side. They wrap onto more lines on narrow screens, and line up with their buttons. There are no "(optional)" marks, since filters are all optional. Put it inside the `<form>`. |
-| `row_actions()` | A table row's buttons, at the end of the row. On phones only the icons show (the labels stay for screen readers). |
-| `list(id=…, label=…)` | Rows in a surface; each row is an `<li>` you write. Put `rx-list__main` on the part that takes the space left (`rx-list__main--done` strikes it through, for a finished task). Rows can be fragments that htmx adds and swaps. |
+| `<rx-navbar brand href="/" logo mark width="narrow" label skip tabs tabs-label>` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. `tabs`: a tab bar at the bottom on phones ([above](#tabs-at-the-bottom-on-phones)). |
+| `<rx-nav-search label id>` | A search form in the bar; on phones behind a search button that opens it on a row under the bar. |
+| `<rx-nav-links>` with `<rx-nav-link href label :active badge>` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways (with `tabs`, the tab bar replaces them). |
+| `<rx-sidebar brand href="/" logo mark label skip>` + `<rx-sidebar-link href label active badge icon>` + `<rx-sidebar-section title>` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
+| `<rx-page-header title subtitle back back-label badge badge-kind>` | A page's heading: the title (with a badge), a line under it, a link back (`back`), and the call block's buttons at the end of the row (under the title on phones). |
+| `<rx-toolbar>` | Filter fields side by side. They wrap onto more lines on narrow screens, and line up with their buttons. There are no "(optional)" marks, since filters are all optional. Put it inside the `<form>`. |
+| `<rx-row-actions>` | A table row's buttons, at the end of the row. On phones only the icons show (the labels stay for screen readers). |
+| `<rx-list id label>` | Rows in a surface; each row is an `<li>` you write. Put `rx-list__main` on the part that takes the space left (`rx-list__main--done` strikes it through, for a finished task). Rows can be fragments that htmx adds and swaps. |
 | `columns(count=2)` | Columns from tablet width up, one column on phones (a photo next to its details, say). |
-| `card_grid()` + `media_card(href, title, image=…, image_alt="", subtitle=…, note=…, dimmed=…)` | Cards with a picture, in a grid that fills the row. Each card is at least 13rem wide; set `--rx-card-min` for another width. |
-| `link_tabs(items, current=…, label=…)` | Links that look like a segmented control, for sections or filters that have their own URLs. `items` are `[href, label]` pairs. (`tabs` switches panels on one page instead.) |
+| `<rx-card-grid>` + `<rx-media-card href title image image-alt="" subtitle note dimmed>` | Cards with a picture, in a grid that fills the row. Each card is at least 13rem wide; set `--rx-card-min` for another width. |
+| `<rx-link-tabs items current label>` | Links that look like a segmented control, for sections or filters that have their own URLs. `items` are `[href, label]` pairs. (`tabs` switches panels on one page instead.) |
 | `thumbnail(src, alt="", href=…)` | A small square picture, for example in a table row. |
-| `progress(value, max=100, label=…, show_value=true)` | A progress bar (the browser's `<progress>`) in the kit's colours, with the percentage next to it. |
+| `<rx-progress value max="100" label show-value>` | A progress bar (the browser's `<progress>`) in the kit's colours, with the percentage next to it. |
 | `menu_button(label, attrs={…}, danger=…)` | A menu item that is a plain button. `attrs` say what it does, usually with htmx (`hx-get`, `hx-delete`…). |
 
 ### Layout fields as tags
 
-These macros also have tags. Each renders the same HTML as its macro (a test checks it).
-
-| Tag | Macro |
+| Tag | What it does |
 | --- | --- |
-| `<rx-repeater name label :rows add-label item-label min max :reorderable hint id span>` with `row` and `prefix` in its content | `{% call(row, prefix) repeater(…) %}`. `prefix` is the row's name part, like `lines[0]`, so a field is `name="{{ prefix }}[qty]"`. |
-| `<rx-key-value name label :value key-label value-label add-label hint id span>` | `key_value(…)` |
-| `<rx-fieldset legend hint columns>…</rx-fieldset>` | `{% call fieldset(…) %}` |
-| `<rx-show-when field values>…</rx-show-when>` | `{% call show_when(field, values) %}` |
-| `<rx-hide-when field values>…</rx-hide-when>` | `{% call hide_when(field, values) %}` |
-| `<rx-wizard id submit-label back-label next-label cancel cancel-label>` with `<rx-wizard-step key title>` children | `{% call wizard(id, steps, submit_label, …) %}` + `{% call wizard_step(id, key, title=…) %}`. The steps list and each step's `id` come from the children. |
+| `<rx-repeater name label :rows add-label item-label min max :reorderable hint id span>` with `row` and `prefix` in its content | Rows that people add, remove and move. `prefix` is the row's name part, like `lines[0]`, so a field is `name="{{ prefix }}[qty]"`. |
+| `<rx-key-value name label :value key-label value-label add-label hint id span>` | Pairs of a key and a value. |
+| `<rx-fieldset legend hint columns>…</rx-fieldset>` | A group of fields under a legend. |
+| `<rx-show-when field values>…</rx-show-when>` | Shows its fields only while another field has one of the values. |
+| `<rx-hide-when field values>…</rx-hide-when>` | The opposite. |
+| `<rx-wizard id submit-label back-label next-label cancel cancel-label>` with `<rx-wizard-step key title>` children | A form in steps. The steps list and each step's `id` come from the children. |
 
 `values` is one word (`values="courier"`) or a list (`:values="['courier', 'post']"`).
 A field that shows only when another has a value:
@@ -824,7 +728,7 @@ A field that shows only when another has a value:
 ```
 
 `<rx-select>` takes `options-url` (where the server answers searches) and `editable` (people can add
-and rename options), like `select(…, options_url=…, editable=true)`.
+and rename options), like `<rx-select options-url editable>`.
 
 ### More classes and options
 
@@ -833,7 +737,7 @@ Some things are classes or options, not macros:
 - `rx-page--fill` on `<body>` makes the page as tall as the screen, with `<main>` taking the
   rest. Use it for a data grid that fills the screen (`rx-grid-fill`).
 - `rx-image` is a picture as wide as its column.
-- `input`, `textarea`, `select` and `checkbox` take `hide_label=true`. The label is hidden on
+- `input`, `textarea`, `select` and `checkbox` take `hide-label`. The label is hidden on
   screen but stays for screen readers (for example a quantity field in a table row).
 - `confirm` takes `cancel_label` ("Keep order") and `fields`: hidden values sent with it, such
   as `{"status": "cancelled"}`.
@@ -1024,34 +928,6 @@ So a page doesn't need to write that HTML by hand:
 </rx-card>
 ```
 
-The same page as macros:
-
-<details>
-<summary>Macro form</summary>
-
-```html
-{% from "renox/ui.html" import card, infolist, entry, repeatable %}
-{% call card(title="Order #" ~ order.id) %}
-  {% call infolist(columns=2) %}
-    {{ entry("Status", order.status, badge={"paid": "success", "pending": "warning"},
-             labels={"paid": "Paid", "pending": "Waiting for payment"}) }}
-    {{ entry("Placed", order.created_at, format="since") }}
-    {{ entry("Total", order.total, format="money") }}
-    {{ entry("Invoice", order.invoice, copyable=true, url=route('invoices.show', order.id)) }}
-    {{ entry("Tags", order.tags, badge=true, limit_list=3) }}
-    {{ entry("Note", order.note, format="markdown", span="full", placeholder="No note") }}
-    {% call entry("Customer") %}<a class="rx-link" href="/customers/{{ order.customer_id }}">{{ order.customer }}</a>{% endcall %}
-    {% call(line) repeatable("Items", order.lines, columns=3) %}
-      {{ entry("Product", line.name) }}
-      {{ entry("Quantity", line.quantity, format="number") }}
-      {{ entry("Subtotal", line.price * line.quantity, format="money") }}
-    {% endcall %}
-  {% endcall %}
-{% endcall %}
-```
-
-</details>
-
 This card shows an order in two columns:
 
 - the status as a coloured badge, with a friendly name ("Waiting for payment");
@@ -1069,22 +945,22 @@ This card shows an order in two columns:
 
 | | |
 |---|---|
-| `infolist(columns=1, inline=false)` | The `<dl>` (description list) around the entries. `inline=true` puts each label beside its value (from tablet width up). |
-| `entry(label, value, format=…, …)` | A label and its value. With `{% call entry(label) %}…{% endcall %}` the block is the value. `span=2` or `"full"` makes it wider. `inline=true` puts this label beside its value. `hide_label=true` keeps the label for screen readers only. `hint` adds a line under the value, `tooltip` a title shown on hover. `id` sets the entry's `id`, for a link or a script to find it. |
+| `<rx-infolist columns="1" inline>` | The `<dl>` (description list) around the entries. `inline` puts each label beside its value (from tablet width up). |
+| `<rx-entry label :value format span inline hide-label hint tooltip id>` | A label and its value. With content between the tags, the content is the value. `span="2"` or `"full"` makes it wider. `inline` puts this label beside its value. `hide-label` keeps the label for screen readers only. `hint` adds a line under the value, `tooltip` a title shown on hover. `id` sets the entry's `id`, for a link or a script to find it. |
 | `format` | `"date"` and `"datetime"` (with `date_format`, using chrono's codes; in `APP_TIMEZONE`). `"since"`: "3 hours ago", with the date as its tooltip. `"money"`: an amount in the smallest unit (cents), shown in `APP_CURRENCY` like the `money` filter, or `currency="EUR"`, `divide_by=1` for whole units. `"number"` (with `decimals`). `"markdown"`. `"bool"`: a check and "Yes", or a cross and "No". `"color"`: a colour sample and its code. `"image"`: a URL (with `image_size`, `circular`). `"key_value"`: pairs or a map, such as `KeyValues`, as a table. |
 | `badge`, `labels` | `badge=true`, a kind (`"success"`), or kinds by value (`{"paid": "success"}`). `labels` gives raw values friendly names (`{"paid": "Paid"}`), with or without a badge. |
 | `url`, `new_tab`, `copyable` | A link; a copy button (it copies the raw value). |
 | `prefix_actions`, `suffix_actions` | Buttons before or after the value, a list of mappings: `label` (also the tooltip of an icon-only button), `icon` (a kit icon such as `"edit"`, `"external"`, `"refresh"`, `"trash"`, `"download"`; without one the label is shown), and what it does: `url` (a link, with `new_tab`), `action` (a small form posted there, with the CSRF token; `method` `"PUT"`, `"PATCH"` or `"DELETE"` for the others), or neither, with `attrs` for htmx (`{"hx-post": …, "hx-confirm": "Sure?"}`). `variant` (`"plain"` by default) and `disabled_reason` as for buttons. |
 | `prefix`, `suffix`, `limit`, `words`, `placeholder` | Text before or after the value. At most `limit` letters, or `words` words, then "…". `placeholder` is what an empty value (none, `""`, an empty list) shows instead (by default `—`). |
 | A list as `value` | Each item is formatted the same way. By default they're joined with commas; `list="lines"` puts one per line, `list="bullets"` makes a bullet list. Badges, colour samples and images sit in a row. `limit_list=3` shows three and folds the rest behind "Show 2 more" (a `<details>` element, no script needed). |
-| `repeatable(label, items, columns=1, placeholder="—", span="full", hide_label=…)` with `{% call(item) %}` | A list of records inside the record (an order's lines). Each item is a small infolist with a border, made of the call block's entries. `placeholder` is shown when there are no items. |
+| `<rx-repeatable label :items columns="1" placeholder="—" span="full" hide-label>` | A list of records inside the record (an order's lines). Each item is a small infolist with a border, made of the tag's `<rx-entry>` children (the item is `item`). `placeholder` is shown when there are no items. |
 
 An entry with buttons beside its value, such as a link to edit it and a form that acts on it:
 
 ```html
-{{ entry("Email", user.email, copyable=true, suffix_actions=[
-     {"label": "Write to them", "icon": "external", "url": "mailto:" ~ user.email},
-     {"label": "Send the verification again", "icon": "refresh", "action": route('users.verify', user.id)}]) }}
+<rx-entry label="Email" :value="user.email" copyable :suffix-actions="[
+  {'label': 'Write to them', 'icon': 'external', 'url': 'mailto:' ~ user.email},
+  {'label': 'Send the verification again', 'icon': 'refresh', 'action': route('users.verify', user.id)}]"/>
 ```
 
 Code shown coloured, read-only and copyable (`code_entry`), and editors for rich text, Markdown
@@ -1169,10 +1045,10 @@ kit's `empty` component and a link home, so a 404 or a 403 keeps the navigation 
 
 ## Components as tags
 
-The macros of the UI kit are also written as HTML tags. Write `<rx-card>` instead of
-`{% call card() %}`. A small compiler in Renox rewrites the tags into plain MiniJinja when a
-template loads, so there is nothing to install and nothing to run at build time. The macros keep
-working: the tags are a way to write them, and you can mix both in one file.
+The UI kit's parts are written as HTML tags: `<rx-card>`, `<rx-input>`, `<rx-table>`. A small
+compiler in Renox rewrites the tags into plain MiniJinja when a template loads, so there is
+nothing to install and nothing to run at build time. A few parts have no tag (they are named
+where they appear) and are called as macros.
 
 A template with no `<rx-…>` or `<app-…>` tag, and no `rx-if`, `rx-else` or `rx-for` attribute, is
 not touched at all.
@@ -1295,9 +1171,7 @@ A file in `resources/views/components/` is a tag. `components/price_tag.html` is
 A bare name is required, `name="text"` has a text default and `:name="expression"` has an
 expression default. `<rx-slot />` is where the tag's content goes; `<rx-slot name="x" />`
 is where the slot `x` goes. Using it: `<app-price-tag :amount="p.price" currency="EUR"/>`.
-The compiler checks the attributes against `<rx-props>`, like it does for the kit. Older
-macro files (no `<rx-props>`) are not tags: import them with `{% from %}` as before, or
-`rnx make:component --macro` to write one.
+The compiler checks the attributes against `<rx-props>`, like it does for the kit. 
 
 ### When something is wrong
 
@@ -1311,9 +1185,11 @@ resources/views/products/index.html:9: <rx-button> "variant" must be one of: pri
 
 Line numbers are kept, so MiniJinja's own errors point at the line you wrote.
 
-### Tags and macros
+### Upgrading from 1.0
 
-| Tag | Macro it calls |
+A 1.0 template keeps working: its `{% from "renox/ui.html" import … %}` and `{% call %}` macros still compile and mix with tags in one file. New pages use tags. To move a page over, find the tag for the macro below (the macro names are also the names the kit's reference tables use). Older component files without `<rx-props>` are macros too: `rnx make:component --macro` writes one. An imported macro takes its name in the template, so a value the handler passes under the same name is hidden by it (while debugging, Renox logs a warning naming both); rename the value or import the macro `as` another name.
+
+| Tag | Macro it replaces |
 |---|---|
 | `rx-card`, `rx-toolbar`, `rx-page-header`, `rx-badge` | `card`, `toolbar`, `page_header`, `badge` |
 | `rx-button`, `rx-link-button`, `rx-icon-button` | `button`, `link_button`, `icon_button` |
@@ -1335,7 +1211,7 @@ Line numbers are kept, so MiniJinja's own errors point at the line you wrote.
 | `rx-stack`, `rx-row` | none: a `div` with the kit's class |
 | `rx-page`, `rx-push`, `rx-form`, `rx-table` | `{% extends %}`/`{% block %}`, `push`, a `<form>`, a loop with `table` markup |
 
-The macros stay the lower level; every part of the kit has a tag now.
+Macros without a tag in this table (`action_group`, `wizard_action`, `nav_links`' siblings you find in the tables above) are still called as macros.
 
 Navigation, menus, tabs and sheets as tags. A link takes `href` or `route`, and its label as an
 attribute or as content. `<rx-tabs>` takes its tab list from the `<rx-tab key label>` children
@@ -1390,8 +1266,7 @@ arguments (`kind`, `labels`, `series`, `format`, `title`, `id`):
 </rx-dashboard>
 ```
 
-A data grid is one tag. Its content draws the `custom` columns, with `row` and `column` in it,
-like the call block of the macro:
+A data grid is one tag. Its content draws the `custom` columns, with `row` and `column` in it:
 
 ```html
 <rx-grid :page="orders">
@@ -1830,15 +1705,14 @@ An **action** is a button that does one thing, often after asking for a few valu
 "Adjust stock", which asks how many to add or take away.
 
 `action_sheet` is all of it at once: the button, a sheet, and the form inside the sheet. The
-fields go in its call block:
+fields go in its content:
 
 ```html
-{% from "renox/ui.html" import action_sheet, input %}
-{% call action_sheet("stock-" ~ product.id, "Stock", route('admin.products.stock', product.id),
-                     "Adjust stock of " ~ product.name, description="A negative number takes away.",
-                     submit_label="Adjust stock", method="PUT", icon="box", size="small") %}
-  {{ input("change", "Change", type="number", required=true, id="stock-change-" ~ product.id) }}
-{% endcall %}
+<rx-action-sheet :id="'stock-' ~ product.id" label="Stock" :action="route('admin.products.stock', product.id)"
+                 :title="'Adjust stock of ' ~ product.name" description="A negative number takes away."
+                 submit-label="Adjust stock" method="PUT" icon="box" size="small">
+  <rx-input name="change" label="Change" type="number" required :id="'stock-change-' ~ product.id"/>
+</rx-action-sheet>
 ```
 
 This makes a small "Stock" button with a box icon. Clicking it opens a sheet titled "Adjust
@@ -2152,7 +2026,7 @@ struct Order { id: i64, total: i64, status: String, created_at: Option<renox::db
 /// The dashboard page: sales, sales in the period before, and the number of orders.
 async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View> {
     // A query for paid orders, made fresh each time it's needed.
-    let paid = || Order::where_eq("status", "paid");
+    let paid = || Order::query().where_(Order::STATUS.eq("paid"));
     // The sum of `total` per day (or month) in the chosen period, and in the one before.
     let sales = Trend::of(paid(), "created_at").over(period).sum(&state, "total").await?;
     let before = Trend::of(paid(), "created_at").over(period.previous()).sum(&state, "total").await?;
@@ -2173,19 +2047,18 @@ a custom range (`?period=custom&from=2026-09-01&to=2026-09-30`, what `period_fil
 "Custom" form sends). Then the template draws them:
 
 ```html
-{% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
-{{ period_filter(period) }}
-{% call stats(4) %}
-  {{ stat("Revenue", revenue | money, delta=change, trend=sales.values) }}
-  {{ stat("Refunds", refunds, delta=refund_change, good="down") }}
-{% endcall %}
-{% call dashboard(3) %}
-  {% call widget("Sales", description="Paid orders", span=2) %}
-    {{ chart("area", sales, format="money") }}
-  {% endcall %}
-  {{ widget("By status", url=route('dashboard.statuses'), poll=60) }}
-  {% call widget("Orders", span="full") %}{{ chart("bar", orders, name="Orders") }}{% endcall %}
-{% endcall %}
+<rx-period-filter :selected="period"/>
+<rx-stats columns="4">
+  <rx-stat label="Revenue" :value="revenue | money" :delta="change" :trend="sales.values"/>
+  <rx-stat label="Refunds" :value="refunds" :delta="refund_change" good="down"/>
+</rx-stats>
+<rx-dashboard columns="3">
+  <rx-widget title="Sales" description="Paid orders" span="2">
+    <rx-chart kind="area" :data="sales" format="money"/>
+  </rx-widget>
+  <rx-widget title="By status" url="{{ route('dashboard.statuses') }}" :poll="60"/>
+  <rx-widget title="Orders" span="full"><rx-chart kind="bar" :data="orders" name="Orders"/></rx-widget>
+</rx-dashboard>
 ```
 
 This page shows, from top to bottom:

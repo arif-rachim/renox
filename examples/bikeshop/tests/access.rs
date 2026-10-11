@@ -107,8 +107,8 @@ async fn see_record(
 /// The ids of the bikes the person may see.
 async fn list_bikes(State(db): State<Db>) -> Result<String> {
     let ids: Vec<i64> = access::visible::<RentalBike>(FLEET_VIEW)
-        .order_by("id")
-        .pluck(&db, "id")
+        .order_by(RentalBike::ID)
+        .pluck(&db, RentalBike::ID)
         .await?;
     Ok(format!("{ids:?}"))
 }

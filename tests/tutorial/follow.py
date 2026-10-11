@@ -124,8 +124,8 @@ def main():
     edit(layout, spacer, "\n".join("  " + l for l in links) + "\n" + spacer, "3")
 
     # 4. A form that saves without a reload.
-    edit(mod_rs, "use renox::prelude::*;\n",
-         "use renox::Toast;\nuse renox::prelude::*;\nuse serde::Deserialize;\n", "4")
+    edit(mod_rs, "use renox::prelude::*;\n", "use renox::Toast;\nuse renox::prelude::*;\n", "4")
+    edit(mod_rs, "use model::Bookmark;\n", "use model::{Bookmark, BookmarkForm};\n", "4")
     write(mod_rs, read(mod_rs).rstrip("\n") + "\n\n" + block_after("Add this to `src/app/bookmarks/mod.rs`"))
     resource = next(l.strip() for l in block_after("And give the resource its `store` action:").splitlines()
                     if l.strip().startswith(".resource("))

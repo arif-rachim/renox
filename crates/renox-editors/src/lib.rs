@@ -15,20 +15,18 @@
 //! In a form, next to the kit's fields:
 //!
 //! ```html
-//! {% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor %}
-//! <form method="post" action="/posts" data-live-validate>
-//!   {{ csrf_field() }}
-//!   {{ rich_editor("body", "Body", value=post.body, required=true) }}
-//!   {{ markdown_editor("notes", "Notes", value=post.notes) }}
-//!   {{ code_editor("settings", "Settings", value=post.settings, language="json") }}
-//! </form>
+//! <rx-form route="posts.store" live>
+//!   <rx-rich-editor name="body" label="Body" :value="post.body" required/>
+//!   <rx-markdown-editor name="notes" label="Notes" :value="post.notes"/>
+//!   <rx-code-editor name="settings" label="Settings" :value="post.settings" language="json"/>
+//! </rx-form>
 //! ```
 //!
 //! Each sends a plain form field of its name, so `Valid<T>`, old input,
 //! errors and live validation work as for the kit's own fields. Rich text
 //! arrives as HTML: read it as a [`RichText`], which cleans it, and show it
 //! with the `rich_text` filter, which cleans it again. On a detail page,
-//! `code_entry` shows code highlighted, with a copy button. The guide is
+//! `<rx-code-entry>` shows code highlighted, with a copy button. The guide is
 //! docs/editors.md in the Renox repository.
 
 use renox::minijinja;
