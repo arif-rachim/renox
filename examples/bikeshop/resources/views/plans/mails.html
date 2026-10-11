@@ -2,8 +2,7 @@
     (src/app/plans/mails.rs), each with the event that sends it, shown in a
     sandboxed frame as a mail client would. -#}
 <rx-page layout="layouts/app.html" title="{{ t('plans.mails.title') }}">
-{% from "plans/_parts.html" import assets %}
-{{ assets() }}
+<app-plans-assets/>
 <rx-page-header title="{{ t('plans.mails.title') }}" subtitle="{{ t('plans.mails.lead') }}" :back="route('plans.index')" back-label="{{ t('plans.index.title') }}"/>
 {# [explain:plans.mails.template] #}
 <div class="bs-plan-mails" data-bs-reveal>

@@ -11,6 +11,7 @@ use super::contracts::Contract;
 fn global_attributes() -> Value {
     json!([
         {"name": "rx-if", "description": "Renders the element only when the expression is true."},
+        {"name": "rx-elif", "description": "Renders the element when the preceding rx-if (or rx-elif) was false and this expression is true."},
         {"name": "rx-else", "description": "Renders the element when the preceding rx-if was false."},
         {"name": "rx-for", "description": "Repeats the element: \"item in list\"."},
         {"name": "can", "description": "Renders the element only when the user may do this (a gate or an ability)."}
@@ -120,7 +121,7 @@ mod tests {
                 .iter()
                 .any(|a| a["name"].as_str().unwrap().starts_with(':'))
         );
-        assert_eq!(v["globalAttributes"].as_array().unwrap().len(), 4);
+        assert_eq!(v["globalAttributes"].as_array().unwrap().len(), 5);
     }
 
     #[test]

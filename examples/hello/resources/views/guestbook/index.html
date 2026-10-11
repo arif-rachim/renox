@@ -1,5 +1,3 @@
-{#- The kit has no tag for `thumbnail` or `pagination`, so they stay macros, imported
-    inside the `entries` block so htmx can ask for that block alone. -#}
 <rx-page layout="layouts/app.html" :title="t('guestbook.title')">
 <rx-page-header :title="t('guestbook.title')"/>
 
@@ -33,18 +31,16 @@
 </script>
 </rx-push>
 
-{% block entries %}
-{% from "renox/ui.html" import thumbnail %}
+<rx-block name="entries">
 <section id="entries" class="rx-stack" hx-boost="true" hx-target="#entries" hx-select="#entries" hx-swap="outerHTML">
   <rx-list rx-if="entries.items" :label="t('guestbook.title')">
     <li rx-for="entry in entries.items">
-      {% if entry.photo %}{{ thumbnail(storage_url(entry.photo)) }}{% endif %}
+      <rx-thumbnail rx-if="entry.photo" :src="storage_url(entry.photo)"/>
       <span class="rx-list__main"><strong>{{ entry.name }}</strong>: {{ entry.message }}</span>
     </li>
   </rx-list>
   <rx-empty rx-else :title="t('guestbook.empty')"/>
-  {% from "renox/pagination.html" import pagination %}
-  {{ pagination(entries) }}
+  <rx-pagination :page="entries"/>
 </section>
-{% endblock %}
+</rx-block>
 </rx-page>

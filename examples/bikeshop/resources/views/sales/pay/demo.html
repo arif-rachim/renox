@@ -3,7 +3,7 @@
     notification Midtrans would send, signed the same way, to this app's
     webhook. -#}
 <rx-page layout="layouts/app.html" title="{{ t('sales.demo.title') }}">
-  {% include "sales/_assets.html" %}
+  <app-sales-assets/>
   <div class="bs-demo-gateway">
     <rx-alert kind="warning" title="{{ t('sales.demo.notice_title') }}" message="{{ t('sales.demo.notice') }}"/>
     <rx-card title="{{ t('sales.demo.title') }}" subtitle="{{ t('sales.demo.merchant', shop=t('shop.name')) }}">
@@ -14,7 +14,7 @@
         <rx-entry label="{{ t('sales.demo.status') }}" :value="t('sales.payment_status.' ~ paying.payment.status)"/>
       </rx-infolist>
       {# [explain:pay.demo.template] #}
-      {%- if paying.payment.status == "pending" %}
+      <template rx-if="paying.payment.status == 'pending'">
       <form class="bs-demo-gateway__form" method="post" action="{{ action }}">
         {{ csrf_field() }}
         <input type="hidden" name="outcome" value="settlement">
@@ -25,7 +25,7 @@
         <input type="hidden" name="outcome" value="cancel">
         <rx-button variant="plain" block>{{ t('sales.demo.cancel') }}</rx-button>
       </form>
-      {%- endif %}
+      </template>
       {# [/explain:pay.demo.template] #}
     </rx-card>
   </div>

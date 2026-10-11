@@ -1,33 +1,7 @@
 {#- Every endpoint of the JSON API (#241), from src/app/api/endpoints.rs; its
     texts in another language under `api.endpoints.<route>`. -#}
 <rx-page layout="layouts/app.html" title="{{ t('api.about.title') }}" description="{{ t('api.about.lead') }}">
-{% from "api/_parts.html" import assets %}
-{#- A text of the endpoint (Markdown) in the page's language, else as written. -#}
-{% macro _md(key, english) -%}
-{%- set found = t(key) -%}
-{{ (found if found != key else english) | markdown }}
-{%- endmacro %}
-
-{# [explain:api.about.template] #}
-{% macro endpoint(e) -%}
-<article class="rx-card bs-endpoint" id="{{ e.route | replace('.', '-') }}">
-  <header class="bs-endpoint__head">
-    <rx-badge text="{{ e.method }}" :kind="'info' if e.method == 'GET' else 'warning'"/>
-    <code class="bs-endpoint__path">{{ e.path }}</code>
-    <span class="rx-subtitle">{{ t('api.about.ability') }} <code>{{ e.ability }}</code></span>
-  </header>
-  {%- set key = 'api.endpoints.' ~ e.route ~ '.' %}
-  <p>{{ _md(key ~ 'purpose', e.purpose) }}</p>
-  <rx-infolist columns="2">
-    <rx-entry label="{{ t('api.about.request') }}">{{ _md(key ~ 'request', e.request) if e.request else "—" }}</rx-entry>
-    <rx-entry label="{{ t('api.about.answer') }}">{{ _md(key ~ 'answer', e.answer) }}</rx-entry>
-  </rx-infolist>
-  <pre class="bs-code"><code>{{ e.curl | replace("$URL", base) }}</code></pre>
-</article>
-{# [/explain:api.about.template] #}
-{%- endmacro %}
-
-{{ assets() }}
+<app-api-assets/>
 <rx-stack>
   <rx-page-header title="{{ t('api.about.title') }}" subtitle="{{ t('api.about.lead') }}"/>
   <rx-card title="{{ t('api.about.how') }}">
@@ -42,8 +16,8 @@
     </div>
   </rx-card>
   <h2 class="bs-api-group">{{ t('api.about.kiosk') }}</h2>
-  <div class="bs-endpoints" data-bs-reveal>{% for e in kiosk %}{{ endpoint(e) }}{% endfor %}</div>
+  <div class="bs-endpoints" data-bs-reveal><app-api-endpoint rx-for="e in kiosk" :e="e" :base="base"/></div>
   <h2 class="bs-api-group">{{ t('api.about.customer') }}</h2>
-  <div class="bs-endpoints" data-bs-reveal>{% for e in customer %}{{ endpoint(e) }}{% endfor %}</div>
+  <div class="bs-endpoints" data-bs-reveal><app-api-endpoint rx-for="e in customer" :e="e" :base="base"/></div>
 </rx-stack>
 </rx-page>

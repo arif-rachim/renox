@@ -38,12 +38,45 @@ thread_local! {
 /// `route("n", key)` and `can="a"` becomes `can("a", var)`.
 pub(super) fn with_row<T>(var: &str, key: &str, f: impl FnOnce() -> T) -> T {
     let before = ROW.with(|r| r.replace(Some((var.to_owned(), key.to_owned()))));
-    let result = f();
+    let result = with_names(vec![var.to_owned()], f);
     ROW.with(|r| *r.borrow_mut() = before);
     result
 }
 
-fn row() -> Option<(String, String)> {
+thread_local! {
+    /// The names a template has bound at this point (loop variables, table rows, `rx-let`), so
+    /// `<rx-let>` can refuse a name that is taken (#511).
+    static NAMES: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Runs `f` with `names` bound.
+pub(super) fn with_names<T>(names: Vec<String>, f: impl FnOnce() -> T) -> T {
+    let len = NAMES.with(|n| {
+        let mut n = n.borrow_mut();
+        let len = n.len();
+        n.extend(names);
+        len
+    });
+    let result = f();
+    NAMES.with(|n| n.borrow_mut().truncate(len));
+    result
+}
+
+/// Whether `name` is bound by an enclosing loop, table row or `rx-let`.
+pub(super) fn name_bound(name: &str) -> bool {
+    NAMES.with(|n| n.borrow().iter().any(|x| x == name))
+}
+
+/// The names an `rx-for` value (`"a, b in xs"`) binds.
+fn loop_names(each: &str) -> Vec<String> {
+    let head = each.split(" in ").next().unwrap_or("");
+    head.split(',')
+        .map(|n| n.trim().trim_matches(['(', ')']).trim().to_owned())
+        .filter(|n| !n.is_empty())
+        .collect()
+}
+
+pub(super) fn row() -> Option<(String, String)> {
     ROW.with(|r| r.borrow().clone())
 }
 
@@ -147,6 +180,40 @@ fn check_event(contract: &Contract, spec: &str) -> Result<(), String> {
     ))
 }
 
+/// A conditional attribute, `?name="expression"` (#518): its name and expression. The attribute
+/// is left out when the value is `false`, `none` or undefined, written bare for `true`, and
+/// `name="text"` for anything else.
+pub(super) fn cond_attr(a: &Attr<'_>, tag: &str) -> Result<(String, String), CompileError> {
+    let name = a.name.strip_prefix('?').unwrap_or(a.name);
+    let value = a.value.unwrap_or("").trim();
+    let valid = !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.'));
+    if !valid {
+        return Err(err(
+            a.line,
+            format!("<{tag}> \"?{name}\" needs an attribute name of letters, digits, - _ : ."),
+        ));
+    }
+    if value.is_empty() {
+        return Err(err(
+            a.line,
+            format!("<{tag}> \"?{name}\" needs an expression: ?{name}=\"expr\""),
+        ));
+    }
+    Ok((name.to_owned(), value.replace(['\n', '\r'], " ")))
+}
+
+/// What `?name="expr"` is replaced with inside a start tag.
+pub(super) fn cond_attr_code(a: &Attr<'_>, tag: &str) -> Result<String, CompileError> {
+    let (name, expr) = cond_attr(a, tag)?;
+    Ok(format!(
+        "{{{{ rx_attr({}, ({expr})) }}}}",
+        attrs::literal(&name)
+    ))
+}
+
 /// The `attrs` pairs for the attributes that are not props (`"key": value`), in order. A declared
 /// `@event` gets its Alpine key; everything else keeps its name.
 pub(super) fn passthrough_pairs(
@@ -169,6 +236,14 @@ pub(super) fn passthrough_pairs(
             ));
             continue;
         }
+        if a.name.starts_with('?') {
+            let (name, expr) = cond_attr(a, contract.tag)?;
+            pairs.push(format!(
+                "{}: rx_attr_value(({expr}))",
+                attrs::literal(&name)
+            ));
+            continue;
+        }
         let e = attrs::prop_expr(a, Kind::Text, &[])
             .map_err(|m| err(a.line, format!("<{}> {m}", contract.tag)))?;
         pairs.push(format!("{}: {e}", attrs::literal(n)));
@@ -185,7 +260,7 @@ pub(super) fn check_attrs(
     let tag = contract.tag;
     let element = matches!(
         contract.render,
-        Render::Element { .. } | Render::Special(Special::Form)
+        Render::Element { .. } | Render::Special(Special::Form | Special::Script | Special::Style)
     );
     let route = attrs.iter().find(|a| bare(a.name) == "route");
     if route.is_some() {
@@ -248,8 +323,14 @@ pub(crate) fn emit(
     let mut out = String::with_capacity(src.len());
     let mut used = Used::new();
     let mut counter = 0;
-    let is_page = |n: &Node<'_>| matches!(n, Node::Element { name, .. } if name == "rx-page");
-    if nodes.iter().any(is_page) {
+    let root_of = |n: &Node<'_>| match n {
+        Node::Element { name, .. } if name == "rx-page" => Some("rx-page"),
+        Node::Element { name, .. } if name == "rx-mail" => Some("rx-mail"),
+        Node::Element { name, .. } if name == "rx-mail-text" => Some("rx-mail-text"),
+        _ => None,
+    };
+    let is_page = |n: &Node<'_>| root_of(n).is_some();
+    if let Some(root) = nodes.iter().find_map(root_of) {
         let stray = nodes.iter().find_map(|n| match n {
             Node::Text(s) if !blank(&src[s.clone()]) => {
                 Some(1 + src[..s.start].matches('\n').count())
@@ -266,10 +347,7 @@ pub(crate) fn emit(
                 _ => None,
             });
         if let Some(line) = stray.or(second) {
-            return Err(err(
-                line,
-                "<rx-page> must hold the whole template".to_owned(),
-            ));
+            return Err(err(line, format!("<{root}> must hold the whole template")));
         }
     }
     emit_into(src, nodes, catalog, None, &mut used, &mut counter, &mut out)?;
@@ -288,6 +366,7 @@ pub(crate) fn emit(
 struct Flow<'a> {
     each: Option<String>,
     cond: Option<String>,
+    elif: Option<String>,
     otherwise: bool,
     can: Option<String>,
     /// The attributes that stay.
@@ -297,13 +376,13 @@ struct Flow<'a> {
 }
 
 impl Flow<'_> {
-    /// The condition of the `{% if %}`, from `rx-if` and `can`.
+    /// The condition of the `{% if %}` (or `{% elif %}`), from `rx-if` / `rx-elif` and `can`.
     fn condition(&self) -> Option<String> {
         let can = self.can.as_ref().map(|a| match row() {
             Some((var, _)) => format!("can({a:?}, {var})"),
             None => format!("can({a:?})"),
         });
-        match (&self.cond, can) {
+        match (self.cond.as_ref().or(self.elif.as_ref()), can) {
             (Some(c), Some(can)) if c.contains(" or ") => Some(format!("({c}) and {can}")),
             (Some(c), Some(can)) => Some(format!("{c} and {can}")),
             (Some(c), None) => Some(c.clone()),
@@ -325,6 +404,7 @@ fn flow_of<'a>(
     let mut f = Flow {
         each: None,
         cond: None,
+        elif: None,
         otherwise: false,
         can: None,
         attrs: Vec::new(),
@@ -351,6 +431,13 @@ fn flow_of<'a>(
                 }
                 f.cond = Some(v);
             }
+            "rx-elif" => {
+                let v = one_line(a.value.unwrap_or(""));
+                if v.is_empty() {
+                    return Err(err(a.line, "rx-elif needs a condition".to_owned()));
+                }
+                f.elif = Some(v);
+            }
             "rx-else" => f.otherwise = true,
             "can" if component => {
                 let v = a.value.unwrap_or("").trim();
@@ -370,11 +457,17 @@ fn flow_of<'a>(
         }
         f.removed.push(start..a.span.end);
     }
-    if f.otherwise && (f.cond.is_some() || f.each.is_some()) {
-        let line = attrs.first().map_or(0, |a| a.line);
+    let line = attrs.first().map_or(0, |a| a.line);
+    if f.otherwise && (f.cond.is_some() || f.each.is_some() || f.elif.is_some()) {
         return Err(err(
             line,
-            "rx-else can't be combined with rx-if or rx-for".to_owned(),
+            "rx-else can't be combined with rx-if, rx-elif or rx-for".to_owned(),
+        ));
+    }
+    if f.elif.is_some() && (f.cond.is_some() || f.each.is_some()) {
+        return Err(err(
+            line,
+            "rx-elif can't be combined with rx-if or rx-for".to_owned(),
         ));
     }
     Ok(f)
@@ -430,32 +523,88 @@ pub(super) fn emit_into(
             continue;
         };
         let flow = flow_of(src, tree::is_component(name), attrs, open)?;
-        if flow.otherwise {
+        if name == "rx-let"
+            && let Some(contract) = catalog.contracts.iter().find(|c| c.tag == "rx-let")
+        {
+            // The tag holds the rest of its siblings: that is its scope.
+            let Node::Element {
+                children,
+                close,
+                line,
+                ..
+            } = node
+            else {
+                unreachable!("matched as an element above")
+            };
+            if flow.cond.is_some()
+                || flow.each.is_some()
+                || flow.elif.is_some()
+                || flow.otherwise
+                || flow.can.is_some()
+            {
+                return Err(err(
+                    *line,
+                    "<rx-let> takes no rx-if, rx-elif, rx-else, rx-for or can".to_owned(),
+                ));
+            }
+            let mut cx = Ctx {
+                src,
+                catalog,
+                used,
+                counter,
+            };
+            return special::let_tag(
+                &mut cx,
+                contract,
+                &flow.attrs,
+                children,
+                open,
+                close.as_ref(),
+                *line,
+                &nodes[i + 1..],
+                parent,
+                out,
+            );
+        }
+        if flow.otherwise || flow.elif.is_some() {
+            let word = if flow.otherwise { "rx-else" } else { "rx-elif" };
             let line = attrs.first().map_or(0, |a| a.line);
             let prev = nodes[..i]
                 .iter()
                 .rev()
                 .find(|n| !matches!(n, Node::Text(s) if blank(&src[s.clone()])));
             let msg = if prev.is_some_and(|p| has_attr(p, "rx-for")) {
-                "rx-else can't follow an element with rx-for"
+                format!("{word} can't follow an element with rx-for")
             } else {
-                "rx-else must follow an element with rx-if"
+                format!("{word} must follow an element with rx-if")
             };
-            return Err(err(line, msg.to_owned()));
+            return Err(err(line, msg));
         }
-        // An `rx-if` element directly followed by an `rx-else` one.
-        let mut partner = None;
+        // An `rx-if` element followed by `rx-elif` elements and an `rx-else` one.
+        let mut branches: Vec<usize> = Vec::new();
         if flow.cond.is_some() && flow.each.is_none() {
             let mut j = i + 1;
-            if let Some(Node::Text(s)) = nodes.get(j)
-                && blank(&src[s.clone()])
-            {
-                j += 1;
-            }
-            if nodes.get(j).is_some_and(|n| has_attr(n, "rx-else")) {
-                partner = Some(j);
+            loop {
+                let mut k = j;
+                if let Some(Node::Text(s)) = nodes.get(k)
+                    && blank(&src[s.clone()])
+                {
+                    k += 1;
+                }
+                match nodes.get(k) {
+                    Some(n) if has_attr(n, "rx-elif") => {
+                        branches.push(k);
+                        j = k + 1;
+                    }
+                    Some(n) if has_attr(n, "rx-else") => {
+                        branches.push(k);
+                        break;
+                    }
+                    _ => break,
+                }
             }
         }
+        let loop_vars = flow.each.as_deref().map(loop_names).unwrap_or_default();
         if let Some(each) = &flow.each {
             out.push_str(&format!("{{% for {each} %}}"));
         }
@@ -463,39 +612,10 @@ pub(super) fn emit_into(
         if let Some(c) = &cond {
             out.push_str(&format!("{{% if {c} %}}"));
         }
-        emit_node(src, node, &flow, catalog, parent, used, counter, out)?;
-        if let Some(j) = partner {
-            for n in &nodes[i + 1..j] {
-                if let Node::Text(s) = n {
-                    out.push_str(&src[s.clone()]);
-                }
-            }
-            out.push_str("{% else %}");
-            let b = &nodes[j];
-            let Node::Element {
-                name, attrs, open, ..
-            } = b
-            else {
-                unreachable!("has_attr is true only for elements")
-            };
-            let bf = flow_of(src, tree::is_component(name), attrs, open)?;
-            if let Some(each) = &bf.each {
-                out.push_str(&format!("{{% for {each} %}}"));
-            }
-            let bc = bf.condition();
-            if let Some(c) = &bc {
-                out.push_str(&format!("{{% if {c} %}}"));
-            }
-            emit_node(src, b, &bf, catalog, parent, used, counter, out)?;
-            if bc.is_some() {
-                out.push_str("{% endif %}");
-            }
-            if bf.each.is_some() {
-                out.push_str("{% endfor %}");
-            }
-            out.push_str("{% endif %}");
-            i = j + 1;
-        } else {
+        with_names(loop_vars, || {
+            emit_node(src, node, &flow, catalog, parent, used, counter, out)
+        })?;
+        if branches.is_empty() {
             if cond.is_some() {
                 out.push_str("{% endif %}");
             }
@@ -503,7 +623,50 @@ pub(super) fn emit_into(
                 out.push_str("{% endfor %}");
             }
             i += 1;
+            continue;
         }
+        let mut last = i;
+        for k in branches {
+            for n in &nodes[last + 1..k] {
+                if let Node::Text(s) = n {
+                    out.push_str(&src[s.clone()]);
+                }
+            }
+            let b = &nodes[k];
+            let Node::Element {
+                name, attrs, open, ..
+            } = b
+            else {
+                unreachable!("has_attr is true only for elements")
+            };
+            let bf = flow_of(src, tree::is_component(name), attrs, open)?;
+            let bc = bf.condition();
+            if bf.elif.is_some() {
+                out.push_str(&format!(
+                    "{{% elif {} %}}",
+                    bc.as_deref().expect("an elif has a condition")
+                ));
+                emit_node(src, b, &bf, catalog, parent, used, counter, out)?;
+            } else {
+                out.push_str("{% else %}");
+                if let Some(each) = &bf.each {
+                    out.push_str(&format!("{{% for {each} %}}"));
+                }
+                if let Some(c) = &bc {
+                    out.push_str(&format!("{{% if {c} %}}"));
+                }
+                emit_node(src, b, &bf, catalog, parent, used, counter, out)?;
+                if bc.is_some() {
+                    out.push_str("{% endif %}");
+                }
+                if bf.each.is_some() {
+                    out.push_str("{% endfor %}");
+                }
+            }
+            last = k;
+        }
+        out.push_str("{% endif %}");
+        i = last + 1;
     }
     Ok(())
 }
@@ -532,11 +695,44 @@ fn emit_node(
         return Ok(());
     };
     let attrs = &flow.attrs;
+    if name == "template" {
+        // `<template rx-if>`, `<template rx-else>`, `<template rx-for>`: the children, no wrapper.
+        if let Some(a) = attrs.first() {
+            return Err(err(
+                a.line,
+                format!(
+                    "<template> with rx-if, rx-elif, rx-else or rx-for takes no other attribute, not \"{}\"",
+                    bare(a.name)
+                ),
+            ));
+        }
+        out.push_str(&pad(&src[open.clone()]));
+        emit_into(src, children, catalog, parent, used, counter, out)?;
+        if let Some(c) = close {
+            out.push_str(&pad(&src[c.clone()]));
+        }
+        return Ok(());
+    }
     if !tree::is_component(name) {
+        // The removed control-flow attributes, and each `?attr` replaced by its code.
+        let mut edits: Vec<(std::ops::Range<usize>, String)> = flow
+            .removed
+            .iter()
+            .map(|r| (r.clone(), String::new()))
+            .collect();
+        for a in attrs.iter().filter(|a| a.name.starts_with('?')) {
+            let mut start = a.span.start;
+            while start > open.start + 1 && src.as_bytes()[start - 1].is_ascii_whitespace() {
+                start -= 1;
+            }
+            edits.push((start..a.span.end, cond_attr_code(a, name)?));
+        }
+        edits.sort_by_key(|(r, _)| r.start);
         let mut pos = open.start;
         let mut gone = String::new();
-        for r in &flow.removed {
+        for (r, code) in &edits {
             out.push_str(&src[pos..r.start]);
+            out.push_str(code);
             gone.push_str(&src[r.clone()]);
             pos = r.end;
         }
@@ -586,8 +782,47 @@ fn emit_node(
             Special::Push => {
                 special::push(&mut cx, contract, attrs, children, open, close, *line, out)
             }
+            Special::Block => {
+                special::block(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::Pagination => {
+                special::pagination(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::Script | Special::Style => {
+                special::nonce_tag(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
             Special::Wizard => {
                 special::wizard(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::WizardAction => {
+                special::wizard_action(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::Mail => {
+                if parent.is_some() {
+                    return Err(err(
+                        *line,
+                        "<rx-mail> must hold the whole template".to_owned(),
+                    ));
+                }
+                special::mail(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::Include => {
+                special::include(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::LinkTabs => {
+                special::link_tabs(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::LinkTab => {
+                special::link_tab(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
+            Special::MailText => {
+                if parent.is_some() {
+                    return Err(err(
+                        *line,
+                        "<rx-mail-text> must hold the whole template".to_owned(),
+                    ));
+                }
+                special::mail_text(&mut cx, contract, attrs, children, open, close, *line, out)
             }
             Special::Tabs => {
                 special::tabs(&mut cx, contract, attrs, children, open, close, *line, out)
@@ -789,6 +1024,8 @@ fn element(
             } else if !value.is_empty() {
                 extra.push(format!(" {value}"));
             }
+        } else if a.name.starts_with('?') {
+            passthrough.push_str(&cond_attr_code(a, contract.tag)?);
         } else if let Some(name) = a.name.strip_prefix(':') {
             let value = a.value.unwrap_or("").trim();
             if value.is_empty() {

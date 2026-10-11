@@ -1051,6 +1051,7 @@
 .rx-table th { text-align: left; font: var(--rx-type-caption); text-transform: var(--rx-caption-case); letter-spacing: var(--rx-caption-tracking); color: var(--rx-secondary-label); padding: 10px var(--rx-space-4); border-bottom: 0.5px solid var(--rx-separator); white-space: nowrap; }
 .rx-table td { padding: 12px var(--rx-space-4); border-bottom: 0.5px solid var(--rx-separator); vertical-align: middle; }
 .rx-table tr:last-child td { border-bottom: 0; }
+.rx-table tfoot th, .rx-table tfoot td { border-top: 0.5px solid var(--rx-separator); border-bottom: 0; }
 .rx-table .rx-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rx-table .rx-row { flex-wrap: nowrap; gap: var(--rx-space-1); }
 

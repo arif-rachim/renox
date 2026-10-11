@@ -32,9 +32,9 @@
       </rx-action-sheet>
     </div>
     <rx-list id="checklist" :label="t('htmx.checklist.title')">
-      {%- for item in items %}{% include "about/htmx/_row.html" %}{% endfor %}
+      <app-about-htmx-row rx-for="item in items" :item="item"/>
     </rx-list>
-    {% include "about/htmx/_empty.html" %}
+    <app-about-htmx-empty :total="total"/>
     <div class="rx-row">
       {#- Plain forms htmx takes over: HX-Refresh reloads this page,
           HX-Redirect goes to another one. -#}
@@ -49,33 +49,33 @@
   </div>
 
   <rx-card :title="t('htmx.scroll.title')" :subtitle="t('htmx.scroll.lead')">
-    <rx-list id="bikes" :label="t('htmx.scroll.title')">{% include "about/htmx/_bikes.html" %}</rx-list>
+    <rx-list id="bikes" :label="t('htmx.scroll.title')"><app-about-htmx-bikes :bikes="bikes" :next="next"/></rx-list>
   </rx-card>
 
   <rx-card :title="t('htmx.recipes.title')" :subtitle="t('htmx.recipes.lead')">
-    {% set recipes = [
+    <rx-let name="recipes" :value='[
       ["modal", "action_sheet(…, target=\"#checklist\", swap=\"afterbegin\")", none],
-      ["oob", "view(…).fragment(\"row\").also(\"count\")", route('cart.show')],
+      ["oob", "view(…).fragment(\"row\").also(\"count\")", route("cart.show")],
       ["retarget", "HxRetarget + HxReswap + HxTrigger", none],
       ["inline", "hx-trigger=\"dblclick\", hx-trigger=\"bs-cancel\"", none],
-      ["toggle", "checkbox(…, attrs={\"hx-patch\": …})", route('staff.roles.index')],
+      ["toggle", "checkbox(…, attrs={\"hx-patch\": …})", route("staff.roles.index")],
       ["menu", "menu_button(…, attrs={\"hx-delete\": …, \"hx-confirm\": …})", none],
       ["tabs", "Alpine.data(\"checklist\") + x-show", none],
-      ["refresh", "(Toast, HxRefresh)", route('sales.orders.index')],
-      ["redirect", "(Toast, htmx.redirect(…))", route('plans.mine')],
+      ["refresh", "(Toast, HxRefresh)", route("sales.orders.index")],
+      ["redirect", "(Toast, htmx.redirect(…))", route("plans.mine")],
       ["scroll", "hx-trigger=\"revealed\" hx-swap=\"outerHTML\"", none],
-    ] %}
+    ]'/>
     <rx-table :rows="recipes" as="r" :caption="t('htmx.recipes.title')">
       <rx-column :label="t('htmx.recipes.recipe')">{{ t('htmx.recipes.' ~ r[0] ~ '.name') }}</rx-column>
       <rx-column :label="t('htmx.recipes.try')">{{ t('htmx.recipes.' ~ r[0] ~ '.try') }}</rx-column>
       <rx-column :label="t('htmx.recipes.answer')"><code>{{ r[1] }}</code></rx-column>
-      <rx-column :label="t('htmx.recipes.shop')">{% if r[2] %}<a class="rx-link" href="{{ r[2] }}">{{ t('htmx.recipes.' ~ r[0] ~ '.shop') }}</a>{% else %}—{% endif %}</rx-column>
+      <rx-column :label="t('htmx.recipes.shop')"><a rx-if="r[2]" class="rx-link" href="{{ r[2] }}">{{ t('htmx.recipes.' ~ r[0] ~ '.shop') }}</a><template rx-else>—</template></rx-column>
     </rx-table>
   </rx-card>
 </div>
 
 <rx-push stack="scripts" once="about-htmx-checklist">
-<script nonce="{{ csp_nonce() }}">
+<rx-script>
   // Escape in an inline edit asks for the row as it was: the input listens
   // for `bs-cancel` (a trigger filter would need eval, refused by CSP=strict).
   document.addEventListener("keyup", function (event) {
@@ -98,6 +98,6 @@
       };
     });
   });
-</script>
+</rx-script>
 </rx-push>
 </rx-page>

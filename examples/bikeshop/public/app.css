@@ -28,7 +28,7 @@
    kit's rx-hide-narrow) lay their buttons out in the bar's own row. The tab
    bar and the search behind a button on phones are the kit's (navbar(…,
    tabs=…), nav_search); the menu panel the last tab opens is
-   layouts/_nav_menu.html. */
+   components/nav_menu.html. */
 .bs-public .rx-navbar .rx-hide-narrow { display: contents; }
 .bs-menu { display: grid; gap: var(--rx-space-2); }
 .bs-menu__links { display: grid; gap: 2px; }
@@ -65,7 +65,7 @@
 
 /* ---------- small delights, on both sides (the visual pass) ---------- */
 
-/* A person as initials in a tinted circle (layouts/_avatar.html); the shop
+/* A person as initials in a tinted circle (components/avatar.html); the shop
    shows no photos of people. Three tints, chosen by the name. */
 .bs-avatar {
   display: inline-grid; place-items: center; flex: none; width: 2.25rem; height: 2.25rem; border-radius: 50%;

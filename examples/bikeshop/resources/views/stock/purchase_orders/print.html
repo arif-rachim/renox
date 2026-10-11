@@ -2,15 +2,14 @@
 <html lang="{{ app.locale }}">
 <head>
   {{ seo(title="PO-" ~ order.id ~ " · " ~ store.name) }}
-  {% include "layouts/_head.html" %}
-  {% from "stock/_parts.html" import styles, scripts %}{{ styles() }}{{ scripts() }}
-  {{ stack('head') }}
+  <app-head/>
+  <app-stock-assets/>
+  <rx-outlet stack="head"/>
 </head>
 {#- The supplier's printable order (#240): reached through a signed link mailed to the
     supplier (ValidSignature), no login and no shop chrome; the kit's table and buttons. -#}
 {# [explain:stock.purchasing.print.template] #}
 <body class="rx-page">
-{% from "renox/ui.html" import table %}
 <main class="bs-print" id="main">
   <div class="bs-print__head">
     <div>
@@ -26,15 +25,13 @@
     <rx-entry :label="t('stock.print.ordered')" :value="order.ordered_at" format="date"/>
     <rx-entry :label="t('stock.print.expected')" :value="order.expected_on" format="date"/>
   </rx-infolist>
-  {% call table([t('stock.fields.sku'), t('stock.fields.product'), [t('stock.purchasing.ordered'), "num"], [t('stock.purchasing.unit_cost'), "num"], [t('stock.purchasing.total'), "num"]], caption=t('stock.print.title', number=order.id)) %}
-    {%- for l in lines %}
-    <tr><td>{{ l.sku }}</td><td>{{ l.name }}</td><td class="rx-num">{{ l.quantity }}</td><td class="rx-num">{{ l.unit_cost | money }}</td><td class="rx-num">{{ l.total | money }}</td></tr>
-    {%- endfor %}
-    <tr><th scope="row" colspan="4">{{ t('stock.purchasing.total') }}</th><td class="rx-num"><strong>{{ order.total | money }}</strong></td></tr>
-  {% endcall %}
-  {%- if order.note %}<p>{{ order.note }}</p>{% endif %}
+  <rx-simple-table :head="[t('stock.fields.sku'), t('stock.fields.product'), [t('stock.purchasing.ordered'), 'num'], [t('stock.purchasing.unit_cost'), 'num'], [t('stock.purchasing.total'), 'num']]" :caption="t('stock.print.title', number=order.id)">
+    <tr rx-for="l in lines"><td>{{ l.sku }}</td><td>{{ l.name }}</td><td class="rx-num">{{ l.quantity }}</td><td class="rx-num">{{ l.unit_cost | money }}</td><td class="rx-num">{{ l.total | money }}</td></tr>
+    <rx-slot name="footer"><tr><th scope="row" colspan="4">{{ t('stock.purchasing.total') }}</th><td class="rx-num"><strong>{{ order.total | money }}</strong></td></tr></rx-slot>
+  </rx-simple-table>
+  <p rx-if="order.note">{{ order.note }}</p>
 </main>
-{% include "layouts/_scripts.html" %}
-{{ stack('scripts') }}
+<app-scripts/>
+<rx-outlet stack="scripts"/>
 </body>
 </html>

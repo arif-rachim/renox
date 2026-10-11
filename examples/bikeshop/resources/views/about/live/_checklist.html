@@ -5,9 +5,7 @@
 <div class="bs-checklist__bar">
   <span class="rx-badge rx-badge--info" id="open-count">{{ t('htmx.open', count=data.open) }}</span>
   <div class="rx-segmented" role="tablist" aria-label="{{ t('htmx.show') }}">
-    {%- for tab in ["all", "open", "done"] %}
-    <button class="rx-segmented__item" type="button" role="tab" id="tab-{{ tab }}" aria-selected="{{ 'true' if (state.filter or 'all') == tab else 'false' }}" rx-click='show("{{ tab }}")'>{{ t('htmx.tabs.' ~ tab) }}</button>
-    {%- endfor %}
+    <button rx-for="tab in ['all', 'open', 'done']" class="rx-segmented__item" type="button" role="tab" id="tab-{{ tab }}" aria-selected="{{ 'true' if (state.filter or 'all') == tab else 'false' }}" rx-click='show("{{ tab }}")'>{{ t('htmx.tabs.' ~ tab) }}</button>
   </div>
 </div>
 <form rx-submit="add" novalidate>
@@ -15,24 +13,21 @@
   <rx-button :label="t('htmx.add')"/>
 </form>
 <ul class="rx-list" id="checklist" aria-label="{{ t('htmx.checklist.title') }}">
-  {%- for item in data["items"] %}
-  <li id="item-{{ item.id }}">
-    {%- if state.editing == item.id %}
-    <form class="bs-checklist__edit" rx-submit="save_edit" novalidate>
+  <li rx-for="item in data['items']" id="item-{{ item.id }}">
+    <form rx-if="state.editing == item.id" class="bs-checklist__edit" rx-submit="save_edit" novalidate>
       <rx-input name="edit_title" :label="t('htmx.item')" :value="state.edit_title" hide-label id="edit-title" rx-model="edit_title" maxlength="60"/>
       <rx-button :label="t('htmx.save')" size="small"/>
       <rx-button :label="t('htmx.live.cancel')" variant="secondary" size="small" type="button" rx-click="cancel_edit"/>
     </form>
-    {%- else %}
+    <template rx-else>
     <rx-checkbox name="done" :label="t('htmx.done_label', title=item.title)" :checked="item.done" hide-label id="done-{{ item.id }}" rx-click="toggle({{ item.id }})"/>
     <span class="{{ class_names('rx-list__main', {'bs-checklist__done': item.done}) }}">{{ item.title }}</span>
     <rx-button :label="t('htmx.edit')" variant="plain" size="small" type="button" rx-click="edit({{ item.id }})"/>
     <rx-button :label="t('htmx.delete')" variant="plain" size="small" type="button" rx-click="delete({{ item.id }})"/>
-    {%- endif %}
+    </template>
   </li>
-  {%- endfor %}
 </ul>
-{% if not data.total %}<p class="rx-subtitle" id="checklist-empty">{{ t('htmx.empty') }}</p>{% endif %}
+<p rx-if="not data.total" class="rx-subtitle" id="checklist-empty">{{ t('htmx.empty') }}</p>
 <div class="rx-row">
   <rx-button :label="t('htmx.clear')" variant="secondary" type="button" rx-click="clear_done"/>
 </div>

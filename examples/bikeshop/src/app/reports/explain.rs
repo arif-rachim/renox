@@ -526,6 +526,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/reports/monthly.rs",
                 "examples/bikeshop/resources/views/reports/monthly.html",
                 "examples/bikeshop/resources/views/reports/_runs.html",
+                "examples/bikeshop/resources/views/components/reports_runs.html",
                 "examples/bikeshop/resources/views/mail/reports/monthly.html",
                 "examples/bikeshop/tests/reports.rs",
             ],

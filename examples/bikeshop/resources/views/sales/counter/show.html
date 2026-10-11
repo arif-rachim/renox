@@ -5,13 +5,12 @@
     forms without JavaScript. The `sale` block imports the app macros it uses
     inside itself, so it renders alone. -#}
 <rx-page layout="layouts/staff.html" :title="t('sales.counter.title')">
-  {% include "sales/_assets.html" %}
+  <app-sales-assets/>
   <rx-stack hx-boost="true">
     <rx-page-header title="{{ t('sales.counter.title') }}" subtitle="{{ t('sales.counter.lead', store=store.name) }}" :back="route('sales.orders.index')" back-label="{{ t('sales.staff.title') }}">
       <form method="post" action="{{ route('sales.counter.clear') }}">{{ csrf_field() }}<rx-button variant="plain" key="x">{{ t('sales.counter.clear') }}</rx-button></form>
     </rx-page-header>
-    {% block sale %}
-    {% from "renox/ui.html" import thumbnail %}{% from "renox-blocks/blocks.html" import quantity, keypad %}
+    <rx-block name="sale">
     <div class="bs-counter" id="counter">
       <section class="bs-counter__left">
         {# [explain:sales.counter.template] #}
@@ -19,26 +18,25 @@
           <form class="bs-counter__find" method="post" action="{{ route('sales.counter.add') }}">
             {{ csrf_field() }}
             <rx-select name="variant_id" label="{{ t('sales.counter.product') }}" :options="[]" searchable options-url="{{ route('sales.counter.variants') }}" placeholder="{{ t('sales.counter.product_hint') }}" required id="counter-product"/>
-            {{ quantity("quantity", 1, min=1, max=20, label=t('sales.orders.quantity'), id="counter-quantity") }}
+            <rx-quantity name="quantity" :value="1" :min="1" :max="20" label="{{ t('sales.orders.quantity') }}" id="counter-quantity"/>
             <rx-button variant="primary" key="a">{{ t('sales.counter.add') }}</rx-button>
           </form>
         </rx-card>
         {# [/explain:sales.counter.template] #}
         <rx-card title="{{ t('sales.counter.sale') }}">
           <rx-alert rx-if="sale.changed" kind="warning" message="{{ t('sales.counter.changed') }}"/>
-          {%- if sale.lines %}
-          <ul class="bs-cart__list" role="list">
-            {%- for line in sale.lines %}
-            <li class="bs-cart__line bs-cart__line--counter">
-              {%- if line.photo %}{{ thumbnail(line.photo, alt="") }}{% else %}<span></span>{% endif %}
+          <ul rx-if="sale.lines" class="bs-cart__list" role="list">
+            <li rx-for="line in sale.lines" class="bs-cart__line bs-cart__line--counter">
+              <rx-thumbnail rx-if="line.photo" :src="line.photo" alt=""/>
+              <span rx-else></span>
               <div class="bs-cart__what">
                 <span class="bs-cart__name">{{ line.product.name }}</span>
-                <p class="rx-subtitle">{{ line.variant.sku }}{% if line.variant.size %} · {{ line.variant.size }}{% endif %}{% if line.variant.colour %} · {{ line.variant.colour }}{% endif %} · {{ line.variant.price | money }} · {{ t('sales.counter.here', count=line.available) }}</p>
+                <p class="rx-subtitle">{{ line.variant.sku }}<template rx-if="line.variant.size"> · {{ line.variant.size }}</template><template rx-if="line.variant.colour"> · {{ line.variant.colour }}</template> · {{ line.variant.price | money }} · {{ t('sales.counter.here', count=line.available) }}</p>
               </div>
               <form class="bs-cart__qty" method="post" action="{{ route('sales.counter.update', line.variant.id) }}"
                     hx-post="{{ route('sales.counter.update', line.variant.id) }}" hx-trigger="change delay:300ms" hx-target="#counter" hx-select="#counter" hx-swap="outerHTML">
                 {{ csrf_field() }}{{ method_field('PATCH') }}
-                {{ quantity("quantity", line.quantity, min=1, max=([line.available, 20] | min if line.available > 0 else line.quantity), label=t('sales.cart.quantity_of', name=line.product.name), hide_label=true, id="cq-" ~ line.variant.id) }}
+                <rx-quantity name="quantity" :value="line.quantity" :min="1" :max="([line.available, 20] | min) if line.available > 0 else line.quantity" label="{{ t('sales.cart.quantity_of', name=line.product.name) }}" hide-label :id="'cq-' ~ line.variant.id"/>
               </form>
               <p class="bs-cart__total rx-num">{{ line.total | money }}</p>
               <form method="post" action="{{ route('sales.counter.remove', line.variant.id) }}">
@@ -48,11 +46,8 @@
                 </button>
               </form>
             </li>
-            {%- endfor %}
           </ul>
-          {%- else %}
-          <rx-empty title="{{ t('sales.counter.empty') }}" message="{{ t('sales.counter.empty_text') }}" icon="scan-barcode"/>
-          {%- endif %}
+          <rx-empty rx-else title="{{ t('sales.counter.empty') }}" message="{{ t('sales.counter.empty_text') }}" icon="scan-barcode"/>
         </rx-card>
       </section>
 
@@ -69,7 +64,7 @@
         <rx-card title="{{ t('sales.counter.pay_title') }}">
           <dl class="bs-totals">
             <div><dt>{{ t('sales.cart.items', count=sale.count) }}</dt><dd class="rx-num">{{ totals.subtotal | money }}</dd></div>
-            {%- if totals.discount > 0 %}<div><dt>{{ t('sales.checkout.plan_discount', percent=totals.discount_percent) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>{% endif %}
+            <div rx-if="totals.discount > 0"><dt>{{ t('sales.checkout.plan_discount', percent=totals.discount_percent) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>
             <div class="bs-totals__total"><dt>{{ t('sales.orders.total') }}</dt><dd class="rx-num" data-bs-counter-total="{{ totals.total }}" data-bs-counter-scale="{{ scale }}">{{ totals.total | money }}</dd></div>
           </dl>
           {# [explain:sales.counter.template] #}
@@ -77,13 +72,13 @@
             {{ csrf_field() }}
             <rx-toggle-buttons name="method" label="{{ t('sales.counter.method') }}" :options="[['cash', t('sales.method.cash')], ['card', t('sales.method.card')]]" :selected="'cash'" required/>
             <rx-input name="tendered" label="{{ t('sales.counter.tendered') }}" type="text" inputmode="decimal" autocomplete="off" hint="{{ t('sales.counter.tendered_hint') }}" id="rx-tendered"/>
-            {{ keypad("rx-tendered", label=t('sales.counter.keypad'), decimal=(scale > 1), enter_label=t('sales.counter.pay')) }}
+            <rx-keypad target="rx-tendered" label="{{ t('sales.counter.keypad') }}" :decimal="scale > 1" enter-label="{{ t('sales.counter.pay') }}"/>
             <rx-button variant="primary" block key="p" :disabled-reason="none if sale.lines else t('sales.counter.empty')">{{ t('sales.counter.pay_amount', amount=(totals.total | money)) }}</rx-button>
           </form>
           {# [/explain:sales.counter.template] #}
         </rx-card>
       </aside>
     </div>
-    {% endblock %}
+    </rx-block>
   </rx-stack>
 </rx-page>

@@ -172,7 +172,7 @@ pub fn source_url(kind: &str, id: i64) -> Option<String> {
 
 /// `GET /staff/books/fees` (`multistore.fees`): each store's fee rate (what
 /// it earns for work done for another store); only the owner changes them.
-pub async fn fees(State(db): State<Db>, user: AuthUser) -> Result<View> {
+pub async fn fees(State(db): State<Db>, user: AuthUser, lang: Lang) -> Result<View> {
     let stores = Store::all_by_name(&db).await?;
     let history = renox::audit::latest(&db, 200)
         .await?
@@ -187,15 +187,17 @@ pub async fn fees(State(db): State<Db>, user: AuthUser) -> Result<View> {
     .await?;
     let names: HashMap<i64, String> = users.into_iter().map(|u| (u.id, u.name)).collect();
     let bp = |value: &renox::serde_json::Value| percent(value.as_i64().unwrap_or(0));
-    let history: Vec<_> = history
+    // The timeline block's items (`<rx-history :items>`), titled in the page's language.
+    let timeline: Vec<_> = history
         .into_iter()
         .map(|e| {
+            let store = e.data["store"].as_str().unwrap_or_default().to_owned();
+            let (from, to) = (bp(&e.data["from_bp"]), bp(&e.data["to_bp"]));
             json!({
-                "at": e.created_at,
+                "time": e.created_at,
+                "title": lang.t("multistore.fees.changed", &[("store", &store), ("from", &from), ("to", &to)]),
                 "by": e.user_id.and_then(|id| names.get(&id).cloned()),
-                "store": e.data["store"],
-                "from": bp(&e.data["from_bp"]),
-                "to": bp(&e.data["to_bp"]),
+                "kind": "info",
             })
         })
         .collect();
@@ -206,7 +208,7 @@ pub async fn fees(State(db): State<Db>, user: AuthUser) -> Result<View> {
     let can_change = user.has_permission(catalogue::SETTINGS_FEES);
     Ok(view(
         "multistore/books/fees.html",
-        context! { rates, changes => history, can_change },
+        context! { rates, timeline, can_change },
     ))
 }
 

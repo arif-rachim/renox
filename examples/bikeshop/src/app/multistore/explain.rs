@@ -124,7 +124,7 @@ pub fn entries() -> Vec<Explanation> {
                 ACTIVE_STORE,
                 AUDIT,
                 "examples/bikeshop/resources/views/multistore/help/index.html",
-                "examples/bikeshop/resources/views/layouts/_store_switcher.html",
+                "examples/bikeshop/resources/views/components/store_switcher.html",
                 TESTS,
                 BROWSER,
             ],

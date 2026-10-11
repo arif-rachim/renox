@@ -23,7 +23,7 @@
 //!   `markdown_editor` (toolbar and preview): the shop shows them with the
 //!   `markdown` filter, which prints any HTML as text, so nothing typed can
 //!   run in a customer's browser. The panel's field macro is replaced
-//!   (`resources/views/renox-admin/fields.html`) to draw that editor for
+//!   (`resources/views/components/admin_field.html`) to draw that editor for
 //!   `description` textareas.
 //! - **Discontinued products** go to the trash (products are soft deleted),
 //!   restorable from the "Trash" tab.

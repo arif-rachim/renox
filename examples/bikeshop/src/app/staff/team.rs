@@ -184,6 +184,24 @@ async fn member(db: &Db, staff_id: i64) -> Result<Member> {
         .ok_or(Error::NotFound)
 }
 
+/// A catalogue text (a role's label) in the page's language: the template
+/// function `tx` for handlers, which build option lists with it. The
+/// translation lives under `text.<english>`; the English shows when the
+/// language has none.
+pub fn translated(lang: &Lang, text: &str) -> String {
+    let key = format!("text.{text}");
+    let said = lang.t(&key, &[]);
+    if said == key { text.to_owned() } else { said }
+}
+
+/// `[value, label]` pairs for a select, the labels in the page's language.
+pub fn role_options(lang: &Lang, roles: &[(String, String)]) -> Vec<(String, String)> {
+    roles
+        .iter()
+        .map(|(name, label)| (name.clone(), translated(lang, label)))
+        .collect()
+}
+
 /// The roles `user` may give in `store`: not a global one, and only roles
 /// whose every permission `user` holds there themselves. From the database
 /// (the owner may have changed what a role grants).
@@ -222,7 +240,12 @@ pub async fn index(State(db): State<Db>) -> Result<View> {
 // [/explain:staff.team.index.handler]
 
 /// `GET /staff/team/{staff}`: one person's roles everywhere, and the forms.
-pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
+pub async fn show(
+    State(db): State<Db>,
+    user: AuthUser,
+    lang: Lang,
+    Path(id): Path<i64>,
+) -> Result<View> {
     let store = Store::find_or_404(&db, active()?).await?;
     let member = member(&db, id).await?;
     let person = User::find_or_404(&db, member.staff.user_id).await?;
@@ -250,6 +273,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
         })
         .collect();
     let roles = assignable(&db, &user, store.id).await?;
+    let role_options = role_options(&lang, &roles);
     Ok(view(
         "staff/team/show.html",
         context! {
@@ -257,6 +281,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
             member,
             assignments,
             roles,
+            role_options,
             is_me => person.id == user.id,
         },
     ))
@@ -423,10 +448,13 @@ fn midnight(day: renox::chrono::NaiveDate) -> DateTime {
 }
 
 /// `GET /staff/team/invite`: the invitation form.
-pub async fn invite(State(db): State<Db>, user: AuthUser) -> Result<View> {
+pub async fn invite(State(db): State<Db>, user: AuthUser, lang: Lang) -> Result<View> {
     let store = Store::find_or_404(&db, active()?).await?;
-    let roles = assignable(&db, &user, store.id).await?;
-    Ok(view("staff/team/invite.html", context! { store, roles }))
+    let roles = role_options(&lang, &assignable(&db, &user, store.id).await?);
+    Ok(view(
+        "staff/team/invite.html",
+        context! { store, role_options => roles },
+    ))
 }
 
 /// The invitation form.

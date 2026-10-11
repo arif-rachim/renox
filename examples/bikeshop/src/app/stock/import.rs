@@ -277,6 +277,20 @@ pub fn report_mail(
         .take(100)
         .map(|f| json!({ "row": f.row, "messages": f.messages().join(" ") }))
         .collect();
+    let table: Vec<[String; 2]> = report
+        .failed
+        .iter()
+        .take(100)
+        .map(|f| {
+            [
+                lang.t(
+                    "stock.mail.import.row",
+                    &[("row", &f.row as &dyn std::fmt::Display)],
+                ),
+                f.messages().join(" "),
+            ]
+        })
+        .collect();
     state.mail_view_in(
         &lang.locale,
         &user.email,
@@ -289,6 +303,7 @@ pub fn report_mail(
             summary => report.summary(),
             imported => report.imported,
             failed,
+            table,
             more => report.failed.len().saturating_sub(100),
             url => supplier.map(|s| crate::app::rentals::link(state, "stock.suppliers.show", Some(s.id))).transpose()?,
         },

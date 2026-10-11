@@ -100,6 +100,17 @@ pub async fn form(
             )
         })
         .collect();
+    // The package choices: "none" first, then each package with its text.
+    let lang = state.current_lang();
+    let mut package_options: Vec<Vec<String>> =
+        vec![vec!["none".into(), lang.t("workshop.book.no_package", &[])]];
+    for (key, _) in PACKAGES {
+        package_options.push(vec![
+            key.to_string(),
+            lang.t(&format!("workshop.packages.{key}.name"), &[]),
+            lang.t(&format!("workshop.packages.{key}.text"), &[]),
+        ]);
+    }
     Ok(view(
         "workshop/book.html",
         context! {
@@ -109,7 +120,7 @@ pub async fn form(
             store_id => store.as_ref().map(|s| s.id),
             capacity => store.as_ref().map(|s| s.workshop_minutes_per_day),
             closed => store.as_ref().map(capacity::closed_weekdays).unwrap_or_default(),
-            packages => PACKAGES.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
+            package_options,
             package => query.package.unwrap_or_default(),
             task_options,
             ticked => query.tasks,

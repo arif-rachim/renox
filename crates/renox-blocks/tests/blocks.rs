@@ -409,3 +409,46 @@ fn between(html: &str, start: &str, end: &str) -> String {
     let to = html[from..].find(end).unwrap() + from;
     html[from..to].to_owned()
 }
+
+const TAGS: &str = r##"<html><head><rx-head/></head><body>
+<form method="post" action="/order">
+<rx-quantity name="qty" :value="2" :min="1" :max="5" label="Bikes"/>
+<rx-range-slider name-min="low" name-max="high" :min="0" :max="1000" :step="50" :value-min="100" :value-max="600" label="Price" suffix=" km"/>
+<rx-keypad target="rx-paid" decimal enter-label="Pay"/>
+<rx-swatches name="size" label="Frame size" :options="[{'value': 'S', 'label': 'S'}, {'value': 'M', 'label': 'M'}]" selected="M" required/>
+<rx-datetime-range name-start="starts_at" name-end="ends_at" label="Rental" min="2026-10-01" :step="30" :opens="9" :closes="10"/>
+</form>
+<rx-gallery :photos="[{'src': '/a.svg', 'alt': 'Side'}]" id="photos"/>
+<rx-history :items="[{'time': '2026-10-06', 'title': 'Done'}]" label="Service" date-format="%d %b"/>
+<rx-compare-plans :plans="[{'key': 'basic', 'name': 'Basic', 'price': 2900}]" highlight="basic"/>
+<rx-month-calendar :month="month" today="2026-02-03"/>
+<rx-availability :columns="['09:00']" :rows="[{'label': 'Trail 5', 'slots': [{'state': 'free'}]}]" corner="Bike"/>
+<rx-kanban id="jobs" :columns="[{'key': 'waiting', 'title': 'Waiting', 'cards': []}]" url="/jobs/move"/>
+</body></html>"##;
+
+#[renox::test]
+async fn the_blocks_are_tags_too() {
+    let app = TestApp::new(
+        App::new()
+            .module(Blocks::new())
+            .module(Shop)
+            .templates(|env| renox::view::add_template(env, "page.html", TAGS).unwrap()),
+    )
+    .await;
+    let html = app.get("/order").await.assert_ok().text();
+    for needle in [
+        r#"<input class="rx-quantity__input" id="rx-qty" name="qty""#,
+        "rx-range",
+        "data-rx-keypad",
+        "rx-swatches",
+        "rx-datetime",
+        "rx-gallery",
+        r#"class="rx-history""#,
+        "rx-plans",
+        "rx-month",
+        "rx-availability",
+        "rx-kanban",
+    ] {
+        assert!(html.contains(needle), "missing {needle}\n{html}");
+    }
+}

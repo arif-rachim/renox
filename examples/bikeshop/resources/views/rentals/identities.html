@@ -2,11 +2,9 @@
 <rx-page layout="layouts/staff.html" title="{{ t('rentals.identities.title') }}">
   <rx-stack data-bs-reveal>
     <rx-page-header title="{{ t('rentals.identities.title') }}" subtitle="{{ t('rentals.identities.lead') }}"/>
-    {%- if waiting %}
     {# [explain:rentals.identities.template] #}
-    <rx-list id="identities" label="{{ t('rentals.identities.title') }}">
-      {%- for w in waiting %}
-      <li>
+    <rx-list rx-if="waiting" id="identities" label="{{ t('rentals.identities.title') }}">
+      <li rx-for="w in waiting">
         <div class="rx-list__main">
           <strong>{{ w.customer.name if w.customer else "?" }}</strong>
           <p class="rx-subtitle">{{ w.masked or "" }} · {{ w.store or "" }} · {{ w.document.submitted_at | since }}</p>
@@ -17,11 +15,8 @@
           <rx-textarea name="note" label="{{ t('rentals.identities.note') }}" rows="3" required id="refuse-note-{{ w.document.id }}"/>
         </rx-action-sheet>
       </li>
-      {%- endfor %}
     </rx-list>
     {# [/explain:rentals.identities.template] #}
-    {%- else %}
-    <div class="rx-card"><rx-empty title="{{ t('rentals.identities.none') }}" message="{{ t('rentals.identities.none_text') }}" icon="id-card"/></div>
-    {%- endif %}
+    <div rx-else class="rx-card"><rx-empty title="{{ t('rentals.identities.none') }}" message="{{ t('rentals.identities.none_text') }}" icon="id-card"/></div>
   </rx-stack>
 </rx-page>

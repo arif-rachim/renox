@@ -233,9 +233,10 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
             )
         })
         .collect();
+    let store_options: Vec<(i64, String)> = others.iter().map(|s| (s.id, s.name.clone())).collect();
     Ok(view(
         "multistore/placements/new.html",
-        context! { direction, others, other, options },
+        context! { direction, store_options, other, options },
     ))
 }
 

@@ -68,10 +68,11 @@ pub struct Row {
 /// customers).
 // [explain:sales.orders.index.handler]
 pub async fn index(
-    State(db): State<Db>,
+    State(state): State<AppState>,
     Page(page): Page,
     Query(q): Query<ListQuery>,
 ) -> Result<View> {
+    let db = state.db.clone();
     let store = active_store::current();
     let tab = q
         .status
@@ -102,9 +103,22 @@ pub async fn index(
             .map(|c| c.name.clone()),
         order,
     });
+    // The tabs: each status's address and its label.
+    let lang = state.current_lang();
+    let base = state.url("sales.orders.index", &[])?;
+    let tab_items: Vec<[String; 2]> = TABS
+        .iter()
+        .map(|key| {
+            [
+                format!("{base}?status={key}"),
+                lang.t(&format!("sales.staff.tab.{key}"), &[]),
+            ]
+        })
+        .collect();
+    let current_tab = format!("{base}?status={tab}");
     Ok(view(
         "sales/staff/index.html",
-        context! { orders, tab, tabs => TABS },
+        context! { orders, tab, tabs => TABS, tab_items, current_tab },
     ))
 }
 

@@ -66,6 +66,15 @@ impl Validate for KioskForm {
     }
 }
 
+/// The ticks of the token form for the kit's checkbox list: `[value, label,
+/// hint]`, the hint being the ability's text in the page's language.
+fn options(lang: &Lang, abilities: &[(&str, &str)]) -> Vec<(String, String, String)> {
+    abilities
+        .iter()
+        .map(|(ability, key)| ((*ability).into(), (*ability).into(), lang.t(key, &[])))
+        .collect()
+}
+
 /// A token as the pages list it.
 #[derive(Serialize, Debug, Clone)]
 pub struct TokenRow {
@@ -79,7 +88,12 @@ pub struct TokenRow {
 
 /// `GET /account/api-tokens` (`api.tokens`): the customer's tokens, the
 /// form for a new one, and a new token once.
-pub async fn index(State(db): State<Db>, user: AuthUser, session: Session) -> Result<View> {
+pub async fn index(
+    State(db): State<Db>,
+    user: AuthUser,
+    session: Session,
+    lang: Lang,
+) -> Result<View> {
     let tokens: Vec<TokenRow> = user
         .tokens(&db)
         .await?
@@ -99,7 +113,7 @@ pub async fn index(State(db): State<Db>, user: AuthUser, session: Session) -> Re
         context! {
             tokens,
             fresh,
-            abilities => CUSTOMER_ABILITIES.iter().map(|(a, k)| (*a, *k)).collect::<Vec<_>>(),
+            abilities => options(&lang, &CUSTOMER_ABILITIES),
             base => super::base_url(),
         },
     ))
@@ -153,7 +167,7 @@ pub struct KioskRow {
 
 /// `GET /staff/api-tokens` (`api.kiosks`): the active store's kiosks and
 /// their tokens, the form for a new one, and a new token once.
-pub async fn kiosks(State(db): State<Db>, session: Session) -> Result<View> {
+pub async fn kiosks(State(db): State<Db>, session: Session, lang: Lang) -> Result<View> {
     let store_id = crate::app::rentals::active_store()?;
     let store = Store::find_or_404(&db, store_id).await?;
     let kiosks = Kiosk::query()
@@ -185,7 +199,7 @@ pub async fn kiosks(State(db): State<Db>, session: Session) -> Result<View> {
             store,
             kiosks => rows,
             fresh,
-            abilities => KIOSK_ABILITIES.iter().map(|(a, k)| (*a, *k)).collect::<Vec<_>>(),
+            abilities => options(&lang, &KIOSK_ABILITIES),
             base => super::base_url(),
         },
     ))

@@ -43,8 +43,8 @@ pub fn entries() -> Vec<Explanation> {
                       so every kit component on every page follows, in light and dark \
                       mode, without a component of the shop's own. The hero, the photo \
                       tiles and the service tiles are CSS grids on the kit's spacing \
-                      tokens; the hero is a macro (`layouts/_hero.html`) the rent and \
-                      plans pages share.",
+                      tokens; the hero is a component (`<app-hero>`, \
+                      `components/hero.html`) the rent and plans pages share.",
                 },
                 Feature {
                     api: "App::share",
@@ -52,8 +52,8 @@ pub fn entries() -> Vec<Explanation> {
                       the catalog area, which shares them with every view as `storefront` \
                       (`Registry::share` in its `register`). The value is computed only \
                       when the path is `/`, so other pages run no query for it, and the \
-                      home module stays ignorant of the catalogue: the page includes \
-                      `catalog/_home.html` with `ignore missing`.",
+                      home module stays ignorant of the catalogue: the page uses \
+                      `<app-catalog-home>` (`components/catalog_home.html`).",
                 },
                 Feature {
                     api: "UI kit: card_grid + media_card",
@@ -126,14 +126,14 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/home/mod.rs",
                 "examples/bikeshop/resources/views/home/index.html",
-                "examples/bikeshop/resources/views/catalog/_home.html",
+                "examples/bikeshop/resources/views/components/catalog_home.html",
                 "examples/bikeshop/src/app/catalog/mod.rs",
                 "examples/bikeshop/resources/views/layouts/app.html",
-                "examples/bikeshop/resources/views/layouts/_nav_cart.html",
+                "examples/bikeshop/resources/views/components/nav_cart.html",
                 "examples/bikeshop/src/app/accounts/locale.rs",
                 "examples/bikeshop/public/app.js",
                 "examples/bikeshop/public/theme.css",
-                "examples/bikeshop/resources/views/layouts/_hero.html",
+                "examples/bikeshop/resources/views/components/hero.html",
                 "examples/bikeshop/public/images/CREDITS.md",
                 "examples/bikeshop/tests/about.rs",
                 "examples/bikeshop/tests/catalog.rs",

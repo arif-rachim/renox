@@ -251,6 +251,27 @@ mail apps ignore style sheets.
 {% endblock %}
 ```
 
+The same mail with tags, which the compiler checks like any page (a misspelt attribute names
+the file and line):
+
+```html
+<rx-mail subject="{{ t('mail.thanks') }}">
+  <p>{{ t('mail.thanks') }}</p>
+  <rx-mail-panel>Order #{{ order_id }} ships tomorrow.</rx-mail-panel>
+  <rx-mail-table :rows="[['Coffee', '$4.50']]" :head="['Item', 'Price']" :total="['Total', '$4.50']"/>
+  <rx-mail-divider/>
+  <rx-mail-button :url="app.url ~ '/orders/' ~ order_id" label="View your order"/>
+</rx-mail>
+```
+
+`<rx-mail>` is the `{% extends %}` (its `subject` fills the `title` block and
+`<rx-slot name="footer">` the `footer` block); the other four are the macros below. Both
+spellings render the same HTML. See [docs/ui.md](ui.md#mails-as-tags).
+
+The text version of a mail (the `.txt` view next to the `.html` one) is `<rx-mail-text>`: the
+text as written, with `{{ }}` and `<template rx-for>` / `<template rx-if>` for loops and
+conditions, and the same bytes the `{% for %}` / `{% if %}` version printed.
+
 What you can use:
 
 - `renox/mail/layout.html` has three **blocks** (named holes you fill): `title`, `content` and

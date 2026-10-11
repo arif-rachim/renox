@@ -85,8 +85,8 @@ pub fn entries() -> Vec<Explanation> {
             "examples/bikeshop/resources/views/staff/dashboard.html",
             "examples/bikeshop/resources/views/layouts/staff.html",
             "examples/bikeshop/src/app/access/active_store.rs",
-            "examples/bikeshop/resources/views/layouts/_store_switcher.html",
-            "examples/bikeshop/resources/views/reports/_overview.html",
+            "examples/bikeshop/resources/views/components/store_switcher.html",
+            "examples/bikeshop/resources/views/components/reports_overview.html",
             "examples/bikeshop/tests/access.rs",
         ],
         code: &[
@@ -1038,7 +1038,7 @@ const ADMIN_DOCS: &[&str] = &[
 const ADMIN_SOURCES: &[&str] = &[
     "examples/bikeshop/src/app/staff/admin.rs",
     "examples/bikeshop/resources/views/renox-admin/layout.html",
-    "examples/bikeshop/resources/views/renox-admin/fields.html",
+    "examples/bikeshop/resources/views/components/admin_field.html",
     "examples/bikeshop/tests/staff.rs",
 ];
 

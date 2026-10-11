@@ -1,10 +1,7 @@
 {#- Sent when returned goods are refunded. -#}
-{% extends "renox/mail/layout.html" %}
-{% from "renox/mail/components.html" import table, panel, button %}
-{% block title %}{{ t('sales.mail.refund.subject', number=order.number) }}{% endblock %}
-{% block content %}
-<p>{{ t('sales.mail.hello', name=name) }}</p>
-{% call panel() %}{{ t('sales.mail.refund.text', amount=(refund | money), number=order.number) }}{% endcall %}
-<p>{{ t('sales.mail.refund.when') }}</p>
-{{ button(url, t('sales.mail.view_order')) }}
-{% endblock %}
+<rx-mail subject="{{ t('sales.mail.refund.subject', number=order.number) }}">
+  <p>{{ t('sales.mail.hello', name=name) }}</p>
+  <rx-mail-panel>{{ t('sales.mail.refund.text', amount=(refund | money), number=order.number) }}</rx-mail-panel>
+  <p>{{ t('sales.mail.refund.when') }}</p>
+  <rx-mail-button :url="url" :label="t('sales.mail.view_order')"/>
+</rx-mail>

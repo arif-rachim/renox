@@ -264,11 +264,13 @@
   the kit's macros stay supported underneath. The `browser (bikeshop)` job failed on main
   after #492 ("Esc closes it" on the About sheet, phone): the Spanish staff test logged in by
   clicking the form, #354's trigger; it logs in with `logInWithFetch(…, { keepCookies: true })`
-  now. Then the workspace was set to `1.1.0-rc.1` (Renoxium's choice: a release candidate
-  before 1.1.0). Published on 2026-10-11 (all ten crates, tag `v1.1.0-rc.1`); the landing
-  page, the plugin guides' dependency lines, the tutorial's install line and the
-  generated llms.txt name `1.1.0-rc.1` (#505), while README's install/clone lines stay the
-  Renoxium's. At 1.1.0 itself, set them back to the plain `"1.1"` / `cargo install renox-cli`.
+  now. Then the workspace was set to `1.1.0-rc.1` and published on 2026-10-11 (all ten
+  crates, tag `v1.1.0-rc.1`). #505: the guides, the tutorial, hello and bikeshop teach only
+  the 1.1 way (tags, typed columns, ViewData; the old forms stay in the API but are not shown),
+  CLAUDE.md became a short guide with the rest in docs/contributing/, and the workspace
+  moved to `1.1.0` (the landing page, the plugin guides, the tutorial, llms.txt and the README
+  name 1.1.0; publishing it is Renoxium's `cargo publish`, in RELEASING.md's order, then the tag
+  `v1.1.0`).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (Renoxium runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

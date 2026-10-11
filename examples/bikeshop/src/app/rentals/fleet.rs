@@ -168,9 +168,22 @@ pub async fn index(
         "others_here": base().where_(RentalBike::LOCATION_STORE_ID.eq(store)).where_(RentalBike::OWNER_STORE_ID.ne(store)).count(&state.db).await?,
         "mine_elsewhere": base().where_(RentalBike::OWNER_STORE_ID.eq(store)).where_(RentalBike::LOCATION_STORE_ID.ne(store)).count(&state.db).await?,
     });
+    // The tabs: each view's address and its label, with the count on all but "all".
+    let mut tab_items = Vec::new();
+    for key in VIEWS {
+        let mut label = lang.t(&format!("rentals.fleet.view.{key}"), &[]);
+        if key != "all" {
+            label = format!("{label} ({})", counts[key]);
+        }
+        tab_items.push([
+            format!("{}?view={key}", state.url("rentals.fleet", &[])?),
+            label,
+        ]);
+    }
+    let current_tab = format!("{}?view={tab}", state.url("rentals.fleet", &[])?);
     Ok(view(
         "rentals/fleet.html",
-        context! { fleet => page, tab, views => VIEWS, counts },
+        context! { fleet => page, tab_items, current_tab },
     ))
 }
 

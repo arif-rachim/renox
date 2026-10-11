@@ -4,19 +4,15 @@
 <rx-page layout="layouts/staff.html" :title="t('staff.catalog.fits_title', product=product.name)">
   <rx-stack data-bs-reveal>
     <rx-page-header :title="t('staff.catalog.fits_title', product=product.name)" :subtitle="category.name" :back="route('admin.products.index')" :back-label="t('staff.catalog.products')"/>
-    {%- if gear %}
-    <rx-card><rx-empty :title="t('staff.catalog.gear')" icon="tag"/></rx-card>
-    {%- else %}
+    <rx-card rx-if="gear"><rx-empty :title="t('staff.catalog.gear')" icon="tag"/></rx-card>
+    <template rx-else>
     <rx-card :title="t('staff.catalog.fits_bikes') if part else t('staff.catalog.fits_parts')">
       <rx-list id="fits" :label="t('staff.catalog.fits_title', product=product.name)">
-        {%- for f in fitted %}
-        <li>
-          <span class="rx-list__main"><strong>{{ f.product.name }}</strong>{% if f.note %}<span class="rx-subtitle">{{ f.note }}</span>{% endif %}</span>
+        <li rx-for="f in fitted">
+          <span class="rx-list__main"><strong>{{ f.product.name }}</strong><span rx-if="f.note" class="rx-subtitle">{{ f.note }}</span></span>
           <rx-confirm :id="'unfit-' ~ f.product.id" :label="t('staff.catalog.remove')" :action="route('staff.catalog.fits.destroy', product.id, f.product.id)" :title="t('staff.catalog.remove_title', product=f.product.name)" :message="t('staff.catalog.remove_text')"/>
         </li>
-        {%- else %}
-        <li><span class="rx-subtitle">{{ t('staff.catalog.none_yet') }}</span></li>
-        {%- endfor %}
+        <li rx-if="not fitted"><span class="rx-subtitle">{{ t('staff.catalog.none_yet') }}</span></li>
       </rx-list>
     </rx-card>
     {# [explain:staff.catalog.fits.template] #}
@@ -30,6 +26,6 @@
       </rx-card>
     </rx-form>
     {# [/explain:staff.catalog.fits.template] #}
-    {%- endif %}
+    </template>
   </rx-stack>
 </rx-page>

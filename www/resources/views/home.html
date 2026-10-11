@@ -20,8 +20,8 @@
     </div>
     <figure class="stage" aria-label="A new Renox app, made and served from a terminal">
       <div class="term"><div class="bar" aria-hidden="true"><i></i><i></i><i></i><span>~/code — zsh</span></div>
-<pre id="tty"><span class="p">❯</span> <span class="c" data-cmd>cargo install renox-cli --version 1.1.0-rc.1</span>
-<span class="d">  Installed</span> rnx v1.1.0-rc.1
+<pre id="tty"><span class="p">❯</span> <span class="c" data-cmd>cargo install renox-cli</span>
+<span class="d">  Installed</span> rnx v1.1.0
 <span class="p">❯</span> <span class="c" data-cmd>rnx new shop</span>
 <span class="g">  created</span> Cargo.toml
 <span class="g">  created</span> src/lib.rs
@@ -53,7 +53,7 @@
     <h2 id="why-title">A Rust web app today is twenty crates <span class="dim">and a week of glue.</span></h2>
     <p class="sub">Rust gives you speed and a compiler that catches bugs before your users do. But for a web app you pick a router, an ORM, a session store, CSRF protection, a queue, a mailer, templates and migrations, then wire them together and keep them in step. Laravel solved that years ago, without Rust's guarantees. Renox brings that productivity to Rust.</p>
     <ul class="list" role="list">
-      <li><span class="n" aria-hidden="true">→</span><span><b>One dependency.</b> <code>renox = "1.1.0-rc.1"</code> and <code>use renox::prelude::*</code>: everything else is already there, and already fits.</span></li>
+      <li><span class="n" aria-hidden="true">→</span><span><b>One dependency.</b> <code>renox = "1"</code> and <code>use renox::prelude::*</code>: everything else is already there, and already fits.</span></li>
       <li><span class="n" aria-hidden="true">→</span><span><b>Laravel's ideas, Rust's types.</b> Routes, models, form requests, jobs, mailables and policies: names you know, checked at compile time. <a href="{{ links.docs }}/docs/laravel">Laravel → Renox, concept by concept</a>.</span></li>
       <li><span class="n" aria-hidden="true">→</span><span><b>Upgrades are a version bump.</b> Apps depend on Renox; framework code is never copied into them.</span></li>
     </ul>
@@ -62,7 +62,7 @@
     <ul class="crates__list" role="list" aria-label="Crates a Rust web app usually wires by hand">
       {%- for c in crates %}<li class="crate">{{ c }}</li>{% endfor %}
     </ul>
-    <p class="one">renox = <em>"1.1.0-rc.1"</em><small>all of it, in one crate</small></p>
+    <p class="one">renox = <em>"1.1"</em><small>all of it, in one crate</small></p>
   </div>
 </div></section>
 

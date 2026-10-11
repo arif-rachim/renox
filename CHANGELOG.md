@@ -10,14 +10,15 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
-## 1.1.0-rc.1 · 2026-10-11
+## 1.1.0 · 2026-10-11
 
-The release candidate for 1.1. Pages are written with `rx-*` tags, parts of a page can be live
+Pages are written with `rx-*` tags, parts of a page can be live
 components, and mistakes surface before a page is opened: `db:check`, `view:check`, typed
 columns and migrations generated from the models. It also fills the gaps the bike shop had to
 work around. Everything is additive: `cargo semver-checks` against 1.0.0 finds nothing
-breaking, and 1.0 apps keep compiling. Try it with `cargo install renox-cli --version
-1.1.0-rc.1` or `renox = "1.1.0-rc.1"`.
+breaking, and 1.0 apps keep compiling. Install it with `cargo install renox-cli`, or set
+`renox = "1.1"`. It is the code of `1.1.0-rc.1`, published earlier the same day, plus the
+guides, the tutorial and the examples moved to the 1.1 way and a shorter CLAUDE.md.
 
 **Behaviour changes**
 

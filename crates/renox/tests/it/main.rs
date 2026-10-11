@@ -68,6 +68,7 @@ mod send_handlers;
 mod seo;
 mod services;
 mod sessions;
+mod tag_usage;
 mod testing;
 mod testing_tools;
 mod tooling;

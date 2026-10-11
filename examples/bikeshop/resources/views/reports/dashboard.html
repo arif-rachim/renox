@@ -1,16 +1,14 @@
 <rx-page layout="layouts/staff.html" :title="t('reports.dashboard.title')">
-{% from "renox/ui.html" import table %}
-{% from "layouts/_avatar.html" import avatar %}
 
 {#- The reports dashboard (src/app/reports/dashboard.rs): the period, books or work, the store;
     figures in the kit's `stats`, charts and lists in the kit's `dashboard` of `widget`s (a CSS
     grid: one column on phones). Everything here comes from `n` (src/app/reports/numbers.rs). -#}
-{% include "reports/_assets.html" %}
+<app-reports-assets/>
 <div class="rx-stack" data-bs-reveal>
   <rx-page-header :title="t('reports.dashboard.title')" :subtitle="t('reports.dashboard.lead_store', store=store_name) if store_name else t('reports.dashboard.lead')">
     <rx-link-button route="reports.monthly" :label="t('reports.monthly.title')" icon="calendar"/>
   </rx-page-header>
-  {% include "reports/_tabs.html" %}
+  <app-reports-tabs/>
 
   <div class="bs-report-controls">
     <rx-period-filter :selected="period" :options="periods" :label="t('reports.period.label')"/>
@@ -53,15 +51,13 @@
     </rx-widget>
   {# [/explain:reports.dashboard.template] #}
     <rx-widget :title="t('reports.widget.mix')" :description="t('reports.widget.mix_hint')">
-      {%- if n.revenue > 0 %}
-      <rx-chart kind="doughnut" :labels="stream_labels" :values="stream_amounts" format="money" :title="t('reports.widget.mix')" id="chart-mix"/>
-      {%- else %}<rx-empty :title="t('reports.widget.nothing')"/>{% endif %}
+      <rx-chart rx-if="n.revenue > 0" kind="doughnut" :labels="stream_labels" :values="stream_amounts" format="money" :title="t('reports.widget.mix')" id="chart-mix"/>
+      <rx-empty rx-else :title="t('reports.widget.nothing')"/>
     </rx-widget>
 
     <rx-widget :title="t('reports.widget.hours')" :description="t('reports.widget.hours_hint')" span="2">
-      {%- if n.rental_hours %}
-      <rx-chart kind="heatmap" :cells="n.rental_hours" :columns="range(24) | map('string') | list" :rows="[t('blocks.calendar.day_1'), t('blocks.calendar.day_2'), t('blocks.calendar.day_3'), t('blocks.calendar.day_4'), t('blocks.calendar.day_5'), t('blocks.calendar.day_6'), t('blocks.calendar.day_0')]" :x-title="t('reports.widget.hour')" :y-title="t('reports.widget.weekday')" :title="t('reports.widget.hours')" id="chart-hours"/>
-      {%- else %}<rx-empty :title="t('reports.widget.nothing')"/>{% endif %}
+      <rx-chart rx-if="n.rental_hours" kind="heatmap" :cells="n.rental_hours" :columns="range(24) | map('string') | list" :rows="[t('blocks.calendar.day_1'), t('blocks.calendar.day_2'), t('blocks.calendar.day_3'), t('blocks.calendar.day_4'), t('blocks.calendar.day_5'), t('blocks.calendar.day_6'), t('blocks.calendar.day_0')]" :x-title="t('reports.widget.hour')" :y-title="t('reports.widget.weekday')" :title="t('reports.widget.hours')" id="chart-hours"/>
+      <rx-empty rx-else :title="t('reports.widget.nothing')"/>
     </rx-widget>
     <rx-widget :title="t('reports.widget.between')" :description="t('reports.widget.between_hint')">
       <div class="bs-widget-stack">
@@ -70,67 +66,53 @@
           <div><dt>{{ t('reports.widget.help_received') }}</dt><dd>{{ t('reports.hours', hours=(n.help_received_hours | number(1))) }}</dd></div>
           <div><dt>{{ t('reports.widget.help_given') }}</dt><dd>{{ t('reports.hours', hours=(n.help_given_hours | number(1))) }}</dd></div>
         </dl>
-        {%- if n.balances %}
-        <rx-table :rows="n.balances" as="b" :caption="t('reports.widget.balances')">
+        <rx-table rx-if="n.balances" :rows="n.balances" as="b" :caption="t('reports.widget.balances')">
           <rx-column :label="t('reports.widget.owes')">{{ t('reports.widget.owes_line', debtor=b.debtor, creditor=b.creditor) }}</rx-column>
           <rx-column :label="t('reports.fields.amount')" align="num">{{ b.amount | money }}</rx-column>
         </rx-table>
-        {%- else %}<rx-empty :title="t('reports.widget.square')"/>{% endif %}
-        {%- if can('intercompany.view') %}<rx-link-button route="reports.entries" :label="t('reports.tab.entries')" size="small"/>{% endif %}
+        <rx-empty rx-else :title="t('reports.widget.square')"/>
+        <rx-link-button rx-if="can('intercompany.view')" route="reports.entries" :label="t('reports.tab.entries')" size="small"/>
       </div>
     </rx-widget>
 
     <rx-widget :title="t('reports.widget.products')" :description="t('reports.widget.products_hint')">
-      {%- if n.top_products %}
-      <div class="bs-top"><rx-list :label="t('reports.widget.products')">
-        {%- for item in n.top_products %}
-        <li><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.units_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
-        {%- endfor %}
+      <div rx-if="n.top_products" class="bs-top"><rx-list :label="t('reports.widget.products')">
+        <li rx-for="item in n.top_products"><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.units_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
       </rx-list></div>
-      {%- else %}<rx-empty :title="t('reports.widget.nothing')"/>{% endif %}
+      <rx-empty rx-else :title="t('reports.widget.nothing')"/>
     </rx-widget>
     <rx-widget :title="t('reports.widget.categories')" :description="t('reports.widget.categories_hint')">
-      {%- if n.top_categories %}
-      <div class="bs-top"><rx-list :label="t('reports.widget.categories')">
-        {%- for item in n.top_categories %}
-        <li><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.units_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
-        {%- endfor %}
+      <div rx-if="n.top_categories" class="bs-top"><rx-list :label="t('reports.widget.categories')">
+        <li rx-for="item in n.top_categories"><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.units_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
       </rx-list></div>
-      {%- else %}<rx-empty :title="t('reports.widget.nothing')"/>{% endif %}
+      <rx-empty rx-else :title="t('reports.widget.nothing')"/>
     </rx-widget>
     <rx-widget :title="t('reports.widget.customers')" :description="t('reports.widget.customers_hint')">
-      {%- if n.top_customers %}
-      <div class="bs-top"><rx-list :label="t('reports.widget.customers')">
-        {%- for item in n.top_customers %}
-        <li>{{ avatar(item.name, size="s") }}<div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.visits_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
-        {%- endfor %}
+      <div rx-if="n.top_customers" class="bs-top"><rx-list :label="t('reports.widget.customers')">
+        <li rx-for="item in n.top_customers"><app-avatar :name="item.name" size="s"/><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.visits_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
       </rx-list></div>
-      {%- else %}<rx-empty :title="t('reports.widget.nothing')"/>{% endif %}
+      <rx-empty rx-else :title="t('reports.widget.nothing')"/>
     </rx-widget>
 
-    {%- if n.comparison %}
-    <rx-widget :title="t('reports.widget.comparison')" :description="t('reports.widget.comparison_hint_' ~ by)" span="full">
+    <rx-widget rx-if="n.comparison" :title="t('reports.widget.comparison')" :description="t('reports.widget.comparison_hint_' ~ by)" span="full">
       <div class="bs-widget-stack">
         <rx-chart kind="bar" :labels="comparison_labels" :series="comparison" stacked format="money" :title="t('reports.widget.comparison')" id="chart-stores"/>
-        {% call table([t('reports.fields.store'), [t('reports.stream.sales'), "num"], [t('reports.stream.rentals'), "num"], [t('reports.stream.workshop'), "num"], [t('reports.stream.plans'), "num"], [t('reports.fields.total'), "num"], [t('reports.widget.share'), "num"]], caption=t('reports.widget.comparison')) %}
-          {%- for s in n.comparison %}
-          <tr>
+        <rx-simple-table :head="[t('reports.fields.store'), [t('reports.stream.sales'), 'num'], [t('reports.stream.rentals'), 'num'], [t('reports.stream.workshop'), 'num'], [t('reports.stream.plans'), 'num'], [t('reports.fields.total'), 'num'], [t('reports.widget.share'), 'num']]" :caption="t('reports.widget.comparison')">
+          <tr rx-for="s in n.comparison">
             <td><a class="rx-link" href="{{ query_with(store=s.id) }}">{{ s.name }}</a></td>
-            {%- for amount in s.streams %}<td class="rx-num">{{ amount | money }}</td>{% endfor %}
+            <td rx-for="amount in s.streams" class="rx-num">{{ amount | money }}</td>
             <td class="rx-num"><strong>{{ s.total | money }}</strong></td>
             <td class="rx-num">{{ s.share | number(1) }} %</td>
           </tr>
-          {%- endfor %}
-          <tr>
+          <rx-slot name="footer"><tr>
             <td><strong>{{ t('reports.fields.company') }}</strong></td>
-            {%- for stream in n.streams %}<td class="rx-num">{{ stream.amount | money }}</td>{% endfor %}
+            <td rx-for="stream in n.streams" class="rx-num">{{ stream.amount | money }}</td>
             <td class="rx-num"><strong>{{ n.revenue | money }}</strong></td>
             <td></td>
-          </tr>
-        {% endcall %}
+          </tr></rx-slot>
+        </rx-simple-table>
       </div>
     </rx-widget>
-    {%- endif %}
   </rx-dashboard>
 </div>
 </rx-page>

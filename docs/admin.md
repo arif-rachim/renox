@@ -42,8 +42,8 @@ Add the crate next to `renox`:
 
 ```toml
 [dependencies]
-renox = "1.1.0-rc.1"
-renox-admin = "1.1.0-rc.1"
+renox = "1.1"
+renox-admin = "1.1"
 ```
 
 Then add the `Admin` module, after `Auth` (the panel is behind a login):

@@ -341,11 +341,7 @@ fn a_region_is_the_marked_lines_without_their_indentation() {
     assert_eq!(lines[routes.last_line - 1], "}");
     let template = bikeshop::code::region("home.template").unwrap();
     assert_eq!(template.language, "html");
-    assert!(
-        template.text.starts_with("{% call page_hero("),
-        "{}",
-        template.text
-    );
+    assert!(template.text.starts_with("<app-hero "), "{}", template.text);
 }
 
 #[test]

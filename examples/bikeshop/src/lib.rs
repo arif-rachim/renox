@@ -28,6 +28,7 @@ pub mod highlight;
 pub mod money;
 pub mod report;
 pub mod seed;
+pub mod text;
 
 use renox::prelude::*;
 
@@ -43,6 +44,8 @@ pub fn app() -> App {
         // The "About this page" panel: `about_page(request.route, request.path)` in the layouts,
         // hidden with BIKESHOP_EXPLAIN=false.
         .templates(explain::register)
+        // `tx(text)` and `tk(key, fallback)`: texts that come from Rust in English.
+        .templates(text::register)
         .share(
             "explain_panels",
             |ctx: renox::view::ViewContext| async move { Ok(explain::enabled(&ctx.state.config)) },

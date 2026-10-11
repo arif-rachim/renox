@@ -211,6 +211,8 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .filter(|id| others.iter().any(|s| s.id == *id))
         .or_else(|| others.first().map(|s| s.id))
         .unwrap_or_default();
+    // The other stores as (id, name) pairs for the select.
+    let stores: Vec<(i64, String)> = others.iter().map(|s| (s.id, s.name.clone())).collect();
     // [explain:stock.consignments.create.handler]
     let owner = if direction == "send" { store } else { other };
     let search = query.q.clone().unwrap_or_default();
@@ -235,7 +237,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
     // [/explain:stock.consignments.create.handler]
     Ok(view(
         "stock/consignments/new.html",
-        context! { direction, others, other, rows, q => search, variant => query.variant },
+        context! { direction, stores, other, rows, q => search, variant => query.variant },
     ))
 }
 
@@ -435,7 +437,12 @@ pub struct LineView {
 /// (each checked in the store that matters: approving and shipping in the
 /// owner store, receiving in the location store).
 // [explain:stock.consignments.show.handler]
-pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
+pub async fn show(
+    State(db): State<Db>,
+    user: AuthUser,
+    lang: Lang,
+    Path(id): Path<i64>,
+) -> Result<View> {
     let shipment = access::find::<ConsignmentShipment>(&db, &user, id).await?;
     // [/explain:stock.consignments.show.handler]
     let lines = ConsignmentShipmentLine::query()
@@ -478,7 +485,9 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
         .map(|(n, step)| json!({ "key": step.as_str(), "done": n <= reached && s != ShipmentStatus::Refused, "current": n == reached }))
         .collect();
     let mut events = vec![json!({
-        "time": shipment.created_at, "title": "requested", "kind": "info",
+        "time": shipment.created_at,
+        "title": lang.t("stock.consignments.status.requested", &[]),
+        "kind": "info",
     })];
     for (time, title, kind) in [
         (shipment.approved_at, "approved", "success"),
@@ -487,6 +496,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
         (shipment.recalled_at, "recalled", "warning"),
     ] {
         if let Some(time) = time {
+            let title = lang.t(&format!("stock.consignments.status.{title}"), &[]);
             events.push(json!({ "time": time, "title": title, "kind": kind }));
         }
     }

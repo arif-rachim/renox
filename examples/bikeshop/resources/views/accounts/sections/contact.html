@@ -3,9 +3,8 @@
     customer, address (line1, line2, district, postal_code, city, country),
     country_id, countries. A login without a customer record (staff) shows
     nothing. -#}
-{%- if section.data.customer %}
-{%- set a = section.data.address %}
-<rx-form :action="route('accounts.contact')" method="PUT" id="account-contact" live>
+<rx-form rx-if="section.data.customer" :action="route('accounts.contact')" method="PUT" id="account-contact" live>
+  <rx-let name="a" :value="section.data.address"/>
   <rx-card title="{{ t('accounts.contact.title') }}" subtitle="{{ t('accounts.contact.lead') }}">
     <rx-form-grid columns="2">
       <rx-input name="phone" label="{{ t('accounts.contact.phone') }}" type="tel" :value="section.data.customer.phone" autocomplete="tel" span="full"/>
@@ -19,4 +18,3 @@
     <div class="rx-card__footer"><rx-button label="{{ t('accounts.save') }}"/></div>
   </rx-card>
 </rx-form>
-{%- endif %}

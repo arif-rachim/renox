@@ -7,7 +7,7 @@
 //! (`live.rs`).
 //!
 //! The "About this page" mechanism is in `src/explain.rs`; the panel every
-//! page shows is `resources/views/about/_panel.html`.
+//! page shows is `resources/views/components/about_panel.html`.
 
 pub mod blocks;
 pub mod data;

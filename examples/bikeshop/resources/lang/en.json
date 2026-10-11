@@ -1169,6 +1169,7 @@
       "damage_note": "What's damaged",
       "damage_photos": "Photos of the damage",
       "photos_hint": "Up to six photos, 5 MB each.",
+      "undamaged_hint": "No damage found: the deposit comes back, less any late fee.",
       "deposit_held": "Deposit held",
       "to_pay": "To pay now",
       "settle_hint": "Late and damage fees come out of the deposit; the rest is given back.",

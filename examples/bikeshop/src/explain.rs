@@ -8,13 +8,13 @@
 //!
 //! Two places show them:
 //! - the "About this page" panel of every layout
-//!   (`resources/views/about/_explain.html`), filled by the
+//!   (`resources/views/components/about_explain.html`, `<app-about-explain>`), filled by the
 //!   `about_page(request.route, request.path)` template function registered
 //!   in [`register`]. On a wide screen (75rem, 1200 px, and up) it is docked
-//!   beside the page (`about/_dock.html`), and can be folded to a slim rail
+//!   beside the page (`<app-about-dock>`), and can be folded to a slim rail
 //!   ([`dock_layer`] reads the choice from a cookie, so the page is drawn
 //!   folded or not from the start); on a narrower one the navbar's "About
-//!   this page" button opens it as the kit's sheet (`about/_panel.html`);
+//!   this page" button opens it as the kit's sheet (`<app-about-panel>`);
 //! - `/about/pages`, the index of every page, filtered by Renox feature or by
 //!   who uses the page (`src/app/about/mod.rs`).
 //!

@@ -177,6 +177,7 @@ impl Notification for Notice {
             context! {
                 title => self.text(state, self.title),
                 body => self.text(state, self.body),
+                table => rows.iter().map(|r| [r.label.clone(), r.value.clone()]).collect::<Vec<_>>(),
                 rows,
                 url => self.url,
                 action => lang.t(self.action, &[]),

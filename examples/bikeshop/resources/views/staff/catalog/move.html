@@ -8,7 +8,7 @@
     <rx-form :action="route('staff.catalog.move.store', token)">
       <rx-card>
         <rx-list :label="t('staff.catalog.products')">
-          {%- for p in products %}<li><span class="rx-list__main">{{ p.name }}</span></li>{% endfor %}
+          <li rx-for="p in products"><span class="rx-list__main">{{ p.name }}</span></li>
         </rx-list>
         <rx-select name="category_id" :label="t('staff.catalog.category')" :options="categories" required searchable :placeholder="t('staff.catalog.choose_category')"/>
         <div class="rx-card__footer"><rx-link-button route="admin.products.index" :label="t('staff.cancel')" variant="plain"/><rx-button :label="t('staff.catalog.move_button')"/></div>

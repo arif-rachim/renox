@@ -350,6 +350,228 @@ async fn rx_page_and_rx_push_match_extends_and_push() {
 }
 
 #[renox::test]
+async fn layout_tags_match_the_template_plumbing() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    // The same layout twice: in tags, and as raw template code.
+    write(
+        "tags.html",
+        "<html><head><rx-head/><rx-ui/></head><body><rx-block name=\"content\"/><rx-block name=\"extra\"><i>default</i></rx-block><rx-outlet stack=\"js\"/><rx-toasts/></body></html>",
+    );
+    write(
+        "raw.html",
+        "<html><head>{{ renox_head() }}{{ renox_ui() }}</head><body>{% block content %}{% endblock %}{% block extra %}<i>default</i>{% endblock %}{{ stack('js') }}{{ toasts() }}</body></html>",
+    );
+    let body = "<rx-push stack=\"js\" once=\"a\"><b>js</b></rx-push><p>{{ name }}</p>\
+                <rx-pagination :page=\"page\"/><rx-pagination :page=\"simple\"/>";
+    write(
+        "m.html",
+        "{% extends \"raw.html\" %}{% block content %}{% call push(\"js\", once=\"a\") %}<b>js</b>{% endcall %}<p>{{ name }}</p>\
+         {% from \"renox/pagination.html\" import pagination, simple_pagination %}{{ pagination(page) }}{{ simple_pagination(simple) }}{% endblock %}",
+    );
+    write(
+        "r.html",
+        &format!("<rx-page layout=\"tags.html\">{body}</rx-page>"),
+    );
+    let ctx = serde_json::json!({
+        "name": "Items",
+        "page": {"page": 1, "last_page": 3, "has_prev": false, "has_next": true, "pages": [1, 2, 3]},
+        "simple": {"page": 2, "has_prev": true, "has_next": true},
+    });
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(Pair(ctx)), move |c| c.views_path = path).await;
+    let (m, r) = (app.get("/m").await, app.get("/r").await);
+    m.assert_ok();
+    r.assert_ok();
+    let (m, r) = (normalize(&m.text()), normalize(&r.text()));
+    assert_eq!(m, r);
+    assert!(r.contains("<i>default</i>"), "{r}");
+    assert!(r.contains("<b>js</b>"), "{r}");
+    assert!(r.contains("rel=\"next\""), "{r}");
+}
+
+/// #508: groups and text under `rx-if` / `rx-elif` / `rx-else` / `rx-for`, with no wrapper.
+#[renox::test]
+async fn template_groups_and_elif_match_the_template_statements() {
+    let tags = "<template rx-if=\"n == 1\">one <b>text</b> and <i>markup</i></template>\
+                <template rx-elif=\"n == 2\">two</template>\
+                <p rx-elif=\"n == 3\">three</p>\
+                <template rx-else>many</template>|\
+                <ul><template rx-for=\"x in xs\"><li>{{ loop.index }}/{{ loop.length }} {{ x }}{% if loop.first %} first{% endif %}{% if loop.last %} last{% endif %}</li>, </template></ul>|\
+                <rx-card><template rx-for=\"x in xs\">{{ loop.index }}={{ x }};</template></rx-card>|\
+                <rx-badge rx-if=\"n == 1\" text=\"one\"/><rx-badge rx-elif=\"n == 2\" text=\"two\"/><rx-badge rx-else text=\"more\"/>|\
+                <template rx-if=\"xs\">has</template><template rx-else>none</template>";
+    let raw = format!(
+        "{UI}{{% if n == 1 %}}one <b>text</b> and <i>markup</i>{{% elif n == 2 %}}two{{% elif n == 3 %}}<p>three</p>{{% else %}}many{{% endif %}}|\
+         <ul>{{% for x in xs %}}<li>{{{{ loop.index }}}}/{{{{ loop.length }}}} {{{{ x }}}}{{% if loop.first %}} first{{% endif %}}{{% if loop.last %}} last{{% endif %}}</li>, {{% endfor %}}</ul>|\
+         {{% call ui.card() %}}{{% for x in xs %}}{{{{ loop.index }}}}={{{{ x }}}};{{% endfor %}}{{% endcall %}}|\
+         {{% if n == 1 %}}{{{{ ui.badge(text=\"one\") }}}}{{% elif n == 2 %}}{{{{ ui.badge(text=\"two\") }}}}{{% else %}}{{{{ ui.badge(text=\"more\") }}}}{{% endif %}}|\
+         {{% if xs %}}has{{% else %}}none{{% endif %}}"
+    );
+    for n in 1..=4 {
+        same(
+            &raw,
+            tags,
+            serde_json::json!({"n": n, "xs": ["a", "b", "c"]}),
+        )
+        .await;
+    }
+    same(&raw, tags, serde_json::json!({"n": 9, "xs": []})).await;
+}
+
+/// #511: `rx-let` is a scoped `{% with %}`.
+#[renox::test]
+async fn rx_let_matches_with_and_does_not_leak() {
+    let tags = "<rx-let name=\"top\" :value=\"n * 2\"/><p>{{ top }}</p>\
+                <div><rx-let name=\"label\" value=\"Item {{ n }}\"/><span>{{ label }}</span>\
+                <rx-let name=\"twice\" :value=\"label ~ label\"/><b>{{ twice }}</b></div>\
+                <p rx-if=\"n\"><rx-let name=\"inner\" :value=\"n + 1\"/>{{ inner }}</p>\
+                <ul><li rx-for=\"x in xs\"><rx-let name=\"shown\" :value=\"x | upper\"/>{{ loop.index }}{{ shown }}</li></ul>\
+                <rx-card><rx-let name=\"in_card\" :value=\"n\"/>{{ in_card }}<template rx-for=\"x in xs\">{{ in_card }}{{ x }}</template></rx-card>\
+                [{% if label is defined or inner is defined or shown is defined or in_card is defined %}leak{% endif %}]";
+    let raw = format!(
+        "{UI}{{% with top = (n * 2) %}}<p>{{{{ top }}}}</p>\
+         <div>{{% with label = \"Item \" ~ (n) %}}<span>{{{{ label }}}}</span>\
+         {{% with twice = (label ~ label) %}}<b>{{{{ twice }}}}</b>{{% endwith %}}{{% endwith %}}</div>\
+         {{% if n %}}<p>{{% with inner = (n + 1) %}}{{{{ inner }}}}{{% endwith %}}</p>{{% endif %}}\
+         <ul>{{% for x in xs %}}<li>{{% with shown = (x | upper) %}}{{{{ loop.index }}}}{{{{ shown }}}}{{% endwith %}}</li>{{% endfor %}}</ul>\
+         {{% call ui.card() %}}{{% with in_card = (n) %}}{{{{ in_card }}}}{{% for x in xs %}}{{{{ in_card }}}}{{{{ x }}}}{{% endfor %}}{{% endwith %}}{{% endcall %}}\
+         [{{% if label is defined or inner is defined or shown is defined or in_card is defined %}}leak{{% endif %}}]\
+         {{% endwith %}}"
+    );
+    same(&raw, tags, serde_json::json!({"n": 3, "xs": ["a", "b"]})).await;
+    // Nothing leaks out of its element (the `[…]` at the end stays empty).
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("m.html"), "unused").unwrap();
+    std::fs::write(dir.path().join("r.html"), tags).unwrap();
+    let path = dir.path().to_path_buf();
+    let ctx = serde_json::json!({"n": 3, "xs": ["a", "b"]});
+    let app =
+        TestApp::with_config(App::new().module(Pair(ctx)), move |c| c.views_path = path).await;
+    let page = app.get("/r").await;
+    page.assert_ok()
+        .assert_see("<p>6</p>")
+        .assert_see("Item 3Item 3");
+    assert!(!page.text().contains("leak"), "{}", page.text());
+}
+
+/// #512: `rx-script` and `rx-style` use the nonce of the page's CSP header.
+#[renox::test]
+async fn rx_script_and_rx_style_use_the_pages_nonce_under_strict_csp() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    write(
+        "layout.html",
+        "<html><head><rx-outlet stack=\"head\"/></head><body><rx-block name=\"content\"/><rx-outlet stack=\"scripts\"/></body></html>",
+    );
+    write(
+        "p.html",
+        "<rx-page layout=\"layout.html\">\
+         <rx-style>.a > .b { color: red }</rx-style>\
+         <script nonce=\"{{ csp_nonce() }}\">var by_hand = 1;</script>\
+         <rx-script>if (1 < 2 && \"x\" > \"a\") { window.inline = {{ 3 + 4 }}; }</rx-script>\
+         <rx-push stack=\"scripts\" once=\"k\"><rx-script type=\"module\">window.pushed = 1;</rx-script></rx-push>\
+         <rx-push stack=\"head\"><rx-style id=\"pushed\">.p { margin: 0 }</rx-style></rx-push>\
+         </rx-page>",
+    );
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(One), move |c| {
+        c.views_path = path;
+        c.csp = renox::CspMode::Strict;
+    })
+    .await;
+    let res = app.get("/p").await;
+    res.assert_ok();
+    let csp = res.header("content-security-policy").expect("a CSP header");
+    let nonce = csp
+        .split("'nonce-")
+        .nth(1)
+        .and_then(|rest| rest.split('\'').next())
+        .expect("a nonce in the policy")
+        .to_owned();
+    assert!(!nonce.is_empty());
+    let html = res.text();
+    for tag in [
+        format!("<style nonce=\"{nonce}\">.a > .b {{ color: red }}</style>"),
+        format!("<script nonce=\"{nonce}\">var by_hand = 1;</script>"),
+        format!(
+            "<script nonce=\"{nonce}\">if (1 < 2 && \"x\" > \"a\") {{ window.inline = 7; }}</script>"
+        ),
+        format!("<script nonce=\"{nonce}\" type=\"module\">window.pushed = 1;</script>"),
+        format!("<style nonce=\"{nonce}\" id=\"pushed\">.p {{ margin: 0 }}</style>"),
+    ] {
+        assert!(html.contains(&tag), "{tag}\n{html}");
+    }
+    assert_eq!(html.matches("<script nonce=").count(), 3, "{html}");
+}
+
+/// #517: `view:check` reports a literal `<rx-include>` of a template that is not there, unless it
+/// is `optional` or its name is computed.
+#[renox::test]
+async fn view_check_reports_an_include_of_a_missing_template() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    write("part.html", "<i>part</i>");
+    write(
+        "fine.html",
+        "<rx-include template=\"part.html\"/><rx-include template=\"gone.html\" optional/><rx-include :template=\"name\"/>",
+    );
+    write("bad.html", "<p>a</p>\n<rx-include template=\"prt.html\"/>");
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new(), move |c| c.views_path = path).await;
+    let message = view_check_problems(&app);
+    assert!(message.starts_with("1 template problem(s)"), "{message}");
+    assert!(
+        message.contains("bad.html:2: <rx-include> (or include) names a template that does not exist: \"prt.html\"; did you mean \"part.html\"?"),
+        "{message}"
+    );
+}
+
+/// `view:check` compiles every template: the new tags' mistakes are reported with file and line.
+#[renox::test]
+async fn view_check_reports_mistakes_in_the_flow_and_scope_tags() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(dir.path().join(name), body).unwrap();
+    write(
+        "fine.html",
+        "<template rx-if=\"a\">x</template><template rx-else>y</template><rx-let name=\"v\" :value=\"1\"/>{{ v }}<rx-script>1</rx-script>",
+    );
+    write(
+        "elif.html",
+        "<p>a</p>\n\n<template rx-elif=\"x\">b</template>",
+    );
+    write(
+        "else.html",
+        "<p rx-if=\"a\">a</p>\n<p rx-else>b</p>\n<p rx-else>c</p>",
+    );
+    write(
+        "let.html",
+        "<div rx-for=\"s in xs\">\n<rx-let name=\"s\" :value=\"1\"/></div>",
+    );
+    write(
+        "let2.html",
+        "<rx-let name=\"a\" :value=\"1\"/>\n<rx-let name=\"a\" :value=\"2\"/>",
+    );
+    write("nonce.html", "\n<rx-script nonce=\"x\"></rx-script>");
+    write("tpl.html", "<template rx-if=\"a\" class=\"x\">a</template>");
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new(), move |c| c.views_path = path).await;
+    let message = view_check_problems(&app);
+    assert!(message.starts_with("6 template problem(s)"), "{message}");
+    for expected in [
+        "elif.html:3: rx-elif must follow an element with rx-if",
+        "else.html:3: rx-else must follow an element with rx-if",
+        "let.html:2: <rx-let> \"s\" is already taken here",
+        "let2.html:2: <rx-let> \"a\" is already taken here",
+        "nonce.html:2: <rx-script> sets the nonce itself",
+        "tpl.html:1: <template> with rx-if, rx-elif, rx-else or rx-for takes no other attribute",
+    ] {
+        assert!(message.contains(expected), "{expected}\n{message}");
+    }
+}
+
+#[renox::test]
 async fn a_page_block_renders_as_a_fragment() {
     struct Frag;
     impl Module for Frag {
@@ -661,7 +883,7 @@ async fn rx_table_holds_columns_only() {
     .await;
     let t = app.get("/r").await.text();
     assert!(
-        t.contains("&lt;rx-table&gt; holds &lt;rx-column&gt;, &lt;rx-row-actions&gt; and &lt;rx-slot name=&quot;empty&quot;&gt;"),
+        t.contains("&lt;rx-table&gt; holds &lt;rx-column&gt;, &lt;rx-row-actions&gt;, &lt;rx-slot name=&quot;empty&quot;&gt; and &lt;rx-slot name=&quot;footer&quot;&gt;"),
         "{t}"
     );
     let (app, _dir) = tables(
@@ -1449,4 +1671,306 @@ async fn view_check_reports_a_typed_page_without_its_template() {
         message.contains("gone.html: not found, but Gone renders it"),
         "{message}"
     );
+}
+
+const MAIL_PARTS: &str =
+    "{% from \"renox/mail/components.html\" import button, panel, table, divider %}";
+
+/// #509: `<rx-mail>` and its parts render the same mail as `{% extends %}` and the macros.
+#[renox::test]
+async fn mail_tags_match_the_mail_layout_and_macros() {
+    let ctx = serde_json::json!({
+        "subj": "Your order", "name": "Ben", "link": "https://shop.test/o/1",
+        "rows": [["Coffee", "$4.50"], ["Tea", "$3.00"]],
+    });
+    same(
+        &format!(
+            "{{% extends \"renox/mail/layout.html\" %}}{MAIL_PARTS}\
+             {{% block title %}}{{{{ subj }}}}{{% endblock %}}\
+             {{% block content %}}<p>Hi {{{{ name }}}}</p>{{{{ button(link, \"Pay now\") }}}}\
+             {{% call panel() %}}Ships tomorrow.{{% endcall %}}\
+             {{{{ table(rows, head=[\"Item\", \"Price\"], total=[\"Total\", \"$7.50\"]) }}}}{{{{ divider() }}}}\
+             {{% endblock %}}{{% block footer %}}Thanks, {{{{ name }}}}{{% endblock %}}"
+        ),
+        "<rx-mail subject=\"{{ subj }}\">\n<p>Hi {{ name }}</p>\n\
+         <rx-mail-button :url=\"link\" label=\"Pay now\"/>\n\
+         <rx-mail-panel>Ships tomorrow.</rx-mail-panel>\n\
+         <rx-mail-table :rows=\"rows\" :head=\"['Item', 'Price']\" :total=\"['Total', '$7.50']\"/>\n\
+         <rx-mail-divider/>\n\
+         <rx-slot name=\"footer\">Thanks, {{ name }}</rx-slot>\n</rx-mail>",
+        ctx.clone(),
+    )
+    .await;
+    // The default layout's footer and title stay when the tag gives none, and a button can
+    // take its label as content.
+    same(
+        &format!(
+            "{{% extends \"renox/mail/layout.html\" %}}{MAIL_PARTS}\
+             {{% block content %}}{{{{ button(link, \"Open\") }}}}{{% endblock %}}"
+        ),
+        "<rx-mail><rx-mail-button :url=\"link\">Open</rx-mail-button></rx-mail>",
+        ctx,
+    )
+    .await;
+}
+
+/// #510: the small kit macros as tags render what the macros do.
+#[renox::test]
+async fn small_kit_tags_match_the_macros() {
+    let ctx = serde_json::json!({"p": {"image": "/p.png", "name": "Bike"}, "url": "/edit/1"});
+    same(
+        "{% from \"renox/ui.html\" import icon, columns, thumbnail, tab_panel, tabs %}\
+         {{ icon(\"bike\") }}{{ icon(\"lock\", size=16, label=\"Private\") }}\
+         {% call columns(3) %}<i>a</i><i>b</i>{% endcall %}\
+         {{ thumbnail(p.image, alt=p.name, href=\"/x\") }}{{ thumbnail(p.image) }}\
+         {{ tabs(\"t\", [[\"a\", \"A\"], [\"b\", \"B\"]]) }}\
+         {% call tab_panel(\"t\", \"a\", selected=true) %}One{% endcall %}{% call tab_panel(\"t\", \"b\") %}Two{% endcall %}",
+        "<rx-icon name=\"bike\"/><rx-icon name=\"lock\" size=\"16\" label=\"Private\"/>\
+         <rx-columns count=\"3\"><i>a</i><i>b</i></rx-columns>\
+         <rx-thumbnail :src=\"p.image\" :alt=\"p.name\" href=\"/x\"/><rx-thumbnail :src=\"p.image\"/>\
+         <rx-tabs id=\"t\"><rx-tab key=\"a\" label=\"A\">One</rx-tab><rx-tab key=\"b\" label=\"B\">Two</rx-tab></rx-tabs>",
+        ctx.clone(),
+    )
+    .await;
+    // `<rx-tab-panel>` is the macro for a `tabs(...)` written by hand.
+    same(
+        "{% from \"renox/ui.html\" import tab_panel %}{% call tab_panel(\"t\", \"a\", selected=true) %}One{% endcall %}{% call tab_panel(\"t\", \"b\") %}Two{% endcall %}",
+        "<rx-tab-panel id=\"t\" key=\"a\" selected>One</rx-tab-panel><rx-tab-panel id=\"t\" key=\"b\">Two</rx-tab-panel>",
+        ctx.clone(),
+    )
+    .await;
+    same(
+        "{% from \"renox/ui.html\" import action_group, menu_link, menu_button, event_stream %}\
+         {% call action_group() %}{{ menu_link(\"/a\", \"A\", icon=\"copy\") }}\
+         {{ menu_button(\"Edit\", attrs={\"hx-get\": url}, icon=\"edit\") }}\
+         {{ menu_button(\"Drop\", attrs={\"hx-delete\": url}, danger=true) }}{% endcall %}\
+         {% call action_group(\"More\", icon=\"plus\") %}{{ menu_link(\"/b\", \"B\") }}{% endcall %}\
+         [{{ event_stream() }}]",
+        "<rx-action-group><rx-menu-link href=\"/a\" label=\"A\" icon=\"copy\"/>\
+         <rx-menu-button hx-get=\"{{ url }}\" icon=\"edit\">Edit</rx-menu-button>\
+         <rx-menu-button hx-delete=\"{{ url }}\" danger>Drop</rx-menu-button></rx-action-group>\
+         <rx-action-group label=\"More\" icon=\"plus\"><rx-menu-link href=\"/b\" label=\"B\"/></rx-action-group>\
+         [<rx-event-stream/>]",
+        ctx.clone(),
+    )
+    .await;
+    same(
+        "{% from \"renox/ui.html\" import import_action, wizard_action, wizard_step, input %}\
+         {{ import_action(\"imp\", \"Import\", \"/import\", \"Import products\", columns=[\"sku\", \"name\"], template_url=\"/t\", description=\"CSV\") }}\
+         {{ import_action(\"imp2\", \"Import\", \"/import\", \"Import\", button=false) }}\
+         {% call wizard_action(\"np\", \"New\", \"/products\", \"New product\", [[\"a\", \"One\"], [\"b\", \"b\"]], submit_label=\"Add\", variant=\"primary\", icon=\"plus\", live=false) %}\
+         {% call wizard_step(\"np\", \"a\", title=\"One\") %}A{% endcall %}{% call wizard_step(\"np\", \"b\") %}B{% endcall %}{% endcall %}",
+        "<rx-import-action id=\"imp\" label=\"Import\" action=\"/import\" title=\"Import products\" :columns=\"['sku', 'name']\" template-url=\"/t\" description=\"CSV\"/>\
+         <rx-import-action id=\"imp2\" label=\"Import\" action=\"/import\" title=\"Import\" :button=\"false\"/>\
+         <rx-wizard-action id=\"np\" label=\"New\" action=\"/products\" title=\"New product\" submit-label=\"Add\" variant=\"primary\" icon=\"plus\" :live=\"false\">\
+         <rx-wizard-step key=\"a\" title=\"One\">A</rx-wizard-step><rx-wizard-step key=\"b\">B</rx-wizard-step></rx-wizard-action>",
+        ctx,
+    )
+    .await;
+}
+
+/// `route` fills `action` of the new action tags, like `rx-action-sheet`.
+#[renox::test]
+async fn the_import_and_wizard_action_tags_take_a_route() {
+    struct Routed;
+    impl Module for Routed {
+        fn name(&self) -> &'static str {
+            "routed"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new()
+                .get("/p", || async { view("p.html", context! {}) })
+                .post("/import", || async { "" })
+                .name("things.import")
+                .post("/new", || async { "" })
+                .name("things.new")
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("p.html"),
+        "<rx-import-action id=\"i\" label=\"Import\" route=\"things.import\" title=\"Import\"/>\
+         <rx-wizard-action id=\"w\" label=\"New\" route=\"things.new\" title=\"New\"><rx-wizard-step key=\"a\">A</rx-wizard-step></rx-wizard-action>",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Routed), move |c| c.views_path = path).await;
+    let res = app.get("/p").await;
+    res.assert_ok();
+    assert!(res.text().contains("action=\"/import\""), "{}", res.text());
+    assert!(res.text().contains("action=\"/new\""), "{}", res.text());
+}
+
+/// `view:check` finds mistakes in mail templates and in the new tags with file and line.
+#[renox::test]
+async fn view_check_reports_mistakes_in_mail_and_kit_tags() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| {
+        let path = dir.path().join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    };
+    write(
+        "mail/fine.html",
+        "<rx-mail subject=\"S\"><rx-mail-button url=\"/x\" label=\"Go\"/><rx-mail-divider/></rx-mail>",
+    );
+    write(
+        "mail/button.html",
+        "<rx-mail>\n<rx-mail-button label=\"Go\"/>\n</rx-mail>",
+    );
+    write(
+        "mail/slot.html",
+        "<rx-mail>x\n<rx-slot name=\"foter\">y</rx-slot></rx-mail>",
+    );
+    write("mail/loose.html", "<p>before</p>\n<rx-mail>x</rx-mail>");
+    write(
+        "mail/table.html",
+        "<rx-mail>\n\n<rx-mail-table rows=\"r\"/></rx-mail>",
+    );
+    write("kit.html", "<rx-icon/>\n<rx-columns cuont=\"2\"/>");
+    write(
+        "wizard.html",
+        "<rx-wizard-action id=\"w\" label=\"L\" action=\"/a\" title=\"T\">\n</rx-wizard-action>",
+    );
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new(), move |c| c.views_path = path).await;
+    let message = view_check_problems(&app);
+    assert!(message.starts_with("6 template problem(s)"), "{message}");
+    for expected in [
+        "mail/button.html:2: <rx-mail-button> needs the attribute \"url\"",
+        "mail/slot.html:2: <rx-mail> has no slot \"foter\"; did you mean \"footer\"?",
+        "mail/loose.html:1: <rx-mail> must hold the whole template",
+        "mail/table.html:3: <rx-mail-table> \"rows\" takes data",
+        "kit.html:1: <rx-icon> needs the attribute \"name\"",
+        "wizard.html:1: <rx-wizard-action> needs at least one <rx-wizard-step>",
+    ] {
+        assert!(message.contains(expected), "{expected}\n{message}");
+    }
+}
+
+/// #517: `<rx-include>` is `{% include %}`: the same page, a missing optional one draws nothing.
+#[renox::test]
+async fn rx_include_matches_the_include_statement() {
+    let files: &[(&str, &str)] = &[
+        ("part.html", "<i>{{ who }}</i>"),
+        (
+            "m.html",
+            "{% include \"part.html\" %}{% include name ignore missing %}{% include \"nope/\" ~ name ignore missing %}",
+        ),
+        (
+            "r.html",
+            "<rx-include template=\"part.html\"/><rx-include :template=\"name\" optional/><rx-include :template=\"'nope/' ~ name\" optional/>",
+        ),
+    ];
+    let dir = tempfile::tempdir().unwrap();
+    for (name, body) in files {
+        std::fs::write(dir.path().join(name), body).unwrap();
+    }
+    let path = dir.path().to_path_buf();
+    let ctx = serde_json::json!({"who": "Ben", "name": "part.html"});
+    let app =
+        TestApp::with_config(App::new().module(Pair(ctx)), move |c| c.views_path = path).await;
+    let (m, r) = (app.get("/m").await, app.get("/r").await);
+    assert_eq!(m.text(), r.text());
+    assert_eq!(r.text(), "<i>Ben</i><i>Ben</i>");
+}
+
+/// #518: `?attr="expr"` leaves the attribute out for false / none, writes it bare for true and
+/// as text otherwise, on elements, on element components and on kit components.
+#[renox::test]
+async fn conditional_attributes_match_the_raw_expressions() {
+    let ctx = serde_json::json!({"on": true, "off": false, "nothing": null, "path": "pay?a=1&b=2"});
+    same(
+        "<a href=\"/x\"{{ ' aria-current=\"page\"' | safe if on }}>a</a>\
+         <a href=\"/y\"{{ ' aria-current=\"page\"' | safe if off }}>b</a>\
+         <input{{ ' disabled' if on }}{{ ' readonly' if off }}>\
+         <div{{ (' hx-get=\"' ~ (path | e) ~ '\"') | safe if on }} class=\"z\">c</div>\
+         <div class=\"rx-stack\"{{ ' hx-swap-oob=\"true\"' | safe if on }}>d</div>",
+        "<a href=\"/x\" ?aria-current=\"'page' if on\">a</a>\
+         <a href=\"/y\" ?aria-current=\"'page' if off\">b</a>\
+         <input ?disabled=\"on\" ?readonly=\"off\">\
+         <div ?hx-get=\"path if on\" class=\"z\">c</div>\
+         <rx-stack ?hx-swap-oob=\"'true' if on\">d</rx-stack>",
+        ctx.clone(),
+    )
+    .await;
+    // Undefined and none leave it out; text is escaped; the kit's own `attrs` skip them too.
+    let page = render_with(
+        "<p ?title=\"nothing\" ?lang=\"missing\" ?id=\"q\" ?hidden=\"on\">x</p>\
+         <rx-input name=\"a\" label=\"A\" ?data-x=\"nothing\" ?data-y=\"'a&b'\" ?data-z=\"on\"/>",
+        serde_json::json!({"nothing": null, "q": "a\"b<c", "on": true}),
+    )
+    .await;
+    assert!(
+        page.contains("<p id=\"a&quot;b&lt;c\" hidden>x</p>"),
+        "{page}"
+    );
+    assert!(!page.contains("data-x"), "{page}");
+    assert!(page.contains("data-y=\"a&amp;b\" data-z>"), "{page}");
+}
+
+/// #519: `<rx-tabs :items>` draws the tab list from data, `<rx-link-tab>` children can be looped.
+#[renox::test]
+async fn tabs_from_data_and_link_tab_children_match_the_macros() {
+    let ctx = serde_json::json!({
+        "tab_list": [["a", "Alpha"], ["b", "Beta"]],
+        "keys": ["own", "all"], "cur": "all", "base": "/stock",
+    });
+    same(
+        "{% from \"renox/ui.html\" import tabs, tab_panel, link_tabs %}\
+         {{ tabs(\"t\", tab_list, label=\"Code\") }}\
+         {% for tab in tab_list %}{% call tab_panel(\"t\", tab[0], selected=loop.first) %}{{ tab[1] }} panel{% endcall %}{% endfor %}\
+         {{ link_tabs([[base ~ '?view=own', 'own'], [base ~ '?view=all', 'all']], current=base ~ '?view=all', label='Views') }}",
+        "<rx-tabs id=\"t\" :items=\"tab_list\" label=\"Code\">\
+         <rx-tab-panel rx-for=\"tab in tab_list\" id=\"t\" :key=\"tab[0]\" :selected=\"loop.first\">{{ tab[1] }} panel</rx-tab-panel>\
+         </rx-tabs>\
+         <rx-link-tabs label=\"Views\">\
+         <rx-link-tab rx-for=\"k in keys\" :href=\"base ~ '?view=' ~ k\" :current=\"k == cur\">{{ k }}</rx-link-tab>\
+         </rx-link-tabs>",
+        ctx,
+    )
+    .await;
+}
+
+/// #520: a hand-written table with a footer is the kit's `table` with `foot`, and the same
+/// footer in `<rx-table>` follows the body.
+#[renox::test]
+async fn simple_tables_and_footers_match_the_macro() {
+    let ctx = serde_json::json!({"rows": [{"n": "Tyre", "q": 2}, {"n": "Bell", "q": 5}]});
+    same(
+        "{% from \"renox/ui.html\" import table %}\
+         {% set foot %}<tr><th scope=\"row\">Total</th><td class=\"rx-num\">7</td></tr>{% endset %}\
+         {% call table([\"Item\", [\"Qty\", \"num\"]], caption=\"Lines\", foot=foot) %}\
+         {% for r in rows %}<tr><td>{{ r.n }}</td><td class=\"rx-num\">{{ r.q }}</td></tr>{% endfor %}{% endcall %}",
+        "<rx-simple-table :head=\"['Item', ['Qty', 'num']]\" caption=\"Lines\">\
+         <tr rx-for=\"r in rows\"><td>{{ r.n }}</td><td class=\"rx-num\">{{ r.q }}</td></tr>\
+         <rx-slot name=\"footer\"><tr><th scope=\"row\">Total</th><td class=\"rx-num\">7</td></tr></rx-slot>\
+         </rx-simple-table>",
+        ctx.clone(),
+    )
+    .await;
+    let page = render_with(
+        "<rx-table :rows=\"rows\" as=\"r\"><rx-column label=\"Item\">{{ r.n }}</rx-column>\
+         <rx-slot name=\"footer\"><tr><th>Total</th></tr></rx-slot></rx-table>",
+        ctx,
+    )
+    .await;
+    let page = normalize(&page);
+    assert!(
+        page.contains("</tbody><tfoot><tr><th>Total</th></tr></tfoot></table>"),
+        "{page}"
+    );
+}
+
+/// Renders `r.html` (the tags) with `ctx`.
+async fn render_with(rx_src: &str, ctx: serde_json::Value) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("m.html"), "").unwrap();
+    std::fs::write(dir.path().join("r.html"), rx_src).unwrap();
+    let path = dir.path().to_path_buf();
+    let app =
+        TestApp::with_config(App::new().module(Pair(ctx)), move |c| c.views_path = path).await;
+    let r = app.get("/r").await;
+    r.assert_ok();
+    r.text()
 }

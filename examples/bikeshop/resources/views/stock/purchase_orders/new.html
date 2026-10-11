@@ -2,27 +2,12 @@
     (parts work orders wait for, #236; goods under their reorder level), then the rest of the
     supplier's price list. A blank quantity isn't ordered. -#}
 <rx-page layout="layouts/staff.html" :title="t('stock.purchasing.new')">
-  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
-  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
-  {# [explain:stock.purchasing.create.template] #}
-  {% macro line(row, i, need) -%}
-  <li class="bs-row">
-    <span class="bs-row__name">{{ row.name }}<small>{{ row.sku }}
-      {%- if need and row.work_orders %} · {% for wo in row.work_orders %}<a class="rx-link" href="{{ route('workshop.order', wo) }}">WO-{{ wo }}</a>{% if not loop.last %}, {% endif %}{% endfor %} {{ t('stock.purchasing.waiting') }}{% endif %}
-      {%- if need and row.available < row.reorder_level %} · {{ t('stock.purchasing.low', available=row.available, level=row.reorder_level) }}{% endif %}
-      {%- if need and not row.sold_by_supplier %} · {{ t('stock.purchasing.not_listed') }}{% endif %}</small></span>
-    <span class="bs-row__figure bs-row__figure--extra">{{ row.reorder_level or "—" }}</span>
-    <span><rx-input name="lines[{{ i }}][unit_cost]" :label="t('stock.purchasing.unit_cost_of', name=row.name)" type="number" :value="row.unit_cost / money_scale" hide-label min="0" :step="money_step"/></span>
-    <span><input type="hidden" name="lines[{{ i }}][variant]" value="{{ row.variant_id }}"><rx-input name="lines[{{ i }}][quantity]" :label="t('stock.purchasing.quantity_of', name=row.name)" type="number" :value="row.quantity if need else none" hide-label min="0" inputmode="numeric"/></span>
-  </li>
-  {%- endmacro %}
-  {# [/explain:stock.purchasing.create.template] #}
+  <app-stock-assets/>
 
   <rx-stack>
     <rx-page-header :title="t('stock.purchasing.new')" :subtitle="t('stock.purchasing.new_lead')" :back="route('stock.purchasing')" :back-label="t('stock.purchasing.title')"/>
-    {%- set opts = namespace(items=[]) %}{% for s in suppliers %}{% set opts.items = opts.items + [[s.id, s.name]] %}{% endfor %}
     <rx-form method="GET" :action="route('stock.purchasing.create')" class="bs-filters" id="po-supplier">
-      <rx-select name="supplier" :label="t('stock.purchasing.supplier')" :options="opts.items" :selected="supplier.id if supplier else none" :placeholder="t('stock.purchasing.pick_supplier')"/>
+      <rx-select name="supplier" :label="t('stock.purchasing.supplier')" :options="supplier_options" :selected="supplier.id if supplier else none" :placeholder="t('stock.purchasing.pick_supplier')"/>
       <rx-button :label="t('stock.purchasing.use_supplier')" variant="secondary"/>
     </rx-form>
     <rx-alert rx-if="not supplier" :message="t('stock.purchasing.pick_first')" kind="info"/>
@@ -30,20 +15,17 @@
       <input type="hidden" name="supplier" value="{{ supplier.id if supplier else '' }}">
       <rx-form-errors/>
       <rx-card :title="t('stock.purchasing.needs', count=needs | length)" :subtitle="t('stock.purchasing.needs_lead')">
-        {%- if needs %}
-        <ul class="bs-rows bs-rows--3 bs-rows--inputs" role="list" data-bs-reveal>
+        <ul rx-if="needs" class="bs-rows bs-rows--3 bs-rows--inputs" role="list" data-bs-reveal>
           <li class="bs-row bs-row--head" aria-hidden="true"><span>{{ t('stock.fields.product') }}</span><span class="bs-row__figure">{{ t('stock.fields.reorder_level') }}</span><span>{{ t('stock.purchasing.unit_cost') }}</span><span>{{ t('stock.fields.quantity') }}</span></li>
-          {%- for row in needs %}{{ line(row, loop.index0, true) }}{% endfor %}
+          <app-stock-po-line rx-for="row in needs" :row="row" :i="loop.index0" :need="true" :money-scale="money_scale" :money-step="money_step"/>
         </ul>
-        {%- else %}<rx-empty :title="t('stock.purchasing.no_needs')" icon="circle-check"/>{% endif %}
+        <rx-empty rx-else :title="t('stock.purchasing.no_needs')" icon="circle-check"/>
       </rx-card>
-      {%- if rest %}
-      <rx-card :title="t('stock.purchasing.price_list', supplier=supplier.name)">
+      <rx-card rx-if="rest" :title="t('stock.purchasing.price_list', supplier=supplier.name)">
         <ul class="bs-rows bs-rows--3 bs-rows--inputs" role="list">
-          {%- for row in rest %}{{ line(row, needs | length + loop.index0, false) }}{% endfor %}
+          <app-stock-po-line rx-for="row in rest" :row="row" :i="needs | length + loop.index0" :need="false" :money-scale="money_scale" :money-step="money_step"/>
         </ul>
       </rx-card>
-      {%- endif %}
       <rx-card>
         <rx-input name="note" :label="t('stock.purchasing.note')"/>
         <rx-button :label="t('stock.purchasing.save_draft')" icon="check" :disabled="not supplier" :disabled-reason="t('stock.purchasing.pick_first')"/>

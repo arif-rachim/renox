@@ -45,7 +45,11 @@ pub struct SheetRow {
 
 /// `GET /staff/stock/take` (`stock.take`): the count sheet of one category
 /// at the active store, own goods first, then goods held for other stores.
-pub async fn sheet(State(db): State<Db>, Query(query): Query<TakeQuery>) -> Result<View> {
+pub async fn sheet(
+    State(db): State<Db>,
+    lang: Lang,
+    Query(query): Query<TakeQuery>,
+) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let here = || {
         access::visible::<StockRow>(catalogue::STOCK_VIEW)
@@ -82,9 +86,14 @@ pub async fn sheet(State(db): State<Db>, Query(query): Query<TakeQuery>) -> Resu
             row,
         })
         .partition(|r| r.row.owner_store_id == store);
+    // The reasons as (key, label) pairs for the select.
+    let reasons: Vec<(&str, String)> = REASONS
+        .iter()
+        .map(|key| (*key, lang.t(&format!("stock.take.reason.{key}"), &[])))
+        .collect();
     Ok(view(
         "stock/take.html",
-        context! { own, held, categories, category, reasons => REASONS },
+        context! { own, held, categories, category, reasons },
     ))
 }
 

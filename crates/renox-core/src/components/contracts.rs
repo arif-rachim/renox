@@ -38,6 +38,8 @@ pub(crate) enum Module {
     Pagination,
     /// `renox/grid.html`.
     Grid,
+    /// `renox/mail/components.html`.
+    Mail,
     /// A template a plugin registered a component for.
     Custom {
         /// The template name.
@@ -54,6 +56,7 @@ impl Module {
             Module::Ui => "renox/ui.html",
             Module::Pagination => "renox/pagination.html",
             Module::Grid => "renox/grid.html",
+            Module::Mail => "renox/mail/components.html",
             Module::Custom { path, .. } => path,
         }
     }
@@ -64,6 +67,7 @@ impl Module {
             Module::Ui => "__rx_ui",
             Module::Pagination => "__rx_pagination",
             Module::Grid => "__rx_grid",
+            Module::Mail => "__rx_mail",
             Module::Custom { alias, .. } => alias,
         }
     }
@@ -77,12 +81,26 @@ pub(crate) enum Special {
     Page,
     /// `rx-push`.
     Push,
+    /// `rx-block`.
+    Block,
+    /// `rx-pagination`.
+    Pagination,
+    /// `rx-let`.
+    Let,
+    /// `rx-script`.
+    Script,
+    /// `rx-style`.
+    Style,
     /// `rx-form`.
     Form,
     /// `rx-table`.
     Table,
     /// `rx-column`, made by its parent.
     Column,
+    /// `rx-mail`.
+    Mail,
+    /// `rx-wizard-action`.
+    WizardAction,
     /// `rx-wizard`.
     Wizard,
     /// `rx-wizard-step`, made by its parent.
@@ -91,6 +109,14 @@ pub(crate) enum Special {
     Tabs,
     /// `rx-tab`, made by its parent.
     Tab,
+    /// `rx-include`.
+    Include,
+    /// `rx-link-tabs`.
+    LinkTabs,
+    /// `rx-link-tab`, made by its parent.
+    LinkTab,
+    /// `rx-mail-text`.
+    MailText,
 }
 
 /// One attribute a component takes.
@@ -405,6 +431,160 @@ pub(crate) static BUILTIN: &[Contract] = &[
         parent: None,
     },
     Contract {
+        tag: "rx-block",
+        doc: "A named block of the layout: `{% block name %}`; self-closing it leaves one for pages to fill.",
+        render: Render::Special(Special::Block),
+        props: &[text(
+            "name",
+            true,
+            "The block's name: letters, digits and underscores; plain text.",
+        )],
+        slots: &[Slot {
+            optional: true,
+            doc: "The block's default content.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-pagination",
+        doc: "Page links for a page of rows (`Paginated` or `SimplePage`).",
+        render: Render::Special(Special::Pagination),
+        props: &[data(
+            "page",
+            true,
+            "The page: a `Paginated` (numbered links) or a `SimplePage` (previous / next).",
+        )],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-let",
+        doc: "A local name for the rest of the enclosing element: `{% with name = value %}`.",
+        render: Render::Special(Special::Let),
+        props: &[
+            text(
+                "name",
+                true,
+                "The name: letters, digits and underscores; plain text.",
+            ),
+            text(
+                "value",
+                true,
+                "The value: text, or `:value=\"expression\"` for data.",
+            ),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-include",
+        doc: "Another template, drawn here with the page's variables: `{% include %}`.",
+        render: Render::Special(Special::Include),
+        props: &[
+            text(
+                "template",
+                true,
+                "The template's name: text, or `:template=\"expression\"` for a name worked out at run time.",
+            ),
+            flag(
+                "optional",
+                "Shows nothing when the template does not exist (`ignore missing`).",
+            ),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-script",
+        doc: "An inline `<script>` that carries the page's CSP nonce.",
+        render: Render::Special(Special::Script),
+        props: &[],
+        slots: &[Slot {
+            optional: true,
+            doc: "The script's code (left as written).",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-style",
+        doc: "An inline `<style>` that carries the page's CSP nonce.",
+        render: Render::Special(Special::Style),
+        props: &[],
+        slots: &[Slot {
+            optional: true,
+            doc: "The style rules (left as written).",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-head",
+        doc: "The head tags Renox adds: assets, CSRF meta, analytics (`renox_head()`).",
+        render: Render::Function("renox_head"),
+        props: &[],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-ui",
+        doc: "The UI kit's script and stylesheet tags (`renox_ui()`).",
+        render: Render::Function("renox_ui"),
+        props: &[flag(
+            "styles",
+            "Set to false to leave out the stylesheet (an app that builds its own).",
+        )],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-toasts",
+        doc: "The toast region (`toasts()`).",
+        render: Render::Function("toasts"),
+        props: &[],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-outlet",
+        doc: "Where a stack's content is written: `stack('name')`; `<rx-push>` adds to it.",
+        render: Render::Function("stack"),
+        props: &[text("stack", true, "The stack's name.")],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
         tag: "rx-wizard",
         doc: "A form in steps; each `<rx-wizard-step>` inside is one step.",
         render: Render::Special(Special::Wizard),
@@ -461,9 +641,15 @@ pub(crate) static BUILTIN: &[Contract] = &[
                 "The key of the open tab; the first by default.",
             ),
             text("label", false, "The tab list's accessible name."),
+            data(
+                "items",
+                false,
+                "The tabs as data, a list of [key, label] pairs, instead of `<rx-tab>` children; the panels are then `<rx-tab-panel>` tags.",
+            ),
         ],
         slots: &[Slot {
-            doc: "Only `<rx-tab>` elements.",
+            optional: true,
+            doc: "`<rx-tab>` elements; or, with `items`, the `<rx-tab-panel>` panels.",
             ..DEFAULT_SLOT
         }],
         events: CHANGED,
@@ -523,6 +709,45 @@ pub(crate) static BUILTIN: &[Contract] = &[
                 optional: true,
                 doc: "What shows when there are no rows.",
                 ..DEFAULT_SLOT
+            },
+            Slot {
+                name: "footer",
+                optional: true,
+                doc: "Rows written by hand (`<tr>`), drawn in a `<tfoot>` after the body: a total.",
+                ..DEFAULT_SLOT
+            },
+        ],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-simple-table",
+        doc: "The kit's table around rows written by hand (`<tr>` under `rx-for`), with an optional footer.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "table",
+        },
+        props: &[
+            data(
+                "head",
+                true,
+                "The heading cells: text, or [text, \"num\"] to align figures to the end.",
+            ),
+            text("caption", false, "A caption for screen readers."),
+        ],
+        slots: &[
+            Slot {
+                doc: "The body rows: `<tr>` elements.",
+                ..DEFAULT_SLOT
+            },
+            Slot {
+                name: "footer",
+                into: Some("foot"),
+                args: &[],
+                optional: true,
+                doc: "Rows drawn in a `<tfoot>` after the body: a total.",
             },
         ],
         events: &[],
@@ -1909,21 +2134,48 @@ pub(crate) static BUILTIN: &[Contract] = &[
     },
     Contract {
         tag: "rx-link-tabs",
-        doc: "Links that look like a segmented control, for switching between pages.",
-        render: Render::Macro {
-            module: Module::Ui,
-            name: "link_tabs",
-        },
+        doc: "Links that look like a segmented control, for switching between pages; from data (`items`) or from `<rx-link-tab>` children.",
+        render: Render::Special(Special::LinkTabs),
         props: &[
-            data("items", true, "A list of [href, label] pairs."),
-            text("current", false, "The href shown as chosen."),
+            data(
+                "items",
+                false,
+                "A list of [href, label] pairs; or write `<rx-link-tab>` children instead.",
+            ),
+            text("current", false, "With `items`: the href shown as chosen."),
             text("label", false, "The navigation's accessible name."),
         ],
-        slots: &[],
+        slots: &[Slot {
+            optional: true,
+            doc: "Only `<rx-link-tab>` elements (also under `rx-for` and `rx-if`).",
+            ..DEFAULT_SLOT
+        }],
         events: &[],
         route_prop: None,
         attrs: false,
         parent: None,
+    },
+    Contract {
+        tag: "rx-link-tab",
+        doc: "One link of `<rx-link-tabs>`; the label is its content or `label`.",
+        render: Render::Special(Special::LinkTab),
+        props: &[
+            text("href", true, "Where the link goes."),
+            text("label", false, "The link's text; or give it as content."),
+            flag(
+                "current",
+                "Draws the link as the chosen one (`aria-current=\"page\"`).",
+            ),
+        ],
+        slots: &[Slot {
+            optional: true,
+            doc: "The label.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: Some("rx-link-tabs"),
     },
     Contract {
         tag: "rx-navbar",
@@ -2086,6 +2338,330 @@ pub(crate) static BUILTIN: &[Contract] = &[
         events: &[],
         route_prop: None,
         attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-icon",
+        doc: "One of the kit's icons, drawn inline in the text's colour.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "icon",
+        },
+        props: &[
+            text("name", true, "The icon's name (docs/ui.md lists them)."),
+            number("size", "The size in pixels (20 by default)."),
+            text(
+                "label",
+                false,
+                "Makes the icon mean something to screen readers; without it the icon is decoration.",
+            ),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-columns",
+        doc: "Children side by side from tablet width up, one column on phones.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "columns",
+        },
+        props: &[number("count", "How many columns (2 by default).")],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-thumbnail",
+        doc: "A small square picture, for example in a table row.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "thumbnail",
+        },
+        props: &[
+            text("src", true, "The picture's URL."),
+            text("alt", false, "The picture's alt text; empty by default."),
+            text("href", false, "Makes the picture a link."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-tab-panel",
+        doc: "One panel for a `tabs(...)` control written as a macro; with tags use `<rx-tabs>` and `<rx-tab>`.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "tab_panel",
+        },
+        props: &[
+            text("id", true, "The tabs' id."),
+            text("key", true, "The key of the tab this panel belongs to."),
+            flag("selected", "Shows the panel at first."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-menu-button",
+        doc: "A menu item that is a plain button, for what its attributes make it do (htmx).",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "menu_button",
+        },
+        props: &[
+            text("label", true, "The label; or give it as content."),
+            text("icon", false, "An icon's name."),
+            flag("danger", "Draws the item as a dangerous action."),
+        ],
+        slots: &[slot_into("label", "The label.")],
+        events: &[],
+        route_prop: None,
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-action-group",
+        doc: "Several actions behind one button; its content is the menu items.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "action_group",
+        },
+        props: &[
+            text(
+                "label",
+                false,
+                "The button's text; without it an icon button named \"Actions\".",
+            ),
+            text("id", false, "The menu list's id."),
+            text("icon", false, "An icon's name."),
+            choice("variant", BUTTON_VARIANTS, "The look."),
+            choice("size", SIZES, "The size."),
+        ],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-import-action",
+        doc: "A button that opens a sheet to import a CSV file; the handler answers with an `ImportReport`.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "import_action",
+        },
+        props: &[
+            text("id", true, "The sheet's id."),
+            text("label", true, "The button's label."),
+            text(
+                "action",
+                true,
+                "The address the file is sent to; or use route.",
+            ),
+            text("title", true, "The sheet's heading."),
+            text("description", false, "A line under the heading."),
+            data(
+                "columns",
+                false,
+                "The file's column names, shown to the reader.",
+            ),
+            text(
+                "template-url",
+                false,
+                "A link to an empty file to fill in (`renox::import::template`).",
+            ),
+            text("submit-label", false, "The submit button's text."),
+            text("accept", false, "The file types the field takes."),
+            text("name", false, "The file field's name (file by default)."),
+            choice("variant", BUTTON_VARIANTS, "The button's look."),
+            choice("size", SIZES, "The button's size."),
+            text("icon", false, "The button's icon (upload by default)."),
+            text("key", false, "A keyboard shortcut."),
+            flag("button", "Whether to draw the opening button."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: Some("action"),
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-wizard-action",
+        doc: "A button that opens a sheet holding a wizard; each `<rx-wizard-step>` inside is one step.",
+        render: Render::Special(Special::WizardAction),
+        props: &[
+            text("id", true, "The sheet's id."),
+            text("label", true, "The button's label."),
+            text(
+                "action",
+                true,
+                "The address the form is sent to; or use route.",
+            ),
+            text("title", true, "The sheet's heading."),
+            text("submit-label", false, "The last step's submit button."),
+            text("description", false, "A line under the heading."),
+            choice(
+                "method",
+                &["POST", "PUT", "PATCH", "DELETE"],
+                "The HTTP method.",
+            ),
+            choice("variant", BUTTON_VARIANTS, "The button's look."),
+            choice("size", SIZES, "The button's size."),
+            text("icon", false, "The button's icon."),
+            text("key", false, "A keyboard shortcut."),
+            flag("slide-over", "Slides in from the side."),
+            choice("width", &["sm", "lg", "xl"], "The width."),
+            flag(
+                "live",
+                "Live validation (on by default); `:live=\"false\"` turns it off.",
+            ),
+            text("target", false, "A selector the answer is swapped into."),
+            text("swap", false, "How the answer is swapped in."),
+            text("enctype", false, "The form's encoding, for files."),
+            flag("button", "Whether to draw the opening button."),
+        ],
+        slots: &[Slot {
+            doc: "Only `<rx-wizard-step>` elements.",
+            ..DEFAULT_SLOT
+        }],
+        events: SHEET_EVENTS,
+        route_prop: Some("action"),
+        attrs: true,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-event-stream",
+        doc: "Opens the notifications stream on a page without the bell, so `state.broadcast(...)` events arrive as DOM events.",
+        render: Render::Macro {
+            module: Module::Ui,
+            name: "event_stream",
+        },
+        props: &[],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-mail",
+        doc: "A mail's layout: `{% extends %}` of the mail layout, with its content and footer.",
+        render: Render::Special(Special::Mail),
+        props: &[
+            text(
+                "subject",
+                false,
+                "The mail's title (the layout's `<title>`).",
+            ),
+            text(
+                "layout",
+                false,
+                "The layout's file name; renox/mail/layout.html by default. Plain text.",
+            ),
+        ],
+        slots: &[
+            Slot {
+                doc: "The mail's body.",
+                ..DEFAULT_SLOT
+            },
+            Slot {
+                name: "footer",
+                optional: true,
+                doc: "Replaces the layout's footer line.",
+                ..DEFAULT_SLOT
+            },
+        ],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-mail-text",
+        doc: "A mail's plain-text version (a `.txt` view): the text as written, with `{{ }}`, `rx-if` and `rx-for` (on a `<template>`).",
+        render: Render::Special(Special::MailText),
+        props: &[],
+        slots: &[Slot {
+            doc: "The text; the line break right after the opening tag and right before the closing one are not part of it.",
+            ..DEFAULT_SLOT
+        }],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-mail-button",
+        doc: "A button for a mail, with its address written under it for clients that hide buttons.",
+        render: Render::Macro {
+            module: Module::Mail,
+            name: "button",
+        },
+        props: &[
+            text("url", true, "Where the button goes."),
+            text("label", true, "The label; or give it as content."),
+        ],
+        slots: &[slot_into("label", "The label.")],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-mail-panel",
+        doc: "A highlighted box in a mail.",
+        render: Render::Macro {
+            module: Module::Mail,
+            name: "panel",
+        },
+        props: &[],
+        slots: &[DEFAULT_SLOT],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-mail-table",
+        doc: "A table for a mail: rows of cells, an optional heading and an optional total row.",
+        render: Render::Macro {
+            module: Module::Mail,
+            name: "table",
+        },
+        props: &[
+            data("rows", true, "The rows: a list of lists of cells."),
+            data("head", false, "The heading cells."),
+            data("total", false, "The last row's cells, drawn in bold."),
+        ],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
+        parent: None,
+    },
+    Contract {
+        tag: "rx-mail-divider",
+        doc: "A thin line between parts of a mail.",
+        render: Render::Macro {
+            module: Module::Mail,
+            name: "divider",
+        },
+        props: &[],
+        slots: &[],
+        events: &[],
+        route_prop: None,
+        attrs: false,
         parent: None,
     },
 ];

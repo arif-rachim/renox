@@ -4,12 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  {#- Title, description, canonical URL and social cards; a page overrides it with
-      {% block seo %}{{ seo(title="…", description="…", image="…") }}{% endblock %} -#}
-  {% block seo %}{{ seo() }}{% endblock %}
-  {{ renox_head() }}
+  {#- Title, description, canonical URL and social cards; a page fills the "seo" block with seo(title="…", description="…", image="…") -#}
+  <rx-block name="seo">{{ seo() }}</rx-block>
+  <rx-head/>
   {#- The UI kit (renox/ui.html): the navigation bar, fields, buttons, lists, toasts. -#}
-  {{ renox_ui() }}
+  <rx-ui/>
   <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body class="rx-page">
@@ -30,10 +29,10 @@
   </rx-navbar>
   <main class="rx-container rx-stack" id="main">
     <rx-alert rx-if="flash.status" :message="flash.status" kind="success"/>
-    {% block content %}{% endblock %}
+    <rx-block name="content"/>
   </main>
-  {{ toasts() }}
+  <rx-toasts/>
   {#- Scripts pushed by pages, e.g. the guestbook form's Alpine component. -#}
-  {{ stack('scripts') }}
+  <rx-outlet stack="scripts"/>
 </body>
 </html>

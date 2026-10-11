@@ -149,6 +149,7 @@ pub struct Choice {
 pub async fn show(
     State(state): State<AppState>,
     session: Session,
+    lang: Lang,
     Found(product): Found<Product>,
     Query(choice): Query<Choice>,
 ) -> Result<View> {
@@ -222,7 +223,7 @@ pub async fn show(
             sizes.push(SwatchOption {
                 value: size.clone(),
                 label: size.clone(),
-                note: (left == 0).then(|| "sold_out".to_owned()),
+                note: (left == 0).then(|| lang.t("catalog.product.sold_out", &[])),
                 color: None,
             });
         }

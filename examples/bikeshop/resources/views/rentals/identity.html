@@ -2,17 +2,12 @@
 <rx-page layout="layouts/app.html" title="{{ t('rentals.identity.title') }}">
   <rx-stack data-bs-reveal>
     <rx-page-header title="{{ t('rentals.identity.title') }}" subtitle="{{ t('rentals.identity.lead') }}" :back="route('rentals.mine')" back-label="{{ t('rentals.mine.title') }}"/>
-    {%- if verified %}
-    <rx-alert kind="success" title="{{ t('rentals.identity.done') }}" message="{{ t('rentals.identity.verified', date=(verified_at | date('%d %b %Y'))) }}"/>
-    {%- elif document and document.status == "pending" %}
-    <rx-alert kind="info" title="{{ t('rentals.identity.sent') }}" message="{{ t('rentals.identity.waiting') }}"/>
-    {%- elif document and document.status == "refused" and document.note %}
-    <rx-alert kind="warning" title="{{ t('rentals.identity.refused') }}" :message="document.note"/>
-    {%- endif %}
+    <rx-alert rx-if="verified" kind="success" title="{{ t('rentals.identity.done') }}" message="{{ t('rentals.identity.verified', date=(verified_at | date('%d %b %Y'))) }}"/>
+    <rx-alert rx-elif="document and document.status == 'pending'" kind="info" title="{{ t('rentals.identity.sent') }}" message="{{ t('rentals.identity.waiting') }}"/>
+    <rx-alert rx-elif="document and document.status == 'refused' and document.note" kind="warning" title="{{ t('rentals.identity.refused') }}" :message="document.note"/>
     <rx-card rx-if="masked"><rx-infolist><rx-entry label="{{ t('rentals.identity.number') }}" :value="masked"/></rx-infolist></rx-card>
-    {%- if not verified %}
     {# [explain:rentals.identity.template] #}
-    <form method="post" action="{{ route('rentals.identity.store') }}" enctype="multipart/form-data" novalidate>
+    <form rx-if="not verified" method="post" action="{{ route('rentals.identity.store') }}" enctype="multipart/form-data" novalidate>
       {{ csrf_field() }}
       <rx-card title="{{ t('rentals.identity.send') }}">
         <rx-form-errors/>
@@ -23,6 +18,5 @@
       </rx-card>
     </form>
     {# [/explain:rentals.identity.template] #}
-    {%- endif %}
   </rx-stack>
 </rx-page>

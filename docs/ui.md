@@ -543,12 +543,12 @@ arguments.
 | `<rx-action-sheet id label action title>` | A button that opens a sheet with a form sent by htmx. See [Actions](#actions). |
 | `<rx-confirm id label action title message confirm-label method="DELETE" size icon modal-icon="warning" key>` | A destructive action (like delete) that asks first, in a sheet. Cancel has the focus first, so pressing Enter by mistake does nothing harmful. `icon` goes on the button, `modal_icon` above the sheet's title (`none` for no icon). |
 | `<rx-menu label id variant="secondary" size="small">` + `<rx-menu-link href label icon download new-tab>` + `<rx-menu-action action label method="POST" danger icon>` + `<rx-menu-open id label>` + `<rx-menu-section title>` + `<rx-menu-separator>` | A drop-down menu of actions. The arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for methods other than POST); `menu_open` opens a sheet. |
-| `action_group(label=none, icon=none)`, `wizard_action(…)`, `import_action(…)` | Several actions behind one button, an action with steps, a CSV import. See [Actions](#action-groups). |
+| `<rx-action-group label id icon variant size>`, `<rx-wizard-action id label route title submit-label …>` with `<rx-wizard-step key title>` children, `<rx-import-action id label route title columns template-url …>` | Several actions behind one button, an action with steps, a CSV import. See [Actions](#action-groups). |
 | `<rx-tabs id selected label>` with `<rx-tab key label>` children | A segmented control: tabs that switch between panels on one page; each panel is the content of its `<rx-tab>`. The arrow keys, Home and End move between tabs. |
 | `<rx-table :rows caption as key card>` with `<rx-column label align hide-narrow>` | A table in a card, one row per item of `rows`. `align="num"` lines a column up on the right (for numbers), and `hide-narrow` hides the column on phones. |
 | `<rx-empty title message action-href action-label icon>` | What an empty list says; `icon` draws one of the kit's icons in a tinted circle above it. With `action_href` (and its `action_label`), it adds a link to add the first item. |
 | `<rx-notification-bell count id="rx-notifications">` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
-| `event_stream()` | Opens the same live stream on a page without the bell, so the app's events (`state.broadcast(…)`) arrive as DOM events. Nothing for guests. See [docs/mail.md](mail.md#your-own-live-events). |
+| `<rx-event-stream/>` | Opens the same live stream on a page without the bell, so the app's events (`state.broadcast(…)`) arrive as DOM events. Nothing for guests. See [docs/mail.md](mail.md#your-own-live-events). |
 
 ### Icons
 
@@ -561,6 +561,11 @@ in the page, in the text's colour:
 {{ icon("truck", size=16) }} Free delivery over $50
 {{ icon("lock", label="Private") }}
 ```
+
+As a tag: `<rx-icon name="bike"/>`, `<rx-icon name="truck" size="16"/>`,
+`<rx-icon name="lock" label="Private"/>`. A tag can't be written inside an attribute's
+expression (`badge={"icon": icon("wrench")}`): there the function call stays, or pass the
+icon's name and draw it with `<rx-icon :name="badge.icon"/>` where it is shown.
 
 - `size` is in pixels (20 by default); the stroke is 1.75 at every size.
 - An icon is decorative: screen readers skip it (`aria-hidden`), since the text beside it says
@@ -699,12 +704,13 @@ top holds the notification bell, and the page's content goes under it.
 | `<rx-toolbar>` | Filter fields side by side. They wrap onto more lines on narrow screens, and line up with their buttons. There are no "(optional)" marks, since filters are all optional. Put it inside the `<form>`. |
 | `<rx-row-actions>` | A table row's buttons, at the end of the row. On phones only the icons show (the labels stay for screen readers). |
 | `<rx-list id label>` | Rows in a surface; each row is an `<li>` you write. Put `rx-list__main` on the part that takes the space left (`rx-list__main--done` strikes it through, for a finished task). Rows can be fragments that htmx adds and swaps. |
-| `columns(count=2)` | Columns from tablet width up, one column on phones (a photo next to its details, say). |
+| `<rx-columns count="2">` | Columns from tablet width up, one column on phones (a photo next to its details, say). |
 | `<rx-card-grid>` + `<rx-media-card href title image image-alt="" subtitle note dimmed>` | Cards with a picture, in a grid that fills the row. Each card is at least 13rem wide; set `--rx-card-min` for another width. |
 | `<rx-link-tabs items current label>` | Links that look like a segmented control, for sections or filters that have their own URLs. `items` are `[href, label]` pairs. (`tabs` switches panels on one page instead.) |
-| `thumbnail(src, alt="", href=…)` | A small square picture, for example in a table row. |
+| `<rx-thumbnail src alt="" href>` | A small square picture, for example in a table row. |
 | `<rx-progress value max="100" label show-value>` | A progress bar (the browser's `<progress>`) in the kit's colours, with the percentage next to it. |
-| `menu_button(label, attrs={…}, danger=…)` | A menu item that is a plain button. `attrs` say what it does, usually with htmx (`hx-get`, `hx-delete`…). |
+| `<rx-menu-button label icon danger>` | A menu item that is a plain button. Its other attributes say what it does, usually with htmx (`hx-get="{{ url }}"`, `hx-delete`…): they are the macro's `attrs`. |
+| `<rx-tab-panel id key selected>` | One panel for a `tabs(…)` written as a macro; with tags, `<rx-tabs>` and `<rx-tab>` make the panels for you. |
 
 ### Layout fields as tags
 
@@ -1089,6 +1095,16 @@ More rules:
   only. A prop with a fixed set of words (`variant="primary"`) checks the word.
 - `{% %}` inside an attribute is an error. Use `{{ }}` or `:`, or put the condition in
   `rx-if`.
+- **`?name="expression"` is an attribute that may be absent.** The value is left out when the
+  expression is `false`, `none` or undefined; `true` writes the bare attribute; any other value
+  (text, a number) is written as `name="value"`, escaped. It works on a plain HTML element, on
+  `rx-stack`, `rx-row`, `rx-form`, `rx-script` and `rx-style`, and on the kit's components that
+  take extra attributes (which then go to the element only when set):
+  `<a href="…" ?aria-current="'page' if current">` is `aria-current="page"` when `current` is
+  true and nothing otherwise, and `<li ?data-done="step.done">` is `data-done` or nothing.
+  `:name="…"` stays the old rule (always written, as `name="value"`), and on a plain element a
+  `:name` is Alpine's `x-bind`, so it is never touched. A `?` in front of the name is the only
+  difference: `?hx-swap-oob="'true' if oob"` replaces `{{ ' hx-swap-oob="true"' | safe if oob }}`.
 - Components made from a macro accept extra attributes whose name has a `-` or starts with `@`
   (`hx-post`, `data-id`, `@click`), plus a few plain ones (`min`, `max`, `step`, `pattern`,
   `minlength`, `maxlength`, `inputmode`, `autofocus`, `tabindex`, `title`, `form`, `accept`).
@@ -1116,21 +1132,40 @@ they are named in the component's entry in the reference.
 
 ### Control flow
 
-Three attributes work on any element, a component or plain HTML:
+Four attributes work on any element, a component or plain HTML:
 
 ```html
 <li rx-for="p in products">{{ p.name }}</li>
 
 <rx-alert rx-if="product.stock == 0" kind="warning">Out of stock.</rx-alert>
 
-<rx-badge rx-if="p.stock > 0">In stock</rx-badge>
-<rx-badge rx-else>Sold out</rx-badge>
+<rx-badge rx-if="p.stock == 0" kind="error">Sold out</rx-badge>
+<rx-badge rx-elif="p.stock < 5" kind="warning">Low</rx-badge>
+<rx-badge rx-else>In stock</rx-badge>
 ```
 
-- `rx-else` goes on the very next sibling element (only spaces or comments between).
+- `rx-elif` and `rx-else` go on the very next sibling element (only spaces or comments between).
+  A chain is one `rx-if`, any number of `rx-elif`, and at most one `rx-else`.
 - With `rx-for` and `rx-if` together, the loop is outside: the test runs for each item.
-- `rx-else` after an `rx-for` element is an error, and there is no `rx-else-if`: nest an
-  `rx-if` instead.
+- `rx-else` or `rx-elif` without an `rx-if` before it, or after an `rx-for` element, is an
+  error with the file and line.
+- `loop.index`, `loop.index0`, `loop.first`, `loop.last` and `loop.length` work inside `rx-for`.
+
+To show several siblings, or plain text, under one condition or in one loop, use `<template>`.
+It writes its children and no element of its own:
+
+```html
+<template rx-if="order.paid">
+  <rx-badge text="Paid"/> on {{ order.paid_at | date }}
+</template>
+<template rx-elif="order.cancelled">Cancelled</template>
+<template rx-else>Waiting for payment</template>
+
+<template rx-for="tag in post.tags">{{ tag }}{% if not loop.last %}, {% endif %}</template>
+```
+
+A `<template>` takes no other attribute, and one with no `rx-` attribute (Alpine's `x-if`,
+`x-for`) is left as it is.
 - `can="update"` on a component shows it only if the user may do that. `can="update"` inside an
   `rx-table` asks about the row: `can('update', row)`.
 - `route="products.edit"` fills the component's link prop with `route("products.edit")`. Inside an
@@ -1144,6 +1179,34 @@ Three attributes work on any element, a component or plain HTML:
   `title` and `description` (the page's SEO tags). Each `<rx-slot name="X">` inside it becomes the
   layout's `{% block X %}`. Give `title` or a `seo` slot, not both.
 - **`rx-push`** adds its content to a stack (`stack="head"`, with `once="key"` to add it once).
+- **`rx-let`** gives a name to a value for the rest of the element, slot or block it is in:
+  `<rx-let name="label" :value="order.number ~ ' / ' ~ order.customer"/>` is
+  `{% with label = (…) %}` around everything after it, so the name ends where its element ends
+  (a `{% set %}` inside an `{% if %}` would stay set after it). `value="Text {{ x }}"` takes text,
+  `:value="…"` an expression. The name must be free: a loop variable, an `rx-table` row, another
+  `rx-let` or one of the names every page has (`loop`, `auth`, `request`, `route`…) is an error
+  from the compiler and `view:check`. It is for local aliases, not for counters that change in a
+  loop. It takes no `rx-if`, `rx-for` or `can`, and a name set in it is not seen by an
+  `<rx-block>` it holds.
+- **`rx-script`** and **`rx-style`** write `<script>` and `<style>` with the page's CSP nonce
+  (`nonce="{{ csp_nonce() }}"`), so they run under `CSP=strict`. Other attributes pass through
+  (`type="module"`, `defer`, `:src="asset('app.js')"`); `nonce` is an error, since the tag
+  sets it. The code between the tags is left exactly as written, so `<`, `>` and `&&` are safe,
+  and `{{ value | tojson }}` still works. They sit inside `rx-push` too:
+  `<rx-push stack="scripts" once="chart"><rx-script>…</rx-script></rx-push>`.
+- **`rx-block`** is a named block: `<rx-block name="bookmarks">…</rx-block>` becomes
+  `{% block bookmarks %}…{% endblock %}`, and self-closing (`<rx-block name="content"/>`) it
+  leaves an empty one for a page to fill. `name` is plain text: letters, digits and underscores.
+  `.fragment("bookmarks")` in Rust keeps working, because it is a Jinja block.
+- **`rx-mail`** is a mail's layout (see [Mails as tags](#mails-as-tags)).
+- **`rx-pagination`** writes the page links: `<rx-pagination :page="bookmarks"/>` is
+  `pagination(bookmarks)` of `renox/pagination.html`, or `simple_pagination` for a `SimplePage`
+  (a value with `has_next` and no `last_page`), the same choice `rx-table` makes.
+- **The layout's plumbing** has tags too, with no content: `<rx-head/>` is `{{ renox_head() }}`,
+  `<rx-ui/>` is `{{ renox_ui() }}` (`<rx-ui :styles="false"/>` leaves out the stylesheet),
+  `<rx-toasts/>` is `{{ toasts() }}`, and `<rx-outlet stack="scripts"/>` is
+  `{{ stack('scripts') }}`, where `rx-push` content ends up. (The tag is not `rx-stack`: that is
+  the vertical layout.)
 - **`rx-form`** writes the `<form>`, the CSRF field, and `_method` for `PUT`, `PATCH` and `DELETE`.
   A `GET` form gets neither. `live` turns on live validation. Its fields are `rx-input`,
   `rx-textarea`, `rx-select`, `rx-checkbox`, `rx-radio` and the others in the table below;
@@ -1153,8 +1216,26 @@ Three attributes work on any element, a component or plain HTML:
   `SimplePage`): for a page, the links are added under the table and they swap only the table
   (htmx), so the rows' own links are not boosted. `as` names the row (`row` by default), `key`
   is what `route` and `can` use (`row.id` by default), and `card` puts the table in a card. The
-  children are `rx-column` (`label`, `align="start|num"`, `hide-narrow`), `rx-row-actions` and
-  `<rx-slot name="empty">`.
+  children are `rx-column` (`label`, `align="start|num"`, `hide-narrow`), `rx-row-actions`,
+  `<rx-slot name="empty">` and `<rx-slot name="footer">`: rows written by hand (`<tr>`) that
+  are drawn in a `<tfoot>` after the body, such as a total row.
+- **`rx-simple-table`** is the kit's table around rows you write yourself, for a table that is
+  not one row per record (a total, cells looped inside a row): `:head` is the heading cells (a
+  text, or `[text, "num"]` to align figures to the end), `caption` is for screen readers, the
+  content is the body rows (`<tr rx-for="line in lines">…</tr>`) and `<rx-slot name="footer">`
+  holds the `<tfoot>` rows. It is the `table` macro with its `foot` parameter.
+- **`rx-include`** draws another template with the current variables, what `{% include %}` does.
+  `template="parts/card.html"` is checked by `view:check` (a template that is not there is a
+  problem); `:template="section.template"` takes a name worked out at run time, and `optional`
+  is `ignore missing`, so a name with no file draws nothing:
+  `<rx-include :template="'admin/' ~ slug ~ '/cells.html'" optional/>`.
+- **`rx-tabs`** takes its tabs from `<rx-tab>` children, or from data with `:items="tabs"`, a
+  list of `[key, label]` pairs: the tab list is drawn from it and the children are the panels,
+  as `<rx-tab-panel>` tags that can sit under `rx-for`. Give `:items` or `<rx-tab>`s, not both.
+- **`rx-link-tabs`** takes `:items` (a list of `[href, label]` pairs and `current`) or
+  `<rx-link-tab :href :current>label</rx-link-tab>` children, which can sit under `rx-for` and
+  `rx-if`: `<rx-link-tab rx-for="v in views" :href="route('stock.index', view=v)" :current="v == view">{{ t(v) }}</rx-link-tab>`.
+  With children, `current` goes on each link.
 
 ### Your own components
 
@@ -1185,6 +1266,59 @@ resources/views/products/index.html:9: <rx-button> "variant" must be one of: pri
 
 Line numbers are kept, so MiniJinja's own errors point at the line you wrote.
 
+### Mails as tags
+
+A mail view is a template like a page, and it compiles with the same checks (`view:check`,
+`assert_views_compile`): a typo in a tag names the file and line. `<rx-mail>` is the mail's
+layout, what `{% extends "renox/mail/layout.html" %}` does, and its parts are the mail kit's
+macros:
+
+```html
+<rx-mail subject="{{ t('mail.receipt.subject', number=order.number) }}">
+  <p>{{ t('mail.thanks') }}</p>
+  <rx-mail-panel>Order #{{ order.number }} ships tomorrow.</rx-mail-panel>
+  <rx-mail-table :rows="rows" :head="['Item', 'Price']" :total="['Total', total]"/>
+  <rx-mail-divider/>
+  <rx-mail-button :url="url" label="View your order"/>
+  <rx-slot name="footer">Questions? Reply to this mail.</rx-slot>
+</rx-mail>
+```
+
+| Tag | What it is |
+|---|---|
+| `<rx-mail subject layout>` | The whole template, like `rx-page`. `subject` fills the layout's `title` block (the HTML `<title>`; the subject line the recipient sees is the one you give `mail_view`). The content is the layout's `content` block, and `<rx-slot name="footer">` replaces its footer. `layout` names another layout file (plain text; `renox/mail/layout.html` by default, which an app can replace by file name). |
+| `<rx-mail-button url label>` | `button(url, label)`; the label can be the content. |
+| `<rx-mail-panel>` | `{% call panel() %}`: a highlighted box. |
+| `<rx-mail-table :rows :head :total>` | `table(rows, head, total)`. The rows, the heading and the total are data (lists of cells): a mail with a row per order line builds them in Rust or with a filter, not with a counter in the template. |
+| `<rx-mail-divider/>` | `divider()`. |
+| `<rx-mail-text>` | A `.txt` view (the mail's text version), see below. |
+
+The text version of a mail, the `.txt` view next to the `.html` one, is written with
+`<rx-mail-text>`. Its text is kept as written, line breaks included, and nothing is escaped (it
+is plain text): `{{ value }}` prints values, and a loop or a condition is a `<template rx-for>` /
+`<template rx-if>`, which draws no tag of its own. The line break right after the opening tag and
+the one right before the closing tag belong to the tags, not to the text:
+
+```html
+<rx-mail-text>
+{{ title }}
+
+{{ body }}
+<template rx-for="row in rows">
+{{ row.label }}: {{ row.value }}</template>
+<template rx-if="url">
+{{ action }}: {{ url }}</template>
+</rx-mail-text>
+```
+
+renders `Title`, a blank line, the body, then one `label: value` line per row and the link line
+when there is a `url`: the same bytes as the `{% for %}` / `{% if %}` version. Write a `<` that
+is text as `{{ '<' }}`. Like `<rx-mail>`, the tag holds the whole template.
+
+The framework's own sign-in mails (`renox/mail/auth/verify-email.html` and
+`reset-password.html`) are written this way; a test checks that their HTML is byte for byte what
+the `{% extends %}` version made. `preheader` is not a slot: the layout has no such block.
+
 ### Upgrading from 1.0
 
 A 1.0 template keeps working: its `{% from "renox/ui.html" import … %}` and `{% call %}` macros still compile and mix with tags in one file. New pages use tags. To move a page over, find the tag for the macro below (the macro names are also the names the kit's reference tables use). Older component files without `<rx-props>` are macros too: `rnx make:component --macro` writes one. An imported macro takes its name in the template, so a value the handler passes under the same name is hidden by it (while debugging, Renox logs a warning naming both); rename the value or import the macro `as` another name.
@@ -1199,19 +1333,34 @@ A 1.0 template keeps working: its `{% from "renox/ui.html" import … %}` and `{
 | `rx-wizard`, `rx-wizard-step` | the `wizard` macros (a special tag) |
 | `rx-infolist`, `rx-entry`, `rx-repeatable` | `infolist`, `entry`, `repeatable` |
 | `rx-list`, `rx-card-grid`, `rx-media-card`, `rx-progress` | `list`, `card_grid`, `media_card`, `progress` |
+| `rx-icon`, `rx-columns`, `rx-thumbnail`, `rx-tab-panel` | `icon`, `columns`, `thumbnail`, `tab_panel` |
 | `rx-stats`, `rx-stat`, `rx-dashboard`, `rx-widget`, `rx-period-filter` | `stats`, `stat`, `dashboard`, `widget`, `period_filter` |
 | `rx-chart` | the `chart(...)` template function (not a macro) |
 | `rx-grid` | `grid(page, tools=…)` of `renox/grid.html` |
 | `rx-rich-editor`, `rx-markdown-editor`, `rx-code-editor`, `rx-code-entry` | the macros of `renox-editors/editors.html` (registered by that plugin) |
 | `rx-navbar`, `rx-nav-links`, `rx-nav-link`, `rx-nav-search`, `rx-sidebar`, `rx-sidebar-link`, `rx-sidebar-section` | `navbar`, `nav_links`, `nav_link`, `nav_search`, `sidebar`, `sidebar_link`, `sidebar_section` |
-| `rx-menu`, `rx-menu-link`, `rx-menu-action`, `rx-menu-section`, `rx-menu-separator`, `rx-menu-open`, `rx-link-tabs` | `menu`, `menu_link`, `menu_action`, `menu_section`, `menu_separator`, `menu_open`, `link_tabs` |
-| `rx-tabs`, `rx-tab` | the `tabs` macros (a special tag) |
+| `rx-menu`, `rx-menu-link`, `rx-menu-action`, `rx-menu-section`, `rx-menu-separator`, `rx-menu-open`, `rx-menu-button`, `rx-link-tabs` | `menu`, `menu_link`, `menu_action`, `menu_section`, `menu_separator`, `menu_open`, `menu_button`, `link_tabs` |
+| `rx-action-group`, `rx-import-action`, `rx-event-stream` | `action_group`, `import_action`, `event_stream` |
+| `rx-wizard-action`, `rx-wizard-step` | the `wizard_action` macro and its `wizard_step`s (a special tag) |
+| `rx-mail`, `rx-mail-button`, `rx-mail-panel`, `rx-mail-table`, `rx-mail-divider` | `{% extends "renox/mail/layout.html" %}` with its blocks, and `button`, `panel`, `table`, `divider` of `renox/mail/components.html` |
+| `rx-tabs`, `rx-tab` | the `tabs` macros (a special tag); `:items` gives the list as data |
+| `rx-link-tab` | the `[href, label]` pairs of `link_tabs`, as children that can be looped |
+| `rx-simple-table` | `{% call table(head, caption=…, foot=…) %}` |
+| `rx-include` | `{% include "name" %}`, `{% include name ignore missing %}` |
+| `rx-mail-text` | a text mail written with `{% for %}` / `{% if %}` |
+| `?name="expr"` | `{{ ' name="…"' \| safe if expr }}` inside a start tag |
 | `rx-sheet`, `rx-open-button`, `rx-action-sheet`, `rx-notification-bell` | `sheet`, `open_button`, `action_sheet`, `notification_bell` |
 | `rx-shell` | none: a `div.rx-shell` |
 | `rx-stack`, `rx-row` | none: a `div` with the kit's class |
-| `rx-page`, `rx-push`, `rx-form`, `rx-table` | `{% extends %}`/`{% block %}`, `push`, a `<form>`, a loop with `table` markup |
+| `rx-block` | `{% block name %}…{% endblock %}` |
+| `rx-pagination` | `pagination(page)` or `simple_pagination(page)` of `renox/pagination.html` |
+| `rx-head`, `rx-ui`, `rx-toasts`, `rx-outlet` | the template functions `renox_head()`, `renox_ui()`, `toasts()`, `stack(name)` |
+| `rx-let` | `{% with name = value %}` around the rest of the element |
+| `rx-script`, `rx-style` | `<script nonce="{{ csp_nonce() }}">`, `<style nonce="{{ csp_nonce() }}">` |
+| `<template rx-if>`, `rx-elif`, `rx-else`, `rx-for` | `{% if %}`, `{% elif %}`, `{% else %}`, `{% for %}` around the children |
+| `rx-page`, `rx-push`, `rx-form`, `rx-table` | `{% extends %}`/`{% block %}`, `push`, a `<form>`, a loop with `table` markup (`<rx-slot name="footer">` is the `foot` of `table`) |
 
-Macros without a tag in this table (`action_group`, `wizard_action`, `nav_links`' siblings you find in the tables above) are still called as macros.
+Every macro of the kit has a tag now, with one exception on purpose: `page_hero` is not the kit's. It is the bike shop's own macro (`layouts/_hero.html`, with its `bs-hero` classes), so its tag is the app's: write it as a component, `components/hero.html` with `<rx-props title accent lead eyebrow photo compact>`, and use `<app-hero …>` (see [Your own components](#your-own-components)). The `{% call(row, column) grid(page) %}` form needs nothing new: `<rx-grid :page="page">…</rx-grid>` already receives `row` and `column` in its content.
 
 Navigation, menus, tabs and sheets as tags. A link takes `href` or `route`, and its label as an
 attribute or as content. `<rx-tabs>` takes its tab list from the `<rx-tab key label>` children
@@ -1270,7 +1419,7 @@ A data grid is one tag. Its content draws the `custom` columns, with `row` and `
 
 ```html
 <rx-grid :page="orders">
-  {% if column.key == "actions" %}<a class="rx-link" href="{{ route('orders.show', row.id) }}">Open</a>{% endif %}
+  <a rx-if="column.key == 'actions'" class="rx-link" href="{{ route('orders.show', row.id) }}">Open</a>
 </rx-grid>
 ```
 
@@ -1836,7 +1985,19 @@ icon button that screen readers call "Actions".
            "Delete " ~ product.name ~ "?", "This can't be undone.", button=false) }}
 ```
 
-- `action_group("More")` shows a labelled button instead; `icon` changes the icon.
+As tags the same group is `<rx-action-group>` around `<rx-menu-link>`, `<rx-menu-action>`,
+`<rx-menu-button>`, `<rx-menu-open>`, `<rx-menu-separator/>` and `<rx-menu-section>`:
+
+```html
+<rx-action-group>
+  <rx-menu-link :href="route('products.replicate', product.id)" label="Duplicate" icon="copy"/>
+  <rx-menu-open id="delete-product" label="Delete" icon="trash" danger/>
+</rx-action-group>
+<rx-confirm id="delete-product" label="Delete" :action="route('products.destroy', product.id)"
+            title="Delete {{ product.name }}?" message="This can't be undone." :button="false"/>
+```
+
+- `action_group("More")` (`<rx-action-group label="More">`) shows a labelled button instead; `icon` changes the icon.
 - Its items: `menu_link` (a link; `download=true` for a file to save, `new_tab=true`),
   `menu_action` (sends a form), `menu_button` (a button with htmx `attrs`), `menu_open`
   (opens a sheet), `menu_separator()`, and `menu_section(title)` around items that belong
@@ -1867,6 +2028,20 @@ form with htmx.
     {{ input("price", "Price", type="number", required=true, id="new-product-price") }}
   {% endcall %}
 {% endcall %}
+```
+
+As a tag, the steps are the `<rx-wizard-step>` children, as in `<rx-wizard>`:
+
+```html
+<rx-wizard-action id="new-product" label="New product" route="products.store" title="New product"
+                  submit-label="Add product" variant="primary" icon="plus">
+  <rx-wizard-step key="details" title="Details">
+    <rx-input name="sku" label="SKU" required id="new-product-sku"/>
+  </rx-wizard-step>
+  <rx-wizard-step key="stock" title="Price and stock">
+    <rx-input name="price" label="Price" type="number" required id="new-product-price"/>
+  </rx-wizard-step>
+</rx-wizard-action>
 ```
 
 The handler is the same as for any form. A 422 after the last step opens the first step with
@@ -1938,6 +2113,10 @@ The page's side is `import_action`, a sheet with a file field and room for the r
 {{ import_action("import-products", "Import", route('products.import'), "Import products",
                  columns=["sku", "name", "price"], template_url=route('products.template')) }}
 ```
+
+As a tag: `<rx-import-action id="import-products" label="Import" route="products.import"
+title="Import products" :columns="['sku', 'name', 'price']" :template-url="route('products.template')"/>`
+(`:button="false"` for a sheet opened from an action group).
 
 What the person sees:
 
@@ -2230,6 +2409,10 @@ The layout:
 <body>… {{ stack('scripts') }}</body>
 ```
 
+With tags, the places are `<rx-outlet stack="head"/>` and `<rx-outlet stack="scripts"/>`, and
+`<rx-push stack="scripts">` adds to them; write the script as `<rx-script>` and it carries the
+CSP nonce by itself.
+
 A component that needs a script:
 
 ```html
@@ -2327,3 +2510,40 @@ If you know Laravel, this table maps what you know to Renox:
 | Filament's tables | `renox::grid` ([docs/grid.md](grid.md)) |
 | Filament's ActionGroup, wizard actions | `action_group`, `wizard_action` |
 | Filament's ImportAction, ReplicateAction, ExportAction | `renox::import` + `import_action`, `Model::replicate`, `Grid::export_as` |
+
+## No raw MiniJinja
+
+A page, a layout or a partial can be written with tags alone. Expressions stay: `{{ value }}`,
+the filters (`money`, `date`, `number`…), `t()`, `route()`, `asset()`, `can()` and an inline
+`x if y else z` are not statements. What replaces each `{% … %}` statement:
+
+| Instead of | Write |
+|---|---|
+| `{% if a %}…{% elif b %}…{% else %}…{% endif %}` | `rx-if`, `rx-elif`, `rx-else` on an element or a component, or on `<template>` for text and several siblings |
+| `{% for x in xs %}…{% endfor %}` | `rx-for="x in xs"`, on an element, a component or `<template>`; `loop.index` and the others still work |
+| `{% set label = … %}` | `<rx-let name="label" :value="…"/>` for a local alias |
+| `<script nonce="{{ csp_nonce() }}">`, `<style nonce="…">` | `<rx-script>`, `<rx-style>` |
+| `{% extends %}`, `{% block %}` | `<rx-page layout="…">`, `<rx-block name="…">` |
+| `{% call push('scripts') %}`, `{{ stack('scripts') }}` | `<rx-push stack="scripts">`, `<rx-outlet stack="scripts"/>` |
+| `{% from "renox/ui.html" import card %}` and `{% call card() %}` | the kit's tags, `<rx-card>`; your own components as `<app-…>` |
+| `{{ icon("bike") }}`, `{% call columns(2) %}`, `{{ thumbnail(src) }}` | `<rx-icon name="bike"/>`, `<rx-columns count="2">`, `<rx-thumbnail :src="src"/>` |
+| `{% call action_group() %}`, `{% call wizard_action(…) %}`, `{{ import_action(…) }}`, `{{ event_stream() }}` | `<rx-action-group>`, `<rx-wizard-action>` with `<rx-wizard-step>`s, `<rx-import-action>`, `<rx-event-stream/>` |
+| `{% call(row, column) grid(page) %}` | `<rx-grid :page="page">…</rx-grid>`: `row` and `column` are in scope in its content |
+| `{% extends "renox/mail/layout.html" %}` and the mail kit's `button`, `panel`, `table`, `divider` | `<rx-mail>` and `<rx-mail-button>`, `<rx-mail-panel>`, `<rx-mail-table>`, `<rx-mail-divider/>` ([Mails as tags](#mails-as-tags)) |
+| `{% for %}` and `{% if %}` in a `.txt` mail | `<rx-mail-text>` with `<template rx-for>` / `<template rx-if>` |
+| `{% include "x.html" %}`, `{% include name ignore missing %}` | `<rx-include template="x.html"/>`, `<rx-include :template="name" optional/>` |
+| `{{ ' hidden' if x }}`, `{{ ' aria-current="page"' \| safe if x }}` inside a tag | `?hidden="x"`, `?aria-current="'page' if x"` |
+| `{% call table(head) %}` with a total row | `<rx-simple-table :head="…">` with `<rx-slot name="footer">` |
+| `tabs(id, items)` from data, `link_tabs(items)` built in a loop | `<rx-tabs :items>` with `<rx-tab-panel rx-for>`, `<rx-link-tabs>` with `<rx-link-tab rx-for>` |
+| an app macro such as the bike shop's `page_hero` | a component file: `components/hero.html`, used as `<app-hero>` |
+
+A `{% set %}` that adds up a total across a loop (a `namespace`) has no tag on purpose: prepare
+that value in Rust, in the handler's data, or with a filter.
+
+Nothing else is left: the `{% include %}` of a name computed at run time, a total row in a hand
+written table, a tab bar from data, an attribute that is sometimes there, and the `.txt` version
+of a mail all have a tag now (`rx-include`, `rx-simple-table` or the `footer` slot of `rx-table`,
+`rx-tabs :items` and `rx-link-tab`, `?attr="…"`, `rx-mail-text`). The bike shop and the guestbook
+have no `{% %}` in their views. The one thing that still needs a statement is what has no tag on
+purpose: a `{% set %}` that changes across a loop (above) and a macro written by hand for
+another template to import.

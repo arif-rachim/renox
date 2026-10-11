@@ -6,14 +6,8 @@
     app reads these through `accounts::preferences::channels_for`. -#}
 <rx-form :action="route('accounts.preferences')" method="PUT" id="account-notifications">
   <rx-card title="{{ t('accounts.notifications.title') }}" subtitle="{{ t('accounts.notifications.lead') }}">
-    {#- The four choices, in `Choice::ALL`'s order (a list literal: a
-        `{% set %}` inside a loop wouldn't outlive the loop). -#}
-    {%- set options = [
-      ["both", t('accounts.notifications.choice.both')],
-      ["mail", t('accounts.notifications.choice.mail')],
-      ["in_app", t('accounts.notifications.choice.in_app')],
-      ["none", t('accounts.notifications.choice.none')],
-    ] %}
+    {#- The four choices, in `Choice::ALL`'s order. -#}
+    <rx-let name="options" :value="[['both', t('accounts.notifications.choice.both')], ['mail', t('accounts.notifications.choice.mail')], ['in_app', t('accounts.notifications.choice.in_app')], ['none', t('accounts.notifications.choice.none')]]"/>
     {# [explain:notifications.template] #}
     <div class="bs-prefs" role="group" aria-label="{{ t('accounts.notifications.title') }}">
       <div rx-for="row in section.data.rows" class="bs-prefs__row" data-bs-pref="{{ row.kind }}">

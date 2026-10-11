@@ -213,6 +213,7 @@ impl Module for Pages {
                 Toast::success(format!("Welcome, {}.", form.name))
             })
             .get("/plain", || async { view("plain.html", context! {}) })
+            .get("/tags", || async { view("tags.html", context! { n => 2 }) })
             .post("/plain", |Valid(form): Valid<Signup>| async move {
                 (
                     Toast::success(format!("Saved {}.", form.name)),

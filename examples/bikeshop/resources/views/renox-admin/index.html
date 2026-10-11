@@ -2,32 +2,18 @@
     its translations: its named filters as tabs, then the grid with its
     search, column filters, actions and exports. `custom` columns are drawn
     by renox-admin/{slug}/cells.html. -#}
-{% extends "renox-admin/layout.html" %}
-{% from "renox/grid.html" import grid %}
-{% from "renox/ui.html" import page_header, link_button, link_tabs, action_sheet %}
-{% from "renox-admin/fields.html" import field %}
-{% from "layouts/_text.html" import tx as tr %}
-
-{% block title %}{{ tr(resource.plural_label) }} · {{ tr(admin.title) }}{% endblock %}
-
-{% block content %}
-{% call page_header(tr(resource.plural_label)) %}
-  {%- if allowed.create %}
-  {{ link_button(resource.create_url, t('admin_panel.new', label=(tr(resource.label) | lower)), variant="primary", icon="plus", key="n") }}
-  {%- endif %}
-{% endcall %}
-{%- if tabs %}
-{{ link_tabs(tabs, current=current_tab, label=t('admin_panel.filters', label=tr(resource.plural_label))) }}
-{%- endif %}
-{% call(row, column) grid(rows) %}
-  {%- include "renox-admin/" ~ resource.slug ~ "/cells.html" ignore missing %}
-{% endcall %}
+<rx-page layout="renox-admin/layout.html">
+<rx-slot name="title">{{ tx(resource.plural_label) }} · {{ tx(admin.title) }}</rx-slot>
+<rx-page-header :title="tx(resource.plural_label)">
+  <rx-link-button rx-if="allowed.create" :href="resource.create_url" :label="t('admin_panel.new', label=(tx(resource.label) | lower))" variant="primary" icon="plus" key="n"/>
+</rx-page-header>
+<rx-link-tabs rx-if="tabs" :items="tabs" :current="current_tab" :label="t('admin_panel.filters', label=tx(resource.plural_label))"/>
+<rx-grid :page="rows">
+  {#- The one statement left: a dynamic include of the app's own cells, which no tag covers. -#}
+  <rx-include :template="'renox-admin/' ~ resource.slug ~ '/cells.html'" optional/>
+</rx-grid>
 {#- Actions that ask for input (AdminAction::form): the grid opens the sheet. -#}
-{%- for sheet in sheets %}
-{% call action_sheet(sheet.id, sheet.title, sheet.url, sheet.title, description=sheet.description, submit_label=sheet.submit_label, danger=sheet.danger, button=false) %}
-  {%- for f in sheet.fields %}
-  {{ field(f, currency=admin.currency) }}
-  {%- endfor %}
-{% endcall %}
-{%- endfor %}
-{% endblock %}
+<rx-action-sheet rx-for="sheet in sheets" :id="sheet.id" :label="sheet.title" :action="sheet.url" :title="sheet.title" :description="sheet.description" :submit-label="sheet.submit_label" :danger="sheet.danger" :button="false">
+  <app-admin-field rx-for="f in sheet.fields" :f="f" :currency="admin.currency"/>
+</rx-action-sheet>
+</rx-page>

@@ -3,19 +3,14 @@
 <rx-page layout="layouts/staff.html" title="{{ t('rentals.fleet.title') }}">
   <rx-stack>
     <rx-page-header title="{{ t('rentals.fleet.title') }}" subtitle="{{ t('rentals.fleet.lead') }}"/>
-    {%- set tabs = namespace(items=[]) %}
-    {%- for key in views %}
-      {%- set label = t('rentals.fleet.view.' ~ key) ~ ((" (" ~ counts[key] ~ ")") if key != "all" else "") %}
-      {%- set tabs.items = tabs.items + [[route('rentals.fleet', view=key), label]] %}
-    {%- endfor %}
-    <rx-link-tabs :items="tabs.items" :current="route('rentals.fleet', view=tab)" label="{{ t('rentals.fleet.views') }}"/>
+    <rx-link-tabs :items="tab_items" :current="current_tab" label="{{ t('rentals.fleet.views') }}"/>
     {# [explain:rentals.fleet.template] #}
     <rx-grid :page="fleet">
-      {%- if column.key == "model" %}{{ row.model }}{% if row.size %} <span class="rx-subtitle">{{ row.size }}</span>{% endif %}
-      {%- elif column.key == "service" %}
-        {%- if row.service_due %}<span class="rx-badge rx-badge--warning">{{ t('rentals.fleet.service_due') }}</span>
-        {%- else %}{{ t('rentals.fleet.hours_left', hours=row.hours_to_service) }}{% endif %}
-      {%- endif %}
+      <template rx-if="column.key == 'model'">{{ row.model }}<template rx-if="row.size"> <span class="rx-subtitle">{{ row.size }}</span></template></template>
+      <template rx-elif="column.key == 'service'">
+        <span rx-if="row.service_due" class="rx-badge rx-badge--warning">{{ t('rentals.fleet.service_due') }}</span>
+        <template rx-else>{{ t('rentals.fleet.hours_left', hours=row.hours_to_service) }}</template>
+      </template>
     </rx-grid>
     {# [/explain:rentals.fleet.template] #}
   </rx-stack>

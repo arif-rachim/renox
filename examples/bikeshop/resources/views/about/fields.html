@@ -1,8 +1,7 @@
 {#- /about/fields (src/app/about/fields.rs): every HTML input with the Rust type
     it is read into, the model's type and the column on SQLite and on
     PostgreSQL (`reference`), the visitor's samples, and the form that tries
-    every row (about/_fields_form.html). Only the kit.
-    The one `{% %}` left is the include of the form: it has no tag yet (#374). -#}
+    every row (components/about_fields_form.html). Only the kit. -#}
 <rx-page layout="layouts/app.html" title="{{ t('fields.title') }}" description="{{ t('fields.lead') }}">
   <rx-stack data-bs-reveal>
     <rx-page-header title="{{ t('fields.title') }}" subtitle="{{ t('fields.lead') }}"/>
@@ -40,7 +39,7 @@
     </rx-card>
 
     <rx-card rx-if="logged_in" title="{{ t('fields.try.title') }}" subtitle="{{ t('fields.try.lead') }}">
-      {% set sample = none %}{% include "about/_fields_form.html" %}
+      <app-about-fields-form :brands="brands" :price="price" :money-symbol="money_symbol" :money-step="money_step" :photo-url="photo_url"/>
     </rx-card>
     <rx-card rx-else title="{{ t('fields.try.title') }}" subtitle="{{ t('fields.try.lead') }}">
       <rx-alert kind="info">{{ t('fields.try.login') }}</rx-alert>
