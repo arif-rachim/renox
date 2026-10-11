@@ -76,6 +76,10 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 
 ## Things that trip agents up
 
+- **Write pages with `rx-*` tags** (`<rx-input>`, `<rx-card>`, `<rx-table>`…; every tag and prop is
+  in docs/ui.md and the framework's `components/contracts.rs`). Use a kit macro
+  (`{% from "renox/ui.html" import … %}`) only where no tag exists, and run `rnx view:check`
+  after editing templates.
 - Component tags (`<rx-card>`, `<app-price-tag>`, `rx-if`/`rx-for`, docs/ui.md "Components as
   tags") are rewritten when a template loads. In an attribute, `title="{{ x }}"` is the value of
   `x` and `:title="x"` is an expression (no `{{ }}` after the colon); `{% %}` there is an error.
@@ -122,40 +126,40 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   no `#[validate]` attributes): it turns a ticked checkbox's `on` into `true`, an unticked one
   into `false`, and empty inputs into `None`. The prelude's `Form<T>` is axum's and doesn't: a
   `bool` field answers 422 to `on`.
-- UI: prefer the kit (`{% from "renox/ui.html" import input, button, … %}`, docs/ui.md) over
+- UI: prefer the kit (`<rx-input>`, `<rx-button>`, … docs/ui.md) over
   hand-written form markup: it refills fields, shows errors and handles accessibility. Keep one
-  primary button per form; put destructive actions behind `confirm(…)`. Give feedback with
+  primary button per form; put destructive actions behind `<rx-confirm>`. Give feedback with
   `Toast::success(…)` returned next to the `Redirect`, and put `{{ toasts() }}` in the layout.
   Fields inside `show_when`/`hide_when` are disabled while hidden, so they aren't sent: use
   `required_if` (not `required`) for them, and `#[serde(default)]` on `Vec` fields of
-  `checkbox_list` or `toggle_buttons(multiple=true)`. Rows of fields (the kit's `repeater`,
-  `key_value`) are named `lines[0][name]`: the form struct takes `lines: Vec<Line>` (or
+  `<rx-checkbox-list>` or `<rx-toggle-buttons multiple>`. Rows of fields (the kit's `<rx-repeater>`,
+  `<rx-key-value>`) are named `lines[0][name]`: the form struct takes `lines: Vec<Line>` (or
   `KeyValues`) with `#[serde(default)]`, rows are checked with `v.nested("lines", &self.lines)`,
   and errors are keyed `lines.0.name`.
-  A select over a long list asks the server: `select(…, options_url=route(…), editable=true)`
+  A select over a long list asks the server: `<rx-select options-url="{{ route(…) }}" editable>`
   with one route answering `GET ?q=`/`?values=` (`renox::select::OptionQuery` →
   `Json<Vec<SelectOption>>`), `POST label` (add) and `PUT value+label` (rename), each checking
   who may do it; parse lookup ids with `query.values_as::<i64>()` (PostgreSQL won't compare
   a `BIGINT` with text).
-  A record's page (show) is an infolist, not hand-written markup: `{% call infolist(columns=2) %}`
-  with `entry(label, value, format="money"|"date"|"since"|"bool"|…, badge=…)`; prices go
+  A record's page (show) is an infolist, not hand-written markup: `<rx-infolist columns="2">`
+  with `<rx-entry label value format="money"|"date"|"since"|"bool"|…>`; prices go
   through `| money` (`APP_CURRENCY`, USD by default), never a hand-made "$" filter. `money`,
-  `entry(…, format="money")`, `chart(…, format="money")` and the grid's `Column::money` all
+  `<rx-entry format="money">`, `<rx-chart format="money">` and the grid's `Column::money` all
   take the stored smallest unit (`1299` → `$12.99`): never divide by 100 in a template.
   Dashboards: `renox::chart::Trend::of(query, "created_at").over(period).sum(&state, "total")`
-  with the `Period` extractor, then `stat(…)`, `chart("line", series, format="money")`,
-  `widget(…)` and `period_filter(period)` in the template (presets, `12w` per week, and a
+  with the `Period` extractor, then `<rx-stat>`, `<rx-chart kind="line" :data="series" format="money">`,
+  `<rx-widget>` and `<rx-period-filter :selected="period">` in the template (presets, `12w` per week, and a
   custom date range it reads as `?period=custom&from=…&to=…`); no chart library.
-  `chart("scatter"|"bubble", points=[{x, y, size, label}], x_title=…, y_title=…)` for
+  `<rx-chart kind="scatter"|"bubble" :points="[{x, y, size, label}]" x-title=… y-title=…>` for
   points; never parse `?from=`/`?to=` by hand for the period.
-  An action that asks for a few values is `{% call action_sheet(id, label, action, title,
-  method="PUT") %}…fields…{% endcall %}`, not a page of its own: the handler returns
+  An action that asks for a few values is `<rx-action-sheet id label action title
+  method="PUT">…fields…</rx-action-sheet>`, not a page of its own: the handler returns
   `(Toast, HxRefresh)`, and a 422 stays in the sheet. With one per row, give each sheet and
-  its fields their own `id`. Icon-only buttons are `icon_button(icon, label, …)` (the label
+  its fields their own `id`. Icon-only buttons are `<rx-icon-button icon label>` (the label
   is the accessible name); shortcuts are `key="mod+s"`; a button that can't be used yet
-  takes `disabled_reason="…"`.
+  takes `disabled-reason="…"`.
   In-app notifications: `to_database` returns `Ok(DatabaseMessage…into())` (title, body, url), and
-  `Auth::new().notifications()` + `{{ notification_bell(unread_notifications) }}` in the
+  `Auth::new().notifications()` + `<rx-notification-bell :count="unread_notifications"/>` in the
   layout gives the list, the badge and live updates (SSE: behind nginx, `proxy_buffering off`).
   Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`, and a
   button that sends a request (`ToastAction::post(label, "/own/path")`, `put`, `patch`,
@@ -225,10 +229,12 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   Rules include `alpha_dash`, `uuid`, `ip`, `size`, `starts_with`, `required_without`,
   `prohibited_if`, and `v.distinct(…)` for lists.
 - Pages are built from the UI kit (`renox/ui.html`, docs/ui.md), not from your own markup and
-  CSS: `navbar`/`nav_link` (or `sidebar` + `rx-shell` for a back office), `page_header`,
-  `card`, the fields (`input`, `select`, `toolbar` for filters), `button`/`link_button`,
-  `table` + `row_actions`, `list`, `card_grid` + `media_card`, `link_tabs`, `sheet`/
-  `action_sheet`/`confirm`, `menu`, `badge`, `alert`, `empty`, `progress`, `toasts()`.
+  CSS, as tags: `<rx-navbar>`/`<rx-nav-link>` (or `<rx-sidebar>` + `rx-shell` for a back office),
+  `<rx-page-header>`, `<rx-card>`, the fields (`<rx-input>`, `<rx-select>`, `<rx-toolbar>` for
+  filters), `<rx-button>`/`<rx-link-button>`, `<rx-table>` + `<rx-row-actions>`, `<rx-list>`,
+  `<rx-card-grid>` + `<rx-media-card>`, `<rx-link-tabs>`, `<rx-sheet>`/`<rx-action-sheet>`/
+  `<rx-confirm>`, `<rx-menu>`, `<rx-badge>`, `<rx-alert>`, `<rx-empty>`, `<rx-progress>`, and
+  `toasts()`.
   `public/app.css` is for brand tokens (`--rx-accent`) and what is truly the app's own; if
   the kit lacks something, use its `rx-*` classes and tokens, never a parallel style. Text
   in the app's own CSS takes the kit's type scale (`font: var(--rx-type-heading)`, `-body`,
