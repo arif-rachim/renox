@@ -4,21 +4,19 @@
     country_id, countries. A login without a customer record (staff) shows
     nothing. -#}
 {%- if section.data.customer %}
-{% from "renox/ui.html" import card, input, select, form_grid, button %}
-<form method="post" action="{{ route('accounts.contact') }}" id="account-contact" data-live-validate>
-  {{ csrf_field() }}{{ method_field('PUT') }}
-  {% call card(title=t('accounts.contact.title'), subtitle=t('accounts.contact.lead')) %}
-    {%- set a = section.data.address %}
-    {% call form_grid(2) %}
-      {{ input("phone", t('accounts.contact.phone'), type="tel", value=section.data.customer.phone, autocomplete="tel", span="full") }}
-      {{ input("line1", t('accounts.contact.line1'), value=(a.line1 if a else none), required=true, autocomplete="address-line1", span="full") }}
-      {{ input("line2", t('accounts.contact.line2'), value=(a.line2 if a else none), autocomplete="address-line2", span="full") }}
-      {{ input("district", t('accounts.contact.district'), value=(a.district if a else none)) }}
-      {{ input("postal_code", t('accounts.contact.postal_code'), value=(a.postal_code if a else none), autocomplete="postal-code") }}
-      {{ input("city", t('accounts.contact.city'), value=(a.city if a else none), required=true, autocomplete="address-level2") }}
-      {{ select("country_id", t('accounts.contact.country'), section.data.countries, selected=section.data.country_id, required=true, searchable=true, placeholder=t('accounts.contact.choose_country')) }}
-    {% endcall %}
-    <div class="rx-card__footer">{{ button(t('accounts.save')) }}</div>
-  {% endcall %}
-</form>
+{%- set a = section.data.address %}
+<rx-form :action="route('accounts.contact')" method="PUT" id="account-contact" live>
+  <rx-card title="{{ t('accounts.contact.title') }}" subtitle="{{ t('accounts.contact.lead') }}">
+    <rx-form-grid columns="2">
+      <rx-input name="phone" label="{{ t('accounts.contact.phone') }}" type="tel" :value="section.data.customer.phone" autocomplete="tel" span="full"/>
+      <rx-input name="line1" label="{{ t('accounts.contact.line1') }}" :value="a.line1 if a else none" required autocomplete="address-line1" span="full"/>
+      <rx-input name="line2" label="{{ t('accounts.contact.line2') }}" :value="a.line2 if a else none" autocomplete="address-line2" span="full"/>
+      <rx-input name="district" label="{{ t('accounts.contact.district') }}" :value="a.district if a else none"/>
+      <rx-input name="postal_code" label="{{ t('accounts.contact.postal_code') }}" :value="a.postal_code if a else none" autocomplete="postal-code"/>
+      <rx-input name="city" label="{{ t('accounts.contact.city') }}" :value="a.city if a else none" required autocomplete="address-level2"/>
+      <rx-select name="country_id" label="{{ t('accounts.contact.country') }}" :options="section.data.countries" :selected="section.data.country_id" required searchable placeholder="{{ t('accounts.contact.choose_country') }}"/>
+    </rx-form-grid>
+    <div class="rx-card__footer"><rx-button label="{{ t('accounts.save') }}"/></div>
+  </rx-card>
+</rx-form>
 {%- endif %}

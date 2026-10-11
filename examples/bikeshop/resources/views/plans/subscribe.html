@@ -1,56 +1,51 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, select, radio, toggle_buttons, button, form_errors, empty, infolist, entry, alert %}
-{% from "plans/_parts.html" import assets %}
-{% block seo %}{{ seo(title=t('plans.subscribe.title'), description=t('plans.subscribe.lead')) }}{% endblock %}
-
 {#- Subscribe a bike to a plan (#237). The form posts to
     `plans.subscribe.store`, which starts renox-billing's checkout; while it
     changes, htmx asks this page again and swaps the weekdays (they depend on
     the store's opening days) and the summary. -#}
-{% block content %}
+<rx-page layout="layouts/app.html" title="{{ t('plans.subscribe.title') }}" description="{{ t('plans.subscribe.lead') }}">
+{% from "plans/_parts.html" import assets %}
 {{ assets() }}
-<div class="rx-stack">
-  {{ page_header(t('plans.subscribe.title'), subtitle=t('plans.subscribe.lead'), back=route('plans.index'), back_label=t('plans.index.title')) }}
+<rx-stack>
+  <rx-page-header title="{{ t('plans.subscribe.title') }}" subtitle="{{ t('plans.subscribe.lead') }}" :back="route('plans.index')" back-label="{{ t('plans.index.title') }}"/>
   {%- if not has_bikes %}
-  <div class="rx-card">{{ empty(t('plans.subscribe.no_bike'), t('plans.subscribe.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add'), icon="bike") }}</div>
+  <div class="rx-card"><rx-empty title="{{ t('plans.subscribe.no_bike') }}" message="{{ t('plans.subscribe.no_bike_text') }}" route="workshop.bikes" action-label="{{ t('workshop.bikes.add') }}" icon="bike"/></div>
   {%- elif not bikes %}
-  <div class="rx-card">{{ empty(t('plans.subscribe.all_taken'), t('plans.subscribe.all_taken_text'), route('plans.mine'), t('plans.mine.title'), icon="circle-check") }}</div>
+  <div class="rx-card"><rx-empty title="{{ t('plans.subscribe.all_taken') }}" message="{{ t('plans.subscribe.all_taken_text') }}" route="plans.mine" action-label="{{ t('plans.mine.title') }}" icon="circle-check"/></div>
   {%- elif not ways %}
-  {{ alert(t('plans.subscribe.no_gateway'), kind="warning") }}
+  <rx-alert kind="warning" message="{{ t('plans.subscribe.no_gateway') }}"/>
   {%- else %}
   {# [explain:plans.subscribe.template] #}
-  <form method="post" action="{{ route('plans.subscribe.store') }}" id="subscribe-form" novalidate data-bs-subscribe
+  <rx-form :action="route('plans.subscribe.store')" id="subscribe-form" novalidate data-bs-subscribe
         hx-get="{{ route('plans.subscribe') }}" hx-trigger="change" hx-select="#subscribe-live" hx-target="#subscribe-live" hx-swap="outerHTML">
-    {{ csrf_field() }}
     <div class="bs-subscribe">
-      {% call card() %}
-        {{ form_errors() }}
-        {{ select("bike", t('plans.fields.bike'), bikes, selected=bike, required=true) }}
-        {{ radio("plan", t('plans.fields.plan'), plans, selected=(plan.slug if plan else none), required=true) }}
-        {{ select("store", t('plans.fields.store'), stores, selected=store_id, required=true, hint=t('plans.subscribe.store_hint')) }}
-        {{ radio("pay_with", t('plans.fields.pay_with'), ways, selected=pay_with, required=true) }}
-      {% endcall %}
+      <rx-card>
+        <rx-form-errors/>
+        <rx-select name="bike" label="{{ t('plans.fields.bike') }}" :options="bikes" :selected="bike" required/>
+        <rx-radio name="plan" label="{{ t('plans.fields.plan') }}" :options="plans" :selected="plan.slug if plan else none" required/>
+        <rx-select name="store" label="{{ t('plans.fields.store') }}" :options="stores" :selected="store_id" required hint="{{ t('plans.subscribe.store_hint') }}"/>
+        <rx-radio name="pay_with" label="{{ t('plans.fields.pay_with') }}" :options="ways" :selected="pay_with" required/>
+      </rx-card>
       <div id="subscribe-live" class="bs-subscribe__summary rx-stack" aria-live="polite">
-        {% call card(title=t('plans.subscribe.when')) %}
-          {{ toggle_buttons("weekday", t('plans.fields.weekday'), weekdays, selected=weekday, required=true, hint=t('plans.subscribe.weekday_hint')) }}
-        {% endcall %}
+        <rx-card title="{{ t('plans.subscribe.when') }}">
+          <rx-toggle-buttons name="weekday" label="{{ t('plans.fields.weekday') }}" :options="weekdays" :selected="weekday" required hint="{{ t('plans.subscribe.weekday_hint') }}"/>
+        </rx-card>
   {# [/explain:plans.subscribe.template] #}
-        {% call card(title=t('plans.subscribe.summary')) %}
+        <rx-card title="{{ t('plans.subscribe.summary') }}">
           <div data-bs-plan-summary>
           {%- if plan %}
-          {% call infolist() %}
-            {{ entry(t('plans.fields.plan'), plan.name) }}
-            {% call entry(t('plans.fields.monthly')) %}<strong class="bs-subscribe__price">{{ monthly | money }}</strong> / {{ t('blocks.plans.month') }}{% endcall %}
-            {{ entry(t('plans.fields.first_visit'), first, format="date", placeholder=t('plans.subscribe.pick_day')) }}
-          {% endcall %}
+          <rx-infolist>
+            <rx-entry label="{{ t('plans.fields.plan') }}" :value="plan.name"/>
+            <rx-entry label="{{ t('plans.fields.monthly') }}"><strong class="bs-subscribe__price">{{ monthly | money }}</strong> / {{ t('blocks.plans.month') }}</rx-entry>
+            <rx-entry label="{{ t('plans.fields.first_visit') }}" :value="first" format="date" placeholder="{{ t('plans.subscribe.pick_day') }}"/>
+          </rx-infolist>
           <p class="rx-hint">{{ t('plans.subscribe.billing_hint') }}</p>
           {%- endif %}
           </div>
-          {{ button(t('plans.subscribe.submit'), icon="check", block=true, key="s") }}
-        {% endcall %}
+          <rx-button label="{{ t('plans.subscribe.submit') }}" icon="check" block key="s"/>
+        </rx-card>
       </div>
     </div>
-  </form>
+  </rx-form>
   {%- endif %}
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>

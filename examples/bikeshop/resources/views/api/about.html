@@ -1,10 +1,7 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, card, badge, link_button, infolist, entry %}
-{% from "api/_parts.html" import assets %}
-{% block seo %}{{ seo(title=t('api.about.title'), description=t('api.about.lead')) }}{% endblock %}
-
 {#- Every endpoint of the JSON API (#241), from src/app/api/endpoints.rs; its
     texts in another language under `api.endpoints.<route>`. -#}
+<rx-page layout="layouts/app.html" title="{{ t('api.about.title') }}" description="{{ t('api.about.lead') }}">
+{% from "api/_parts.html" import assets %}
 {#- A text of the endpoint (Markdown) in the page's language, else as written. -#}
 {% macro _md(key, english) -%}
 {%- set found = t(key) -%}
@@ -15,26 +12,25 @@
 {% macro endpoint(e) -%}
 <article class="rx-card bs-endpoint" id="{{ e.route | replace('.', '-') }}">
   <header class="bs-endpoint__head">
-    {{ badge(e.method, kind=("info" if e.method == "GET" else "warning")) }}
+    <rx-badge text="{{ e.method }}" :kind="'info' if e.method == 'GET' else 'warning'"/>
     <code class="bs-endpoint__path">{{ e.path }}</code>
     <span class="rx-subtitle">{{ t('api.about.ability') }} <code>{{ e.ability }}</code></span>
   </header>
   {%- set key = 'api.endpoints.' ~ e.route ~ '.' %}
   <p>{{ _md(key ~ 'purpose', e.purpose) }}</p>
-  {% call infolist(columns=2) %}
-    {% call entry(t('api.about.request')) %}{{ _md(key ~ 'request', e.request) if e.request else "—" }}{% endcall %}
-    {% call entry(t('api.about.answer')) %}{{ _md(key ~ 'answer', e.answer) }}{% endcall %}
-  {% endcall %}
+  <rx-infolist columns="2">
+    <rx-entry label="{{ t('api.about.request') }}">{{ _md(key ~ 'request', e.request) if e.request else "—" }}</rx-entry>
+    <rx-entry label="{{ t('api.about.answer') }}">{{ _md(key ~ 'answer', e.answer) }}</rx-entry>
+  </rx-infolist>
   <pre class="bs-code"><code>{{ e.curl | replace("$URL", base) }}</code></pre>
 </article>
 {# [/explain:api.about.template] #}
 {%- endmacro %}
 
-{% block content %}
 {{ assets() }}
-<div class="rx-stack">
-  {{ page_header(t('api.about.title'), subtitle=t('api.about.lead')) }}
-  {% call card(title=t('api.about.how')) %}
+<rx-stack>
+  <rx-page-header title="{{ t('api.about.title') }}" subtitle="{{ t('api.about.lead') }}"/>
+  <rx-card title="{{ t('api.about.how') }}">
     <ul class="bs-api-rules">
       <li>{{ t('api.about.rule_token') }}</li>
       <li>{{ t('api.about.rule_errors') }}</li>
@@ -42,12 +38,12 @@
       <li>{{ t('api.about.rule_cors', origin=origin) }}</li>
     </ul>
     <div class="bs-api-links">
-      {%- if auth.check %}{{ link_button(route('api.tokens'), t('api.tokens.title'), size="small") }}{% endif %}
+      <rx-link-button rx-if="auth.check" route="api.tokens" label="{{ t('api.tokens.title') }}" size="small"/>
     </div>
-  {% endcall %}
+  </rx-card>
   <h2 class="bs-api-group">{{ t('api.about.kiosk') }}</h2>
   <div class="bs-endpoints" data-bs-reveal>{% for e in kiosk %}{{ endpoint(e) }}{% endfor %}</div>
   <h2 class="bs-api-group">{{ t('api.about.customer') }}</h2>
   <div class="bs-endpoints" data-bs-reveal>{% for e in customer %}{{ endpoint(e) }}{% endfor %}</div>
-</div>
-{% endblock %}
+</rx-stack>
+</rx-page>
