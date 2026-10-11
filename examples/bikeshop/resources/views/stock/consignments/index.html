@@ -1,44 +1,34 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, link_tabs, link_button, table, empty %}
-{% from "stock/_parts.html" import styles, shipment_status %}
-{% block seo %}{{ seo(title=t('stock.consignments.title')) }}{% endblock %}
-
 {#- Consignment shipments of the active store, both ways (#240, #245). -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack" data-bs-reveal>
-  {% call page_header(t('stock.consignments.title'), subtitle=t('stock.consignments.lead')) %}
-    {%- if can('consignment.manage') %}
-    {{ link_button(route('stock.consignments.create', direction="ask"), t('stock.consignments.ask'), icon="download") }}
-    {{ link_button(route('stock.consignments.create', direction="send"), t('stock.consignments.send'), variant="primary", icon="box") }}
-    {%- endif %}
-  {% endcall %}
-  {# [explain:stock.consignments.template] #}
-  {%- set tabs = namespace(items=[]) %}
-  {%- for key in views %}{% set tabs.items = tabs.items + [[route('stock.consignments', view=key), t('stock.consignments.view.' ~ key)]] %}{% endfor %}
-  {{ link_tabs(tabs.items, current=route('stock.consignments', view=tab), label=t('stock.consignments.views')) }}
-  {# [/explain:stock.consignments.template] #}
-  {%- if shipments.items %}
-  <div class="rx-card">
-  {% call table([t('stock.consignments.number'), t('stock.fields.owner_store'), t('stock.fields.location_store'), t('stock.fields.status'), [t('stock.consignments.units'), "num"], [t('stock.consignments.in_transit'), "num"], t('stock.consignments.updated')], caption=t('stock.consignments.title')) %}
+<rx-page layout="layouts/staff.html" :title="t('stock.consignments.title')">
+  <rx-push stack="head" once="stock-css"><link rel="stylesheet" href="{{ asset('areas/stock.css') }}"></rx-push>
+  <rx-push stack="scripts" once="stock-js"><script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script></rx-push>
+  {% from "stock/_parts.html" import shipment_status %}
+  {% from "renox/pagination.html" import pagination %}
+  <rx-stack data-bs-reveal>
+    <rx-page-header :title="t('stock.consignments.title')" :subtitle="t('stock.consignments.lead')">
+      <rx-link-button rx-if="can('consignment.manage')" :href="route('stock.consignments.create', direction='ask')" :label="t('stock.consignments.ask')" icon="download"/>
+      <rx-link-button rx-if="can('consignment.manage')" :href="route('stock.consignments.create', direction='send')" :label="t('stock.consignments.send')" variant="primary" icon="box"/>
+    </rx-page-header>
     {# [explain:stock.consignments.template] #}
-    {%- for s in shipments.items %}
-    <tr>
-      <td><a class="rx-link" href="{{ route('stock.consignments.show', s.id) }}">CS-{{ s.id }}</a></td>
-      <td>{{ s.owner }}{% if s.ours %} <span class="rx-subtitle">({{ t('stock.consignments.ours') }})</span>{% endif %}</td>
-      <td>{{ s.location }}</td>
-      <td>{{ shipment_status(s.status) }}</td>
-      <td class="rx-num">{{ s.units }}</td>
-      <td class="rx-num">{{ s.in_transit or "—" }}</td>
-      <td>{{ s.updated_at | since }}</td>
+    {%- set tabs = namespace(items=[]) %}
+    {%- for key in views %}{% set tabs.items = tabs.items + [[route('stock.consignments', view=key), t('stock.consignments.view.' ~ key)]] %}{% endfor %}
+    <rx-link-tabs :items="tabs.items" :current="route('stock.consignments', view=tab)" :label="t('stock.consignments.views')"/>
     {# [/explain:stock.consignments.template] #}
-    </tr>
-    {%- endfor %}
-  {% endcall %}
-  </div>
-  {% from "renox/pagination.html" import pagination %}{{ pagination(shipments) }}
-  {%- else %}
-  <div class="rx-card">{{ empty(t('stock.consignments.empty'), icon="truck") }}</div>
-  {%- endif %}
-</div>
-{% endblock %}
+    {%- if shipments.items %}
+    {# [explain:stock.consignments.template] #}
+    <rx-table :rows="shipments.items" as="s" card :caption="t('stock.consignments.title')">
+      <rx-column :label="t('stock.consignments.number')"><a class="rx-link" href="{{ route('stock.consignments.show', s.id) }}">CS-{{ s.id }}</a></rx-column>
+      <rx-column :label="t('stock.fields.owner_store')">{{ s.owner }}{% if s.ours %} <span class="rx-subtitle">({{ t('stock.consignments.ours') }})</span>{% endif %}</rx-column>
+      <rx-column :label="t('stock.fields.location_store')">{{ s.location }}</rx-column>
+      <rx-column :label="t('stock.fields.status')">{{ shipment_status(s.status) }}</rx-column>
+      <rx-column :label="t('stock.consignments.units')" align="num">{{ s.units }}</rx-column>
+      <rx-column :label="t('stock.consignments.in_transit')" align="num">{{ s.in_transit or "—" }}</rx-column>
+      <rx-column :label="t('stock.consignments.updated')">{{ s.updated_at | since }}</rx-column>
+    </rx-table>
+    {# [/explain:stock.consignments.template] #}
+    {{ pagination(shipments) }}
+    {%- else %}
+    <rx-card><rx-empty :title="t('stock.consignments.empty')" icon="truck"/></rx-card>
+    {%- endif %}
+  </rx-stack>
+</rx-page>

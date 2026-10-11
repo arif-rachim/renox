@@ -142,7 +142,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "stock.index.handler",
                 },
                 Code {
-                    title: "Template: `link_tabs` with counts over the kit's `grid`",
+                    title: "Template: `<rx-link-tabs>` with counts over the kit's `<rx-grid>`",
                     region: "stock.index.template",
                 },
             ],
@@ -547,7 +547,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "stock.suppliers.page",
                 },
                 Code {
-                    title: "Template: the kit's `table`, one row per supplier",
+                    title: "Template: the kit's `<rx-table>`, one row per supplier",
                     region: "stock.suppliers.template",
                 },
             ],
@@ -1019,7 +1019,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "stock.fleet.handler",
                 },
                 Code {
-                    title: "Template: a searchable `select` and a `form_grid`",
+                    title: "Template: a searchable `<rx-select>` and an `<rx-form-grid>`",
                     region: "stock.fleet.template",
                 },
             ],

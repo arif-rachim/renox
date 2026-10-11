@@ -138,7 +138,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "multistore.help.approve",
                 },
                 Code {
-                    title: "Template: the kit's `row_actions` with an `action_sheet` for hours",
+                    title: "Template: the kit's `<rx-row-actions>` with an `<rx-action-sheet>` for hours",
                     region: "multistore.help.template",
                 },
             ],
@@ -195,7 +195,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "multistore.help.create.form",
                 },
                 Code {
-                    title: "Template: `form_grid` with a searchable select and date pickers",
+                    title: "Template: `<rx-form-grid>` with a searchable select and date pickers",
                     region: "multistore.help.create.template",
                 },
             ],
@@ -252,7 +252,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "multistore.help.hours.log",
                 },
                 Code {
-                    title: "Template: the kit's `stats` over a `table`",
+                    title: "Template: the kit's `<rx-stats>` over an `<rx-table>`",
                     region: "multistore.help.hours.template",
                 },
             ],
@@ -496,7 +496,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "multistore.settlements.handler",
                 },
                 Code {
-                    title: "Template: the kit's `table` with badges per side",
+                    title: "Template: an `<rx-table>` with badges per side",
                     region: "multistore.settlements.template",
                 },
             ],
@@ -620,7 +620,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "multistore.fees.handler",
                 },
                 Code {
-                    title: "Template: an `action_sheet` per store to change its rate",
+                    title: "Template: an `<rx-action-sheet>` per store to change its rate",
                     region: "multistore.fees.template",
                 },
             ],
