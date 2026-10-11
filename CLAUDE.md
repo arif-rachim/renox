@@ -1434,9 +1434,13 @@ picks the build, not the terminal.
   `View::typed` #383; live components (`LiveComponent`, `#[renox::live_component]`,
   `<live-NAME>`, `rx-click`/`rx-submit`/`rx-model`, `TestApp::live`; docs/live.md) #386. #384:
   `rx-*` tags are the default in `rnx new`, the starter, both examples and the guides (#493–#500);
-  the kit's macros stay supported underneath. Not released yet: the workspace is still 1.0.0.
-  The browser job `browser (bikeshop)` fails on main since #492 ("Esc closes it" on the About
-  sheet, phone), which looks like #354.
+  the kit's macros stay supported underneath. The `browser (bikeshop)` job failed on main
+  after #492 ("Esc closes it" on the About sheet, phone): the Spanish staff test logged in by
+  clicking the form, #354's trigger; it logs in with `logInWithFetch(…, { keepCookies: true })`
+  now. Then the workspace was set to `1.1.0-rc.1` (the owner's choice: a release candidate
+  before 1.1.0; README's install/clone lines, the plugin guides' `"1.0"` and the landing
+  page's version stay on 1.0.0 until 1.1.0 itself). Published when the owner runs
+  `cargo publish`.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

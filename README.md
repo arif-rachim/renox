@@ -679,7 +679,9 @@ Then v1.0. It brought:
 - the bike shop example and its design system: the editorial default theme, icons, the phone
   tab bar, renox-blocks, and the starter's page patterns.
 
-Since 1.0, `main` is heading for **1.1**, all of it additive (1.0 apps keep compiling):
+**1.1.0-rc.1**, the release candidate for 1.1, is out for trying (`cargo install renox-cli
+--version 1.1.0-rc.1`, or `renox = "1.1.0-rc.1"`; Cargo never picks a pre-release unless
+asked). Everything in it is additive, so 1.0 apps keep compiling:
 - what the bike shop had to work around: seeders from modules, public `db::Conn`, signed
   routes inside groups, the session in view contexts, users by permission, device tokens;
   computed grid columns, Excel workbooks with several sheets and heatmap charts; paused
