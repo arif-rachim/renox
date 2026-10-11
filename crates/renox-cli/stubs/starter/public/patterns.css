@@ -1,7 +1,7 @@
 /* The page patterns of this app (the bike shop's, in examples/bikeshop): a hero with one
    coloured phrase, section headings, feature cards in a showcase grid, a figures strip, a
    summary with totals, a steps list, empty states, stat cards with icons and the sign-in
-   pages' art. Their markup is in resources/views/patterns.html (macros) and the pages that
+   pages' art. Their markup is in resources/views/components/ (the `app-*` tags) and the pages that
    call them; this file is theirs. Both are this app's: change them as you like.
 
    Every part is a CSS grid spaced and typed with the UI kit's tokens (--rx-space-*,

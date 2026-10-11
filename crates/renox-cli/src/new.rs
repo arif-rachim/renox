@@ -116,10 +116,46 @@ const STARTER: &[(&str, &str)] = &[
         "resources/lang/en.json",
         include_str!("../stubs/starter/resources/lang/en.json"),
     ),
-    // The page patterns (from examples/bikeshop): the app's own macros and CSS.
+    // The page patterns (from examples/bikeshop): the app's own components and CSS.
     (
-        "resources/views/patterns.html",
-        include_str!("../stubs/starter/resources/views/patterns.html"),
+        "resources/views/components/icon_circle.html",
+        include_str!("../stubs/starter/resources/views/components/icon_circle.html"),
+    ),
+    (
+        "resources/views/components/hero.html",
+        include_str!("../stubs/starter/resources/views/components/hero.html"),
+    ),
+    (
+        "resources/views/components/art_app.html",
+        include_str!("../stubs/starter/resources/views/components/art_app.html"),
+    ),
+    (
+        "resources/views/components/art_icons.html",
+        include_str!("../stubs/starter/resources/views/components/art_icons.html"),
+    ),
+    (
+        "resources/views/components/section_head.html",
+        include_str!("../stubs/starter/resources/views/components/section_head.html"),
+    ),
+    (
+        "resources/views/components/feature_card.html",
+        include_str!("../stubs/starter/resources/views/components/feature_card.html"),
+    ),
+    (
+        "resources/views/components/summary.html",
+        include_str!("../stubs/starter/resources/views/components/summary.html"),
+    ),
+    (
+        "resources/views/components/steps.html",
+        include_str!("../stubs/starter/resources/views/components/steps.html"),
+    ),
+    (
+        "resources/views/components/empty_state.html",
+        include_str!("../stubs/starter/resources/views/components/empty_state.html"),
+    ),
+    (
+        "resources/views/components/stat_card.html",
+        include_str!("../stubs/starter/resources/views/components/stat_card.html"),
     ),
     (
         "public/patterns.css",
@@ -163,8 +199,8 @@ fn with_notifications(file: &str, contents: &str) -> String {
              .module(renox::auth::Auth::new().account().notifications())\n",
         )],
         "resources/views/layouts/app.html" => &[(
-            "    {% if auth.check %}\n",
-            "    {% if auth.check %}\n      \
+            "    <template rx-if=\"auth.check\">\n",
+            "    <template rx-if=\"auth.check\">\n      \
                  {#- In-app notifications: a badge, a panel, new ones live (docs/mail.md). -#}\n      \
                  <rx-notification-bell :count=\"unread_notifications\"/>\n",
         )],
@@ -546,6 +582,35 @@ fn title(name: &str) -> String {
 mod tests {
     use super::*;
 
+    /// #516: the templates `rnx new` writes use tags, never template statements.
+    #[test]
+    fn no_stub_template_has_a_statement() {
+        fn walk(dir: &std::path::Path, found: &mut Vec<String>, seen: &mut usize) {
+            for entry in fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    walk(&path, found, seen);
+                } else if path.extension().is_some_and(|e| e == "html") {
+                    *seen += 1;
+                    let text = fs::read_to_string(&path).unwrap();
+                    for (n, line) in text.lines().enumerate() {
+                        if line.contains("{%") {
+                            found.push(format!("{}:{}", path.display(), n + 1));
+                        }
+                    }
+                }
+            }
+        }
+        let stubs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("stubs");
+        let (mut found, mut seen) = (Vec::new(), 0);
+        walk(&stubs, &mut found, &mut seen);
+        assert!(seen > 10, "found only {seen} templates under {stubs:?}");
+        assert!(
+            found.is_empty(),
+            "template statements in the stubs: {found:#?}"
+        );
+    }
+
     #[test]
     fn validates_names() {
         assert!(validate_name("shop").is_ok());
@@ -773,7 +838,7 @@ mod tests {
         let root = dir.path().join("desk");
         // Every stub once, the kit's version where it has one, and its own files.
         let files = files(true);
-        assert_eq!(files.len(), STUBS.len() + 17);
+        assert_eq!(files.len(), STUBS.len() + 26);
         for (file, _) in &files {
             assert!(root.join(file).is_file(), "{file}");
         }
@@ -798,7 +863,7 @@ mod tests {
             .find("## The starter kit's pages")
             .expect("the starter's notes");
         assert!(notes < agents.find("## Things that trip agents up").unwrap());
-        assert_eq!(agents.matches("resources/views/patterns.html").count(), 1);
+        assert_eq!(agents.matches("resources/views/components/").count(), 1);
         // The plain app has none of it.
         run_in(dir.path(), "plain", None, SQLITE).unwrap();
         let plain = read_lf(dir.path().join("plain/AGENTS.md"));

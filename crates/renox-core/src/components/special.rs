@@ -189,12 +189,62 @@ pub(super) fn block(
 ) -> Result<(), CompileError> {
     check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
     let a = attr(attrs, "name").expect("checked: required");
+    named_block(cx, "rx-block", a, children, open, close, line, out)
+}
+
+/// `<rx-outlet name="X">` is a block (`{% block X %}`, the children its default content);
+/// `<rx-outlet stack="X"/>` is `{{ stack("X") }}`. Exactly one of the two.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn outlet(
+    cx: &mut Ctx<'_, '_>,
+    contract: &Contract,
+    attrs: &[Attr<'_>],
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
+    check_attrs(contract, attrs, &[]).map_err(|m| err(line, m))?;
+    match (attr(attrs, "name"), attr(attrs, "stack")) {
+        (Some(a), None) => named_block(cx, "rx-outlet", a, children, open, close, line, out),
+        (None, Some(a)) => {
+            if super::emit::has_content(cx.src, children) {
+                return Err(err(
+                    line,
+                    "<rx-outlet stack=\"…\"> takes no content".to_owned(),
+                ));
+            }
+            let stack = text_prop(a, "rx-outlet")?;
+            out.push_str(&format!("{{{{ stack({stack}) }}}}"));
+            out.push_str(&pad(&cx.src[open.clone()]));
+            if let Some(c) = close {
+                out.push_str(&pad(&cx.src[c.clone()]));
+            }
+            Ok(())
+        }
+        _ => Err(err(
+            line,
+            "<rx-outlet> needs exactly one of the attributes \"name\" (a layout block) or \"stack\" (a stack)"
+                .to_owned(),
+        )),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn named_block(
+    cx: &mut Ctx<'_, '_>,
+    tag: &str,
+    a: &Attr<'_>,
+    children: &[Node<'_>],
+    open: &Range<usize>,
+    close: Option<&Range<usize>>,
+    line: usize,
+    out: &mut String,
+) -> Result<(), CompileError> {
     let name = a.value.unwrap_or("");
     if a.name.starts_with(':') || name.contains("{{") || name.contains("{%") {
-        return Err(err(
-            a.line,
-            "<rx-block> \"name\" must be plain text".to_owned(),
-        ));
+        return Err(err(a.line, format!("<{tag}> \"name\" must be plain text")));
     }
     let valid = !name.is_empty()
         && !name.starts_with(|c: char| c.is_ascii_digit())
@@ -202,18 +252,18 @@ pub(super) fn block(
     if !valid {
         return Err(err(
             a.line,
-            format!("<rx-block> \"name\" must be letters, digits and underscores, not \"{name}\""),
+            format!("<{tag}> \"name\" must be letters, digits and underscores, not \"{name}\""),
         ));
     }
     if children
         .iter()
         .any(|c| matches!(c, Node::Element { name, .. } if name == "rx-slot"))
     {
-        return Err(err(line, "<rx-block> has no named slots".to_owned()));
+        return Err(err(line, format!("<{tag}> has no named slots")));
     }
     out.push_str(&format!("{{% block {name} %}}"));
     out.push_str(&pad(&cx.src[open.clone()]));
-    cx.nodes(children, "rx-block", out)?;
+    cx.nodes(children, tag, out)?;
     out.push_str("{% endblock %}");
     if let Some(c) = close {
         out.push_str(&pad(&cx.src[c.clone()]));

@@ -30,12 +30,15 @@ test('rx-script and rx-style run under CSP=strict, in place and pushed', () => b
   const state = await page.eval(() => ({
     color: getComputedStyle(document.getElementById('mark')).color,
     nonces: [...document.querySelectorAll('script[nonce], style[nonce]')].map((e) => e.getAttribute('nonce')),
-    bare: document.querySelectorAll('script:not([nonce]):not([src]), style:not([nonce])').length,
+    // htmx writes its own indicator <style> at run time, without a nonce; it is not ours.
+    bare: [...document.querySelectorAll('script:not([nonce]):not([src]), style:not([nonce])')]
+      .filter((e) => !e.textContent.startsWith('.htmx-indicator'))
+      .map((e) => e.outerHTML.slice(0, 120)),
   }));
   assert.equal(state.color, 'rgb(255, 0, 0)', 'the <rx-style> rule applied');
   assert.ok(state.nonces.length >= 3, `three tags carry a nonce: ${state.nonces}`);
   assert.equal(new Set(state.nonces).size, 1, 'one nonce for the page');
-  assert.equal(state.bare, 0, 'no inline code without a nonce');
+  assert.deepEqual(state.bare, [], 'no inline code without a nonce');
   page.assertClean();
 }));
 
@@ -47,7 +50,8 @@ test('template groups, elif, loops and rx-let render without wrappers', () => br
     templates: document.querySelectorAll('#tags-box template').length,
     items: [...document.querySelectorAll('#tags-box .item')].map((e) => e.textContent),
   }));
-  assert.equal(box.text, '20 two and text 1a 2b');
+  // `<template rx-for>` writes its children one after the other, with no text between.
+  assert.equal(box.text, '20 two and text 1a2b');
   assert.equal(box.two, 'two');
   assert.equal(box.templates, 0, 'no <template> element is written');
   assert.deepEqual(box.items, ['1a', '2b']);

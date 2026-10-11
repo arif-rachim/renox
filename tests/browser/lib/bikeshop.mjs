@@ -38,3 +38,27 @@ export async function logInWithFetch(page, url, email, { keepCookies = false } =
   }
   return answer;
 }
+
+/**
+ * Logs in as a person does, in the tab it is given: types the email and
+ * password into the login form and clicks its submit button, and waits for
+ * the page to leave `/login`. Keys pressed afterwards in the same tab reach
+ * the page (#354: the login page is not at fault; a page that missed keys
+ * was a tab Chrome did not treat as focused, see `Page.press` in cdp.mjs).
+ * Keeps the session the page already has (a language chosen before logging
+ * in, say).
+ *
+ * @param {import('./cdp.mjs').Page} page
+ * @param {string} url the app's address
+ * @param {string} email
+ * @returns {Promise<string>} `"<path>"` the page ended on
+ */
+export async function logInWithForm(page, url, email) {
+  await page.goto(`${url}/login`);
+  await page.type('form input[name=email]', email);
+  await page.type('form input[name=password]', 'password');
+  await page.click('form button[type=submit]');
+  await page.waitFor(() => location.pathname !== '/login', { message: 'to leave the login page' });
+  await page.settle();
+  return page.eval(() => location.pathname);
+}

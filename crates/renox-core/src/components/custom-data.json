@@ -283,12 +283,17 @@
     {
       "attributes": [
         {
-          "description": "(required) The stack's name.",
+          "description": "A layout block's name; pages fill it. Not with `stack`.",
+          "name": "name",
+          "values": []
+        },
+        {
+          "description": "A stack's name. Not with `name`.",
           "name": "stack",
           "values": []
         }
       ],
-      "description": "Where a stack's content is written: `stack('name')`; `<rx-push>` adds to it.",
+      "description": "A hole in a layout: `name` is `{% block name %}` (the content is its default), `stack` is `stack('name')` where `<rx-push>` content lands. Exactly one of the two.",
       "name": "rx-outlet"
     },
     {

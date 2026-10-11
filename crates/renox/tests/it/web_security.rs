@@ -133,6 +133,9 @@ impl Module for Probe {
             .post("/upload/image", upload_image)
             .post("/upload/png-or-svg", upload_png_or_svg)
             .get("/private-link/{name}", private_link)
+            .get("/own-permissions", || async {
+                ([("permissions-policy", "camera=(self)")], "mine")
+            })
             .get("/boom", || async {
                 Err::<String, Error>(
                     anyhow::anyhow!("db password=hunter2 <script>alert(9)</script>").into(),
@@ -1654,6 +1657,70 @@ async fn headers_on_every_response_type() {
 }
 
 #[renox::test]
+async fn permissions_policy_is_on_every_response() {
+    let app = fixture().await;
+    let default = app
+        .get("/")
+        .await
+        .header("permissions-policy")
+        .map(str::to_owned);
+    let default = default.expect("a page has a Permissions-Policy");
+    assert!(
+        default.contains("camera=()") && default.contains("geolocation=()"),
+        "{default}"
+    );
+    let cases: Vec<(&str, TestResponse)> = vec![
+        ("json", app.request().json().get("/whoami").await),
+        (
+            "redirect",
+            app.request().header("referer", "/x").get("/back").await,
+        ),
+        ("404", app.get("/nope").await),
+        ("500", app.get("/boom").await),
+        ("422", app.htmx().post("/profile", &[]).await),
+        ("public file", app.get("/app.css").await),
+    ];
+    for (what, res) in &cases {
+        assert_eq!(
+            res.header("permissions-policy"),
+            Some(default.as_str()),
+            "{what}"
+        );
+    }
+    // A handler's own header wins.
+    app.get("/own-permissions")
+        .await
+        .assert_header("permissions-policy", "camera=(self)");
+}
+
+#[renox::test]
+async fn permissions_policy_follows_the_setting_and_ignores_csp() {
+    use renox::PermissionsMode;
+    let off = fixture_with(Auth::new(), |c| c.permissions_policy = PermissionsMode::Off).await;
+    assert!(off.get("/").await.header("permissions-policy").is_none());
+    assert!(
+        off.get("/nope")
+            .await
+            .header("permissions-policy")
+            .is_none()
+    );
+
+    let custom = fixture_with(Auth::new(), |c| {
+        c.permissions_policy = PermissionsMode::Custom("geolocation=(self)".into());
+    })
+    .await;
+    custom
+        .get("/")
+        .await
+        .assert_header("permissions-policy", "geolocation=(self)");
+
+    let no_csp = fixture_with(Auth::new(), |c| c.csp = renox::CspMode::Off).await;
+    let res = no_csp.get("/").await;
+    assert!(res.header("content-security-policy").is_none());
+    assert!(res.header("permissions-policy").is_some());
+}
+
+#[renox::test]
 async fn cors_preflight_from_disallowed_origin() {
     let app = fixture().await;
     let req = |origin: &str| {
@@ -1725,6 +1792,10 @@ async fn maintenance_mode() {
     let res = app.get("/").await;
     res.assert_status(503);
     assert_eq!(res.header("retry-after"), Some("60"));
+    assert!(
+        res.header("permissions-policy").is_some(),
+        "the 503 page too"
+    );
     app.request().json().get("/").await.assert_status(503);
     app.get("/health").await.assert_ok();
     app.request()

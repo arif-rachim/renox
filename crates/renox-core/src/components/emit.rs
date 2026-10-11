@@ -785,6 +785,9 @@ fn emit_node(
             Special::Block => {
                 special::block(&mut cx, contract, attrs, children, open, close, *line, out)
             }
+            Special::Outlet => {
+                special::outlet(&mut cx, contract, attrs, children, open, close, *line, out)
+            }
             Special::Pagination => {
                 special::pagination(&mut cx, contract, attrs, children, open, close, *line, out)
             }

@@ -356,7 +356,7 @@ async fn layout_tags_match_the_template_plumbing() {
     // The same layout twice: in tags, and as raw template code.
     write(
         "tags.html",
-        "<html><head><rx-head/><rx-ui/></head><body><rx-block name=\"content\"/><rx-block name=\"extra\"><i>default</i></rx-block><rx-outlet stack=\"js\"/><rx-toasts/></body></html>",
+        "<html><head><rx-head/><rx-ui/></head><body><rx-outlet name=\"content\"/><rx-outlet name=\"extra\"><i>default</i></rx-outlet><rx-outlet stack=\"js\"/><rx-toasts/></body></html>",
     );
     write(
         "raw.html",

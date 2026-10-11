@@ -137,7 +137,8 @@ pub use assets::{ALPINE_VERSION, CALLY_VERSION, HTMX_VERSION, IDIOMORPH_VERSION}
 pub use auth::{AuthUser, Policy};
 pub use client_ip::{ClientIp, TrustedProxies};
 pub use config::{
-    AnalyticsConfig, CacheStore, Config, CspMode, Environment, LogFormat, SessionDriver,
+    AnalyticsConfig, CacheStore, Config, CspMode, Environment, LogFormat, PermissionsMode,
+    SessionDriver,
 };
 pub use cookies::{Cookies, SetCookie};
 pub use crypto::{generate_key, random_token};

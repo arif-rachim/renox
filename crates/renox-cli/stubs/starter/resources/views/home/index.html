@@ -1,17 +1,15 @@
 <rx-page layout="layouts/public.html" title="{{ app.name }}" description="{{ t('home.lead') }}">
-  {% from "patterns.html" import hero, section_head, feature_card, steps %}
-
   {#- The public front page, made of this app's page patterns
-      (resources/views/patterns.html, styled by public/patterns.css) and its
-      components (components/figures.html): a hero, a figures strip, feature
+      (components/hero.html and friends, styled by public/patterns.css) and its
+      other components (components/figures.html): a hero, a figures strip, feature
       cards in a showcase grid and a steps list. Its texts are in
       resources/lang/en.json (`home.*`). -#}
   <rx-stack class="app-home">
-    {% call hero(t('home.title'), accent=t('home.accent'), lead=t('home.lead'), eyebrow=t('home.eyebrow'), eyebrow_icon="star") %}
+    <app-hero :title="t('home.title')" :accent="t('home.accent')" :lead="t('home.lead')" :eyebrow="t('home.eyebrow')" eyebrow-icon="star">
       <rx-link-button rx-if="auth.check" route="dashboard" label="{{ t('home.open_dashboard') }}" variant="primary" icon="layout-dashboard"/>
       <rx-link-button rx-if="not auth.check" route="register" label="{{ t('home.start') }}" variant="primary" icon="arrow-right"/>
       <rx-link-button rx-if="not auth.check" route="login" label="{{ t('home.log_in') }}" icon="log-in"/>
-    {% endcall %}
+    </app-hero>
 
     <app-figures label="{{ t('home.figures.label') }}" :items="[
       {'value': people | number, 'label': t('home.figures.people'), 'icon': 'users'},
@@ -19,23 +17,23 @@
       {'value': '1', 'label': t('home.figures.binary'), 'icon': 'package', 'tone': 'sand'},
     ]"/>
 
-    {% call section_head(t('home.features.title'), "features-title", accent=t('home.features.accent'), lead=t('home.features.lead'), more_href="https://docs.renox.rs", more_label=t('home.features.more')) %}
+    <app-section-head :title="t('home.features.title')" id="features-title" :accent="t('home.features.accent')" :lead="t('home.features.lead')" more-href="https://docs.renox.rs" :more-label="t('home.features.more')">
     <ul class="app-showcase" role="list">
-      <li>{{ feature_card(t('home.features.accounts.title'), t('home.features.accounts.text'), "circle-user") }}</li>
-      <li>{{ feature_card(t('home.features.roles.title'), t('home.features.roles.text'), "shield-check", tone="clay") }}</li>
-      <li>{{ feature_card(t('home.features.dashboard.title'), t('home.features.dashboard.text'), "chart-line", tone="sand") }}</li>
-      <li>{{ feature_card(t('home.features.activity.title'), t('home.features.activity.text'), "history", tone="ink") }}</li>
-      <li>{{ feature_card(t('home.features.notifications.title'), t('home.features.notifications.text'), "bell") }}</li>
+      <li><app-feature-card :title="t('home.features.accounts.title')" :text="t('home.features.accounts.text')" icon="circle-user"/></li>
+      <li><app-feature-card :title="t('home.features.roles.title')" :text="t('home.features.roles.text')" icon="shield-check" tone="clay"/></li>
+      <li><app-feature-card :title="t('home.features.dashboard.title')" :text="t('home.features.dashboard.text')" icon="chart-line" tone="sand"/></li>
+      <li><app-feature-card :title="t('home.features.activity.title')" :text="t('home.features.activity.text')" icon="history" tone="ink"/></li>
+      <li><app-feature-card :title="t('home.features.notifications.title')" :text="t('home.features.notifications.text')" icon="bell"/></li>
     </ul>
-    {% endcall %}
+    </app-section-head>
 
-    {% call section_head(t('home.steps.title'), "steps-title", accent=t('home.steps.accent'), lead=t('home.steps.lead')) %}
-    {{ steps([
-      {"title": t('home.steps.edit.title'), "text": t('home.steps.edit.text'), "code": "resources/views/home/index.html"},
-      {"title": t('home.steps.module.title'), "text": t('home.steps.module.text'), "code": "rnx make:module notes"},
-      {"title": t('home.steps.ship.title'), "text": t('home.steps.ship.text'), "code": "rnx build"},
-    ], label=t('home.steps.title')) }}
+    <app-section-head :title="t('home.steps.title')" id="steps-title" :accent="t('home.steps.accent')" :lead="t('home.steps.lead')">
+    <app-steps :label="t('home.steps.title')" :items="[
+      {'title': t('home.steps.edit.title'), 'text': t('home.steps.edit.text'), 'code': 'resources/views/home/index.html'},
+      {'title': t('home.steps.module.title'), 'text': t('home.steps.module.text'), 'code': 'rnx make:module notes'},
+      {'title': t('home.steps.ship.title'), 'text': t('home.steps.ship.text'), 'code': 'rnx build'},
+    ]"/>
       <p class="rx-subtitle">{{ t('home.edit') }}</p>
-    {% endcall %}
+    </app-section-head>
   </rx-stack>
 </rx-page>

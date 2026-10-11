@@ -105,6 +105,7 @@ pub struct App {
     registry: Registry,
     embedded: Option<crate::Embedded>,
     csp: crate::security::Csp,
+    permissions_policy: crate::security::PermissionsPolicy,
     provided: HashMap<std::any::TypeId, Arc<dyn std::any::Any + Send + Sync>>,
     layers: Vec<AppLayer>,
     limiters: HashMap<String, crate::rate_limit::LimitRule>,
@@ -137,6 +138,7 @@ impl App {
             registry: Registry::default(),
             embedded: None,
             csp: crate::security::Csp::default(),
+            permissions_policy: crate::security::PermissionsPolicy::default(),
             provided: HashMap::new(),
             layers: Vec::new(),
             limiters: HashMap::new(),
@@ -207,6 +209,29 @@ impl App {
     /// `.csp(|csp| { csp.allow("script-src", "https://www.googletagmanager.com"); })`.
     pub fn csp(mut self, allow: impl FnOnce(&mut crate::security::Csp)) -> Self {
         allow(&mut self.csp);
+        self
+    }
+
+    /// Allows browser features in the `Permissions-Policy`, which switches off
+    /// the ones a typical app never uses (camera, microphone, geolocation,
+    /// payment, USB…): `.permissions_policy(|p| { p.allow("geolocation", "self"); })`.
+    /// A feature can be allowed for `self`, for an origin
+    /// (`"https://pay.example.com"`) or for everyone (`"*"`). `PERMISSIONS_POLICY`
+    /// in `.env` sets the base: `default`, `off` or a full header value.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// App::new().permissions_policy(|p| {
+    ///     p.allow("camera", "self");
+    /// })
+    /// # ;
+    /// ```
+    pub fn permissions_policy(
+        mut self,
+        allow: impl FnOnce(&mut crate::security::PermissionsPolicy),
+    ) -> Self {
+        allow(&mut self.permissions_policy);
         self
     }
 
@@ -801,7 +826,8 @@ impl App {
             view_data,
             shares.iter().map(|(key, _)| key.clone()).collect(),
         );
-        let mut security = crate::security::Security::new(&config, &self.csp, &listing);
+        let mut security =
+            crate::security::Security::new(&config, &self.csp, &self.permissions_policy, &listing)?;
         security.xsrf_cookie = self.xsrf_cookie;
         let security = Arc::new(security);
         let mut mailers = HashMap::new();

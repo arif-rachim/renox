@@ -603,7 +603,7 @@ inside it, like the layers of an onion.
 Every request passes through these layers, outermost first. You rarely need the details. They
 tell you what your own middleware can count on.
 
-1. **Security headers** (nosniff, Referrer-Policy, X-Frame-Options, HSTS, the CSP) and the
+1. **Security headers** (nosniff, Referrer-Policy, X-Frame-Options, Permissions-Policy, HSTS, the CSP) and the
    client IP. (These headers tell browsers to block common tricks; the CSP, or Content
    Security Policy, says which scripts a page may run.)
 2. **Method spoofing**: a POST with `_method=PUT|PATCH|DELETE` is routed as that method (see

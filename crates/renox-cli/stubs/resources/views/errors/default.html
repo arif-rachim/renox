@@ -3,7 +3,7 @@
     also `request_line` and `template`). -#}
 <rx-page layout="layouts/app.html">
   <rx-slot name="seo"><title>{{ status }} {{ reason }} · {{ app.name }}</title></rx-slot>
-  {% set fallback = "That page isn't here. The link may be old or mistyped." if status == 404 else "Sorry, that didn't work." %}
+  <rx-let name="fallback" :value="'That page isn\'t here. The link may be old or mistyped.' if status == 404 else 'Sorry, that didn\'t work.'"/>
   <rx-card>
     <rx-empty :title="reason" :message="detail or fallback" route="home" action-label="Go to the home page"/>
   </rx-card>

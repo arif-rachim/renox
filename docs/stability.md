@@ -190,7 +190,7 @@ field for you.
 A `_` arm is the "anything else" case at the end of a `match`. With it, your `match` still
 compiles when a new variant appears.
 
-- `Error`, `Environment`, `CspMode`, `Channel`, `DbValue`, `Inspected` (a `Rule`
+- `Error`, `Environment`, `CspMode`, `PermissionsMode`, `security::PermissionsPolicy`, `Channel`, `DbValue`, `Inspected` (a `Rule`
   matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`,
   `grid::Kind`, `db::ColumnKind`, `grid::Summary`, `grid::ExportFormat`
 - the settings: `SessionDriver`, `LogFormat`, `CacheStore`, `mail::MailDriver`,
