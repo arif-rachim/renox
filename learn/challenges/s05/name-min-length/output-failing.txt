@@ -1,0 +1,19 @@
+running 1 test
+test a_name_needs_at_least_three_characters ... FAILED
+
+failures:
+
+---- a_name_needs_at_least_three_characters stdout ----
+
+thread 'a_name_needs_at_least_three_characters' panicked at tests/challenge_name_min_length.rs:37:10:
+expected status 422, got 303 See Other:
+…
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    a_name_needs_at_least_three_characters
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in …
+
+error: test failed, to rerun pass `--test challenge_name_min_length`

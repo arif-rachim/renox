@@ -1,0 +1,3 @@
+<rx-props :stock="none">
+<rx-badge rx-if="stock == 0" kind="error">Sold out</rx-badge>
+<rx-badge rx-elif="stock is not none and stock <= 3" kind="warning">Only {{ stock }} left</rx-badge>

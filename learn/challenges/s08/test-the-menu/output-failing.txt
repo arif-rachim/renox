@@ -1,0 +1,17 @@
+running 1 test
+test the_menu_index_has_its_two_tests ... FAILED
+
+failures:
+
+---- the_menu_index_has_its_two_tests stdout ----
+
+thread 'the_menu_index_has_its_two_tests' panicked at tests/challenge_test_the_menu.rs:11:5:
+tests/menu_index.rs has 0 tests marked #[renox::test]; the challenge asks for 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    the_menu_index_has_its_two_tests
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in …
+
+error: test failed, to rerun pass `--test challenge_test_the_menu`

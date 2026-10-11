@@ -1,0 +1,22 @@
+{
+  "id": "s06-drink-builder",
+  "stage": 6,
+  "title": "The drink builder: every click sends the state and gets HTML back",
+  "viewport": { "width": 1280, "height": 720 },
+  "poster_at": 5.0,
+  "steps": [
+    { "goto": "/" },
+    { "scroll": "[data-rx-live=\"drink-builder\"]" },
+    { "pause": 1000 },
+    { "click": "#size-large" },
+    { "pause": 900 },
+    { "click": "#add-shot" },
+    { "pause": 700 },
+    { "click": "#add-shot" },
+    { "pause": 900 },
+    { "click": "#remove-shot" },
+    { "pause": 900 },
+    { "click": "#size-small" },
+    { "pause": 1500 }
+  ]
+}

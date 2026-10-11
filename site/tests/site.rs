@@ -165,3 +165,15 @@ async fn the_home_page_installs_this_version() {
         env!("CARGO_PKG_VERSION")
     ));
 }
+
+#[renox::test]
+async fn the_header_links_to_the_course() {
+    let app = site().await;
+    for path in ["/", "/docs/overview"] {
+        app.get(path)
+            .await
+            .assert_ok()
+            .assert_see("href=\"https://learn.renox.rs\"")
+            .assert_see("<span>Learn</span>");
+    }
+}

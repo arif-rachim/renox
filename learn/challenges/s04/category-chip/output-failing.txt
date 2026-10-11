@@ -1,0 +1,18 @@
+running 1 test
+test the_item_page_shows_a_chip_per_category ... FAILED
+
+failures:
+
+---- the_item_page_shows_a_chip_per_category stdout ----
+
+thread 'the_item_page_shows_a_chip_per_category' panicked at tests/challenge_category_chip.rs:24:10:
+expected to see "rx-badge--info\">Coffee" in:
+…
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    the_item_page_shows_a_chip_per_category
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in …
+
+error: test failed, to rerun pass `--test challenge_category_chip`

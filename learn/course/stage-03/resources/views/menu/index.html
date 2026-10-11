@@ -1,0 +1,10 @@
+<rx-page layout="layouts/app.html" title="Menu">
+  <rx-page-header title="Menu" subtitle="What we serve today"/>
+  {# [learn:menu.table] #}
+  <rx-table :rows="items" as="item" :key="item.id" caption="Menu">
+    <rx-column label="Name"><a href="{{ route('menu.show', item.id) }}">{{ item.name }}</a></rx-column>
+    <rx-column label="Price" align="num">{{ item.price | money }}</rx-column>
+    <rx-slot name="empty"><rx-empty title="Nothing on the menu yet"/></rx-slot>
+  </rx-table>
+  {# [/learn:menu.table] #}
+</rx-page>

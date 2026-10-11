@@ -135,6 +135,7 @@ async fn language_models_get_llms_txt() {
     llms.assert_ok()
         .assert_see("# Renox\n")
         .assert_see("- [Tutorial](https://docs.renox.rs/docs/tutorial)")
+        .assert_see("- Course (learn by building an app): https://learn.renox.rs")
         .assert_see("https://renox.rs/blog/why-we-built-renox.md");
     app.get("/llms-full.txt")
         .await
@@ -181,4 +182,16 @@ async fn google_analytics_is_sent_in_production_only() {
         .to_owned();
     assert!(csp.contains("https://www.googletagmanager.com"), "{csp}");
     assert!(csp.contains("https://*.google-analytics.com"), "{csp}");
+}
+
+#[renox::test]
+async fn the_navigation_links_to_the_course() {
+    let app = site().await;
+    for path in ["/", "/blog"] {
+        app.get(path)
+            .await
+            .assert_ok()
+            .assert_see("<a href=\"https://learn.renox.rs\">Learn</a>")
+            .assert_see("<a href=\"https://learn.renox.rs\">Course</a>");
+    }
 }

@@ -1,4 +1,4 @@
-//! The course's outline: one app (a product catalog with stock) built stage
+//! The course's outline: one app (a coffee shop's menu) built stage
 //! by stage. The chapters themselves come with the content pipeline (#524);
 //! until then the home page shows what each stage will teach.
 
@@ -26,7 +26,7 @@ pub static STAGES: &[Stage] = &[
         number: 0,
         slug: "setup",
         title: "Set up and run an app",
-        summary: "Install rnx, create the catalog app and see it answer in the browser.",
+        summary: "Install rnx, create the coffee app and see it answer in the browser.",
         topics: &["rnx new", "rnx serve", "rnx doctor", ".env"],
         guide: "tutorial",
     },
@@ -34,7 +34,7 @@ pub static STAGES: &[Stage] = &[
         number: 1,
         slug: "migrations",
         title: "Migrations",
-        summary: "Create the products table with plain SQL, then let Renox write the next migration from the model.",
+        summary: "Create the categories table with plain SQL, then let Renox write the menu items table from the model.",
         topics: &[
             "up.sql / down.sql",
             "rnx migrate",
@@ -47,10 +47,10 @@ pub static STAGES: &[Stage] = &[
         number: 2,
         slug: "models",
         title: "Models",
-        summary: "Turn the table into a Rust struct and query it with columns the compiler checks.",
+        summary: "Turn the tables into Rust structs and query them with columns the compiler checks.",
         topics: &[
             "#[derive(Model)]",
-            "Product::PRICE.lt(…)",
+            "MenuItem::PRICE.lt(…)",
             "find_or_404",
             "save",
         ],
@@ -60,7 +60,7 @@ pub static STAGES: &[Stage] = &[
         number: 3,
         slug: "pages",
         title: "Routes and pages",
-        summary: "Add a route, read the products in a handler and show them in a page made of rx- tags.",
+        summary: "Add a route, read the menu in a handler and show them in a page made of rx- tags.",
         topics: &["Routes", "view(…)", "<rx-page>", "<rx-table>"],
         guide: "routing",
     },
@@ -68,7 +68,7 @@ pub static STAGES: &[Stage] = &[
         number: 4,
         slug: "components",
         title: "Your own components",
-        summary: "Write an <app-price-tag> once and use it everywhere, with props the compiler checks.",
+        summary: "Write an <app-price-tag> once and use it on every page, with props the compiler checks.",
         topics: &[
             "rnx make:component",
             "<rx-props>",
@@ -81,7 +81,7 @@ pub static STAGES: &[Stage] = &[
         number: 5,
         slug: "forms",
         title: "Forms and validation",
-        summary: "Add products through a form whose errors appear next to the fields, without a reload.",
+        summary: "Add menu items through a form whose errors appear next to the fields, without a reload.",
         topics: &[
             "#[derive(Validate)]",
             "Valid<T>",
@@ -107,7 +107,7 @@ pub static STAGES: &[Stage] = &[
         number: 7,
         slug: "live-and-models",
         title: "A live component on a model",
-        summary: "A stock editor that keeps only the product's id, reads the model and saves it after checking the user may.",
+        summary: "A stock counter that keeps only the menu item's id, reads the model and saves it after checking the user may.",
         topics: &["LiveContext::mount", "data()", "authorize", "<live-…>"],
         guide: "live",
     },

@@ -2471,11 +2471,13 @@ dependencies = [
 name = "renox-learn"
 version = "1.1.0"
 dependencies = [
+ "pulldown-cmark",
  "renox",
  "renox-site",
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

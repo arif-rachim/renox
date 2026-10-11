@@ -1,0 +1,19 @@
+{
+  "id": "s07-stock-counter",
+  "stage": 7,
+  "title": "The stock counter: selling a portion and restocking",
+  "viewport": { "width": 1280, "height": 720 },
+  "poster_at": 4.0,
+  "login": { "email": "bea@example.com", "password": "password123" },
+  "steps": [
+    { "goto": "/menu/7" },
+    { "scroll": "[data-rx-live=\"stock-counter\"]" },
+    { "pause": 1000 },
+    { "click": "#sell" },
+    { "pause": 800 },
+    { "click": "#sell" },
+    { "pause": 800 },
+    { "click": "#restock-6" },
+    { "pause": 1500 }
+  ]
+}

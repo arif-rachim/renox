@@ -40,6 +40,7 @@
     <a href="/#pipeline">Under the hood</a>
     <a href="/#bench">Benchmarks</a>
     <a href="/blog"{% if route_is('blog.*') %} aria-current="page"{% endif %}>Blog</a>
+    <a href="{{ links.learn }}">Learn</a>
     <a href="{{ links.docs }}">Docs</a>
   </nav>
   <span class="sp"></span>
@@ -53,7 +54,7 @@
   <div class="foot__brand"><a class="logo" href="/"><i aria-hidden="true">R</i>renox</a>
     <p>A batteries-included web framework for Rust. Open source, MIT OR Apache-2.0. This site is built with Renox.</p></div>
   <nav aria-label="Documentation"><h2>Learn</h2>
-    <a href="{{ links.docs }}/docs/tutorial">Tutorial</a><a href="{{ links.docs }}/docs/overview">Documentation</a><a href="{{ links.docs }}/docs/laravel">Coming from Laravel</a><a href="{{ links.docs }}/docs/cheatsheet">Cheat sheet</a></nav>
+    <a href="{{ links.learn }}">Course</a><a href="{{ links.docs }}/docs/tutorial">Tutorial</a><a href="{{ links.docs }}/docs/overview">Documentation</a><a href="{{ links.docs }}/docs/laravel">Coming from Laravel</a><a href="{{ links.docs }}/docs/cheatsheet">Cheat sheet</a></nav>
   <nav aria-label="Project"><h2>Project</h2>
     <a href="{{ links.github }}" rel="noopener">GitHub</a><a href="{{ links.demo }}">Live demo</a><a href="/blog">Blog</a><a href="/blog/feed.xml">Atom feed</a></nav>
   <nav aria-label="For machines"><h2>For machines</h2>

@@ -6,6 +6,8 @@ use serde::Serialize;
 
 /// The docs site.
 pub const DOCS: &str = "https://docs.renox.rs";
+/// The course.
+pub const LEARN: &str = "https://learn.renox.rs";
 /// The repository.
 pub const REPOSITORY: &str = "https://github.com/arif-rachim/renox";
 /// The live demo.

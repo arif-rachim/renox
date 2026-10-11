@@ -1,0 +1,4 @@
+# Every stage builds into one directory, so the dependencies (Renox and all it
+# needs) compile once for the nine apps.
+[build]
+target-dir = "target"

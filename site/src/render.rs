@@ -203,7 +203,7 @@ pub fn code_panel(language: &str, code: &str) -> String {
 
 /// A callout's class, icon and title: GitHub's `> [!NOTE]` kinds. A plain
 /// quote has none.
-fn callout(kind: Option<BlockQuoteKind>) -> Option<(&'static str, &'static str, &'static str)> {
+pub fn callout(kind: Option<BlockQuoteKind>) -> Option<(&'static str, &'static str, &'static str)> {
     Some(match kind? {
         BlockQuoteKind::Tip => ("tip", "lightbulb", "Tip"),
         BlockQuoteKind::Important => ("important", "circle-alert", "Important"),
@@ -229,7 +229,7 @@ fn is_doctest(kind: &CodeBlockKind) -> bool {
 }
 
 /// The text of a heading's events.
-fn plain_text(events: &[Event]) -> String {
+pub fn plain_text(events: &[Event]) -> String {
     let mut text = String::new();
     for event in events {
         if let Event::Text(t) | Event::Code(t) = event {
@@ -256,7 +256,9 @@ pub fn slugify(text: &str) -> String {
     }
 }
 
-fn unique_id(slug: &str, ids: &mut HashSet<String>) -> String {
+/// `slug`, or `slug-1`, `slug-2`… when `ids` already has it; the result is
+/// added to `ids`.
+pub fn unique_id(slug: &str, ids: &mut HashSet<String>) -> String {
     if ids.insert(slug.to_owned()) {
         return slug.to_owned();
     }

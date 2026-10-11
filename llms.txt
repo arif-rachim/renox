@@ -57,7 +57,10 @@
 - [www/](www): renox.rs, the landing page and blog (a Renox app: Markdown posts in
   www/content/blog, JSON-LD, Atom feed, sitemap, llms.txt).
 - [learn/](learn): learn.renox.rs, the course that builds one app stage by stage (a Renox
-  app; so far the outline of the stages, epic #538).
+  app, epic #538): the outline of the stages and the chapters, Markdown files in
+  learn/content/stages with `learn:` directives (include, changes, screenshot, video,
+  challenge, quiz; each stage also at /stages/{slug}.md); see learn/README.md "Writing a chapter" (screenshots: learn/media/screens.mjs; videos: learn/media/record.mjs, encode.sh, manifest.mjs, upload.sh, listed in learn/content/media.json). The course app (a coffee shop's
+  menu) is learn/course/stage-00 ... stage-08, standalone apps run by learn/course/run.sh.
 - `rnx new <name> --starter` (files in crates/renox-cli/stubs/starter/): a whole app to start
   from: sidebar layout with the notification bell, email verification, roles (`Permissions`),
   a dashboard, a users page that changes roles, the activity log (`Audit`), `users:admin`,

@@ -1,0 +1,34 @@
+running 4 tests
+test the_allergens_column_is_nullable ... FAILED
+test the_down_file_removes_the_column ... FAILED
+test the_migration_rolls_back_and_runs_again ... FAILED
+test the_model_has_the_field ... ok
+
+failures:
+
+---- the_allergens_column_is_nullable stdout ----
+
+thread 'the_allergens_column_is_nullable' panicked at tests/challenge_add_allergens.rs:29:10:
+called `Result::unwrap()` on an `Err` value: Database(SqliteError { code: 1, message: "no such column: allergens" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- the_down_file_removes_the_column stdout ----
+
+thread 'the_down_file_removes_the_column' panicked at tests/challenge_add_allergens.rs:68:5:
+assertion `left == right` failed: one .down.sql file should mention allergens
+  left: 0
+ right: 1
+
+---- the_migration_rolls_back_and_runs_again stdout ----
+
+thread 'the_migration_rolls_back_and_runs_again' panicked at tests/challenge_add_allergens.rs:50:30:
+called `Result::unwrap()` on an `Err` value: Database(SqliteError { code: 1, message: "no such column: allergens" })
+
+failures:
+    the_allergens_column_is_nullable
+    the_down_file_removes_the_column
+    the_migration_rolls_back_and_runs_again
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in …
+
+error: test failed, to rerun pass `--test challenge_add_allergens`

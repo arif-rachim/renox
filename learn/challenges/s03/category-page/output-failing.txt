@@ -1,0 +1,18 @@
+running 1 test
+test a_category_lists_its_available_items ... FAILED
+
+failures:
+
+---- a_category_lists_its_available_items stdout ----
+
+thread 'a_category_lists_its_available_items' panicked at tests/challenge_category_page.rs:18:10:
+expected status 200, got 404 Not Found:
+…
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    a_category_lists_its_available_items
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in …
+
+error: test failed, to rerun pass `--test challenge_category_page`

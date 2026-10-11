@@ -28,12 +28,14 @@ function freePort() {
 /**
  * Starts `binary` (a package's binary name) from `dir` (relative to the
  * repository). `env` adds or overrides variables, e.g. `{ CSP: 'strict' }`.
+ * `target` is the cargo target directory holding the binary (default:
+ * CARGO_TARGET_DIR, else the repository's `target`), for apps built apart.
  */
-export async function start(binary, dir, { env = {}, seed = false } = {}) {
+export async function start(binary, dir, { env = {}, seed = false, target = TARGET } = {}) {
   const port = await freePort();
   const data = mkdtempSync(join(tmpdir(), `renox-${binary}-`));
   const cwd = join(ROOT, dir);
-  const exe = join(TARGET, 'debug', binary);
+  const exe = join(target, 'debug', binary);
   const vars = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,

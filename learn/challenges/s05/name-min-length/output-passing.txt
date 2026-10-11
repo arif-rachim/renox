@@ -1,0 +1,4 @@
+running 1 test
+test a_name_needs_at_least_three_characters ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in …

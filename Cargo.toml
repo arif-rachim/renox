@@ -1,7 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "examples/*", "site", "www", "learn", "tests/browser/fixture", "tests/chaos"]
-# The course app of learn.renox.rs is its own workspace, one app per stage (#525).
+members = ["crates/*", "examples/*", "site", "www", "lear[n]", "tests/browser/fixture", "tests/chaos"]
+# learn.renox.rs is a member (written as a glob: cargo only lets `exclude` apply to a
+# folder inside a member when the member is a glob). Its course app is nine standalone
+# apps, one per stage, sharing one target directory (#525).
 exclude = ["learn/course"]
 
 [workspace.package]

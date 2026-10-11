@@ -1,0 +1,331 @@
+<rx-page layout="layouts/app.html">
+<rx-slot name="seo">{{ seo(title="Design · Learn Renox", description="Every component of learn.renox.rs.") }}<meta name="robots" content="noindex"></rx-slot>
+<div class="wrap">
+  <header class="design__head">
+    <h1>Design system</h1>
+    <p class="design__note">renox.rs's tokens, fonts and patterns for a course. Chapters sit on paper; the header, footer, hero and code panels are dark in both modes. Use the toggle in the header to see the other mode.</p>
+    <nav class="design__index" aria-label="Components">
+      <a rx-for="c in components" href="#c-{{ c }}">{{ c }}</a>
+    </nav>
+  </header>
+
+  <section class="design__item" id="c-tokens" data-component="tokens">
+    <h2 class="design__name">tokens</h2>
+    <p class="design__note">The colour roles in the current mode. Every colour comes from a token; nothing below the tokens in learn.css defines one.</p>
+    <div class="design__swatches">
+      <figure class="design__swatch design__swatch--page"><span></span><figcaption>--learn-page</figcaption></figure>
+      <figure class="design__swatch design__swatch--surface"><span></span><figcaption>--learn-surface</figcaption></figure>
+      <figure class="design__swatch design__swatch--text"><span></span><figcaption>--learn-text</figcaption></figure>
+      <figure class="design__swatch design__swatch--text-2"><span></span><figcaption>--learn-text-2</figcaption></figure>
+      <figure class="design__swatch design__swatch--meta"><span></span><figcaption>--learn-meta</figcaption></figure>
+      <figure class="design__swatch design__swatch--link"><span></span><figcaption>--learn-link</figcaption></figure>
+      <figure class="design__swatch design__swatch--accent"><span></span><figcaption>--accent</figcaption></figure>
+      <figure class="design__swatch design__swatch--ok"><span></span><figcaption>--learn-ok</figcaption></figure>
+      <figure class="design__swatch design__swatch--warn"><span></span><figcaption>--learn-warn</figcaption></figure>
+      <figure class="design__swatch design__swatch--bad"><span></span><figcaption>--learn-bad</figcaption></figure>
+      <figure class="design__swatch design__swatch--code"><span></span><figcaption>--bg (code)</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="design__item" id="c-type" data-component="type">
+    <h2 class="design__name">type</h2>
+    <p class="design__note">One line per --learn-type-* token. Inter for text, JetBrains Mono for code, eyebrows, numbers and meta.</p>
+    <div class="design__type">
+      <p class="design__type-hero">Hero and section titles<small>--learn-type-hero</small></p>
+      <p class="design__type-h1">Page titles<small>--learn-type-h1</small></p>
+      <p class="design__type-h2">Chapter headings<small>--learn-type-h2</small></p>
+      <p class="design__type-h3">Sub-headings<small>--learn-type-h3</small></p>
+      <p class="design__type-h4">Small headings<small>--learn-type-h4</small></p>
+      <p class="design__type-card">Card titles<small>--learn-type-card</small></p>
+      <p class="design__type-lead">The lead paragraph under a title.<small>--learn-type-lead</small></p>
+      <p class="design__type-prose">Reading text in a chapter.<small>--learn-type-prose</small></p>
+      <p class="design__type-ui">Interface text.<small>--learn-type-ui</small></p>
+      <p class="design__type-small">Small interface text.<small>--learn-type-small</small></p>
+      <p class="design__type-tag">Tags and eyebrows<small>--learn-type-tag</small></p>
+      <p class="design__type-meta">Meta lines and captions<small>--learn-type-meta</small></p>
+      <p class="design__type-code">let price = 450;<small>--learn-type-code</small></p>
+      <p class="design__type-button">Button text<small>--learn-type-button</small></p>
+    </div>
+  </section>
+
+  <section class="design__item" id="c-header" data-component="header">
+    <h2 class="design__name">header</h2>
+    <p class="design__note">The real one, at the top of this page: a dark bar with the logo tile, three links and the theme toggle. Every page uses it (layouts/app.html).</p>
+  </section>
+
+  <section class="design__item" id="c-footer" data-component="footer">
+    <h2 class="design__name">footer</h2>
+    <p class="design__note">The real one, at the bottom of this page: dark, with the brand and a list of links. Every page uses it (layouts/app.html).</p>
+  </section>
+
+  <section class="design__item" id="c-theme-toggle" data-component="theme-toggle">
+    <h2 class="design__name">theme-toggle</h2>
+    <p class="design__note">The header's button. It shows only with JavaScript, flips light and dark, and remembers the choice under renox-learn:theme. A static copy in the pressed state, on the header's dark bar:</p>
+    <div class="design__dark"><button type="button" class="nav__theme" aria-pressed="true">Light</button></div>
+  </section>
+
+  <section class="design__item" id="c-eyebrow" data-component="eyebrow">
+    <h2 class="design__name">eyebrow</h2>
+    <p class="design__note">A mono uppercase tag with a number: three digits for sections on the home page, two for stages.</p>
+    <p class="eyebrow"><b>001</b> The stages</p>
+    <p class="eyebrow"><b aria-hidden="true">●</b> A course in 9 stages</p>
+  </section>
+
+  <section class="design__item" id="c-buttons" data-component="buttons">
+    <h2 class="design__name">buttons</h2>
+    <p class="design__note">The kit's rx-button, coloured like renox.rs's: an orange primary with dark text, a ghost secondary, a plain one. Never rx-button--danger.</p>
+    <div class="design__row">
+      <button type="button" class="rx-button rx-button--primary">Start stage 0</button>
+      <button type="button" class="rx-button rx-button--secondary">Show the solution</button>
+      <button type="button" class="rx-button rx-button--plain">Skip</button>
+      <button type="button" class="rx-button rx-button--primary" disabled>Check</button>
+      <button type="button" class="rx-button rx-button--secondary" aria-pressed="true">I passed it</button>
+    </div>
+  </section>
+
+  <section class="design__item" id="c-hero" data-component="hero">
+    <h2 class="design__name">hero</h2>
+    <p class="design__note">The home page's opening, dark in both modes.</p>
+    <header class="hero"><div class="wrap">
+      <p class="eyebrow"><b aria-hidden="true">●</b> A course in 9 stages</p>
+      <h3 class="hero__title">Build a web app in Rust with Renox, <span class="accent">one stage at a time.</span></h3>
+      <p class="hero__lead">You build one app, a coffee shop, from <code>rnx new</code> to a live component with tests.</p>
+      <p class="hero__ctas"><a class="rx-button rx-button--primary" href="#main">Start with stage 0 <rx-icon name="arrow-right"/></a></p>
+    </div></header>
+  </section>
+
+  <section class="design__item" id="c-section" data-component="section">
+    <h2 class="design__name">section</h2>
+    <p class="design__note">A light band on grid paper (dark mode: the dark page with faint lines), with an eyebrow and a title. The home page's stages sit in one.</p>
+    <section class="band band--paper gridlines" aria-labelledby="design-band-title"><div class="wrap">
+      <p class="eyebrow"><b>001</b> The stages</p>
+      <h3 id="design-band-title" class="band__title">Nine stages, one app</h3>
+    </div></section>
+  </section>
+
+  <section class="design__item" id="c-stage-card" data-component="stage-card">
+    <h2 class="design__name">stage-card</h2>
+    <p class="design__note">Home page, filled by #524 (links) and #535 (done). Three states: coming soon, available, done.</p>
+    <ol class="stages" role="list">
+      <li class="stage">
+        <span class="stage__number" aria-hidden="true">00</span>
+        <div class="stage__body">
+          <h3 class="stage__title"><span class="visually-hidden">Stage 0: </span>Set up and run an app</h3>
+          <p class="stage__summary">Install rnx, create the coffee app and see it answer in the browser.</p>
+          <ul class="topics" role="list" aria-label="What it covers"><li><code>rnx new</code></li><li><code>rnx serve</code></li></ul>
+          <p class="stage__more">Coming soon. Until then, the guide: <a href="{{ links.docs }}/docs/tutorial">tutorial</a>.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage__number" aria-hidden="true">01</span>
+        <div class="stage__body">
+          <h3 class="stage__title"><a href="#main"><span class="rx-visually-hidden">Stage 1: </span>Migrations</a></h3>
+          <p class="stage__summary">Create the menu table with plain SQL, then let Renox write the next migration.</p>
+          <ul class="topics" role="list" aria-label="What it covers"><li><code>up.sql / down.sql</code></li><li><code>rnx migrate</code></li></ul>
+        </div>
+      </li>
+      <li class="stage is-done">
+        <span class="stage__number" aria-hidden="true">02</span>
+        <div class="stage__body">
+          <h3 class="stage__title"><a href="#main"><span class="rx-visually-hidden">Stage 2: </span>Models</a></h3>
+          <span class="stage__done rx-badge rx-badge--success">Done</span>
+          <p class="stage__summary">Turn the table into a Rust struct and query it.</p>
+          <ul class="topics" role="list" aria-label="What it covers"><li><code>#[derive(Model)]</code></li></ul>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="design__item" id="c-continue" data-component="continue">
+    <h2 class="design__name">continue</h2>
+    <p class="design__note">Home page, #535: the way back to the stage the reader was on.</p>
+    <p class="continue" data-learn-continue><a class="rx-button rx-button--primary" href="#main">Continue: <span>Stage 1: Migrations</span> <rx-icon name="arrow-right"/></a></p>
+  </section>
+
+  <section class="design__item" id="c-reset" data-component="reset">
+    <h2 class="design__name">reset</h2>
+    <p class="design__note">Home page, #535: forgets the reader's progress, after a confirmation.</p>
+    <details class="reset" data-learn-reset><summary>Reset my progress</summary><p>This forgets which stages and challenges you finished, in this browser only.</p><button type="button" class="rx-button rx-button--secondary" data-learn-reset-confirm>Forget everything</button></details>
+    <p role="status" class="reset__status">Your progress was cleared.</p>
+  </section>
+
+  <section class="design__item" id="c-crumbs" data-component="crumbs">
+    <h2 class="design__name">crumbs</h2>
+    <p class="design__note">Stage pages, #524: where the reader is.</p>
+    <nav class="crumbs design__bare" aria-label="Breadcrumb"><ol><li><a href="/">Course</a></li><li aria-current="page">Stage 3</li></ol></nav>
+  </section>
+
+  <section class="design__item" id="c-chapter-head" data-component="chapter-head">
+    <h2 class="design__name">chapter-head</h2>
+    <p class="design__note">Stage pages, #524: the stage's eyebrow, title and one-sentence summary.</p>
+    <header class="chapter__head">
+      <p class="eyebrow"><b>03</b> Stage 3 · 25 min</p>
+      <h3 class="chapter__title">A page</h3>
+      <p class="chapter__summary">Add the menu page: a route, a handler and a template that lists the items.</p>
+    </header>
+  </section>
+
+  <section class="design__item" id="c-chapter" data-component="chapter">
+    <h2 class="design__name">chapter</h2>
+    <p class="design__note">Stage pages, #524: the table of contents beside the text from 900 px, above it on a phone. The text column is 720 px wide.</p>
+    <div class="chapter">
+      <aside class="toc" aria-label="Chapter layout sample"><p class="toc__title">Beside the text</p></aside>
+      <div class="prose"><p>The reading column, at the measure of renox.rs's blog.</p></div>
+    </div>
+  </section>
+
+  <section class="design__item" id="c-toc" data-component="toc">
+    <h2 class="design__name">toc</h2>
+    <p class="design__note">Stage pages, #524: the headings of the page. Sticky beside the text from 900 px, a box above it on a phone.</p>
+    <aside class="toc" aria-labelledby="toc-title"><p class="toc__title" id="toc-title">On this page</p>
+      <ol><li><a href="#main">Add the route</a></li><li class="toc__h3"><a href="#main">The handler</a></li><li><a href="#main">The template</a></li></ol>
+    </aside>
+  </section>
+
+  <section class="design__item" id="c-prose" data-component="prose">
+    <h2 class="design__name">prose</h2>
+    <p class="design__note">Everything a chapter's Markdown becomes: headings, links, lists, inline code, a table, a rule and a fold-out.</p>
+    <div class="prose">
+      <h2>Add the route</h2>
+      <p>A route connects a path to a <a href="{{ links.docs }}/docs/routing">handler</a>. Open <code>src/app/menu/mod.rs</code> and add <code>Routes::new().get("/menu", index)</code>.</p>
+      <h3>The handler</h3>
+      <ul><li>Read the items with <code>MenuItem::query()</code>.</li><li>Return a <code>View</code>.</li></ul>
+      <ol><li>Save the file.</li><li>Reload the page.</li></ol>
+      <h4>A table</h4>
+      <table><thead><tr><th>Item</th><th>Price</th><th>Stock</th></tr></thead><tbody><tr><td>Espresso</td><td>$3.00</td><td>12</td></tr><tr><td>Flat white</td><td>$4.50</td><td>8</td></tr></tbody></table>
+      <hr>
+      <details><summary>Why cents?</summary><p>Money is stored as whole cents, so sums are exact.</p></details>
+    </div>
+  </section>
+
+  <section class="design__item" id="c-kbd" data-component="kbd">
+    <h2 class="design__name">kbd</h2>
+    <p class="design__note">Keys the reader presses.</p>
+    <p><kbd>Ctrl</kbd> + <kbd>C</kbd> stops the server.</p>
+  </section>
+
+  <section class="design__item" id="c-code-panel" data-component="code-panel">
+    <h2 class="design__name">code-panel</h2>
+    <p class="design__note">The docs' code panel dressed as renox.rs's terminal, dark in both modes. The Copy button appears once #524's learn.js is loaded.</p>
+    {{ code_rust | safe }}
+    {{ code_bash | safe }}
+    {{ code_text | safe }}
+  </section>
+
+  <section class="design__item" id="c-code-file" data-component="code-file">
+    <h2 class="design__name">code-file</h2>
+    <p class="design__note">A file of the course app, named above its code: the output of the <code>learn:include</code> directive for a stage 1 file.</p>
+    {{ code_file | safe }}
+  </section>
+
+  <section class="design__item" id="c-changes" data-component="changes">
+    <h2 class="design__name">changes</h2>
+    <p class="design__note">What a stage changed in each file, as a fold-out diff: the output of the <code>learn:changes</code> directive for stage 2.</p>
+    {{ changes | safe }}
+  </section>
+
+  <section class="design__item" id="c-callouts" data-component="callouts">
+    <h2 class="design__name">callouts</h2>
+    <p class="design__note">Five kinds and a plain quote, as the docs write them.</p>
+    <div class="prose">
+      {{ callouts | safe }}
+    </div>
+  </section>
+
+  <section class="design__item" id="c-shot" data-component="shot">
+    <h2 class="design__name">shot</h2>
+    <p class="design__note">Stage pages, #533: a screenshot of the course app, wide and phone.</p>
+    <figure class="learn-shot"><img src="/img/s03/menu-list.webp" alt="The menu page: a table listing each drink and pastry with its price." width="1280" height="800" loading="lazy" decoding="async"><figcaption>The menu after stage 3</figcaption></figure>
+    <figure class="learn-shot learn-shot--phone"><img src="/img/s03/menu-phone.webp" alt="The same menu page on a phone: the table fits the narrow screen." width="390" height="844" loading="lazy" decoding="async"><figcaption>The same page on a phone</figcaption></figure>
+  </section>
+
+  <section class="design__item" id="c-video" data-component="video">
+    <h2 class="design__name">video</h2>
+    <p class="design__note">Stage pages, #534: a short recording. This sample has no source, so it loads nothing.</p>
+    <figure class="learn-video"><video controls preload="none" playsinline width="1280" height="720" aria-label="A recording of the menu page"></video><figcaption>Adding an item to the menu</figcaption></figure>
+    {{ video | safe }}
+  </section>
+
+  <section class="design__item" id="c-quiz" data-component="quiz">
+    <h2 class="design__name">quiz</h2>
+    <p class="design__note">Stage pages, #524 (markup) and #535 (answers). Three states: unanswered, correct, wrong.</p>
+    <form class="learn-quiz" data-quiz="design-open">
+      <p class="eyebrow"><b>?</b> Quick check</p>
+      <fieldset>
+        <legend class="learn-quiz__question">Where does <code>rnx serve</code> answer by default?</legend>
+        <label class="learn-quiz__choice"><input type="radio" name="quiz-design-open" value="0"> <span>http://localhost:8000</span></label>
+        <label class="learn-quiz__choice"><input type="radio" name="quiz-design-open" value="1"> <span>http://127.0.0.1:3000</span></label>
+      </fieldset>
+      <p class="learn-quiz__result" role="status" aria-live="polite"></p>
+      <button type="submit" class="rx-button rx-button--primary learn-quiz__check" disabled>Check</button>
+    </form>
+    <form class="learn-quiz is-correct" data-quiz="design-correct">
+      <p class="eyebrow"><b>?</b> Quick check</p>
+      <fieldset>
+        <legend class="learn-quiz__question">Where is a price stored?</legend>
+        <label class="learn-quiz__choice"><input type="radio" name="quiz-design-correct" value="0" checked> <span>As whole cents</span></label>
+        <label class="learn-quiz__choice"><input type="radio" name="quiz-design-correct" value="1"> <span>As a decimal string</span></label>
+      </fieldset>
+      <p class="learn-quiz__result" role="status" aria-live="polite">Correct.</p>
+      <div class="learn-quiz__explain"><p>Whole cents keep sums exact; the money filter shows dollars.</p></div>
+      <button type="submit" class="rx-button rx-button--primary learn-quiz__check">Check</button>
+    </form>
+    <form class="learn-quiz is-wrong" data-quiz="design-wrong">
+      <p class="eyebrow"><b>?</b> Quick check</p>
+      <fieldset>
+        <legend class="learn-quiz__question">Which command applies migrations?</legend>
+        <label class="learn-quiz__choice"><input type="radio" name="quiz-design-wrong" value="0" checked> <span>rnx serve</span></label>
+        <label class="learn-quiz__choice"><input type="radio" name="quiz-design-wrong" value="1"> <span>rnx migrate</span></label>
+      </fieldset>
+      <p class="learn-quiz__result" role="status" aria-live="polite">Not quite. Try again.</p>
+      <button type="submit" class="rx-button rx-button--primary learn-quiz__check">Check</button>
+    </form>
+  </section>
+
+  <section class="design__item" id="c-challenge" data-component="challenge">
+    <h2 class="design__name">challenge</h2>
+    <p class="design__note">Stage pages: a task solved on the reader's machine, the real cheap-items section. Shown plain and passed.</p>
+    <div class="prose">
+      {{ challenge | safe }}
+      {{ challenge_passed | safe }}
+    </div>
+  </section>
+
+  <section class="design__item" id="c-done-button" data-component="done-button">
+    <h2 class="design__name">done-button</h2>
+    <p class="design__note">Stage pages, #535: the reader marks a stage as done. Both states.</p>
+    <div class="design__row">
+      <button type="button" class="rx-button rx-button--secondary learn-done design__bare" data-learn-done aria-pressed="false">Mark this stage as done</button>
+      <button type="button" class="rx-button rx-button--secondary learn-done design__bare" data-learn-done aria-pressed="true">Done</button>
+    </div>
+  </section>
+
+  <section class="design__item" id="c-going-deeper" data-component="going-deeper">
+    <h2 class="design__name">going-deeper</h2>
+    <p class="design__note">Stage pages, #524: the guide that goes further.</p>
+    <p class="deeper design__bare"><rx-icon name="book-open"/> Going deeper: <a href="{{ links.docs }}/docs/routing">the routing guide</a></p>
+  </section>
+
+  <section class="design__item" id="c-pager" data-component="pager">
+    <h2 class="design__name">pager</h2>
+    <p class="design__note">Stage pages, #524: the previous and next stage, or a note that the next one is coming.</p>
+    <nav class="pager" aria-label="Stages">
+      <a class="pager__link" rel="prev" href="#main"><span class="pager__label">← Previous</span><span class="pager__name">Stage 2: Models</span></a>
+      <a class="pager__link pager__link--next" rel="next" href="#main"><span class="pager__label">Next →</span><span class="pager__name">Stage 4: Components</span></a>
+    </nav>
+    <p class="pager__soon">Next: Stage 5, Forms, coming soon.</p>
+  </section>
+
+  <section class="design__item" id="c-problem" data-component="problem">
+    <h2 class="design__name">problem</h2>
+    <p class="design__note">Stage pages, #524: a mistake in a chapter's Markdown, shown instead of the chapter in debug builds.</p>
+    <div class="learn-problem" role="alert">content/stages/01-migrations.md:14: unknown directive "inclde"</div>
+  </section>
+
+  <section class="design__item" id="c-placeholder" data-component="placeholder">
+    <h2 class="design__name">placeholder</h2>
+    <p class="design__note">Stage pages, #524: stands in for a directive whose content arrives with a later issue.</p>
+    <div class="learn-placeholder" data-directive="include">Code: stage-02/src/app/menu/model.rs</div>
+  </section>
+</div>
+</rx-page>

@@ -16,6 +16,9 @@ pub mod render;
 use content::{PAGES, Section};
 use render::{RENDERED, REPOSITORY};
 
+/// The course.
+pub const LEARN: &str = "https://learn.renox.rs";
+
 pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())
@@ -24,6 +27,9 @@ pub fn app() -> App {
             env.add_function("icon", |name: String| {
                 renox::minijinja::Value::from_safe_string(icons::svg(&name))
             });
+        })
+        .share("learn", |_ctx: renox::view::ViewContext| async move {
+            Ok(LEARN)
         })
         .module(Docs)
 }
