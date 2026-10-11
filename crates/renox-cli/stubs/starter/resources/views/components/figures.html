@@ -2,9 +2,6 @@
 {#- <app-figures :items="[…]" label="…"/>: figures side by side, one row on every screen.
     `items` are `{"value": …, "label": …, "icon": …, "tone": …}`; `label` names the strip
     for screen readers. -#}
-{% from "patterns.html" import icon_circle %}
 <ul class="app-figures" aria-label="{{ label }}">
-  {%- for item in items %}
-  <li class="app-figures__item">{% if item.icon %}{{ icon_circle(item.icon, tone=item.tone | default(none)) }}{% endif %}<span class="app-figures__value">{{ item.value }}</span><span class="app-figures__label">{{ item.label }}</span></li>
-  {%- endfor %}
+  <li rx-for="item in items" class="app-figures__item"><app-icon-circle rx-if="item.icon" :icon="item.icon" :tone="item.tone | default(none)"/><span class="app-figures__value">{{ item.value }}</span><span class="app-figures__label">{{ item.label }}</span></li>
 </ul>

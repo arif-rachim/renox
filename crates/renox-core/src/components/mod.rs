@@ -752,7 +752,19 @@ mod tests {
             c("<rx-outlet stack=\"scripts\"/>"),
             "{{ stack(\"scripts\") }}"
         );
-        assert!(msg("<rx-outlet/>").contains("needs the attribute \"stack\""));
+        assert!(msg("<rx-outlet/>").contains("exactly one of"));
+        assert!(msg("<rx-outlet name=\"a\" stack=\"b\"/>").contains("\"name\""));
+        assert!(msg("<rx-outlet name=\"a\" stack=\"b\"/>").contains("\"stack\""));
+        assert!(msg("<rx-outlet stack=\"a\">x</rx-outlet>").contains("takes no content"));
+        assert!(msg("<rx-outlet name=\"a-b\"/>").contains("letters, digits and underscores"));
+        assert_eq!(
+            c("<rx-outlet name=\"content\"/>"),
+            "{% block content %}{% endblock %}"
+        );
+        assert_eq!(
+            c("<rx-outlet name=\"seo\">{{ seo() }}</rx-outlet>"),
+            "{% block seo %}{{ seo() }}{% endblock %}"
+        );
         assert!(msg("<rx-head>x</rx-head>").contains("takes no content"));
         assert!(msg("<rx-head foo=\"1\"/>").contains("has no"));
         assert!(msg("<rx-outlt stack=\"a\"/>").contains("did you mean <rx-outlet>"));

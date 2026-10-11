@@ -6,11 +6,11 @@
     {'value': totals.verified | number, 'label': t('users.figures.verified'), 'icon': 'circle-check', 'tone': 'sand'},
   ]"/>
   <rx-grid :page="users">
-    {%- if column.key == "roles" -%}
-      {%- for role in row.roles %}<rx-badge :kind="'info' if role == 'admin' else none">{{ role }}</rx-badge> {% else %}<span class="rx-subtitle">{{ t('users.no_role') }}</span>{% endfor -%}
-    {%- elif column.key == "actions" -%}
-      <rx-open-button id="roles-{{ row.id }}" label="{{ t('users.roles') }}" size="small"/>
-    {%- endif -%}
+    <template rx-if="column.key == 'roles'">
+      <template rx-for="role in row.roles"><rx-badge :kind="'info' if role == 'admin' else none">{{ role }}</rx-badge> </template>
+      <span rx-if="not row.roles" class="rx-subtitle">{{ t('users.no_role') }}</span>
+    </template>
+    <rx-open-button rx-elif="column.key == 'actions'" id="roles-{{ row.id }}" label="{{ t('users.roles') }}" size="small"/>
   </rx-grid>
   {#- A sheet per person to change their roles: a form sent with htmx; errors
       stay in the sheet, a success refreshes the page. -#}

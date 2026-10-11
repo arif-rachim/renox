@@ -429,9 +429,18 @@ export class Page {
       }
       if (arrived) return;
       if (attempt >= 3) {
-        process.stderr.write(`cdp: the ${key} key never reached the page\n`);
+        const state = await this.eval(() => ({
+          hasFocus: document.hasFocus(),
+          visibility: document.visibilityState,
+          active: document.activeElement?.outerHTML.slice(0, 80),
+          readyState: document.readyState,
+        })).catch((e) => String(e));
+        process.stderr.write(`cdp: the ${key} key never reached the page: ${JSON.stringify(state)}\n`);
         return;
       }
+      // Bring the tab to the front and make it the active target, then
+      // make sure the document counts as focused before sending again.
+      await fetch(`http://127.0.0.1:${this.port}/json/activate/${this.target.id}`).catch(() => {});
       await this.send('Page.bringToFront');
       await sleep(100 * attempt);
     }

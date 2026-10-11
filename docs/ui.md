@@ -1198,6 +1198,10 @@ A `<template>` takes no other attribute, and one with no `rx-` attribute (Alpine
   `{% block bookmarks %}…{% endblock %}`, and self-closing (`<rx-block name="content"/>`) it
   leaves an empty one for a page to fill. `name` is plain text: letters, digits and underscores.
   `.fragment("bookmarks")` in Rust keeps working, because it is a Jinja block.
+  In a layout, write the same hole as `<rx-outlet name="content"/>`; its children are the
+  block's default content (`<rx-outlet name="seo">{{ seo() }}</rx-outlet>`). `rx-outlet` takes
+  exactly one of `name` or `stack`, and it is an error to give both or neither. (Deviation from
+  #516: `<rx-block>` is also allowed inside `<rx-page>`, where the examples use it.)
 - **`rx-mail`** is a mail's layout (see [Mails as tags](#mails-as-tags)).
 - **`rx-pagination`** writes the page links: `<rx-pagination :page="bookmarks"/>` is
   `pagination(bookmarks)` of `renox/pagination.html`, or `simple_pagination` for a `SimplePage`
@@ -1205,7 +1209,7 @@ A `<template>` takes no other attribute, and one with no `rx-` attribute (Alpine
 - **The layout's plumbing** has tags too, with no content: `<rx-head/>` is `{{ renox_head() }}`,
   `<rx-ui/>` is `{{ renox_ui() }}` (`<rx-ui :styles="false"/>` leaves out the stylesheet),
   `<rx-toasts/>` is `{{ toasts() }}`, and `<rx-outlet stack="scripts"/>` is
-  `{{ stack('scripts') }}`, where `rx-push` content ends up. (The tag is not `rx-stack`: that is
+  `{{ stack('scripts') }}` (and `<rx-outlet name="content"/>` is a layout block), where `rx-push` content ends up. (The tag is not `rx-stack`: that is
   the vertical layout.)
 - **`rx-form`** writes the `<form>`, the CSRF field, and `_method` for `PUT`, `PATCH` and `DELETE`.
   A `GET` form gets neither. `live` turns on live validation. Its fields are `rx-input`,
@@ -1354,7 +1358,8 @@ A 1.0 template keeps working: its `{% from "renox/ui.html" import … %}` and `{
 | `rx-stack`, `rx-row` | none: a `div` with the kit's class |
 | `rx-block` | `{% block name %}…{% endblock %}` |
 | `rx-pagination` | `pagination(page)` or `simple_pagination(page)` of `renox/pagination.html` |
-| `rx-head`, `rx-ui`, `rx-toasts`, `rx-outlet` | the template functions `renox_head()`, `renox_ui()`, `toasts()`, `stack(name)` |
+| `rx-head`, `rx-ui`, `rx-toasts` | the template functions `renox_head()`, `renox_ui()`, `toasts()` |
+| `rx-outlet` | `name`: `{% block name %}…{% endblock %}` (the children are its default); `stack`: `stack(name)`. Exactly one |
 | `rx-let` | `{% with name = value %}` around the rest of the element |
 | `rx-script`, `rx-style` | `<script nonce="{{ csp_nonce() }}">`, `<style nonce="{{ csp_nonce() }}">` |
 | `<template rx-if>`, `rx-elif`, `rx-else`, `rx-for` | `{% if %}`, `{% elif %}`, `{% else %}`, `{% for %}` around the children |
@@ -2523,7 +2528,7 @@ the filters (`money`, `date`, `number`…), `t()`, `route()`, `asset()`, `can()`
 | `{% for x in xs %}…{% endfor %}` | `rx-for="x in xs"`, on an element, a component or `<template>`; `loop.index` and the others still work |
 | `{% set label = … %}` | `<rx-let name="label" :value="…"/>` for a local alias |
 | `<script nonce="{{ csp_nonce() }}">`, `<style nonce="…">` | `<rx-script>`, `<rx-style>` |
-| `{% extends %}`, `{% block %}` | `<rx-page layout="…">`, `<rx-block name="…">` |
+| `{% extends %}`, `{% block %}` | `<rx-page layout="…">`, `<rx-outlet name="…"/>` in a layout, `<rx-block name="…">` |
 | `{% call push('scripts') %}`, `{{ stack('scripts') }}` | `<rx-push stack="scripts">`, `<rx-outlet stack="scripts"/>` |
 | `{% from "renox/ui.html" import card %}` and `{% call card() %}` | the kit's tags, `<rx-card>`; your own components as `<app-…>` |
 | `{{ icon("bike") }}`, `{% call columns(2) %}`, `{{ thumbnail(src) }}` | `<rx-icon name="bike"/>`, `<rx-columns count="2">`, `<rx-thumbnail :src="src"/>` |

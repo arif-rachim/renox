@@ -420,8 +420,8 @@ and `rnx view:check` names a wrong one with its file and line.
    Macros with no tag: group, tab_panel. renox_ui(styles=false) loads only the script (styles published with ui:publish). #}
 
 {# The layout's plumbing as tags: <rx-head/> {{ renox_head() }}, <rx-ui/> {{ renox_ui() }} (<rx-ui :styles="false"/>),
-   <rx-toasts/> {{ toasts() }}, <rx-outlet stack="scripts"/> {{ stack('scripts') }}; <rx-block name="content"/> a block
-   a page fills; <rx-pagination :page="products"/> the page links. #}
+   <rx-toasts/> {{ toasts() }}, <rx-outlet stack="scripts"/> {{ stack('scripts') }}; <rx-outlet name="content"/> a layout block
+   a page fills (children = its default; name or stack, not both); <rx-pagination :page="products"/> the page links. #}
 
 {# Control flow: rx-if / rx-elif / rx-else / rx-for on any element or component; <template rx-if="a">text and siblings</template>
    <template rx-else>…</template> and <template rx-for="x in xs">…</template> write their children with no wrapper.
@@ -2253,6 +2253,12 @@ fn secured(app: App) -> App {
     })
     // The CSRF token also as an `XSRF-TOKEN` cookie, accepted back in `X-XSRF-TOKEN` (axios).
     .xsrf_cookie()
+    // The Permissions-Policy switches off camera, microphone, geolocation, payment, USB...
+    // (`PERMISSIONS_POLICY=default|off|<header value>`); allow what the app uses.
+    .permissions_policy(|p| {
+        p.allow("geolocation", "self")
+            .allow("payment", "https://pay.example.com");
+    })
     // TRUSTED_HOSTS=example.com,*.example.com: other `Host`s get a 400.
 }
 
@@ -2513,7 +2519,7 @@ table, no 4 KB limit, a new id at each login/logout), `MAIL_FROM_ADDRESS`, `MAIL
 `STORAGE_DISK` (`local` | `s3`, with `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`,
 `S3_SECRET_ACCESS_KEY`, and `STORAGE_URL` for the bucket's public URL), `UPLOAD_MAX_SIZE` (MB, 10),
 `RUST_LOG` (e.g. `info,sqlx=warn`), `LOG_FORMAT` (`text` | `json`), `LOG_FILE` (append to this file instead of stdout),
-`CSP` (`relaxed` | `strict` | `off`), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
+`CSP` (`relaxed` | `strict` | `off`), `PERMISSIONS_POLICY` (`default` | `off` | a header value), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
 proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).
 Timeouts in seconds: `DATABASE_ACQUIRE_TIMEOUT` (5), `DATABASE_STATEMENT_TIMEOUT` (30,
 PostgreSQL; 0 = none), `REQUEST_TIMEOUT` (60; 0 = none), `MAIL_TIMEOUT` (10).

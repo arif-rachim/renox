@@ -188,6 +188,28 @@ Two exceptions:
 - `APP_URL`'s host is always allowed;
 - `/health` answers for any host, because load balancers check it by IP address.
 
+### `PERMISSIONS_POLICY`: browser features the app switches off
+
+Every response carries a `Permissions-Policy` header. By default it turns off the browser
+features a typical app never uses: accelerometer, autoplay, bluetooth, camera, display capture,
+geolocation, gyroscope, HID, magnetometer, microphone, MIDI, payment, serial, USB and WebXR. A
+compromised page, or a script injected into it, can't then switch on the camera or read the
+location. The features Renox's own scripts use (the copy buttons' clipboard write, for
+example) are not in the list.
+
+- `PERMISSIONS_POLICY=default`: that list (also when the variable is empty or missing).
+- `PERMISSIONS_POLICY=off` (also `false`, `none`): no header.
+- `PERMISSIONS_POLICY=geolocation=(self), camera=()`: your own header value instead of the list.
+  Write origins in quotes: `payment=(self "https://pay.example.com")`. A value the header can't
+  carry stops the app at boot, naming the variable.
+
+An app that really uses a feature allows it in code, on top of whichever base is set:
+`app.permissions_policy(|p| { p.allow("geolocation", "self"); })`. A handler that sets its own
+`Permissions-Policy` keeps it. `CSP=off` doesn't switch this header off.
+
+An app that asked for the location without this header will now be refused it until it allows
+`geolocation`: check before you deploy.
+
 ### Headers the proxy must keep
 
 Routes for other hosts (`Routes::domain("admin.example.com", …)`) are picked by the `Host`

@@ -83,6 +83,8 @@ pub(crate) enum Special {
     Push,
     /// `rx-block`.
     Block,
+    /// `rx-outlet`.
+    Outlet,
     /// `rx-pagination`.
     Pagination,
     /// `rx-let`.
@@ -575,10 +577,21 @@ pub(crate) static BUILTIN: &[Contract] = &[
     },
     Contract {
         tag: "rx-outlet",
-        doc: "Where a stack's content is written: `stack('name')`; `<rx-push>` adds to it.",
-        render: Render::Function("stack"),
-        props: &[text("stack", true, "The stack's name.")],
-        slots: &[],
+        doc: "A hole in a layout: `name` is `{% block name %}` (the content is its default), `stack` is `stack('name')` where `<rx-push>` content lands. Exactly one of the two.",
+        render: Render::Special(Special::Outlet),
+        props: &[
+            text(
+                "name",
+                false,
+                "A layout block's name; pages fill it. Not with `stack`.",
+            ),
+            text("stack", false, "A stack's name. Not with `name`."),
+        ],
+        slots: &[Slot {
+            optional: true,
+            doc: "With `name`: the block's default content.",
+            ..DEFAULT_SLOT
+        }],
         events: &[],
         route_prop: None,
         attrs: false,

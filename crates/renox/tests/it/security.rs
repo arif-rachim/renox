@@ -182,6 +182,37 @@ async fn the_policy_can_be_extended_or_turned_off() {
 }
 
 #[renox::test]
+async fn an_app_allows_features_in_the_permissions_policy() {
+    let (app, _dir) = app(
+        |_| {},
+        |a| {
+            a.permissions_policy(|p| {
+                p.allow("geolocation", "self")
+                    .allow("payment", "https://pay.example.com");
+            })
+        },
+    )
+    .await;
+    let res = app.get("/").await;
+    let policy = res.header("permissions-policy").unwrap();
+    assert!(policy.contains("geolocation=(self)"), "{policy}");
+    assert!(
+        policy.contains(r#"payment=("https://pay.example.com")"#),
+        "{policy}"
+    );
+    assert!(policy.contains("camera=()"), "{policy}");
+}
+
+#[renox::test]
+async fn a_bad_permissions_policy_origin_fails_at_boot() {
+    let app = App::new().permissions_policy(|p| {
+        p.allow("camera", "two words");
+    });
+    let err = app.boot().await.err().expect("boot fails");
+    assert!(format!("{err:#}").contains("permissions_policy"), "{err:#}");
+}
+
+#[renox::test]
 async fn production_over_https_gets_hsts() {
     let (app, _dir) = app(
         |c| {

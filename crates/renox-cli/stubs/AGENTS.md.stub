@@ -77,12 +77,14 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 ## Things that trip agents up
 
 - **Write pages with `rx-*` tags** (`<rx-input>`, `<rx-card>`, `<rx-table>`…; every tag and prop is
-  in docs/ui.md and the framework's `components/contracts.rs`). Use a kit macro
-  (`{% from "renox/ui.html" import … %}`) only where no tag exists, and run `rnx view:check`
-  after editing templates.
+  in docs/ui.md and the framework's `components/contracts.rs`). Don't write
+  template statements (`if`, `for`, `set`, `extends`, `block`, `call`, `from … import`): the tags
+  have a way for each (`rx-if`/`rx-elif`/`rx-else`/`rx-for` on an element or on `<template>`,
+  `<rx-let>`, `<rx-page layout=…>`, `<rx-outlet name=…/>`, `<rx-push>`, `<app-…>` components;
+  docs/ui.md "No raw MiniJinja"). Run `rnx view:check` after editing templates.
 - Component tags (`<rx-card>`, `<app-price-tag>`, `rx-if`/`rx-for`, docs/ui.md "Components as
   tags") are rewritten when a template loads. In an attribute, `title="{{ x }}"` is the value of
-  `x` and `:title="x"` is an expression (no `{{ }}` after the colon); `{% %}` there is an error.
+  `x` and `:title="x"` is an expression (no `{{ }}` after the colon); a statement there is an error.
   `rx-else` goes on the very next sibling of its `rx-if` element, and never follows `rx-for`.
   `class` is not allowed on kit tags (only on `rx-stack`, `rx-row`, `rx-form`).  An `<app-…>` file needs `<rx-props>` first.
   Form tags: `<rx-repeater>` gives its content `row` and `prefix` (`name="{{ prefix }}[qty]"`);
@@ -249,7 +251,8 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   exports need the `xlsx` feature (`renox = { …, features = ["xlsx"] }`); CSV and the print
   page work without it.
 - A script or `<meta>` a page or component needs goes through the layout's stacks:
-  `{% call push('scripts', once='chart') %}…{% endcall %}` (`stack('head')`, `stack('scripts')`).
+  `<rx-push stack="scripts" once="chart">…</rx-push>`, drawn by `<rx-outlet stack="scripts"/>`
+  (and `<rx-outlet stack="head"/>`) in the layout.
 - If `resources/css/app.css` exists, the app uses Tailwind: `rnx serve` rebuilds
   `public/css/app.css`; commit that file. Use utilities for layout and the kit for controls.
 - Tests: `#[renox::test] async fn …() { let app = TestApp::new({{crate_name}}::app()).await; … }`,
@@ -267,6 +270,10 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `state.http`.
 - `v.each("tags", &self.tags, |t| t.required().max(20))` keys errors `tags.0`, `tags.1`…:
   `assert_invalid("tags.1")` in tests; `error('tags')` in a template shows the first.
+- Every response carries a `Permissions-Policy` that switches off camera, microphone, geolocation,
+  payment, USB and similar features. If the app uses one, allow it with
+  `app.permissions_policy(|p| { p.allow("geolocation", "self"); })`; `PERMISSIONS_POLICY=off`
+  removes the header (`CSP=off` does not).
 
 ## Checks before you finish
 

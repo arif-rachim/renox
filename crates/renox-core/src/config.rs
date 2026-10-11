@@ -60,6 +60,36 @@ impl CspMode {
     }
 }
 
+/// The `Permissions-Policy` header, from `PERMISSIONS_POLICY`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum PermissionsMode {
+    /// Switches off the features a typical app never uses (camera,
+    /// microphone, geolocation, payment, USB…); `App::permissions_policy`
+    /// allows some back.
+    #[default]
+    Default,
+    /// No `Permissions-Policy` header.
+    Off,
+    /// This header value as the base, e.g. `geolocation=(self), camera=()`.
+    Custom(String),
+}
+
+impl PermissionsMode {
+    fn parse(value: &str) -> anyhow::Result<Self> {
+        let value = value.trim();
+        match value.to_ascii_lowercase().as_str() {
+            "default" | "" => Ok(Self::Default),
+            "off" | "false" | "none" => Ok(Self::Off),
+            _ => {
+                crate::security::parse_permissions_policy(value)
+                    .with_context(|| format!("PERMISSIONS_POLICY is not usable: `{value}`"))?;
+                Ok(Self::Custom(value.to_owned()))
+            }
+        }
+    }
+}
+
 setting_enum! {
     /// Where sessions live, from `SESSION_DRIVER`.
     pub enum SessionDriver ("SESSION_DRIVER") {
@@ -174,6 +204,9 @@ pub struct Config {
     pub live_snapshot_max: usize,
     /// The Content-Security-Policy, from `CSP` (`relaxed`, `strict` or `off`).
     pub csp: CspMode,
+    /// The Permissions-Policy, from `PERMISSIONS_POLICY` (`default`, `off` or a
+    /// full header value such as `geolocation=(self), camera=()`).
+    pub permissions_policy: PermissionsMode,
     /// Values `var()` returns before looking at the environment, e.g. a
     /// webhook secret set in a test with `TestApp::with_config`.
     pub vars: std::collections::HashMap<String, String>,
@@ -200,6 +233,7 @@ impl std::fmt::Debug for Config {
             .field("port", &self.port)
             .field("views_path", &self.views_path)
             .field("public_path", &self.public_path)
+            .field("permissions_policy", &self.permissions_policy)
             .field("session_lifetime", &self.session_lifetime)
             .field("session_cookie", &self.session_cookie)
             .field("session_driver", &self.session_driver)
@@ -417,6 +451,7 @@ impl Config {
                 .and_then(|kb| kb.checked_mul(1024))
                 .context("LIVE_SNAPSHOT_MAX_SIZE must be a number of kilobytes")?,
             csp: CspMode::parse(&v.or("CSP", "relaxed"))?,
+            permissions_policy: PermissionsMode::parse(&v.or("PERMISSIONS_POLICY", "default"))?,
             trusted_proxies: crate::TrustedProxies::read(&v.or("TRUSTED_PROXIES", ""))?,
             trusted_hosts: v
                 .or("TRUSTED_HOSTS", "")
@@ -492,6 +527,7 @@ impl Default for Config {
             upload_max_size: 10 * 1024 * 1024,
             live_snapshot_max: 64 * 1024,
             csp: CspMode::Relaxed,
+            permissions_policy: PermissionsMode::Default,
             vars: Default::default(),
             analytics: AnalyticsConfig::default(),
             trusted_proxies: Default::default(),
@@ -571,6 +607,7 @@ mod tests {
         assert_eq!(c.request_timeout, Some(Duration::from_secs(60)));
         assert_eq!(c.cache_store, CacheStore::Memory);
         assert_eq!(c.csp, CspMode::Relaxed);
+        assert_eq!(c.permissions_policy, PermissionsMode::Default);
         assert!(c.key.is_none() && c.mail.port.is_none());
     }
 
@@ -639,6 +676,7 @@ mod tests {
             ("MAIL_USERNAME", ""),
             ("MAIL_FAILOVER", "backup, log"),
             ("CSP", "strict"),
+            ("PERMISSIONS_POLICY", "geolocation=(self), camera=()"),
             ("TRUSTED_PROXIES", "10.0.0.0/8"),
             ("TRUSTED_HOSTS", "shop.example.com, *.Example.org"),
             ("S3_BUCKET", "files"),
@@ -655,9 +693,33 @@ mod tests {
         assert_eq!(c.mail.username, None, "empty means unset");
         assert_eq!(c.mail.failover, ["backup", "log"]);
         assert_eq!(c.csp, CspMode::Strict);
+        assert_eq!(
+            c.permissions_policy,
+            PermissionsMode::Custom("geolocation=(self), camera=()".into())
+        );
         assert!(c.trusted_proxies.contains("10.1.2.3".parse().unwrap()));
         assert_eq!(c.trusted_hosts, ["shop.example.com", "*.example.org"]);
         assert_eq!(c.storage.bucket.as_deref(), Some("files"));
+    }
+
+    #[test]
+    fn permissions_policy_takes_default_off_or_a_header_value() {
+        for (value, want) in [
+            ("", PermissionsMode::Default),
+            ("DEFAULT", PermissionsMode::Default),
+            ("off", PermissionsMode::Off),
+            ("false", PermissionsMode::Off),
+            (
+                "camera=(self \"https://a.example\"), payment=*",
+                PermissionsMode::Custom("camera=(self \"https://a.example\"), payment=*".into()),
+            ),
+        ] {
+            let c = load(&[("PERMISSIONS_POLICY", value)]).unwrap();
+            assert_eq!(c.permissions_policy, want, "{value}");
+        }
+        // `CSP=off` leaves it alone.
+        let c = load(&[("CSP", "off")]).unwrap();
+        assert_eq!(c.permissions_policy, PermissionsMode::Default);
     }
 
     #[test]
@@ -672,6 +734,9 @@ mod tests {
             ("UPLOAD_MAX_SIZE", "99999999999999999"),
             ("MAIL_PORT", "99999"),
             ("CSP", "loose"),
+            ("PERMISSIONS_POLICY", "camera"),
+            ("PERMISSIONS_POLICY", "Camera=(self)"),
+            ("PERMISSIONS_POLICY", "camera=(http://x.example)"),
             ("TRUSTED_PROXIES", "proxy.local"),
             ("SESSION_DRIVER", "redis"),
             ("CACHE_STORE", "redis"),

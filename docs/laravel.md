@@ -907,7 +907,7 @@ starter kit:
 
 - a sidebar layout with the notification bell, and the kit's tab bar on phones;
 - a public home page and branded sign-in pages, made of page patterns the app owns
-  (`resources/views/patterns.html` and `public/patterns.css`: a hero, section headings,
+  (`resources/views/components/` and `public/patterns.css`: a hero, section headings,
   feature cards, a figures strip, a summary with totals, steps, empty states);
 - a dashboard with a welcome card and stat cards;
 - roles (`admin`, `member`);

@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { Browser } from './lib/cdp.mjs';
 import { start } from './lib/app.mjs';
-import { logInWithFetch } from './lib/bikeshop.mjs';
+import { logInWithForm } from './lib/bikeshop.mjs';
 
 const PHONE = { width: 390, height: 844 };
 const ENGLISH = ['Renox features used, and why', 'Under the hood', 'In the guide', 'Source files'];
@@ -267,11 +267,10 @@ describe('bikeshop in Spanish', () => {
         await spanish(page);
         await page.goto(`${app.url}/login`);
         assert.ok((await page.text('body')).includes('Iniciar sesión'), "Renox's login page in Spanish");
-        // The form's own fields, sent with fetch in this session (the
-        // language stays): a tab that submits it by a click can get no key
-        // presses afterwards in CI (#354), and Esc closes the sheet below.
-        const status = await logInWithFetch(page, app.url, 'owner@bikeshop.test', { keepCookies: true });
-        assert.ok(!status.endsWith(' /login'), `logged in as the owner (${status})`);
+        // Logged in through the form, in this tab (the language stays), and
+        // Esc closes the sheet below in the same tab (#354).
+        const path = await logInWithForm(page, app.url, 'owner@bikeshop.test');
+        assert.ok(path !== '/login', 'logged in as the owner');
         await page.goto(`${app.url}/staff/roles`);
         const roles = await page.text('main');
         assert.ok(roles.includes('Encargado de tienda') && roles.includes('Leer el registro de actividad.'), 'the roles in Spanish');

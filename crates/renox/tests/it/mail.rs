@@ -158,11 +158,13 @@ async fn tagged_mails_render_byte_for_byte_like_the_template_statements() {
         },
     };
     let html = |view: &str| {
+        // Windows checks templates out with CRLF; the generated parts use LF.
         state
             .mail_view("a@b.test", "s", view, ctx.clone())
             .unwrap()
             .html
             .unwrap()
+            .replace("\r\n", "\n")
     };
     let new = html("mail/new");
     assert_eq!(new, html("mail/old"));

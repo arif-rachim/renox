@@ -2,7 +2,7 @@
 //! over a period (`?period=`, `renox::chart::Period`), new sign-ups as a
 //! chart, a summary with totals, and what the signed-in person did lately
 //! (the activity log). The template is `resources/views/dashboard/show.html`,
-//! made of the app's page patterns (`resources/views/patterns.html`).
+//! made of the app's page patterns (`resources/views/components/`).
 
 use renox::audit;
 use renox::chart::{Period, Trend};

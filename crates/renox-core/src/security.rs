@@ -1,7 +1,9 @@
 //! Security headers on every response: a Content-Security-Policy (see
 //! [`CspMode`], `CSP` in `.env`),
-//! `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, and HSTS
-//! in production over https. A header the handler already set is kept.
+//! `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, a
+//! `Permissions-Policy` (see [`PermissionsPolicy`], `PERMISSIONS_POLICY` in
+//! `.env`), and HSTS in production over https. A header the handler already
+//! set is kept.
 //!
 //! Allow another site's scripts, images or frames with [`App::csp`](crate::App::csp):
 //!
@@ -17,6 +19,10 @@
 //!
 //! With `CSP=strict`, inline scripts need the request's nonce:
 //! `<script nonce="{{ csp_nonce() }}">…</script>`.
+//!
+//! The `Permissions-Policy` switches off the browser features a typical app
+//! never uses (camera, microphone, geolocation, payment, USB…). Allow the one
+//! your app needs with [`App::permissions_policy`](crate::App::permissions_policy).
 
 use std::collections::{BTreeMap, HashSet};
 use std::convert::Infallible;
@@ -32,7 +38,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
 use crate::AppState;
-use crate::config::{Config, CspMode, Environment};
+use crate::config::{Config, CspMode, Environment, PermissionsMode};
 use crate::routing::RouteInfo;
 
 /// Sources an app adds to the Content-Security-Policy, per directive.
@@ -51,6 +57,179 @@ impl Csp {
             .push(source.trim().to_owned());
         self
     }
+}
+
+/// The features the default `Permissions-Policy` switches off. The framework's
+/// own scripts use none of them: `navigator.clipboard.writeText` (the copy
+/// buttons) is allowed for the page's own origin by the browsers' default,
+/// which this list leaves alone, and neither fullscreen, the date picker, file
+/// inputs nor the editors need a gated feature.
+const DEFAULT_OFF: &[&str] = &[
+    "accelerometer",
+    "autoplay",
+    "bluetooth",
+    "camera",
+    "display-capture",
+    "geolocation",
+    "gyroscope",
+    "hid",
+    "magnetometer",
+    "microphone",
+    "midi",
+    "payment",
+    "serial",
+    "usb",
+    "xr-spatial-tracking",
+];
+
+/// Features an app allows on top of the `Permissions-Policy`, from
+/// [`App::permissions_policy`](crate::App::permissions_policy).
+///
+/// The default policy switches off the browser features a typical app never
+/// uses (`camera`, `microphone`, `geolocation`, `payment`, `usb`…); each
+/// [`allow`](PermissionsPolicy::allow) turns one back on, for the site itself,
+/// for another origin or for everyone.
+///
+/// ```
+/// # use renox::prelude::*;
+/// # let _ =
+/// App::new().permissions_policy(|p| {
+///     p.allow("geolocation", "self")
+///         .allow("payment", "https://pay.example.com");
+/// })
+/// # ;
+/// ```
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct PermissionsPolicy {
+    extra: Vec<(String, String)>,
+}
+
+impl PermissionsPolicy {
+    /// Allows `feature` (e.g. `geolocation`, `camera`) for `origin`: `self`
+    /// (this site), `*` (everyone) or an origin such as
+    /// `https://pay.example.com`. Calling it again adds more origins. A name
+    /// or origin the header cannot carry makes the app fail at boot.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let mut p = renox::security::PermissionsPolicy::default();
+    /// p.allow("camera", "self").allow("camera", "https://scan.example.com");
+    /// ```
+    pub fn allow(&mut self, feature: &str, origin: &str) -> &mut Self {
+        self.extra.push((
+            feature.trim().to_ascii_lowercase(),
+            origin.trim().to_owned(),
+        ));
+        self
+    }
+}
+
+/// One feature of the policy with its allowlist, tokens as they are written
+/// in the header (`self`, `*`, `"https://x"`).
+type Feature = (String, Vec<String>);
+
+fn check_feature(name: &str) -> anyhow::Result<()> {
+    if name.is_empty()
+        || !name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+    {
+        anyhow::bail!("`{name}` is not a feature name (lowercase letters, digits and dashes)");
+    }
+    Ok(())
+}
+
+/// An origin as the header writes it: `self` and `*` bare, the rest quoted.
+fn origin_token(origin: &str) -> anyhow::Result<String> {
+    let origin = origin.trim().trim_matches('"');
+    match origin {
+        "self" | "*" | "src" => Ok(origin.to_owned()),
+        _ if origin.is_empty()
+            || origin
+                .bytes()
+                .any(|b| b.is_ascii_control() || b" \"(),;".contains(&b)) =>
+        {
+            anyhow::bail!("`{origin}` is not an origin (`self`, `*` or like `https://x.example`)")
+        }
+        _ => Ok(format!("\"{origin}\"")),
+    }
+}
+
+/// Reads a full header value (`geolocation=(self), camera=()`).
+pub(crate) fn parse_permissions_policy(value: &str) -> anyhow::Result<Vec<Feature>> {
+    let mut features: Vec<Feature> = Vec::new();
+    for part in value.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        let (name, list) = part
+            .split_once('=')
+            .ok_or_else(|| anyhow::anyhow!("`{part}` should look like `feature=(self)`"))?;
+        let name = name.trim();
+        check_feature(name)?;
+        let list = list.trim();
+        let inner = match list.strip_prefix('(') {
+            Some(rest) => rest
+                .strip_suffix(')')
+                .ok_or_else(|| anyhow::anyhow!("`{part}` is missing a `)`"))?,
+            None => list,
+        };
+        let tokens = inner
+            .split_whitespace()
+            .map(|token| {
+                if !matches!(token, "self" | "*" | "src") && !token.starts_with('"') {
+                    anyhow::bail!("`{token}` needs quotes: `\"{token}\"`");
+                }
+                origin_token(token)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        features.push((name.to_owned(), tokens));
+    }
+    if features.is_empty() {
+        anyhow::bail!("it names no feature");
+    }
+    Ok(features)
+}
+
+/// The header value, or `None` when the policy is off.
+fn permissions_header(
+    mode: &PermissionsMode,
+    app: &PermissionsPolicy,
+) -> anyhow::Result<Option<String>> {
+    let mut features: Vec<Feature> = match mode {
+        PermissionsMode::Off => return Ok(None),
+        PermissionsMode::Default => DEFAULT_OFF
+            .iter()
+            .map(|name| ((*name).to_owned(), Vec::new()))
+            .collect(),
+        PermissionsMode::Custom(value) => parse_permissions_policy(value)?,
+    };
+    for (name, origin) in &app.extra {
+        check_feature(name).map_err(|e| anyhow::anyhow!("App::permissions_policy: {e}"))?;
+        let token = origin_token(origin)
+            .map_err(|e| anyhow::anyhow!("App::permissions_policy({name}): {e}"))?;
+        let at = match features.iter().position(|(n, _)| n == name) {
+            Some(at) => at,
+            None => {
+                features.push((name.clone(), Vec::new()));
+                features.len() - 1
+            }
+        };
+        if !features[at].1.contains(&token) {
+            features[at].1.push(token);
+        }
+    }
+    Ok(Some(
+        features
+            .iter()
+            .map(|(name, tokens)| {
+                if tokens.iter().any(|t| t == "*") {
+                    format!("{name}=*")
+                } else {
+                    format!("{name}=({})", tokens.join(" "))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", "),
+    ))
 }
 
 /// The request's CSP nonce, also `csp_nonce()` in templates.
@@ -77,6 +256,8 @@ pub(crate) struct Security {
     pub mode: CspMode,
     /// The policy, with `{nonce}` where each request's nonce goes.
     policy: Option<String>,
+    /// The `Permissions-Policy` value; `None` when `PERMISSIONS_POLICY=off`.
+    permissions: Option<String>,
     hsts: bool,
     /// (method, path pattern) of routes marked `without_csrf()`; method `*` is any.
     csrf_exempt: HashSet<(String, String)>,
@@ -89,7 +270,13 @@ pub(crate) struct Security {
 }
 
 impl Security {
-    pub fn new(config: &Config, csp: &Csp, routes: &[RouteInfo]) -> Self {
+    pub fn new(
+        config: &Config,
+        csp: &Csp,
+        permissions: &PermissionsPolicy,
+        routes: &[RouteInfo],
+    ) -> anyhow::Result<Self> {
+        let permissions = permissions_header(&config.permissions_policy, permissions)?;
         let script = match config.csp {
             CspMode::Strict => format!("'self' 'nonce-{NONCE}'"),
             _ => "'self' 'unsafe-inline' 'unsafe-eval'".to_owned(),
@@ -150,15 +337,16 @@ impl Security {
             .filter(|route| route.middleware.iter().any(|m| m.starts_with("webhook:")))
             .map(|route| route.path.clone())
             .collect();
-        Self {
+        Ok(Self {
             webhook_paths,
             mode: config.csp,
             policy,
+            permissions,
             hsts: config.env == Environment::Production && config.url.starts_with("https://"),
             csrf_exempt,
             xsrf_cookie: false,
             trusted_hosts: trusted_hosts(config),
-        }
+        })
     }
 
     /// Whether the app answers requests for `host` (`TRUSTED_HOSTS`).
@@ -333,6 +521,9 @@ pub(crate) async fn middleware(
     if security.hsts {
         set(STRICT_TRANSPORT_SECURITY, "max-age=31536000");
     }
+    if let Some(policy) = &security.permissions {
+        set(HeaderName::from_static("permissions-policy"), policy);
+    }
     // Not on a 304: the browser keeps the policy it stored with the page,
     // whose nonce is the one in that page.
     if let Some(policy) = &security.policy
@@ -353,6 +544,80 @@ mod tests {
     use axum::response::IntoResponse;
 
     use super::*;
+
+    fn header(mode: PermissionsMode, build: impl FnOnce(&mut PermissionsPolicy)) -> String {
+        let mut app = PermissionsPolicy::default();
+        build(&mut app);
+        permissions_header(&mode, &app).unwrap().unwrap()
+    }
+
+    #[test]
+    fn the_default_policy_switches_features_off() {
+        let h = header(PermissionsMode::Default, |_| {});
+        assert!(
+            h.starts_with("accelerometer=(), autoplay=(), bluetooth=()"),
+            "{h}"
+        );
+        assert!(
+            h.contains("camera=()") && h.contains("xr-spatial-tracking=()"),
+            "{h}"
+        );
+        assert!(!h.contains("clipboard") && !h.contains("fullscreen"), "{h}");
+    }
+
+    #[test]
+    fn an_app_allows_features_back() {
+        let h = header(PermissionsMode::Default, |p| {
+            p.allow("geolocation", "self")
+                .allow("payment", "https://pay.example.com")
+                .allow("payment", "self")
+                .allow("camera", "*")
+                .allow("fullscreen", "self");
+        });
+        assert!(h.contains("geolocation=(self)"), "{h}");
+        assert!(
+            h.contains(r#"payment=("https://pay.example.com" self)"#),
+            "{h}"
+        );
+        assert!(h.contains("camera=*"), "{h}");
+        assert!(h.ends_with("fullscreen=(self)"), "{h}");
+    }
+
+    #[test]
+    fn a_custom_value_is_the_base_and_off_is_none() {
+        let mode = PermissionsMode::Custom("geolocation=(self), camera=()".into());
+        assert_eq!(
+            header(mode.clone(), |_| {}),
+            "geolocation=(self), camera=()"
+        );
+        assert_eq!(
+            header(mode, |p| {
+                p.allow("camera", "self");
+            }),
+            "geolocation=(self), camera=(self)"
+        );
+        assert!(
+            permissions_header(&PermissionsMode::Off, &PermissionsPolicy::default())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn a_bad_feature_or_origin_is_an_error() {
+        for (feature, origin) in [
+            ("Bad Name", "self"),
+            ("camera", "two words"),
+            ("camera", ""),
+        ] {
+            let mut app = PermissionsPolicy::default();
+            app.allow(feature, origin);
+            assert!(
+                permissions_header(&PermissionsMode::Default, &app).is_err(),
+                "{feature} {origin}"
+            );
+        }
+    }
 
     /// What the ETag hashes: the page without the request's nonce.
     #[test]

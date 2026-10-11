@@ -1,6 +1,6 @@
 //! The public front page (`resources/views/home/index.html`, in
 //! `layouts/public.html`), made of the app's page patterns
-//! (`resources/views/patterns.html`). Signed-in people go on to `/dashboard`.
+//! (`resources/views/components/`). Signed-in people go on to `/dashboard`.
 
 use renox::prelude::*;
 
