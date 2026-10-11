@@ -1,76 +1,73 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, select, button, alert, empty, radio, link_button, form_errors, icon %}
-{% from "renox-blocks/blocks.html" import datetime_range, availability %}
-{% from "rentals/_parts.html" import styles %}
-{% from "layouts/_hero.html" import page_hero %}
-{% block seo %}{{ seo(title=t('rentals.search.title'), description=t('rentals.search.lead')) }}{% endblock %}
-
 {#- Find a bike (#235): the filters are a GET form that htmx re-sends as they
     change, swapping only #rent-results (the address follows, so it can be
     shared); without JavaScript it is a plain form. -#}
-{% block content %}
-{{ styles() }}
-<div class="bs-rent">
-  <div class="bs-rent__header">
-    {% call page_hero(t('rentals.search.title'), lead=t('rentals.search.lead'), eyebrow=t('rentals.search.eyebrow'), photo="/images/site/rent-1.webp", compact=true) %}
-    <ul class="bs-perks" role="list">
-      <li><span class="bs-icon-circle">{{ icon("store") }}</span>{{ t('rentals.search.perks.stores') }}</li>
-      <li><span class="bs-icon-circle">{{ icon("clock") }}</span>{{ t('rentals.search.perks.hours') }}</li>
-      <li><span class="bs-icon-circle">{{ icon("banknote") }}</span>{{ t('rentals.search.perks.deposit') }}</li>
-    </ul>
-    {% endcall %}
-  </div>
-
-  {# [explain:rentals.create.filters] #}
-  <form class="rx-card bs-rent__filters" method="get" action="{{ route('rentals.create') }}"
-        hx-get="{{ route('rentals.create') }}" hx-trigger="change, submit" hx-target="#rent-results"
-        hx-select="#rent-results" hx-swap="outerHTML" hx-push-url="true" aria-label="{{ t('rentals.search.filters') }}">
-    {%- set opts = namespace(stores=[], types=[["", t('rentals.search.any_type')]], sizes=[["", t('rentals.search.any_size')]]) %}
-    {%- for s in stores %}{% set opts.stores = opts.stores + [[s.id, s.name]] %}{% endfor %}
-    {%- for c in categories %}{% set opts.types = opts.types + [[c.id, c.name]] %}{% endfor %}
-    {%- for s in sizes %}{% set opts.sizes = opts.sizes + [[s, s]] %}{% endfor %}
-    {{ select("store", t('rentals.fields.store'), opts.stores, selected=store_id, required=true) }}
-    {{ datetime_range("starts_at", "ends_at", label=t('rentals.fields.period'), value_start=starts_at, value_end=ends_at,
-                      min=min_day, max=max_day, step=60, opens=8, closes=20, required=true) }}
-    {{ select("category", t('rentals.fields.type'), opts.types, selected=category or "") }}
-    {{ select("size", t('rentals.fields.size'), opts.sizes, selected=size) }}
-    {{ button(t('rentals.search.show'), variant="secondary", icon="search") }}
-  </form>
-  {# [/explain:rentals.create.filters] #}
-
-  <section class="bs-rent__results" id="rent-results" aria-live="polite" aria-label="{{ t('rentals.search.results') }}" data-bs-reveal>
-    {%- if problem %}
-    {{ alert(problem, kind="warning") }}
-    {%- elif not offers %}
-    <div class="rx-card">{{ empty(t('rentals.search.none_title'), t('rentals.search.none_text'), icon="calendar") }}</div>
-    {%- else %}
-    <form class="rx-card bs-rent__filters" method="post" action="{{ route('rentals.reserve') }}" id="reserve-form">
-      {{ csrf_field() }}
-      <input type="hidden" name="store" value="{{ store_id }}">
-      <input type="hidden" name="starts_at" value="{{ starts_at }}">
-      <input type="hidden" name="ends_at" value="{{ ends_at }}">
-      {{ form_errors() }}
-      {%- set bikes = namespace(options=[]) %}
-      {%- for o in offers %}
-        {%- set hint = (o.quote.price | money) ~ " · " ~ t('rentals.fields.deposit') ~ " " ~ (o.quote.deposit | money) ~ " · " ~ o.frame_number %}
-        {%- set hint = hint ~ (" · " ~ t('rentals.search.placed_by', store=o.owner_store) if o.placed_here else "") %}
-        {%- set bikes.options = bikes.options + [[o.id, o.model ~ (" (" ~ o.size ~ ")" if o.size else ""), hint]] %}
-      {%- endfor %}
-      {{ radio("bike", t('rentals.search.pick', count=offers | length), bikes.options, selected=old('bike', offers[0].id), required=true) }}
-      <p class="rx-hint">{{ t('rentals.search.rule', grace=15) }}</p>
-      {%- if signed_in %}
-      {{ button(t('rentals.search.reserve'), icon="check") }}
-      {%- else %}
-      {{ link_button(route('login'), t('rentals.search.login'), variant="primary", icon="log-in") }}
-      {%- endif %}
-    </form>
-    {%- endif %}
-    {%- if timeline.rows %}
-    <div class="rx-card">
-      <h2 class="rx-card__title">{{ t('rentals.search.day') }}</h2>
-      {{ availability(timeline.columns, timeline.rows, label=t('rentals.search.day'), corner=t('rentals.fields.bike'), id="rent-day") }}
+<rx-page layout="layouts/app.html" title="{{ t('rentals.search.title') }}" description="{{ t('rentals.search.lead') }}">
+  {% from "renox/ui.html" import icon %}
+  {% from "renox-blocks/blocks.html" import datetime_range, availability %}
+  {% from "rentals/_parts.html" import styles %}
+  {% from "layouts/_hero.html" import page_hero %}
+  {{ styles() }}
+  <div class="bs-rent">
+    <div class="bs-rent__header">
+      {% call page_hero(t('rentals.search.title'), lead=t('rentals.search.lead'), eyebrow=t('rentals.search.eyebrow'), photo="/images/site/rent-1.webp", compact=true) %}
+      <ul class="bs-perks" role="list">
+        <li><span class="bs-icon-circle">{{ icon("store") }}</span>{{ t('rentals.search.perks.stores') }}</li>
+        <li><span class="bs-icon-circle">{{ icon("clock") }}</span>{{ t('rentals.search.perks.hours') }}</li>
+        <li><span class="bs-icon-circle">{{ icon("banknote") }}</span>{{ t('rentals.search.perks.deposit') }}</li>
+      </ul>
+      {% endcall %}
     </div>
-    {%- endif %}
-  </section>
-</div>
-{% endblock %}
+
+    {# [explain:rentals.create.filters] #}
+    <form class="rx-card bs-rent__filters" method="get" action="{{ route('rentals.create') }}"
+          hx-get="{{ route('rentals.create') }}" hx-trigger="change, submit" hx-target="#rent-results"
+          hx-select="#rent-results" hx-swap="outerHTML" hx-push-url="true" aria-label="{{ t('rentals.search.filters') }}">
+      {%- set opts = namespace(stores=[], types=[["", t('rentals.search.any_type')]], sizes=[["", t('rentals.search.any_size')]]) %}
+      {%- for s in stores %}{% set opts.stores = opts.stores + [[s.id, s.name]] %}{% endfor %}
+      {%- for c in categories %}{% set opts.types = opts.types + [[c.id, c.name]] %}{% endfor %}
+      {%- for s in sizes %}{% set opts.sizes = opts.sizes + [[s, s]] %}{% endfor %}
+      <rx-select name="store" label="{{ t('rentals.fields.store') }}" :options="opts.stores" :selected="store_id" required/>
+      {{ datetime_range("starts_at", "ends_at", label=t('rentals.fields.period'), value_start=starts_at, value_end=ends_at,
+                        min=min_day, max=max_day, step=60, opens=8, closes=20, required=true) }}
+      <rx-select name="category" label="{{ t('rentals.fields.type') }}" :options="opts.types" :selected="category or ''"/>
+      <rx-select name="size" label="{{ t('rentals.fields.size') }}" :options="opts.sizes" :selected="size"/>
+      <rx-button variant="secondary" icon="search">{{ t('rentals.search.show') }}</rx-button>
+    </form>
+    {# [/explain:rentals.create.filters] #}
+
+    <section class="bs-rent__results" id="rent-results" aria-live="polite" aria-label="{{ t('rentals.search.results') }}" data-bs-reveal>
+      {%- if problem %}
+      <rx-alert kind="warning" :message="problem"/>
+      {%- elif not offers %}
+      <div class="rx-card"><rx-empty title="{{ t('rentals.search.none_title') }}" message="{{ t('rentals.search.none_text') }}" icon="calendar"/></div>
+      {%- else %}
+      <form class="rx-card bs-rent__filters" method="post" action="{{ route('rentals.reserve') }}" id="reserve-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="store" value="{{ store_id }}">
+        <input type="hidden" name="starts_at" value="{{ starts_at }}">
+        <input type="hidden" name="ends_at" value="{{ ends_at }}">
+        <rx-form-errors/>
+        {%- set bikes = namespace(options=[]) %}
+        {%- for o in offers %}
+          {%- set hint = (o.quote.price | money) ~ " · " ~ t('rentals.fields.deposit') ~ " " ~ (o.quote.deposit | money) ~ " · " ~ o.frame_number %}
+          {%- set hint = hint ~ (" · " ~ t('rentals.search.placed_by', store=o.owner_store) if o.placed_here else "") %}
+          {%- set bikes.options = bikes.options + [[o.id, o.model ~ (" (" ~ o.size ~ ")" if o.size else ""), hint]] %}
+        {%- endfor %}
+        <rx-radio name="bike" label="{{ t('rentals.search.pick', count=offers | length) }}" :options="bikes.options" :selected="old('bike', offers[0].id)" required/>
+        <p class="rx-hint">{{ t('rentals.search.rule', grace=15) }}</p>
+        {%- if signed_in %}
+        <rx-button icon="check">{{ t('rentals.search.reserve') }}</rx-button>
+        {%- else %}
+        <rx-link-button route="login" label="{{ t('rentals.search.login') }}" variant="primary" icon="log-in"/>
+        {%- endif %}
+      </form>
+      {%- endif %}
+      {%- if timeline.rows %}
+      <div class="rx-card">
+        <h2 class="rx-card__title">{{ t('rentals.search.day') }}</h2>
+        {{ availability(timeline.columns, timeline.rows, label=t('rentals.search.day'), corner=t('rentals.fields.bike'), id="rent-day") }}
+      </div>
+      {%- endif %}
+    </section>
+  </div>
+</rx-page>
