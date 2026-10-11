@@ -3,11 +3,10 @@
     the same content (about/_explain.html), code included. The navbar's
     "About this page" button (`data-rx-open="about-page"`) opens it; Esc, the
     backdrop or the close button shut it. -#}
-{% from "renox/ui.html" import sheet, button %}
 {% from "about/_explain.html" import explain %}
-{% call sheet("about-page", about.title, slide_over=true, width="lg") %}
+<rx-sheet id="about-page" :title="about.title" slide-over width="lg">
   {{ explain(about, "about-page") }}
   <div class="rx-sheet__actions">
-    {{ button(t('about.panel.close'), variant="primary", type="button", attrs={"data-rx-close": "about-page"}) }}
+    <rx-button :label="t('about.panel.close')" variant="primary" type="button" data-rx-close="about-page"/>
   </div>
-{% endcall %}
+</rx-sheet>

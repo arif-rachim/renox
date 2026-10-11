@@ -8,18 +8,15 @@
     `access.store.switch`, which checks the store again before keeping it in
     the session. Customers and guests get `none`: nothing is shown. -#}
 {%- if store_switcher and store_switcher.current %}
-{%- from "renox/ui.html" import menu, menu_action, menu_section, badge %}
 <div class="bs-store-switcher" data-bs-store="{{ store_switcher.current.id }}">
   {%- if store_switcher.stores | length > 1 %}
-  {% call menu(t('access.switcher.working_in', store=store_switcher.current.name), id="store-menu", variant="plain") %}
-    {% call menu_section(t('access.switcher.switch_to')) %}
-      {%- for store in store_switcher.stores %}
-      {{ menu_action(route('access.store.switch', store.id), store.name, icon=("check" if store.id == store_switcher.current.id else none)) }}
-      {%- endfor %}
-    {% endcall %}
-  {% endcall %}
+  <rx-menu :label="t('access.switcher.working_in', store=store_switcher.current.name)" id="store-menu" variant="plain">
+    <rx-menu-section :title="t('access.switcher.switch_to')">
+      <rx-menu-action rx-for="store in store_switcher.stores" :action="route('access.store.switch', store.id)" :label="store.name" :icon="'check' if store.id == store_switcher.current.id else none"/>
+    </rx-menu-section>
+  </rx-menu>
   {%- else %}
-  {{ badge(t('access.switcher.working_in', store=store_switcher.current.name)) }}
+  <rx-badge :text="t('access.switcher.working_in', store=store_switcher.current.name)"/>
   {%- endif %}
 </div>
 {%- endif %}

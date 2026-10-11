@@ -1,12 +1,10 @@
-{% extends "layouts/app.html" %}
 {#- Every error page (404, 403, 500…), in the app's layout. Add errors/404.html
     and friends for one status; `status`, `reason` and `detail` are set (with APP_DEBUG
     also `request_line` and `template`). -#}
-{% block seo %}<title>{{ status }} {{ reason }} · {{ app.name }}</title>{% endblock %}
-{% block content %}
-{% from "renox/ui.html" import empty %}
+<rx-page layout="layouts/app.html">
+<rx-slot name="seo"><title>{{ status }} {{ reason }} · {{ app.name }}</title></rx-slot>
 {% set fallback = t('errors.not_found') if status == 404 else t('errors.failed') %}
 <div class="rx-card">
-  {{ empty(reason, detail or fallback, "/", t('errors.home')) }}
+  <rx-empty :title="reason" :message="detail or fallback" action-href="/" :action-label="t('errors.home')"/>
 </div>
-{% endblock %}
+</rx-page>

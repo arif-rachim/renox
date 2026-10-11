@@ -1,11 +1,8 @@
-{% extends "layouts/staff.html" %}
-{% block seo %}{{ seo(title=t('reports.' ~ tab ~ '.title')) }}{% endblock %}
-
+<rx-page layout="layouts/staff.html" :title="t('reports.' ~ tab ~ '.title')">
 {#- One report grid (src/app/reports/grids.rs): `rows` is the grid's page (renox::grid), `tab`
     which report it is. The grid draws its toolbar (search, columns, groups, the advanced
     filter, exports), the heading filters, the sums and the cards on phones itself; only the
     books' "source" column is drawn here. -#}
-{% block content %}
 {% include "reports/_assets.html" %}
 <div class="rx-stack">
   <rx-page-header :title="t('reports.' ~ tab ~ '.title')" :subtitle="t('reports.' ~ tab ~ '.lead')">
@@ -18,4 +15,4 @@
   </rx-grid>
   {# [/explain:reports.grid.template] #}
 </div>
-{% endblock %}
+</rx-page>

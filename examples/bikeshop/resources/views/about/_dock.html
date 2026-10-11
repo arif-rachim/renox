@@ -5,7 +5,6 @@
     jumps when it loads). The panel scrolls on its own; its button folds it
     to a rail, whose button opens it again (public/app.js writes the
     cookie). Narrower screens hide it and use the sheet (about/_panel.html). -#}
-{% from "renox/ui.html" import icon_button %}
 {% from "about/_explain.html" import explain %}
 <aside class="bs-dock" id="explain-dock" aria-labelledby="explain-dock-title" data-bs-dock>
   <div class="bs-dock__panel" id="explain-dock-panel"{% if about.rail %} hidden{% endif %}>
@@ -14,7 +13,7 @@
         <p class="bs-dock__eyebrow">{{ t('about.button') }}</p>
         <h2 class="bs-dock__title" id="explain-dock-title">{{ about.title }}</h2>
       </div>
-      {{ icon_button("next", t('about.panel.hide'), attrs={"aria-expanded": "true", "aria-controls": "explain-dock-panel", "data-bs-dock-toggle": "rail"}) }}
+      <rx-icon-button icon="next" :label="t('about.panel.hide')" aria-expanded="true" aria-controls="explain-dock-panel" data-bs-dock-toggle="rail"/>
     </header>
     {{ explain(about, "explain-dock") }}
   </div>

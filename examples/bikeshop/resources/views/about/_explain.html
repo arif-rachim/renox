@@ -6,14 +6,14 @@
     that keeps the two copies' ids apart. Top to bottom: what the page is for
     and who uses it, the Renox features as chips (each opens its "why"), the
     code in tabs, what happens under the hood, and the links. -#}
-{% from "renox/ui.html" import badge, tabs, tab_panel, icon_button %}
+{% from "renox/ui.html" import tabs, tab_panel %}
 {% macro explain(about, explain_id) -%}
 <div class="bs-explain">
   {#- Both may hold Markdown (`code`, **bold**). -#}
   <div class="bs-explain__purpose">{{ about.purpose | markdown }}</div>
   <div class="bs-explain__who">
     <div class="bs-explain__who-text">{{ about.who | markdown }}</div>
-    <span class="bs-badges" aria-label="{{ t('about.panel.roles') }}">{% for role in about.audience %}{{ badge(role.label) }}{% endfor %}{{ badge(about.flow.label, kind="info") }}</span>
+    <span class="bs-badges" aria-label="{{ t('about.panel.roles') }}">{% for role in about.audience %}<rx-badge :text="role.label"/>{% endfor %}<rx-badge :text="about.flow.label" kind="info"/></span>
   </div>
 
   <section class="bs-explain__section" aria-labelledby="{{ explain_id }}-features">
@@ -45,7 +45,7 @@
           <div class="bs-code__bar">
             <span class="bs-code__lang">{{ sample.language }}</span>
             <a class="bs-code__path" href="{{ sample.github }}" target="_blank" rel="noopener" title="{{ t('about.panel.github') }}"><code>{{ sample.path | replace("examples/bikeshop/", "") }}</code></a>
-            {{ icon_button("external", t('about.panel.github'), href=sample.github, size="small", new_tab=true) }}
+            <rx-icon-button icon="external" :label="t('about.panel.github')" :href="sample.github" size="small" new-tab/>
             <button class="rx-icon-button rx-icon-button--plain rx-icon-button--small bs-copy" type="button" data-rx-copy data-rx-copy-text="{{ sample.text }}" aria-label="{{ t('about.panel.copy') }}" data-rx-tip="{{ t('about.panel.copy') }}" data-label-done="{{ t('about.panel.copied') }}">
               <svg class="bs-copy__idle" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="6.5" y="6.5" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13.5 6.5V5a1.5 1.5 0 00-1.5-1.5H5A1.5 1.5 0 003.5 5v7A1.5 1.5 0 005 13.5h1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
               <svg class="bs-copy__done" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>

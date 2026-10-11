@@ -301,11 +301,12 @@ fn htmx_page() -> Explanation {
             },
             Feature {
                 api: "UI kit: action_sheet + menu",
-                why: "The modal is the kit's `action_sheet` with `target=\"#checklist\"` and \
+                why: "The modal is the kit's `<rx-action-sheet>` with `target=\"#checklist\"` and \
                       `swap=\"afterbegin\"`: a 422 keeps it open with the error under the \
                       field, a success closes and clears it, and `key=\"n\"` opens it from the \
-                      keyboard. The row's `menu_button`s and the `checkbox` carry their htmx \
-                      attributes in `attrs`, `hx-confirm` included.",
+                      keyboard. The row's `<rx-checkbox>` carries its htmx attributes as plain \
+                      attributes (`hx-patch`, `hx-target`), and the menu's `menu_button`s \
+                      (no tag yet) take them in `attrs`, `hx-confirm` included.",
             },
             Feature {
                 api: "Alpine.data",
