@@ -18,5 +18,5 @@ renox.workspace = true
 # The 4.0 line: 4.1 and later bring cssparser (MPL-2.0, which deny.toml
 # doesn't allow) for filtering `style` attributes, which this crate drops
 # anyway. 4.0.3 has the fixes for every RustSec advisory so far.
-ammonia = "~4.0.3"
+ammonia = "~4.2.1"
 serde = { version = "1.0.229", features = ["derive"] }
