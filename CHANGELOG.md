@@ -10,6 +10,137 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.1.0-rc.1 · 2026-10-11
+
+The release candidate for 1.1. Pages are written with `rx-*` tags, parts of a page can be live
+components, and mistakes surface before a page is opened: `db:check`, `view:check`, typed
+columns and migrations generated from the models. It also fills the gaps the bike shop had to
+work around. Everything is additive: `cargo semver-checks` against 1.0.0 finds nothing
+breaking, and 1.0 apps keep compiling. Try it with `cargo install renox-cli --version
+1.1.0-rc.1` or `renox = "1.1.0-rc.1"`.
+
+**Behaviour changes**
+
+- **Templates are compiled when they load (#372):** `<rx-…>` and `<app-…>` tags and the
+  `rx-if` / `rx-else` / `rx-for` attributes now mean components. A template without them is
+  left exactly as it was. One that already used such names for its own markup needs them
+  renamed.
+- **`#[derive(Model)]` writes a constant per column (#380):** `Product::PRICE`,
+  `Product::NAME`. A model with its own associated constants of those names adds
+  `#[model(no_typed_columns)]`.
+- **A new framework migration (#316):** `00010101000007_create_device_tokens_table`, for apps
+  with the `Auth` module. Run `migrate` after upgrading.
+
+**Added: pages**
+
+- **Components as tags (#372–#376, #384):** `<rx-page layout=… title=…>`, `<rx-form>`,
+  `<rx-input>`, `<rx-table :rows=…>` with `<rx-column>`, `<rx-sheet>`, `<rx-navbar>`,
+  `<rx-sidebar>`, `<rx-tabs>`, `<rx-wizard>`, `<rx-repeater>`, `<rx-chart>`, `<rx-grid>`
+  and the rest of the kit, plus `rx-if` / `rx-else` / `rx-for` on any element and the
+  `can=` / `route=` shortcuts.
+  - Tags become MiniJinja macro calls when the template loads, so live reload, overriding
+    built-in views, `embedded!()` and every existing template keep working.
+  - A wrong tag or attribute fails with the file, the line and "did you mean".
+  - The macros underneath (`renox/ui.html`) stay supported for anything without a tag.
+  - The guide is [docs/ui.md](docs/ui.md#components-as-tags).
+- **Your own components:** `<app-price-tag>` is `components/price_tag.html`, which declares
+  its props with `<rx-props>`. `rnx make:component` writes that form; `--macro` writes the
+  old one.
+- **Plugins compile their templates too:** `view::add_template`, and they register their own
+  tags with `Registry::component`. The editors register theirs as tags.
+- **Component events (#373):** components dispatch `rx:<component>:<event>` (a sheet's
+  `opened`, `closed`, `saved` and `failed`; `changed` on fields, tabs and the wizard; a
+  repeater's `added` / `removed`; the grid's `selected`, `sorted` and `filtered`).
+  `@closed="…"` on a tag listens to them. Attributes that aren't props pass through to the
+  component's root element.
+- **Live components (#386), Renox's answer to Livewire:** a part of a page whose state lives
+  in a Rust struct.
+  - `impl LiveComponent` (or `#[renox::live_component]`), registered with
+    `App::live_component`.
+  - In the template: `<live-NAME>`, `rx-click`, `rx-submit`, and `rx-model` (`.live` /
+    `.blur`).
+  - The browser posts to `/_renox/live/{component}/{action}`, the server runs the method and
+    renders the component again, and idiomorph (0.7.3, 0BSD, vendored) morphs the page into
+    it.
+  - The state travels signed; `LIVE_SNAPSHOT_MAX_SIZE` caps it (64 KB).
+  - `LiveContext` gives the action the session, the user, toasts, redirects and validation.
+  - Tested with `TestApp::live`.
+  - The guide is [docs/live.md](docs/live.md); the bike shop's `/about/htmx/live` shows one.
+- **Template checks (#377):** `rnx view:check` loads every template and checks its
+  components and route names; `TestApp::assert_views_compile` does the same in a test.
+- **Editor autocomplete for the tags (#378):** `rnx view:data` writes the HTML custom data
+  that VS Code and other editors read.
+- **Typed view contexts (#383):** `#[derive(ViewData)]` and `View::typed`.
+- **Charts:** `chart("heatmap", …)` (#319).
+
+**Added: data**
+
+- **`rnx db:check` (#370):** compares every model registered with `App::model` with its
+  table and fails on a mismatch. `TestApp::assert_models_match_schema` does the same in a
+  test.
+- **Migrations from the models (#371):** `rnx make:migration --auto add_sku` (or `db:diff`)
+  writes the difference between the models and the migrations as a plain SQL migration to
+  review.
+  - It writes SQL for SQLite (rebuilding the table when needed) and for PostgreSQL.
+  - The model's fields can carry `index`, `unique`, `default` and `references`.
+- **Typed columns (#380):** `Product::query().where_(Product::PRICE.lt(20_000))` (`eq`, `ne`,
+  `lt`, `lte`, `gt`, `gte`, `is_null`, `is_not_null`, `is_in`, `like`). `order_by`,
+  `order_by_desc` and `pluck` take a typed column or a name, as before.
+- **Forms from models (#381):** `#[model(form)]` makes the model's form struct and `fill`,
+  so a new field is added in one place.
+- **Queries:** `Query::group_by_raw` (#313). `db::Conn` is public, with
+  `Executor::into_conn` and `Conn::reborrow` (#303).
+- **The data grid:**
+  - `Column::computed(sql)` (#313): a column worked out in SQL that sorts, filters,
+    searches, sums and groups like the others.
+  - `grid::Workbook` (#319): several queries in one Excel file, a sheet each (the `xlsx`
+    feature).
+
+**Added: auth, plugins and the rest**
+
+- **Device tokens (#316):** `auth::DeviceToken` and the `Device` extractor, for kiosks and
+  tills that belong to a place rather than a person. `i18n::RequestLocale` (with
+  `RequestLocale::switch`) and `auth::normalize_email` are public.
+- **Permissions:** `permissions::users_with_permission` / `users_with_permission_in` (#310).
+- **Seeders from modules:** `Registry::seeder` (#302); the app's seeders run first.
+- **Signed URLs:** `signed::verify` is public, and `Option<ValidSignature>` works (#307).
+- **Views:**
+  - `ViewContext::session` (#309).
+  - While debugging, a warning when a value passed to a view is named like a macro the
+    template imports (#312).
+- **Errors:** `Display` for `Error`, the message without its chain (#301).
+- **renox-billing (#315):**
+  - named guards: `require_subscription_named`, `require_plan_named`;
+  - paused subscriptions: `Customer::pause` / `unpause` / `can_pause`,
+    `SubscriptionStatus::Paused`, and the `SubscriptionPaused` / `SubscriptionUnpaused`
+    events;
+  - webhook hooks with the app's state: `Gateway::verify_webhook_with` /
+    `parse_webhook_with`.
+- **renox-admin (#314):** actions that ask for input (`ActionInput`), an after-save hook
+  (`SaveContext`), relation managers for child rows (`RelationManager`), layout slots
+  (`Admin::slot`), and its texts translatable as `renox.admin.*`.
+- **`rnx doctor` (#379):** says what this machine or this app is missing. `rnx new` writes
+  `.cargo/config.toml` when it finds a fast linker.
+
+**Changed**
+
+- **`rx-*` tags are the default way to write pages (#384, #493–#500):** `rnx new`, the
+  starter kit, `make:module --resource`, examples/hello, every bike shop page, the guides,
+  CHEATSHEET.md, llms.txt and the app agent guides all use them.
+- **`make:module --resource` (#382):** runs the migration, prints the page's address, and
+  `--open` opens it (`--no-migrate` leaves the migration for later).
+
+**Fixed**
+
+- **#307:** a signed URL checked inside a `Routes::group` was refused, because the group's
+  prefix was missing from the path it checked.
+- **#319:** a data grid's `select` filter on a whole-number column failed on PostgreSQL.
+- **#354, browser tests:** the Spanish staff test logs in with fetch, so the Escape key
+  reaches the page in CI. The cause inside Chrome is still open.
+- **CI:** the semver job compares with the latest release on crates.io (#139); the browser
+  suite runs in two halves (#262); and the tutorial's navigation step uses the new layout's
+  tags (#501).
+
 ## 1.0.0 · 2026-10-08
 
 The first stable release. From here Renox follows semantic versioning
