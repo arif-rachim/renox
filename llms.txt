@@ -9,7 +9,7 @@
 
 - https://docs.renox.rs: these files as a website with search (the latest `main`).
 
-- The 1.1 way (Renox 1.1.0-rc.1: `cargo install renox-cli --version 1.1.0-rc.1`, `renox = "1.1.0-rc.1"`),
+- The 1.1 way (Renox 1.1: `cargo install renox-cli`, `renox = "1.1"`),
   and where each part is taught: pages as `<rx-*>` / `<app-*>` tags with `rx-if` / `rx-else` /
   `rx-for` ([docs/ui.md](docs/ui.md#components-as-tags)); your own components with `<rx-props>`
   ([docs/ui.md](docs/ui.md#your-own-components)); parts of a page with state as live components,

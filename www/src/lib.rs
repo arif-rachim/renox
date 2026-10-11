@@ -347,7 +347,7 @@ async fn llms_full(State(state): State<AppState>) -> Response {
     for c in landing::comparison() {
         text.push_str(&format!("| {} | {} |\n", c.what, c.cells.join(" | ")));
     }
-    text.push_str("\n## Quick start\n\n```bash\ncargo install renox-cli --version 1.1.0-rc.1\nrnx new shop && cd shop\nrnx serve\n```\n");
+    text.push_str("\n## Quick start\n\n```bash\ncargo install renox-cli\nrnx new shop && cd shop\nrnx serve\n```\n");
     for post in blog::published() {
         text.push_str(&format!(
             "\n---\n\n# {}\n\n{} · {base}/blog/{}\n\n{}\n",
