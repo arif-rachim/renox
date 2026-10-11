@@ -1,30 +1,26 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, select, input, checkbox_list, textarea, button, form_errors, form_grid, fieldset, date_picker %}
-{% block seo %}{{ seo(title=t('workshop.walkin.title')) }}{% endblock %}
-
 {#- A walk-in work order (#236): a known customer or a new one, the bike, the tasks, the day. -#}
-{% block content %}
-<div class="rx-stack" data-bs-reveal>
-  {{ page_header(t('workshop.walkin.title'), subtitle=t('workshop.walkin.lead'), back=route('workshop.board'), back_label=t('workshop.board.title')) }}
-  {# [explain:workshop.walkin.template] #}
-  <form method="post" action="{{ route('workshop.walkin.store') }}" novalidate>
-    {{ csrf_field() }}
-    {% call card() %}
-      {{ form_errors() }}
-      {% call fieldset(t('workshop.walkin.who')) %}
-        {{ select("customer", t('workshop.fields.customer'), [], placeholder=t('workshop.walkin.search'), options_url=route('workshop.customers'), searchable=true, hint=t('workshop.walkin.or_new')) }}
-        {% call form_grid(2) %}
-          {{ input("new_name", t('workshop.walkin.new_name')) }}
-          {{ input("new_phone", t('workshop.walkin.new_phone'), type="tel") }}
-        {% endcall %}
-      {% endcall %}
-      {{ input("bike", t('workshop.fields.bike'), required=true, placeholder=t('workshop.bikes.name_hint')) }}
-      {{ checkbox_list("tasks", t('workshop.book.tasks'), tasks, columns=2, required=true) }}
-      {{ date_picker("day", t('workshop.fields.day'), disabled_dates=full, closed_weekdays=closed, value=today, min=today, required=true) }}
-      {{ textarea("note", t('workshop.book.note'), rows=2) }}
-      {{ button(t('workshop.walkin.submit'), icon="check") }}
-    {% endcall %}
-  </form>
-  {# [/explain:workshop.walkin.template] #}
-</div>
-{% endblock %}
+<rx-page layout="layouts/staff.html" title="{{ t('workshop.walkin.title') }}">
+  <rx-stack data-bs-reveal>
+    <rx-page-header title="{{ t('workshop.walkin.title') }}" subtitle="{{ t('workshop.walkin.lead') }}" :back="route('workshop.board')" back-label="{{ t('workshop.board.title') }}"/>
+    {# [explain:workshop.walkin.template] #}
+    <form method="post" action="{{ route('workshop.walkin.store') }}" novalidate>
+      {{ csrf_field() }}
+      <rx-card>
+        <rx-form-errors/>
+        <rx-fieldset legend="{{ t('workshop.walkin.who') }}">
+          <rx-select name="customer" label="{{ t('workshop.fields.customer') }}" :options="[]" placeholder="{{ t('workshop.walkin.search') }}" options-url="{{ route('workshop.customers') }}" searchable hint="{{ t('workshop.walkin.or_new') }}"/>
+          <rx-form-grid columns="2">
+            <rx-input name="new_name" label="{{ t('workshop.walkin.new_name') }}"/>
+            <rx-input name="new_phone" label="{{ t('workshop.walkin.new_phone') }}" type="tel"/>
+          </rx-form-grid>
+        </rx-fieldset>
+        <rx-input name="bike" label="{{ t('workshop.fields.bike') }}" required placeholder="{{ t('workshop.bikes.name_hint') }}"/>
+        <rx-checkbox-list name="tasks" label="{{ t('workshop.book.tasks') }}" :options="tasks" columns="2" required/>
+        <rx-date-picker name="day" label="{{ t('workshop.fields.day') }}" :disabled-dates="full" :closed-weekdays="closed" :value="today" :min="today" required/>
+        <rx-textarea name="note" label="{{ t('workshop.book.note') }}" rows="2"/>
+        <rx-button icon="check">{{ t('workshop.walkin.submit') }}</rx-button>
+      </rx-card>
+    </form>
+    {# [/explain:workshop.walkin.template] #}
+  </rx-stack>
+</rx-page>

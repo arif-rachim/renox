@@ -221,7 +221,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "rentals.show.handler",
                 },
                 Code {
-                    title: "Template: pay the deposit, or cancel with the kit's `confirm`",
+                    title: "Template: pay the deposit, or cancel with the kit's `<rx-confirm>`",
                     region: "rentals.show.actions",
                 },
                 Code {
@@ -287,7 +287,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "rentals.rows",
                 },
                 Code {
-                    title: "Template: the kit's `list` with a shared `rental_item` macro",
+                    title: "Template: the kit's `<rx-list>` with a shared `rental_item` macro",
                     region: "rentals.mine.template",
                 },
             ],
@@ -364,7 +364,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "rentals.identity.store",
                 },
                 Code {
-                    title: "Template: a multipart form with the kit's `file` field",
+                    title: "Template: a multipart form with the kit's `<rx-file>` field",
                     region: "rentals.identity.template",
                 },
             ],
@@ -446,7 +446,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "rentals.identities.photo",
                 },
                 Code {
-                    title: "Template: approve in a form, refuse with a note in an `action_sheet`",
+                    title: "Template: approve in a form, refuse with a note in an `<rx-action-sheet>`",
                     region: "rentals.identities.template",
                 },
             ],
@@ -514,7 +514,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "rentals.counter.handler",
                 },
                 Code {
-                    title: "Template: three columns of the kit's `list`",
+                    title: "Template: three columns of the kit's `<rx-list>`",
                     region: "rentals.counter.template",
                 },
             ],
@@ -572,7 +572,7 @@ pub fn entries() -> Vec<Explanation> {
             ],
             code: &[
                 Code {
-                    title: "Template: a searchable `select` that asks the server for options",
+                    title: "Template: a searchable `<rx-select>` that asks the server for options",
                     region: "rentals.walkin.template",
                 },
                 Code {
@@ -904,7 +904,7 @@ pub fn entries() -> Vec<Explanation> {
                     region: "rentals.fleet.show.handler",
                 },
                 Code {
-                    title: "Template: the answers as a kit `list` with badges",
+                    title: "Template: the answers as a kit `<rx-list>` with badges",
                     region: "rentals.fleet.show.template",
                 },
             ],

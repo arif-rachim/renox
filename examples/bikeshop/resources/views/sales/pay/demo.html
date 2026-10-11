@@ -1,36 +1,32 @@
-{% extends "layouts/app.html" %}
 {#- The demo gateway's hosted page (src/app/sales/gateway.rs): stands in for
     Midtrans' page when MIDTRANS_SERVER_KEY isn't set. Paying here queues the
     notification Midtrans would send, signed the same way, to this app's
     webhook. -#}
-{% from "renox/ui.html" import page_header, card, button, alert, infolist, entry, radio %}
-{% block seo %}{{ seo(title=t('sales.demo.title')) }}{% endblock %}
-
-{% block content %}
-{% include "sales/_assets.html" %}
-<div class="bs-demo-gateway">
-  {{ alert(t('sales.demo.notice'), kind="warning", title=t('sales.demo.notice_title')) }}
-  {% call card(t('sales.demo.title'), subtitle=t('sales.demo.merchant', shop=t('shop.name'))) %}
-    {% call infolist(columns=2) %}
-      {{ entry(t('sales.demo.amount'), paying.payment.amount, format="money") }}
-      {{ entry(t('sales.demo.reference'), "BS-" ~ paying.payment.id) }}
-      {%- if paying.order %}{{ entry(t('sales.orders.number'), paying.order.number) }}{% endif %}
-      {{ entry(t('sales.demo.status'), t('sales.payment_status.' ~ paying.payment.status)) }}
-    {% endcall %}
-    {# [explain:pay.demo.template] #}
-    {%- if paying.payment.status == "pending" %}
-    <form class="bs-demo-gateway__form" method="post" action="{{ action }}">
-      {{ csrf_field() }}
-      <input type="hidden" name="outcome" value="settlement">
-      {{ button(t('sales.demo.pay', amount=(paying.payment.amount | money)), variant="primary", block=true, key="p") }}
-    </form>
-    <form method="post" action="{{ action }}">
-      {{ csrf_field() }}
-      <input type="hidden" name="outcome" value="cancel">
-      {{ button(t('sales.demo.cancel'), variant="plain", block=true) }}
-    </form>
-    {%- endif %}
-    {# [/explain:pay.demo.template] #}
-  {% endcall %}
-</div>
-{% endblock %}
+<rx-page layout="layouts/app.html" title="{{ t('sales.demo.title') }}">
+  {% include "sales/_assets.html" %}
+  <div class="bs-demo-gateway">
+    <rx-alert kind="warning" title="{{ t('sales.demo.notice_title') }}" message="{{ t('sales.demo.notice') }}"/>
+    <rx-card title="{{ t('sales.demo.title') }}" subtitle="{{ t('sales.demo.merchant', shop=t('shop.name')) }}">
+      <rx-infolist columns="2">
+        <rx-entry label="{{ t('sales.demo.amount') }}" :value="paying.payment.amount" format="money"/>
+        <rx-entry label="{{ t('sales.demo.reference') }}" :value="'BS-' ~ paying.payment.id"/>
+        <rx-entry rx-if="paying.order" label="{{ t('sales.orders.number') }}" :value="paying.order.number"/>
+        <rx-entry label="{{ t('sales.demo.status') }}" :value="t('sales.payment_status.' ~ paying.payment.status)"/>
+      </rx-infolist>
+      {# [explain:pay.demo.template] #}
+      {%- if paying.payment.status == "pending" %}
+      <form class="bs-demo-gateway__form" method="post" action="{{ action }}">
+        {{ csrf_field() }}
+        <input type="hidden" name="outcome" value="settlement">
+        <rx-button variant="primary" block key="p">{{ t('sales.demo.pay', amount=(paying.payment.amount | money)) }}</rx-button>
+      </form>
+      <form method="post" action="{{ action }}">
+        {{ csrf_field() }}
+        <input type="hidden" name="outcome" value="cancel">
+        <rx-button variant="plain" block>{{ t('sales.demo.cancel') }}</rx-button>
+      </form>
+      {%- endif %}
+      {# [/explain:pay.demo.template] #}
+    </rx-card>
+  </div>
+</rx-page>

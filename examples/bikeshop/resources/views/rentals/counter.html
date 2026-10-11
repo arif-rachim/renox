@@ -1,55 +1,52 @@
-{% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import toolbar, input, button, link_button, list, empty, columns, icon %}
-{% from "rentals/_parts.html" import styles, rental_item %}
-{% block seo %}{{ seo(title=t('rentals.counter.title')) }}{% endblock %}
-
 {#- The rental counter (#235): the active store's day, and a search by code or customer. -#}
-{% block content %}
-{{ styles() }}
-<div class="rx-stack bs-counter" data-bs-reveal>
-  {#- The page's title over a photo of the fleet (public/app.css, `bs-banner`). -#}
-  <header class="bs-banner">
-    <img src="/images/site/fleet.webp" alt="" width="1200" height="900">
-    <p class="bs-banner__eyebrow">{{ icon("key-round", size=16) }}<span>{{ t('rentals.nav.counter') }}</span></p>
-    <h1 class="bs-banner__title">{{ t('rentals.counter.title') }}</h1>
-    <p class="bs-banner__lead">{{ t('rentals.counter.lead') }}</p>
-  </header>
-  {% call toolbar() %}
-    <form method="get" action="{{ route('rentals.counter') }}" class="bs-board__search" role="search">
-      {{ input("q", t('rentals.counter.search'), value=q, placeholder=t('rentals.counter.search_hint'), hide_label=true) }}
-    </form>
-    <span class="rx-spacer"></span>
-    {%- if can('rentals.checkout') %}{{ link_button(route('rentals.walkin'), t('rentals.walkin.title'), variant="primary", icon="plus") }}{% endif %}
-    {%- if can('rentals.verify_id') %}{{ link_button(route('rentals.identities'), t('rentals.identities.title')) }}{% endif %}
-    {%- if can('fleet.view') %}{{ link_button(route('rentals.fleet'), t('rentals.fleet.title')) }}{% endif %}
-  {% endcall %}
-  {%- if searched %}
-  <section class="rx-stack" aria-labelledby="found-title">
-    <h2 class="rx-card__title" id="found-title">{{ t('rentals.counter.found', count=found | length) }}</h2>
-    {%- if found %}
-    {% call list(id="found-rentals", label=t('rentals.counter.found', count=found | length)) %}
-      {%- for row in found %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
-    {% endcall %}
-    {%- else %}
-    <div class="rx-card">{{ empty(t('rentals.counter.nothing'), t('rentals.counter.nothing_text'), icon="search") }}</div>
-    {%- endif %}
-  </section>
-  {%- endif %}
-  {# [explain:rentals.counter.template] #}
-  {% call columns(3) %}
-    {%- for key, rows, sign in [["pickups", pickups, "calendar-check"], ["out", out, "bike"], ["overdue", overdue, "clock"]] %}
-    <section class="rx-stack" aria-labelledby="{{ key }}-title">
-      <h2 class="rx-card__title bs-counter-heading" id="{{ key }}-title"><span class="bs-icon-circle bs-icon-circle--small{% if key == 'overdue' and rows %} bs-icon-circle--clay{% endif %}">{{ icon(sign, size=18) }}</span>{{ t('rentals.counter.' ~ key) }} <span class="rx-badge">{{ rows | length }}</span></h2>
-      {%- if rows %}
-      {% call list(id=key ~ "-rentals", label=t('rentals.counter.' ~ key)) %}
-        {%- for row in rows %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
-      {% endcall %}
+<rx-page layout="layouts/staff.html" title="{{ t('rentals.counter.title') }}">
+  {% from "renox/ui.html" import columns, icon %}
+  {% from "rentals/_parts.html" import styles, rental_item %}
+  {{ styles() }}
+  <rx-stack class="bs-counter" data-bs-reveal>
+    {#- The page's title over a photo of the fleet (public/app.css, `bs-banner`). -#}
+    <header class="bs-banner">
+      <img src="/images/site/fleet.webp" alt="" width="1200" height="900">
+      <p class="bs-banner__eyebrow">{{ icon("key-round", size=16) }}<span>{{ t('rentals.nav.counter') }}</span></p>
+      <h1 class="bs-banner__title">{{ t('rentals.counter.title') }}</h1>
+      <p class="bs-banner__lead">{{ t('rentals.counter.lead') }}</p>
+    </header>
+    <rx-toolbar>
+      <form method="get" action="{{ route('rentals.counter') }}" class="bs-board__search" role="search">
+        <rx-input name="q" label="{{ t('rentals.counter.search') }}" :value="q" placeholder="{{ t('rentals.counter.search_hint') }}" hide-label/>
+      </form>
+      <span class="rx-spacer"></span>
+      <rx-link-button rx-if="can('rentals.checkout')" route="rentals.walkin" label="{{ t('rentals.walkin.title') }}" variant="primary" icon="plus"/>
+      <rx-link-button rx-if="can('rentals.verify_id')" route="rentals.identities" label="{{ t('rentals.identities.title') }}"/>
+      <rx-link-button rx-if="can('fleet.view')" route="rentals.fleet" label="{{ t('rentals.fleet.title') }}"/>
+    </rx-toolbar>
+    {%- if searched %}
+    <section class="rx-stack" aria-labelledby="found-title">
+      <h2 class="rx-card__title" id="found-title">{{ t('rentals.counter.found', count=found | length) }}</h2>
+      {%- if found %}
+      <rx-list id="found-rentals" label="{{ t('rentals.counter.found', count=found | length) }}">
+        {%- for row in found %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
+      </rx-list>
       {%- else %}
-      <div class="rx-card">{{ empty(t('rentals.counter.empty_' ~ key), icon=("circle-check" if key == "overdue" else sign)) }}</div>
+      <div class="rx-card"><rx-empty title="{{ t('rentals.counter.nothing') }}" message="{{ t('rentals.counter.nothing_text') }}" icon="search"/></div>
       {%- endif %}
     </section>
-    {%- endfor %}
-  {% endcall %}
-  {# [/explain:rentals.counter.template] #}
-</div>
-{% endblock %}
+    {%- endif %}
+    {# [explain:rentals.counter.template] #}
+    {% call columns(3) %}
+      {%- for key, rows, sign in [["pickups", pickups, "calendar-check"], ["out", out, "bike"], ["overdue", overdue, "clock"]] %}
+      <section class="rx-stack" aria-labelledby="{{ key }}-title">
+        <h2 class="rx-card__title bs-counter-heading" id="{{ key }}-title"><span class="bs-icon-circle bs-icon-circle--small{% if key == 'overdue' and rows %} bs-icon-circle--clay{% endif %}">{{ icon(sign, size=18) }}</span>{{ t('rentals.counter.' ~ key) }} <span class="rx-badge">{{ rows | length }}</span></h2>
+        {%- if rows %}
+        <rx-list :id="key ~ '-rentals'" :label="t('rentals.counter.' ~ key)">
+          {%- for row in rows %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
+        </rx-list>
+        {%- else %}
+        <div class="rx-card"><rx-empty :title="t('rentals.counter.empty_' ~ key)" :icon="'circle-check' if key == 'overdue' else sign"/></div>
+        {%- endif %}
+      </section>
+      {%- endfor %}
+    {% endcall %}
+    {# [/explain:rentals.counter.template] #}
+  </rx-stack>
+</rx-page>
