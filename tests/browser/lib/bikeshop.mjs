@@ -10,15 +10,21 @@
  * request still in flight from the page before can make them disagree. So a
  * 419 loads the form again and sends it once more (up to three times).
  *
+ * #354: a tab that submitted the login form by a click can get no key presses
+ * afterwards (in CI), so a test that presses keys after logging in uses this
+ * too. `keepCookies` keeps the session the page already has (a language the
+ * visitor chose before logging in, say) instead of starting a fresh one.
+ *
  * @param {import('./cdp.mjs').Page} page
  * @param {string} url the app's address
  * @param {string} email
+ * @param {{ keepCookies?: boolean }} [options]
  * @returns {Promise<string>} the last answer, `"<status> <path>"`
  */
-export async function logInWithFetch(page, url, email) {
+export async function logInWithFetch(page, url, email, { keepCookies = false } = {}) {
   let answer = '';
   for (let attempt = 1; attempt <= 3; attempt++) {
-    await page.send('Network.clearBrowserCookies');
+    if (!keepCookies) await page.send('Network.clearBrowserCookies');
     await page.goto(`${url}/login`);
     await page.waitFor(() => location.pathname === '/login' && !!document.querySelector('form input[name=email]'), { message: 'the login form' });
     answer = await page.eval(async (e) => {
