@@ -4,7 +4,8 @@
 > Start at [CLAUDE.md](../../CLAUDE.md).
 
 ```
-Cargo.toml                 workspace: members crates/*, examples/*, tests/chaos; shared package
+Cargo.toml                 workspace: members crates/*, examples/*, site, www, learn, tests/browser/fixture, tests/chaos
+                           (learn/course excluded: its own workspace); shared package
                            metadata; rust-version (MSRV); argon2 opt-level for dev builds
 README.md                  front page (compiled as doctests: `ReadMe`)
 ROADMAP.md, CHANGELOG.md   plan + decisions; changes per milestone
@@ -365,6 +366,16 @@ www/                       renox.rs: the landing page and blog (package `renox-w
                            .github/workflows/release-www.yml builds it for Renoxium's server.
                            Links into the docs must name a page in site/src/content.rs PAGES
                            (tests/www.rs checks)
+learn/                     learn.renox.rs: the course (package `renox-learn`, publish = false; epic
+                           #538, skeleton #523), a Renox app compiled into one binary like www.
+                           src/course.rs (the stages: number, slug, title, summary, topics, the
+                           guide that goes deeper), src/lib.rs (routes, JSON-LD `Course`,
+                           sitemap, llms.txt), deploy/ (systemd, port 3100);
+                           .github/workflows/release-learn.yml builds it for Renoxium's server.
+                           Coming (#524-#536): chapters in content/, the course app in
+                           learn/course/ (its own workspace, excluded from the root one), a
+                           CodeMirror 6 editor, challenges checked in a sandbox, screenshots and
+                           videos. Links into the docs must name a page in PAGES (tests/learn.rs)
 benchmarks/                Renox vs bare Axum vs Laravel (FPM and Octane) in Docker, pinned to
                            2 cores and 1 GB, driven by oha (#333): its own cargo workspace
                            (renox-app, axum-app; not a member of the root one), laravel/

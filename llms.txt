@@ -56,6 +56,8 @@
 - [site/](site): the documentation site, a Renox app that serves these files.
 - [www/](www): renox.rs, the landing page and blog (a Renox app: Markdown posts in
   www/content/blog, JSON-LD, Atom feed, sitemap, llms.txt).
+- [learn/](learn): learn.renox.rs, the course that builds one app stage by stage (a Renox
+  app; so far the outline of the stages, epic #538).
 - `rnx new <name> --starter` (files in crates/renox-cli/stubs/starter/): a whole app to start
   from: sidebar layout with the notification bell, email verification, roles (`Permissions`),
   a dashboard, a users page that changes roles, the activity log (`Audit`), `users:admin`,
