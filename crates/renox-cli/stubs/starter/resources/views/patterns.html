@@ -3,12 +3,15 @@
     the UI kit's: change the markup here and the look there. Texts come from
     the caller (through `t()`, resources/lang/en.json).
 
-    {% from "patterns.html" import hero, section_head, feature_card, figures, summary, steps, empty_state, page_title, stat_card, icon_circle %}
+    {% from "patterns.html" import hero, section_head, feature_card, summary, steps, empty_state, stat_card, icon_circle %}
+
+    `page_title` and `figures` are components in resources/views/components/
+    (`<app-page-title>`, `<app-figures>`).
 
     Icons are the kit's `icon(name)` (Lucide line icons; docs/ui.md lists
     the names). Tones: "teal" (the accent), "clay" (the second accent),
     "ink" and "sand". -#}
-{% from "renox/ui.html" import icon, stat, link_button, page_header %}
+{% from "renox/ui.html" import icon, stat, link_button %}
 
 {#- A tinted circle with an icon (`tone`: none, "clay" or "sand"; `large`). -#}
 {% macro icon_circle(name, tone=none, large=false, size=20) -%}
@@ -89,17 +92,6 @@
 </{{ tag }}>
 {%- endmacro %}
 
-{#- Figures side by side, one row on every screen: `items` are
-    `{"value": …, "label": …, "icon": …}`. `label` names the strip for
-    screen readers. -#}
-{% macro figures(items, label) -%}
-<ul class="app-figures" aria-label="{{ label }}">
-  {%- for item in items %}
-  <li class="app-figures__item">{% if item.icon %}{{ icon_circle(item.icon, tone=item.tone | default(none)) }}{% endif %}<span class="app-figures__value">{{ item.value }}</span><span class="app-figures__label">{{ item.label }}</span></li>
-  {%- endfor %}
-</ul>
-{%- endmacro %}
-
 {#- Lines and their figures, then a total under a rule: `lines` are
     `{"label": …, "value": …, "icon": …}`, `total` is `{"label": …, "value": …}`. -#}
 {% macro summary(lines, total=none) -%}
@@ -135,14 +127,6 @@
   <p class="app-empty__title">{{ title }}</p>
   {%- if text %}<p class="app-empty__text">{{ text }}</p>{% endif %}
   {%- if action_href %}{{ link_button(action_href, action_label, variant="primary", icon=action_icon) }}{% endif %}
-</div>
-{%- endmacro %}
-
-{#- The kit's `page_header` with an icon in a tinted square before it. -#}
-{% macro page_title(icon_name, title, subtitle=none) -%}
-<div class="app-page-title">
-  {{ icon_circle(icon_name, size=24) }}
-  {{ page_header(title, subtitle=subtitle) }}
 </div>
 {%- endmacro %}
 

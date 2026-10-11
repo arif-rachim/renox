@@ -1,59 +1,56 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import stats, dashboard, widget, period_filter, list, link_button %}
-{% from "patterns.html" import hero, stat_card, summary, section_head, empty_state, icon_circle %}
+<rx-page layout="layouts/app.html" title="{{ t('dashboard.title') }}">
+  {% from "patterns.html" import hero, stat_card, summary, section_head, empty_state, icon_circle %}
 
-{% block seo %}{{ seo(title=t('dashboard.title')) }}{% endblock %}
-{#- The dashboard: a welcome card (the compact hero), figures over a period
-    (`?period=`), sign-ups as a chart, a summary with totals and the
-    signed-in person's recent activity. The patterns are in
-    resources/views/patterns.html, their texts in resources/lang/en.json. -#}
-{% block content %}
-{% call hero(t('dashboard.welcome'), accent=auth.user.name ~ ".", lead=t('dashboard.lead'), eyebrow=t('dashboard.title'), eyebrow_icon="layout-dashboard", art="icons", compact=true) %}
-  {{ link_button(route('account.show'), t('dashboard.account'), icon="circle-user") }}
-  {%- if can('users.manage') %}{{ link_button(route('users.index'), t('dashboard.users'), icon="users") }}{% endif %}
-{% endcall %}
-
-<div class="rx-row">
-  {#- One period for the figures and the chart (`?period=`). -#}
-  {{ period_filter(period) }}
-</div>
-
-{% call stats(3) %}
-  {{ stat_card("user", t('dashboard.stats.signups'), signups_total | number, delta=signups_change, trend=signups.values) }}
-  {{ stat_card("users", t('dashboard.stats.users'), users | number, tone="clay", url=route('users.index') if can('users.manage') else none) }}
-  {{ stat_card("bell", t('dashboard.stats.unread'), unread | number, tone="sand", url=route('notifications.index')) }}
-{% endcall %}
-
-{% call dashboard(2) %}
-  {% call widget(t('dashboard.chart.title'), description=t('dashboard.chart.description')) %}
-    {{ chart("bar", signups, name=t('dashboard.chart.title'), title=t('dashboard.chart.title'), height=180) }}
+  {#- The dashboard: a welcome card (the compact hero), figures over a period
+      (`?period=`), sign-ups as a chart, a summary with totals and the
+      signed-in person's recent activity. The patterns are in
+      resources/views/patterns.html, their texts in resources/lang/en.json. -#}
+  {% call hero(t('dashboard.welcome'), accent=auth.user.name ~ ".", lead=t('dashboard.lead'), eyebrow=t('dashboard.title'), eyebrow_icon="layout-dashboard", art="icons", compact=true) %}
+    <rx-link-button route="account.show" label="{{ t('dashboard.account') }}" icon="circle-user"/>
+    <rx-link-button rx-if="can('users.manage')" route="users.index" label="{{ t('dashboard.users') }}" icon="users"/>
   {% endcall %}
-  {% call widget(t('dashboard.summary.title'), description=t('dashboard.summary.description')) %}
-    {{ summary([
-      {"label": t('dashboard.summary.this_period'), "value": signups_total | number, "icon": "trending-up"},
-      {"label": t('dashboard.summary.before'), "value": signups_before | number, "icon": "history"},
-      {"label": t('dashboard.summary.verified'), "value": verified | number, "icon": "circle-check"},
-    ], total={"label": t('dashboard.summary.total'), "value": users | number}) }}
-  {% endcall %}
-{% endcall %}
 
-{%- set see_all = route('activity.index') if can('activity.view') else none %}
-{% call section_head(t('dashboard.activity.title'), "activity-title", more_href=see_all, more_label=t('dashboard.activity.more'), compact=true) %}
-  {%- if activity %}
-  {#- An icon per kind of entry; others get the clock. -#}
-  {%- set marks = {"auth.login": "log-in", "auth.logout": "log-out", "auth.login_failed": "triangle-alert", "auth.locked_out": "lock",
-                   "auth.registered": "user", "auth.email_verified": "mail", "auth.password_changed": "key-round", "auth.password_reset": "key-round",
-                   "auth.profile_updated": "pencil", "user.roles_changed": "shield-check"} %}
-  {% call list(label=t('dashboard.activity.title')) %}
-    {%- for entry in activity %}
-    <li>{{ icon_circle(marks[entry.action] | default("history"), size=18) }}<div class="rx-list__main">
-      <span>{{ entry.action }}</span>
-      <span class="rx-subtitle">{{ entry.created_at | since }}{% if entry.ip %} · {{ entry.ip }}{% endif %}</span>
-    </div></li>
-    {%- endfor %}
+  <rx-row>
+    {#- One period for the figures and the chart (`?period=`). -#}
+    <rx-period-filter :selected="period"/>
+  </rx-row>
+
+  <rx-stats columns="3">
+    {{ stat_card("user", t('dashboard.stats.signups'), signups_total | number, delta=signups_change, trend=signups.values) }}
+    {{ stat_card("users", t('dashboard.stats.users'), users | number, tone="clay", url=route('users.index') if can('users.manage') else none) }}
+    {{ stat_card("bell", t('dashboard.stats.unread'), unread | number, tone="sand", url=route('notifications.index')) }}
+  </rx-stats>
+
+  <rx-dashboard columns="2">
+    <rx-widget title="{{ t('dashboard.chart.title') }}" description="{{ t('dashboard.chart.description') }}">
+      <rx-chart kind="bar" :data="signups" name="{{ t('dashboard.chart.title') }}" title="{{ t('dashboard.chart.title') }}" :height="180"/>
+    </rx-widget>
+    <rx-widget title="{{ t('dashboard.summary.title') }}" description="{{ t('dashboard.summary.description') }}">
+      {{ summary([
+        {"label": t('dashboard.summary.this_period'), "value": signups_total | number, "icon": "trending-up"},
+        {"label": t('dashboard.summary.before'), "value": signups_before | number, "icon": "history"},
+        {"label": t('dashboard.summary.verified'), "value": verified | number, "icon": "circle-check"},
+      ], total={"label": t('dashboard.summary.total'), "value": users | number}) }}
+    </rx-widget>
+  </rx-dashboard>
+
+  {%- set see_all = route('activity.index') if can('activity.view') else none %}
+  {% call section_head(t('dashboard.activity.title'), "activity-title", more_href=see_all, more_label=t('dashboard.activity.more'), compact=true) %}
+    {%- if activity %}
+    {#- An icon per kind of entry; others get the clock. -#}
+    {%- set marks = {"auth.login": "log-in", "auth.logout": "log-out", "auth.login_failed": "triangle-alert", "auth.locked_out": "lock",
+                     "auth.registered": "user", "auth.email_verified": "mail", "auth.password_changed": "key-round", "auth.password_reset": "key-round",
+                     "auth.profile_updated": "pencil", "user.roles_changed": "shield-check"} %}
+    <rx-list label="{{ t('dashboard.activity.title') }}">
+      {%- for entry in activity %}
+      <li>{{ icon_circle(marks[entry.action] | default("history"), size=18) }}<div class="rx-list__main">
+        <span>{{ entry.action }}</span>
+        <span class="rx-subtitle">{{ entry.created_at | since }}{% if entry.ip %} · {{ entry.ip }}{% endif %}</span>
+      </div></li>
+      {%- endfor %}
+    </rx-list>
+    {%- else %}
+    <div class="app-panel">{{ empty_state("history", t('dashboard.activity.empty'), t('dashboard.activity.empty_text')) }}</div>
+    {%- endif %}
   {% endcall %}
-  {%- else %}
-  <div class="app-panel">{{ empty_state("history", t('dashboard.activity.empty'), t('dashboard.activity.empty_text')) }}</div>
-  {%- endif %}
-{% endcall %}
-{% endblock %}
+</rx-page>
