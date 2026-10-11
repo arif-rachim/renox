@@ -117,8 +117,8 @@ This app uses Renox, a Laravel-like Rust web framework (https://github.com/arif-
 Before writing Renox code, read
 https://raw.githubusercontent.com/arif-rachim/renox/main/llms.txt: it maps every topic to the
 guide or example that shows the official way (its links are paths in that repository).
-Prefer `rnx make:*` generators, `use renox::prelude::*`, and the UI kit (`renox/ui.html`) for
-pages. Run `cargo test` after changes.
+Prefer `rnx make:*` generators, `use renox::prelude::*`, and the UI kit's `rx-*` tags for
+pages. Run `cargo test`, `rnx db:check` and `rnx view:check` after changes.
 ```
 
 **Claude Code, set up once per app** (optional, both make it faster):
@@ -164,6 +164,10 @@ Tips:
   an agent can read the real code instead of guessing.
 - Ask for tests with every change: `renox::testing::TestApp` drives the app without a server,
   so `cargo test` checks pages, forms, mail and jobs in seconds.
+- Mistakes show up before a page is opened: `rnx db:check` compares every model with its
+  table, `rnx view:check` loads every template and checks its components and route names, and
+  `rnx doctor` says what is missing on the machine. An agent gets a precise error from a
+  command instead of a broken page.
 
 ## A taste
 
@@ -211,13 +215,19 @@ impl Module for Guestbook {
 ```
 
 ```html
-<form hx-post="/entries" hx-target="#entries" hx-swap="outerHTML">  <!-- CSRF sent for you -->
-  <input name="name"> <textarea name="message"></textarea> <button>Send</button>
-</form>
+<rx-form hx-post="{{ route('entries.store') }}" hx-target="#entries" hx-swap="outerHTML">
+  {#- the CSRF field is written for you -#}
+  <rx-input name="name" label="Name"/>
+  <rx-textarea name="message" label="Message"/>
+  <rx-button label="Send"/>
+</rx-form>
 {% block entries %}                                                  {# all htmx gets back #}
-<ul id="entries">{% for e in entries %}<li>{{ e.name }}: {{ e.message }}</li>{% endfor %}</ul>
+<ul id="entries"><li rx-for="e in entries">{{ e.name }}: {{ e.message }}</li></ul>
 {% endblock %}
 ```
+
+The `rx-*` tags are the UI kit's components: they become MiniJinja when the template loads,
+and a typo in a tag or an attribute fails with the file, the line and "did you mean".
 
 ## Feature tour
 
@@ -264,10 +274,25 @@ type in Rust, templates or the terminal.
 </details>
 
 <details>
-<summary><b>Views & HTMX</b>: MiniJinja templates, fragments, Alpine.js</summary>
+<summary><b>Views & HTMX</b>: MiniJinja templates, <code>rx-*</code> tags, live components, fragments, Alpine.js</summary>
 
 - Templates are HTML files with blanks the app fills in. Renox uses MiniJinja for them, with
   layouts, blocks and macros. While you develop, templates reload when you refresh the page.
+- Components are written as tags: `<rx-page layout="layouts/app.html" title="Products">`,
+  `<rx-form>`, `<rx-input name="email" label="Email" required/>`, `<rx-table :rows="products">`
+  with `<rx-column>`, and `rx-if` / `rx-else` / `rx-for` on any element. Your own components
+  are `<app-price-tag>` files that declare their props with `<rx-props>`. Tags become MiniJinja
+  when a template loads, so live reload, overriding and single-file builds work as before, and
+  a wrong tag or attribute fails with the file, the line and "did you mean"
+  ([guide](docs/ui.md#components-as-tags)). Components send events to the page
+  (`@closed="…"` on a sheet).
+- Live components, Renox's answer to Livewire: a part of a page whose state lives in a Rust
+  struct (`impl LiveComponent`). `rx-click="increment"` calls a method, the server renders the
+  component again and the browser morphs the page into it. No route per action, no JavaScript;
+  the state travels signed ([guide](docs/live.md)).
+- Templates are checked before anyone opens them: `rnx view:check` loads every template and
+  checks its components and route names, `#[derive(ViewData)]` with `View::typed` gives a page a
+  typed context, and `rnx view:data` gives your editor autocomplete for the tags.
 - `.fragment("block")` answers htmx with just one block of the page, not the whole page.
   `HxTrigger`, `HxRedirect` and `Back` cover the rest.
 - `{{ csrf_field() }}`, `{{ method_field('PUT') }}`, `old()`, `error()`, `t()` and `route()` work
@@ -279,9 +304,10 @@ type in Rust, templates or the terminal.
   `{{ stack('scripts') }}` / `{{ stack('head') }}`, once if asked (`{% call push('scripts', once='chart') %}`).
 - Tailwind CSS without Node: `rnx new --tailwind`, and `rnx serve` / `rnx build` run Tailwind's
   standalone CLI (downloaded once, checked by SHA-256).
-- Components are macros that see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit
-  ships with Renox (`renox/ui.html`), with a warm default theme (Inter and Poppins bundled, a
-  type scale that puts the important figure first; a `classic` theme too):
+- Components see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit ships with
+  Renox, as tags or as the macros underneath them (`renox/ui.html`), with an editorial default
+  theme (Inter and Poppins bundled, a type scale that puts the important figure first; `warm`
+  and `classic` themes too):
   - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
   - the page's frame: a navigation bar or a back office's sidebar, page headers, toolbars,
     row actions, lists, card grids and progress bars;
@@ -299,7 +325,8 @@ type in Rust, templates or the terminal.
   - toasts (`Toast::success(…)`, with a body, links, a duration and a position) and live
     validation.
 - Dashboards without a chart library (`renox::chart`): figures with their change and a
-  sparkline, line, area, bar, pie and doughnut charts drawn on the server as HTML and SVG
+  sparkline, line, area, bar, pie, doughnut, scatter and heatmap charts drawn on the server as
+  HTML and SVG
   (crosshair tooltips, keyboard, a data table, colours checked for colour blindness), values
   per day or month from a query (`Trend::of(query, "created_at").over(period).sum(…)`), a
   period filter, and widgets that load on their own and refresh.
@@ -310,7 +337,9 @@ type in Rust, templates or the terminal.
   dragged into order, merged cells, and CSV/Excel/print exports. Also a search box, filter
   chips, rows that link to a page, several grids on one page, bulk and row actions, summaries
   and groups, cards on phones, image/badge/link/copyable cells, columns from related tables,
-  an advanced filter, state remembered in the session and polling ([guide](docs/grid.md)).
+  columns computed in SQL (`Column::computed`) that sort, filter, sum and group like the
+  others, an advanced filter, state remembered in the session, polling, and Excel workbooks
+  with a sheet per query (`grid::Workbook`) ([guide](docs/grid.md)).
 - `.also("block")` sends out-of-band blocks with a fragment; `HxRetarget`, `HxReswap` and
   `HxPushUrl` set the other htmx headers.
 </details>
@@ -324,6 +353,12 @@ type in Rust, templates or the terminal.
 - Migrations (small files that create or change tables) are plain SQL and run in batches
   (`migrate`, `migrate:rollback`, `migrate:fresh --seed`), with per-database files when SQL
   differs.
+- The model is the one place a column is declared. `rnx make:migration --auto add_sku`
+  compares the models with the migrations and writes the difference as a plain SQL migration
+  to review (indexes, unique keys, defaults and foreign keys come from attributes on the
+  fields). `rnx db:check` fails when a model and its table disagree, and
+  `app.assert_models_match_schema()` does the same in a test, so a mismatch never waits for a
+  page to break ([guide](docs/types.md)).
 - A model is a Rust struct that matches a table: one struct is one row. `#[derive(Model)]`
   gives it `create`, `save`, `delete` (with optional soft deletes), `find_or_404`,
   a query builder (OR groups, sub-queries, `where_has`, aggregates, `group_by`/`having`, raw
@@ -331,6 +366,9 @@ type in Rust, templates or the terminal.
   simple or by cursor) and factories with fake data. The key is the `id` field's type: a
   number the database counts, or a ULID, UUID or string
   (`rnx make:model Invoice --module invoices --key ulid`; the module must exist).
+- Columns are typed constants the derive writes, so a misspelt column doesn't compile:
+  `Product::query().where_(Product::PRICE.lt(20_000)).order_by(Product::NAME)`.
+  `#[model(form)]` makes the model's form struct too, so a new field is added in one place.
 - Models can save only what changed (`save_changes`, `save_only`), run hooks (`saving`, `saved`,
   `deleting`, `deleted`), carry a default scope, e.g. the current tenant, that every query
   applies until `unscoped()`, and keep secrets encrypted at rest (`Encrypted<String>` fields,
@@ -380,7 +418,8 @@ type in Rust, templates or the terminal.
 - Auth events (`LoggedIn`, `LoginFailed`, `Registered`, …) and an opt-in `Audit` module that
   records them, plus your own entries (`audit::record`).
 - API tokens (`Authorization: Bearer`) with abilities and expiry serve mobile apps and
-  integrations.
+  integrations, and device tokens (`auth::DeviceToken`, the `Device` extractor) serve kiosks
+  and tills that belong to a place rather than a person.
 - Policies and gates, the rules for who may do what: `user.authorize("update", &product)?` in
   handlers, `can(...)` in views, `App::gate_before` for super-admins, and an opt-in
   `Permissions` module with roles and permissions (`user.assign_role(db, "editor")`,
@@ -465,6 +504,9 @@ rnx make:module products --resource --fields "name:string price:money"  # a whol
 rnx make:module news --resource --model Article   # when the model's name isn't the module's in the singular
                                                   # also make:model -m, make:policy, make:job, make:factory, make:test…
 rnx make:command orders:close --module orders     # a typed command (clap): --help, checked arguments, prompts
+rnx make:migration --auto add_sku                 # the SQL that brings the tables in line with the models
+rnx db:check && rnx view:check                    # models vs tables, templates vs components and routes
+rnx doctor                                        # what this machine or this app is missing
 rnx route:list                                    # every route with its name, module and guards
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
 rnx build && rnx make:deploy                      # dist/blog + Dockerfile, systemd (+ socket), Litestream
@@ -540,7 +582,7 @@ Two examples, both on the UI kit:
 | `Route::resource`, `make:controller --resource` | `Routes::resource`, `rnx make:module --resource` |
 | `Event::fake`, `Notification::fake`, `$this->travel()` | `app.fake_events()`, `app.fake_notifications()`, `app.travel(…)` |
 | Blade | MiniJinja templates, with `{% extends %}` and `{% block %}` |
-| Blade components, Breeze's UI | Macros that see the request (`rnx make:component`), the `renox/ui.html` kit |
+| Blade components (`<x-alert>`), Breeze's UI | `rx-*` tags (`<rx-alert>`), your own `<app-*>` components (`rnx make:component`), the UI kit |
 | `routes/web.php`, `Route::prefix()->name()->group()` | `Module::routes`, `Routes::group("/admin", "admin.", …)` |
 | `Route::domain`, `Route::fallback`, `redirect()->route()`, `->intended()` | `Routes::domain(…)`, `Routes::fallback(…)`, `Redirect::route(…)`, `Redirect::intended(…)` |
 | `HasUlids` / `HasUuids`, `encrypted` casts, nested transactions | `id: Ulid` / `id: Uuid`, `Encrypted<T>` fields, `tx.savepoint(…)` |
@@ -570,7 +612,8 @@ Two examples, both on the UI kit:
 | Artisan commands (`$signature`, `$this->ask()`, `confirm()`, `secret()`, `choice()`) | `impl AppCommand` on a clap struct, `renox::prompt::{ask, confirm, secret, choice}` |
 | `@push` / `@stack` | `{% call push('scripts') %}…{% endcall %}` / `{{ stack('scripts') }}` |
 | Vite + Tailwind | `rnx new --tailwind` (the standalone CLI, no Node) |
-| Livewire | htmx and Alpine.js, with handlers that return fragments |
+| Livewire | live components (`impl LiveComponent`, `rx-click`, `rx-model`) ([docs/live.md](docs/live.md)), or htmx and Alpine.js with handlers that return fragments |
+| Migrations written from the schema builder | `rnx make:migration --auto` from the models, `rnx db:check` |
 | Filament tables | `renox::grid` with `renox/grid.html` ([docs/grid.md](docs/grid.md)) |
 | Filament forms, infolists, actions, notifications, widgets | the kit's fields, `infolist`, `action_sheet`, `Toast` and `notification_bell`, `stat`/`chart(…)` with `renox::chart` ([docs/ui.md](docs/ui.md)) |
 | Filament's demo app | [`examples/bikeshop`](examples/bikeshop) (its back office and admin panel) |
@@ -587,7 +630,7 @@ change on `main`. The landing page and blog are [renox.rs](https://renox.rs) ([`
 - [Coming from Laravel](docs/laravel.md): each Laravel concept and its Renox counterpart.
 - [CHEATSHEET.md](CHEATSHEET.md): one short, compiled example per task.
 - Guides: [routing and middleware](docs/routing.md), [validation](docs/validation.md),
-  [views and the UI kit](docs/ui.md), [the data grid](docs/grid.md), [mail and notifications](docs/mail.md),
+  [views and the UI kit](docs/ui.md), [live components](docs/live.md), [the data grid](docs/grid.md), [mail and notifications](docs/mail.md),
   [scheduler, events, cache and commands](docs/scheduling.md), [testing](docs/testing.md),
   [relations](docs/relations.md), [full-text search](docs/search.md),
   [authorization and tenants](docs/authorization.md), [two-factor authentication](docs/two-factor.md),
@@ -635,6 +678,19 @@ Then v1.0. It brought:
 - the starter kit (`rnx new --starter`) and the 1.x promise;
 - the bike shop example and its design system: the editorial default theme, icons, the phone
   tab bar, renox-blocks, and the starter's page patterns.
+
+**1.1.0-rc.1**, the release candidate for 1.1, is out for trying (`cargo install renox-cli
+--version 1.1.0-rc.1`, or `renox = "1.1.0-rc.1"`; Cargo never picks a pre-release unless
+asked). Everything in it is additive, so 1.0 apps keep compiling:
+- what the bike shop had to work around: seeders from modules, public `db::Conn`, signed
+  routes inside groups, the session in view contexts, users by permission, device tokens;
+  computed grid columns, Excel workbooks with several sheets and heatmap charts; paused
+  subscriptions in renox-billing; actions with input, relation managers and layout slots in
+  renox-admin;
+- the developer-experience work: `rx-*` tags as the default way to write pages (in `rnx new`,
+  the starter, both examples and the guides), component events, live components, typed
+  columns, `#[model(form)]`, migrations generated from models, `db:check`, `view:check`,
+  typed view contexts, editor autocomplete and `rnx doctor`.
 
 Breaking changes up to 1.0 are listed in [CHANGELOG.md](CHANGELOG.md).
 

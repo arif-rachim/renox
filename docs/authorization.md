@@ -804,6 +804,8 @@ mail) logs them in with the same rules as the login page:
   account for an address another service verified: no password, the address verified, then
   `Auth::on_registered` (the extra pairs are in its `Registration`) and `Registered`.
   `renox::auth::registration_open(&state)` says whether sign-ups are allowed at all.
+  Addresses are stored trimmed and in lowercase; compare one you got elsewhere through
+  `renox::auth::normalize_email(email)`, as Renox does at registration and login.
 - **`renox::auth::confirm_identity(&session)`** counts as typing the password at
   `/confirm-password`, and returns the page that asked for it.
 

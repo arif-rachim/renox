@@ -882,7 +882,9 @@ it, is in [types.md](types.md).
 
 Error messages come in the request's language. Renox picks it in this order: the session's
 locale, then the browser's `Accept-Language` header (with `App::detect_locale`), else
-`APP_LOCALE`.
+`APP_LOCALE`. Your own middleware (`App::layer`) can read the choice from the request's
+`renox::i18n::RequestLocale` extension and change it for this request with
+`RequestLocale::switch(&mut req, "es")`, for example to use a language saved on the account.
 
 Renox ships English messages. For another language, the app translates them in its own
 language file (for example `resources/lang/es.json`). Anything it leaves out stays English.

@@ -55,7 +55,7 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, t
                            ReadMe, CheatSheet, TypesGuide, RelationsGuide, AuthorizationGuide,
                            QueueGuide, UiGuide, GridGuide, ValidationGuide, RoutingGuide,
                            MailGuide, SchedulingGuide, TestingGuide, OperationsGuide,
-                           TutorialGuide, LaravelGuide, MacroCompileErrors
+                           TutorialGuide, LaravelGuide, LiveGuide, MacroCompileErrors
   tests/it/                ONE integration-test binary (main.rs + a module per area); add new areas
                            as `mod x;` in main.rs. Notable modules: send_handlers.rs (every data
                            API in a routed handler), web_security.rs, data_resilience.rs,
@@ -106,7 +106,13 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/components/          the tag compiler: `<rx-…>`/`<app-…>` and `rx-if`/`rx-else`/`rx-for` to MiniJinja
                            when a template loads (scan.rs, tree.rs, attrs.rs, contracts.rs: the static
-                           component table, emit.rs, special.rs: rx-page/push/form/table, app.rs, suggest.rs)
+                           component table, emit.rs, special.rs: rx-page/push/form/table, app.rs, suggest.rs);
+                           plugins compile theirs through `view::add_template` and register
+                           tags with `Registry::component`
+  src/live_component/      live components (#386): mod.rs (LiveComponent, registration),
+                           context.rs (LiveContext), snapshot.rs (signed state, LIVE_SNAPSHOT_MAX_SIZE),
+                           route.rs (POST /_renox/live/{component}/{action}); views/live.html,
+                           assets/renox-live.js + idiomorph-0.7.3.min.js (0BSD, idiomorph-LICENSE)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/icons.rs             the kit's icons: Lucide paths (lucide-static 1.53.0, ISC; assets/NOTICE,
                            assets/lucide-LICENSE) drawn by `renox_icon`, behind ui.html's `icon(…)`
@@ -130,7 +136,11 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            query_log.rs (capture_queries: a task-local statement log, also
                            feeding /_renox/debug), search.rs (full-text search: the index
                            migration (FTS5 + triggers / generated tsvector + GIN), the
-                           filter and rank SQL behind Query::search, rebuild)
+                           filter and rank SQL behind Query::search, rebuild), column.rs
+                           (typed columns: Col, Condition, IntoColumn, Query::where_),
+                           schema.rs + schema_check.rs (db:check: models vs tables),
+                           schema_diff.rs + schema_sql.rs + auto_migration.rs (db:diff,
+                           make:migration --auto: the SQL per dialect, SQLite rebuilds)
   src/path.rs              renox::Path: axum's Path with a 404 (not 400) when a value won't parse
                            (a parameter the route lacks is a 500); Found<M> (route model binding:
                            the parameter named after the table, else the only one; by key or
@@ -150,7 +160,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            a module's step after the password; pending_login/complete_login,
                            #167), external.rs (sign_in / register_verified /
                            registration_open / confirm_identity: logging in another way than
-                           the password, for renox-oauth, #147), verification, tokens.rs (API tokens,
+                           the password, for renox-oauth, #147), device.rs (DeviceToken, the
+                           Device extractor: tokens owned by a kiosk or till, #316),
+                           verification, tokens.rs (API tokens,
                            abilities, prune), LoginThrottle (pair/account/IP), notifications
                            (Recipient, Channel::Custom, notify/notify_later,
                            SendToChannel job, DatabaseMessage, Hub), inbox.rs (the
@@ -234,8 +246,10 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   migrations/              framework-owned migrations (auth/, permissions/, audit/, queue/,
                            cache/, session/, grid/, webhook/); see §4.5
   tests/                   core-only integration tests (support/mod.rs has a small TestApp)
-crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum, Validate (validate.rs);
-                           embedded!(), migrations!(), #[renox::test]
+crates/renox-macros/       proc macros: derive Model (typed column constants, `#[model(form)]`,
+                           schema attributes), FromRow, DbEnum, Validate (validate.rs), ViewData
+                           (view_data.rs); #[renox::live_component] (live.rs); embedded!(),
+                           migrations!(), #[renox::test]
 crates/renox-2fa/          the first plugin (#146), a separate crate versioned with renox:
                            TwoFactor module (lib.rs: second_factor, account_section, its
                            views registered in `templates` unless the app has a file of the
@@ -287,7 +301,9 @@ crates/renox-admin/        the admin panel plugin (#148, Filament's resources): 
                            resource.rs (AdminResource trait: Model + Policy + Default, Form:
                            Validate + Serialize, columns/fields/fill/rules/entries/filters/
                            actions/query/grid/allows; AdminAction, ActionContext, Filter,
-                           BoxFuture), field.rs (Field, FieldKind), entry.rs (Entry),
+                           BoxFuture; ActionInput, SaveContext), field.rs (Field, FieldKind),
+                           entry.rs (Entry), relation.rs (RelationManager: child rows),
+                           texts.rs (`renox.admin.*` defaults), `Admin::slot` (#314),
                            panel.rs (routes `admin.{slug}.*` in a Routes::group, generic
                            handlers behind `Extension(Ctx<R>)`; the panel's gate then the
                            resource's `allows` before `Valid<T>` is read; bulk/row actions
@@ -301,6 +317,7 @@ crates/renox-billing/      the subscriptions plugin (#155, Laravel's Cashier): B
                            `Registry::provide`, the account section, listeners: AccountDeleted
                            cancels at the gateway and deletes the rows, audit entries; views
                            registered in `templates` unless the app has a file of the name),
+                           events.rs (SubscriptionPaused/Unpaused, …; pause and named guards #315),
                            plan.rs (Plan, Interval), customer.rs (Billing::of → Customer,
                            Billable, Owner `kind:id`), gateway.rs (Gateway trait, BoxFuture,
                            Remote: only what's set changes a row, Notice, Payment, Checkout,
@@ -320,7 +337,8 @@ crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, se
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
                            standalone CLI: download via curl + SHA-256 check, build/watch; used by
                            new --tailwind, serve, build), doctor.rs (rnx doctor),
-                           tools.rs (programs on PATH, the fast linker rnx new writes)
+                           tools.rs (programs on PATH, the fast linker rnx new writes),
+                           finish.rs (after make:module --resource: migrate, the URL, --open)
   build.rs                 sets RENOX_GIT_REV (the commit `rnx new` pins apps to)
   stubs/starter/           `rnx new --starter`: the starter kit's files, written over the
                            stubs below (same path) or next to them (`STARTER` in new.rs)
@@ -425,8 +443,10 @@ tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a rea
                            found by their lead-in sentence, never line numbers), then fmt,
                            clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
                            Changing a tutorial step's wording may need follow.py changed too
-docs/ui.md                 components, the UI kit, toasts, fragments, htmx headers, live
-                           validation, stacks, Tailwind (doctest `UiGuide`)
+docs/ui.md                 components (as rx-* tags first), the UI kit, toasts, fragments, htmx
+                           headers, live validation, stacks, view:check, typed views, editor
+                           autocomplete, Tailwind (doctest `UiGuide`)
+docs/live.md               live components (doctest `LiveGuide`)
 docs/grid.md               the data grid (renox::grid): columns, filters, actions, summaries,
                            exports (doctest `GridGuide`)
 docs/routing.md            routes, groups, domains, extractors, middleware, guards, sessions,
@@ -502,7 +522,8 @@ docs/assets/demo.gif       the README's demo (see §4.10)
    (a handler panic or a run past `REQUEST_TIMEOUT` becomes a 500 with the error page).
 7. `App::layer` layers (first added = outermost), around the modules' routes only.
 8. Routes. Also inside the layers: `/_renox/files` (storage), `/_renox/grid/{grid}/prefs` (data
-   grid preferences), `/_renox/mail` and
+   grid preferences), `POST /_renox/live/{component}/{action}` (live components: session,
+   auth and CSRF apply as on any page), `/_renox/mail` and
    `/_renox/debug` (only with `APP_DEBUG`; the inspector answers 404 unless also local), and the fallback: `public/` (`ServeDir`, or the embedded files) with a 404.
 
 With `Routes::domain`, `build_router` runs once per domain pattern (each with the whole stack
@@ -535,8 +556,8 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **The app binary is its own CLI** (like artisan): `my-app migrate|migrate:rollback|migrate:fresh|
   migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|queue:forget|
   queue:prune-failed|queue:prune-batches|webhook:failed|webhook:retry|cache:prune|session:prune|
-  ui:publish|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
-  up|help`, default `serve` (modules add more: `tokens:prune` and `notifications:prune` from Auth, `audit:prune` from Audit),
+  ui:publish|schedule:list|schedule:run|schedule:work|route:list|db:shell|db:check|db:diff|
+  view:check|view:data|down|up|help`, default `serve` (modules add more: `tokens:prune` and `notifications:prune` from Auth, `audit:prune` from Audit),
   plus the app's own commands (`App::command`, or `App::typed_command` for a clap `AppCommand`;
   names can't clash with built-ins). Migrations and
   jobs are compiled into the app, so only the app can run them. `rnx <anything unknown>` forwards
@@ -656,7 +677,9 @@ a closure borrowing `req` alive across `next.run(req).await` (scope it in a bloc
 ### 4.3 Built-in templates, texts and template helpers
 - Templates are compiled by `components::compile` in the loader (`view.rs`): tags become macro calls
   on `renox/ui.html`, and a new kit macro gets a `Contract` in `components/contracts.rs`. Plugin
-  templates (`env.add_template`) skip it. Errors read `file:line: message`; line numbers are kept.
+  templates go through `view::add_template`, which compiles them too (never call
+  `env.add_template` directly), and plugins register their own tags with
+  `Registry::component`. Errors read `file:line: message`; line numbers are kept.
 - Add the file under `crates/renox-core/views/…` **and** register it in `BUILTIN` in `view.rs`.
   Built-in names are prefixed `renox/` (e.g. `renox/auth/login.html`). Forgetting `BUILTIN` gives
   "template not found" at runtime only.
@@ -967,7 +990,8 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
 - **Requests:** `REQUEST_TIMEOUT` (seconds, 60; 0 = none), `UPLOAD_MAX_SIZE` (MB, 10),
   `TRUSTED_PROXIES` (addresses, CIDR ranges or `*`), `TRUSTED_HOSTS` (host names, `*.example.com`;
   other hosts get a 400; empty: any), `CSP` (relaxed|strict|off, also `false`/`none`
-  for off; relaxed is the owner's chosen default).
+  for off; relaxed is the owner's chosen default), `LIVE_SNAPSHOT_MAX_SIZE` (KB, 64: the
+  largest live component state a request may carry).
 - **Logs:** `RUST_LOG` (default by command: `info,renox=debug` for `serve`/`queue:work`/
   `schedule:work` with debug on, `info` for them without, `warn` for every other command), `LOG_FORMAT` (text|json; anything else fails at boot),
   `LOG_FILE` (append there instead of stdout, no ANSI colors; falls back to stdout if it can't
@@ -1388,8 +1412,35 @@ picks the build, not the terminal.
   table: sorts, filters, searches, summaries and groups work on it and on the related columns,
   `summarize` reads each column's SQL through `sql_of`) and `Query::group_by_raw` #313; a
   `select` column with whole-number options filters with `CAST(col AS TEXT) IN (…)` so integer
-  columns work on PostgreSQL #319 (multi-sheet exports and a heatmap chart stay open in #319).
-  Tests in grid.rs `computed_columns_are_summed_grouped_and_integers_filtered_by_select`.
+  columns work on PostgreSQL #319. Tests in grid.rs
+  `computed_columns_are_summed_grouped_and_integers_filtered_by_select`. Then the rest of #319:
+  `grid::Workbook` (several sheets in one Excel file, `xlsx` feature) and `chart("heatmap", …)`.
+- **1.1, plugins and auth** (additive): renox-billing named guards
+  (`require_subscription_named`/`require_plan_named`), `Customer::pause`/`unpause`,
+  `SubscriptionStatus::Paused` and webhook state hooks #315; renox-admin actions with input
+  (`ActionInput`), the after-save hook (`SaveContext`), relation managers, `Admin::slot` and
+  `renox.admin.*` texts #314; `auth::DeviceToken` + the `Device` extractor (framework migration
+  `00010101000007`), public `i18n::RequestLocale` and `auth::normalize_email` #316.
+- **1.1, the developer-experience epic #385** (PRs #492 and #502; every sub-issue closed, the
+  epic itself and #354 still open): `db:check` + `TestApp::assert_models_match_schema` (models
+  registered with `App::model`) #370; `db:diff` / `rnx make:migration --auto` from the models'
+  schema attributes (`index`, `unique`, `default`, `references`) #371; the `rx-*` tag stages
+  #372–#376 (forms, navigation, overlays, dashboards, the grid, plugin tags through
+  `view::add_template` + `Registry::component`); component events and `@event` #373;
+  `view:check` + `TestApp::assert_views_compile` #377; `view:data` (editor custom data) #378;
+  `rnx doctor` and the fast linker `rnx new` writes #379; typed columns (`Product::PRICE.lt(…)`,
+  `Query::where_`, `#[model(no_typed_columns)]`) #380; `#[model(form)]` #381;
+  `make:module --resource` migrates, prints the URL, `--open` #382; `#[derive(ViewData)]` +
+  `View::typed` #383; live components (`LiveComponent`, `#[renox::live_component]`,
+  `<live-NAME>`, `rx-click`/`rx-submit`/`rx-model`, `TestApp::live`; docs/live.md) #386. #384:
+  `rx-*` tags are the default in `rnx new`, the starter, both examples and the guides (#493–#500);
+  the kit's macros stay supported underneath. The `browser (bikeshop)` job failed on main
+  after #492 ("Esc closes it" on the About sheet, phone): the Spanish staff test logged in by
+  clicking the form, #354's trigger; it logs in with `logInWithFetch(…, { keepCookies: true })`
+  now. Then the workspace was set to `1.1.0-rc.1` (the owner's choice: a release candidate
+  before 1.1.0; README's install/clone lines, the plugin guides' `"1.0"` and the landing
+  page's version stay on 1.0.0 until 1.1.0 itself). Published when the owner runs
+  `cargo publish`.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
@@ -1489,7 +1540,8 @@ picks the build, not the terminal.
 - **#372, components as tags** (epic #385; tasks #443–#458): `components/` compiles `<rx-…>`,
   `<app-…>` and `rx-if`/`rx-else`/`rx-for` to MiniJinja at load (the loader hook, a static contract
   table, `make:component` writing `<rx-props>`); bikeshop's supplier and field pages use it; guide:
-  docs/ui.md "Components as tags". Plugin templates are not compiled yet.
+  docs/ui.md "Components as tags". Plugin templates are compiled too since e94a7e6e
+  (`view::add_template`).
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
