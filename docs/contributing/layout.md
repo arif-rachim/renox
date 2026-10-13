@@ -386,8 +386,12 @@ learn/                     learn.renox.rs: the course (package `renox-learn`, pu
                            media/{record.mjs,encode.sh,manifest.mjs,upload.sh,scenes/*.json,Containerfile.ffmpeg}
                            (the chapters' videos, #534: recorded from the course app, encoded in a pinned
                            container, uploaded by hand; only content/media.json is committed), src/media.rs.
-                           Coming (#526-#536): a CodeMirror 6 editor, challenges checked in a sandbox,
-                           videos. Links into the docs must name a page in PAGES (tests/learn.rs)
+                           editor/ (#528: package.json + package-lock.json pinning CodeMirror 6,
+                           entry.mjs, bundle.sh building public/vendor/codemirror-<V>.js in a pinned
+                           Node container, CI job `learn-editor`; samples/), public/editor.js
+                           (`window.LearnEditor`, mounts textarea[data-learn-editor]), src/editor.rs
+                           (`GET /editor`, the playground, noindex), tests/editor.rs.
+                           Links into the docs must name a page in PAGES (tests/learn.rs)
 benchmarks/                Renox vs bare Axum vs Laravel (FPM and Octane) in Docker, pinned to
                            2 cores and 1 GB, driven by oha (#333): its own cargo workspace
                            (renox-app, axum-app; not a member of the root one), laravel/

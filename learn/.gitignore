@@ -3,3 +3,6 @@
 # Videos made by media/encode.sh are uploaded to the server, not committed.
 /media/out
 /course/target
+# CodeMirror: npm ci and esbuild output of editor/bundle.sh (the bundle is copied to public/vendor/).
+/editor/node_modules
+/editor/out

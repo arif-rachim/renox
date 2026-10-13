@@ -1,0 +1,20 @@
+<rx-page layout="layouts/app.html">
+<rx-slot name="seo">{{ seo(title="Editor playground · Learn Renox", description="The course's code editor, in Rust and HTML mode.") }}<meta name="robots" content="noindex"></rx-slot>
+<div class="wrap editor-page">
+  <header class="editor-page__head">
+    <p class="eyebrow"><b>000</b> Playground</p>
+    <h1>The editor</h1>
+    <p class="editor-page__lead">CodeMirror 6 in Rust and HTML mode, with Renox's templates marked. Suggestions come from Renox's API and this stage's code; they are not type inference. Tab indents; press Esc, then Tab, to leave an editor.</p>
+  </header>
+  <figure class="learn-editor">
+    <figcaption class="learn-editor__bar"><span class="learn-editor__lang">Rust</span><span class="learn-editor__path">src/app/menu/model.rs</span></figcaption>
+    <textarea class="learn-editor__source" data-learn-editor="rust" data-path="src/app/menu/model.rs" aria-label="Rust: src/app/menu/model.rs" spellcheck="false" rows="20">{{ rust_sample }}</textarea>
+  </figure>
+  <figure class="learn-editor">
+    <figcaption class="learn-editor__bar"><span class="learn-editor__lang">HTML</span><span class="learn-editor__path">resources/views/menu/index.html</span></figcaption>
+    <textarea class="learn-editor__source" data-learn-editor="html" data-path="resources/views/menu/index.html" aria-label="HTML: resources/views/menu/index.html" spellcheck="false" rows="12">{{ html_sample }}</textarea>
+  </figure>
+</div>
+<script src="{{ asset(codemirror) }}" defer></script>
+<script src="{{ asset('editor.js') }}" defer></script>
+</rx-page>

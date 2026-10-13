@@ -224,6 +224,17 @@
     {{ changes | safe }}
   </section>
 
+  <section class="design__item" id="c-editor" data-component="editor">
+    <h2 class="design__name">editor</h2>
+    <p class="design__note">The code editor, #528: CodeMirror 6 on a textarea[data-learn-editor] (editor.js), dark in both modes like the code panels. In HTML mode Renox's expressions and rx-/app-/live- tags are marked. This sample is read-only, so Tab moves on; in an editable one Tab indents, and Esc then Tab leaves. /editor is its playground.</p>
+    <figure class="learn-editor">
+      <figcaption class="learn-editor__bar"><span class="learn-editor__lang">HTML</span><span class="learn-editor__path">resources/views/menu/index.html</span></figcaption>
+      <textarea class="learn-editor__source" data-learn-editor="html" data-path="design/index.html" aria-label="HTML: resources/views/menu/index.html" spellcheck="false" rows="10" readonly>{{ editor_sample }}</textarea>
+    </figure>
+    <script src="{{ asset(codemirror) }}" defer></script>
+    <script src="{{ asset('editor.js') }}" defer></script>
+  </section>
+
   <section class="design__item" id="c-callouts" data-component="callouts">
     <h2 class="design__name">callouts</h2>
     <p class="design__note">Five kinds and a plain quote, as the docs write them.</p>

@@ -30,6 +30,7 @@ pub const COMPONENTS: &[&str] = &[
     "code-panel",
     "code-file",
     "changes",
+    "editor",
     "callouts",
     "shot",
     "video",
@@ -118,6 +119,8 @@ pub async fn page() -> Result<View> {
             changes => changes,
             challenge => challenge,
             challenge_passed => passed,
+            codemirror => crate::editor::CODEMIRROR,
+            editor_sample => crate::editor::HTML_SAMPLE,
         },
     ))
 }

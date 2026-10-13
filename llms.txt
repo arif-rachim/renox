@@ -61,6 +61,8 @@
   learn/content/stages with `learn:` directives (include, changes, screenshot, video,
   challenge, quiz; each stage also at /stages/{slug}.md); see learn/README.md "Writing a chapter" (screenshots: learn/media/screens.mjs; videos: learn/media/record.mjs, encode.sh, manifest.mjs, upload.sh, listed in learn/content/media.json). The course app (a coffee shop's
   menu) is learn/course/stage-00 ... stage-08, standalone apps run by learn/course/run.sh.
+  The code editor (CodeMirror 6, vendored by learn/editor/bundle.sh, public/editor.js,
+  playground at /editor) is in learn/editor/README.md.
 - `rnx new <name> --starter` (files in crates/renox-cli/stubs/starter/): a whole app to start
   from: sidebar layout with the notification bell, email verification, roles (`Permissions`),
   a dashboard, a users page that changes roles, the activity log (`Audit`), `users:admin`,

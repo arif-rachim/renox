@@ -24,6 +24,8 @@ It is a Renox app compiled into one binary (views and public files embedded), li
 | [`resources/views/stage.html`](resources/views/stage.html), [`public/learn.js`](public/learn.js) | a chapter's page; the code panels' copy buttons |
 | [`tests/content.rs`](tests/content.rs) | the chapters have no problems, render in the layout, link to each other |
 | [`tests/learn.rs`](tests/learn.rs) | every route, the tags, the stages' order, links into the docs |
+| [`editor/`](editor), [`public/editor.js`](public/editor.js), [`src/editor.rs`](src/editor.rs) | the code editor: CodeMirror 6 vendored as one pinned bundle in `public/vendor/`, `window.LearnEditor`, the `/editor` playground ([editor/README.md](editor/README.md)) |
+| [`tests/editor.rs`](tests/editor.rs) | the playground, the bundle's budget and its NOTICE |
 | [`deploy/`](deploy) | the systemd socket and service |
 
 ## Design system

@@ -19,6 +19,7 @@ pub mod content;
 pub mod course;
 pub mod design;
 pub mod directive;
+pub mod editor;
 pub mod media;
 pub mod render;
 
@@ -57,6 +58,8 @@ impl Module for Learn {
             .name("home")
             .get("/design", design::page)
             .name("design")
+            .get("/editor", editor::page)
+            .name("editor")
             .get("/stages/{slug}", stage)
             .name("stage")
             .etag();
