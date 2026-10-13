@@ -2471,11 +2471,15 @@ dependencies = [
 name = "renox-learn"
 version = "1.1.0"
 dependencies = [
+ "heck",
+ "proc-macro2",
  "pulldown-cmark",
+ "quote",
  "renox",
  "renox-site",
  "serde",
  "serde_json",
+ "syn 3.0.6",
  "tokio",
  "tracing",
 ]

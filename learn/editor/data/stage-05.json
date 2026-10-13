@@ -1,0 +1,3870 @@
+{
+  "version": 1,
+  "stage": 5,
+  "slug": "forms",
+  "models": [
+    {
+      "name": "Category",
+      "table": "categories",
+      "key": "i64",
+      "doc": "A group of menu items: Coffee, Tea, Pastry.",
+      "columns": [
+        {
+          "const": "ID",
+          "column": "id",
+          "type": "i64",
+          "doc": ""
+        },
+        {
+          "const": "NAME",
+          "column": "name",
+          "type": "String",
+          "doc": ""
+        },
+        {
+          "const": "CREATED_AT",
+          "column": "created_at",
+          "type": "Option<DateTime>",
+          "doc": ""
+        },
+        {
+          "const": "UPDATED_AT",
+          "column": "updated_at",
+          "type": "Option<DateTime>",
+          "doc": ""
+        }
+      ]
+    },
+    {
+      "name": "MenuItem",
+      "table": "menu_items",
+      "key": "i64",
+      "doc": "One thing on the menu: a drink, or something to eat.",
+      "columns": [
+        {
+          "const": "ID",
+          "column": "id",
+          "type": "i64",
+          "doc": ""
+        },
+        {
+          "const": "CATEGORY_ID",
+          "column": "category_id",
+          "type": "i64",
+          "doc": ""
+        },
+        {
+          "const": "USER_ID",
+          "column": "user_id",
+          "type": "i64",
+          "doc": "Who added it."
+        },
+        {
+          "const": "NAME",
+          "column": "name",
+          "type": "String",
+          "doc": ""
+        },
+        {
+          "const": "DESCRIPTION",
+          "column": "description",
+          "type": "Option<String>",
+          "doc": ""
+        },
+        {
+          "const": "PRICE",
+          "column": "price",
+          "type": "i64",
+          "doc": "In cents: 450 is $4.50."
+        },
+        {
+          "const": "AVAILABLE",
+          "column": "available",
+          "type": "bool",
+          "doc": ""
+        },
+        {
+          "const": "STOCK",
+          "column": "stock",
+          "type": "Option<i64>",
+          "doc": "Portions left today. `None` means they aren't counted, like a drink."
+        },
+        {
+          "const": "CREATED_AT",
+          "column": "created_at",
+          "type": "Option<DateTime>",
+          "doc": ""
+        },
+        {
+          "const": "UPDATED_AT",
+          "column": "updated_at",
+          "type": "Option<DateTime>",
+          "doc": ""
+        }
+      ]
+    }
+  ],
+  "tags": [
+    {
+      "name": "rx-stack",
+      "doc": "Children stacked in a column with the kit's spacing.",
+      "attributes": []
+    },
+    {
+      "name": "rx-row",
+      "doc": "Children side by side in a row with the kit's spacing.",
+      "attributes": [
+        {
+          "name": "end",
+          "doc": "Pushes the children to the end of the row.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-page-header",
+      "doc": "The page's title, with an optional subtitle, back link, badge and actions.",
+      "attributes": [
+        {
+          "name": "title",
+          "doc": "(required) The page title.",
+          "values": []
+        },
+        {
+          "name": "subtitle",
+          "doc": "A line under the title.",
+          "values": []
+        },
+        {
+          "name": "back",
+          "doc": "The URL of a back link.",
+          "values": []
+        },
+        {
+          "name": "back-label",
+          "doc": "The back link's text.",
+          "values": []
+        },
+        {
+          "name": "badge",
+          "doc": "A badge next to the title.",
+          "values": []
+        },
+        {
+          "name": "badge-kind",
+          "doc": "The badge's colour.",
+          "values": [
+            "info",
+            "success",
+            "warning",
+            "error"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-card",
+      "doc": "A titled section on the page.",
+      "attributes": [
+        {
+          "name": "title",
+          "doc": "The card's heading.",
+          "values": []
+        },
+        {
+          "name": "subtitle",
+          "doc": "A line under the heading.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-toolbar",
+      "doc": "A row of buttons and filters above a list.",
+      "attributes": []
+    },
+    {
+      "name": "rx-badge",
+      "doc": "A small coloured label.",
+      "attributes": [
+        {
+          "name": "text",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "kind",
+          "doc": "The colour.",
+          "values": [
+            "info",
+            "success",
+            "warning",
+            "error"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-page",
+      "doc": "The whole template: extends a layout, sets the SEO title and fills its blocks.",
+      "attributes": [
+        {
+          "name": "layout",
+          "doc": "(required) The layout's file name; plain text.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "The page title for the SEO tags.",
+          "values": []
+        },
+        {
+          "name": "description",
+          "doc": "The page description for the SEO tags.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-push",
+      "doc": "Content added to a stack of the layout.",
+      "attributes": [
+        {
+          "name": "stack",
+          "doc": "(required) The stack's name.",
+          "values": []
+        },
+        {
+          "name": "once",
+          "doc": "A key: the content is added once per page.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-block",
+      "doc": "A named block of the layout: `{% block name %}`; self-closing it leaves one for pages to fill.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The block's name: letters, digits and underscores; plain text.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-pagination",
+      "doc": "Page links for a page of rows (`Paginated` or `SimplePage`).",
+      "attributes": [
+        {
+          "name": ":page",
+          "doc": "(required) The page: a `Paginated` (numbered links) or a `SimplePage` (previous / next).",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-let",
+      "doc": "A local name for the rest of the enclosing element: `{% with name = value %}`.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The name: letters, digits and underscores; plain text.",
+          "values": []
+        },
+        {
+          "name": "value",
+          "doc": "(required) The value: text, or `:value=\"expression\"` for data.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-include",
+      "doc": "Another template, drawn here with the page's variables: `{% include %}`.",
+      "attributes": [
+        {
+          "name": "template",
+          "doc": "(required) The template's name: text, or `:template=\"expression\"` for a name worked out at run time.",
+          "values": []
+        },
+        {
+          "name": "optional",
+          "doc": "Shows nothing when the template does not exist (`ignore missing`).",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-script",
+      "doc": "An inline `<script>` that carries the page's CSP nonce.",
+      "attributes": []
+    },
+    {
+      "name": "rx-style",
+      "doc": "An inline `<style>` that carries the page's CSP nonce.",
+      "attributes": []
+    },
+    {
+      "name": "rx-head",
+      "doc": "The head tags Renox adds: assets, CSRF meta, analytics (`renox_head()`).",
+      "attributes": []
+    },
+    {
+      "name": "rx-ui",
+      "doc": "The UI kit's script and stylesheet tags (`renox_ui()`).",
+      "attributes": [
+        {
+          "name": "styles",
+          "doc": "Set to false to leave out the stylesheet (an app that builds its own).",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-toasts",
+      "doc": "The toast region (`toasts()`).",
+      "attributes": []
+    },
+    {
+      "name": "rx-outlet",
+      "doc": "A hole in a layout: `name` is `{% block name %}` (the content is its default), `stack` is `stack('name')` where `<rx-push>` content lands. Exactly one of the two.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "A layout block's name; pages fill it. Not with `stack`.",
+          "values": []
+        },
+        {
+          "name": "stack",
+          "doc": "A stack's name. Not with `name`.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-wizard",
+      "doc": "A form in steps; each `<rx-wizard-step>` inside is one step.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The wizard's id; its steps build theirs from it.",
+          "values": []
+        },
+        {
+          "name": "submit-label",
+          "doc": "(required) The last step's submit button.",
+          "values": []
+        },
+        {
+          "name": "back-label",
+          "doc": "The back button's text.",
+          "values": []
+        },
+        {
+          "name": "next-label",
+          "doc": "The next button's text.",
+          "values": []
+        },
+        {
+          "name": "cancel",
+          "doc": "Shows a cancel button that closes the sheet.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "cancel-label",
+          "doc": "The cancel button's text.",
+          "values": []
+        },
+        {
+          "name": "@changed",
+          "doc": "Runs when the component sends changed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-wizard-step",
+      "doc": "One step of a wizard; its fields are the content.",
+      "attributes": [
+        {
+          "name": "key",
+          "doc": "(required) The step's key, unique in the wizard.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "The step's name in the progress list.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-tabs",
+      "doc": "Tabs with their panels; each `<rx-tab>` inside is one tab and its panel.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The tabs' id; the panels build theirs from it.",
+          "values": []
+        },
+        {
+          "name": "selected",
+          "doc": "The key of the open tab; the first by default.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "The tab list's accessible name.",
+          "values": []
+        },
+        {
+          "name": ":items",
+          "doc": "The tabs as data, a list of [key, label] pairs, instead of `<rx-tab>` children; the panels are then `<rx-tab-panel>` tags.",
+          "values": []
+        },
+        {
+          "name": "@changed",
+          "doc": "Runs when the component sends changed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-tab",
+      "doc": "One tab; its content is the panel.",
+      "attributes": [
+        {
+          "name": "key",
+          "doc": "(required) The tab's key, unique in the tabs.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The tab's text.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-table",
+      "doc": "A table written as columns; the rows are looped and a page of rows gets its links.",
+      "attributes": [
+        {
+          "name": ":rows",
+          "doc": "(required) The rows: a list, or a page (`Paginated` / `SimplePage`).",
+          "values": []
+        },
+        {
+          "name": "as",
+          "doc": "The row's name in the cells; row by default.",
+          "values": []
+        },
+        {
+          "name": ":key",
+          "doc": "The row's key for route and can; {as}.id by default.",
+          "values": []
+        },
+        {
+          "name": "caption",
+          "doc": "A caption for screen readers.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The id of the table's wrapper; rx-table-N by default.",
+          "values": []
+        },
+        {
+          "name": "card",
+          "doc": "Puts the table in a card.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-simple-table",
+      "doc": "The kit's table around rows written by hand (`<tr>` under `rx-for`), with an optional footer.",
+      "attributes": [
+        {
+          "name": ":head",
+          "doc": "(required) The heading cells: text, or [text, \"num\"] to align figures to the end.",
+          "values": []
+        },
+        {
+          "name": "caption",
+          "doc": "A caption for screen readers.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-column",
+      "doc": "One column of a table; the content is its cell, with the row in scope.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "(required) The column heading.",
+          "values": []
+        },
+        {
+          "name": "align",
+          "doc": "num aligns the cell to the end.",
+          "values": [
+            "start",
+            "num"
+          ]
+        },
+        {
+          "name": "hide-narrow",
+          "doc": "Hides the column on narrow screens.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-row-actions",
+      "doc": "A row of small buttons; in a table it is the last column.",
+      "attributes": []
+    },
+    {
+      "name": "rx-button",
+      "doc": "A button; its content is the label.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "variant",
+          "doc": "The look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "type",
+          "doc": "The button's type.",
+          "values": [
+            "submit",
+            "button",
+            "reset"
+          ]
+        },
+        {
+          "name": "name",
+          "doc": "The name sent with a form.",
+          "values": []
+        },
+        {
+          "name": "value",
+          "doc": "The value sent with a form.",
+          "values": []
+        },
+        {
+          "name": "size",
+          "doc": "The size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "block",
+          "doc": "Fills the width.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "badge",
+          "doc": "A count shown on the button.",
+          "values": []
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the button off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "disabled-reason",
+          "doc": "Why the button is off.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-link-button",
+      "doc": "A link that looks like a button.",
+      "attributes": [
+        {
+          "name": "href",
+          "doc": "(required) The address; or use route.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "variant",
+          "doc": "The look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "badge",
+          "doc": "A count shown on the button.",
+          "values": []
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "new-tab",
+          "doc": "Opens in a new tab.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-icon-button",
+      "doc": "A button with only an icon; the label is for screen readers and the tooltip.",
+      "attributes": [
+        {
+          "name": "icon",
+          "doc": "(required) An icon's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) What screen readers say.",
+          "values": []
+        },
+        {
+          "name": "href",
+          "doc": "Makes it a link; or use route.",
+          "values": []
+        },
+        {
+          "name": "variant",
+          "doc": "The look.",
+          "values": [
+            "plain",
+            "primary",
+            "danger"
+          ]
+        },
+        {
+          "name": "type",
+          "doc": "The button's type.",
+          "values": [
+            "submit",
+            "button",
+            "reset"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "badge",
+          "doc": "A count shown on the button.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the button off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "disabled-reason",
+          "doc": "Why the button is off.",
+          "values": []
+        },
+        {
+          "name": "new-tab",
+          "doc": "Opens in a new tab.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-confirm",
+      "doc": "A button that asks before it acts, with its dialog.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The dialog's id.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The button's label.",
+          "values": []
+        },
+        {
+          "name": "action",
+          "doc": "(required) The address the form is sent to; or use route.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "(required) The dialog's heading.",
+          "values": []
+        },
+        {
+          "name": "message",
+          "doc": "(required) The question; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "confirm-label",
+          "doc": "The confirm button's text.",
+          "values": []
+        },
+        {
+          "name": "method",
+          "doc": "The HTTP method.",
+          "values": [
+            "DELETE",
+            "POST",
+            "PUT",
+            "PATCH"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "modal-icon",
+          "doc": "The dialog's icon.",
+          "values": [
+            "warning",
+            "error",
+            "info",
+            "success"
+          ]
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "cancel-label",
+          "doc": "The cancel button's text.",
+          "values": []
+        },
+        {
+          "name": ":fields",
+          "doc": "Hidden fields sent with the form.",
+          "values": []
+        },
+        {
+          "name": "button",
+          "doc": "Whether to draw the opening button.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "@confirmed",
+          "doc": "Runs when the component sends confirmed.",
+          "values": []
+        },
+        {
+          "name": "@cancelled",
+          "doc": "Runs when the component sends cancelled.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-sheet",
+      "doc": "A dialog; open it with an `<rx-open-button>` or any `data-rx-open=\"id\"`.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The dialog's id.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "(required) The dialog's heading.",
+          "values": []
+        },
+        {
+          "name": "message",
+          "doc": "A line under the heading.",
+          "values": []
+        },
+        {
+          "name": "slide-over",
+          "doc": "Slides in from the side.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "width",
+          "doc": "The width.",
+          "values": [
+            "sm",
+            "lg",
+            "xl"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "@opened",
+          "doc": "Runs when the component sends opened.",
+          "values": []
+        },
+        {
+          "name": "@closed",
+          "doc": "Runs when the component sends closed.",
+          "values": []
+        },
+        {
+          "name": "@saved",
+          "doc": "Runs when the component sends saved.",
+          "values": []
+        },
+        {
+          "name": "@failed",
+          "doc": "Runs when the component sends failed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-open-button",
+      "doc": "A button that opens the sheet with the given id.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The id of the sheet to open.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": "variant",
+          "doc": "The look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "badge",
+          "doc": "A count shown on the button.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-action-sheet",
+      "doc": "A button that opens a sheet with a form, sent with htmx; the content is the form's fields.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The sheet's id.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The button's label.",
+          "values": []
+        },
+        {
+          "name": "action",
+          "doc": "(required) The address the form is sent to; or use route.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "(required) The sheet's heading.",
+          "values": []
+        },
+        {
+          "name": "description",
+          "doc": "A line under the heading.",
+          "values": []
+        },
+        {
+          "name": "submit-label",
+          "doc": "The submit button's text.",
+          "values": []
+        },
+        {
+          "name": "method",
+          "doc": "The HTTP method.",
+          "values": [
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "name": "variant",
+          "doc": "The button's look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The button's size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "The button's icon.",
+          "values": []
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "slide-over",
+          "doc": "Slides in from the side.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "width",
+          "doc": "The width.",
+          "values": [
+            "sm",
+            "lg",
+            "xl"
+          ]
+        },
+        {
+          "name": "modal-icon",
+          "doc": "The sheet's icon.",
+          "values": []
+        },
+        {
+          "name": "danger",
+          "doc": "Makes the submit button red.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "target",
+          "doc": "A selector the answer is swapped into.",
+          "values": []
+        },
+        {
+          "name": "swap",
+          "doc": "How the answer is swapped in.",
+          "values": []
+        },
+        {
+          "name": "enctype",
+          "doc": "The form's encoding, for files.",
+          "values": []
+        },
+        {
+          "name": "button",
+          "doc": "Whether to draw the opening button.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "@opened",
+          "doc": "Runs when the component sends opened.",
+          "values": []
+        },
+        {
+          "name": "@closed",
+          "doc": "Runs when the component sends closed.",
+          "values": []
+        },
+        {
+          "name": "@saved",
+          "doc": "Runs when the component sends saved.",
+          "values": []
+        },
+        {
+          "name": "@failed",
+          "doc": "Runs when the component sends failed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-notification-bell",
+      "doc": "The bell with the unread count and its panel; nothing for guests.",
+      "attributes": [
+        {
+          "name": "count",
+          "doc": "The unread count to start with.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The panel's id prefix.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-alert",
+      "doc": "A message in a coloured box.",
+      "attributes": [
+        {
+          "name": "message",
+          "doc": "(required) The message; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "kind",
+          "doc": "The colour.",
+          "values": [
+            "info",
+            "success",
+            "warning",
+            "error"
+          ]
+        },
+        {
+          "name": "title",
+          "doc": "A heading.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-empty",
+      "doc": "What a list shows when it has nothing.",
+      "attributes": [
+        {
+          "name": "title",
+          "doc": "(required) The heading.",
+          "values": []
+        },
+        {
+          "name": "message",
+          "doc": "A line under the heading; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "action-href",
+          "doc": "The address of a button; or use route.",
+          "values": []
+        },
+        {
+          "name": "action-label",
+          "doc": "The button's text.",
+          "values": []
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-form",
+      "doc": "A form: the CSRF field and the method field are written for you.",
+      "attributes": [
+        {
+          "name": "action",
+          "doc": "The address; or use route. Left out, the page's own.",
+          "values": []
+        },
+        {
+          "name": "method",
+          "doc": "The HTTP method (POST by default).",
+          "values": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "name": "live",
+          "doc": "Checks the fields with the server as people leave them.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-input",
+      "doc": "A text field with its label, hint and errors.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": "type",
+          "doc": "The input's type.",
+          "values": [
+            "text",
+            "email",
+            "password",
+            "number",
+            "date",
+            "datetime-local",
+            "time",
+            "month",
+            "week",
+            "url",
+            "tel",
+            "search",
+            "color",
+            "range"
+          ]
+        },
+        {
+          "name": "value",
+          "doc": "The starting value; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "autocomplete",
+          "doc": "The autocomplete word.",
+          "values": []
+        },
+        {
+          "name": "placeholder",
+          "doc": "Text shown while empty.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "prefix",
+          "doc": "Text before the input.",
+          "values": []
+        },
+        {
+          "name": "suffix",
+          "doc": "Text after the input.",
+          "values": []
+        },
+        {
+          "name": ":datalist",
+          "doc": "Suggestions.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "readonly",
+          "doc": "The value can't be edited.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "revealable",
+          "doc": "A button shows the password.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "copyable",
+          "doc": "A button copies the value.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "hide-label",
+          "doc": "Hides the label from sight, not from screen readers.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        },
+        {
+          "name": "min",
+          "doc": "The smallest value (number and date types).",
+          "values": []
+        },
+        {
+          "name": "max",
+          "doc": "The largest value (number and date types).",
+          "values": []
+        },
+        {
+          "name": "step",
+          "doc": "The step between values (number types).",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-textarea",
+      "doc": "A multi-line text field with its label, hint and errors.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": "value",
+          "doc": "The starting value; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": "rows",
+          "doc": "The visible lines.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "placeholder",
+          "doc": "Text shown while empty.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "readonly",
+          "doc": "The value can't be edited.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "hide-label",
+          "doc": "Hides the label from sight, not from screen readers.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-select",
+      "doc": "A choice among options, with its label, hint and errors.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":options",
+          "doc": "(required) The options: pairs of value and label.",
+          "values": []
+        },
+        {
+          "name": ":selected",
+          "doc": "The chosen value, or values with multiple.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "placeholder",
+          "doc": "The empty choice's text.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "multiple",
+          "doc": "Several choices.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "searchable",
+          "doc": "Type to filter the options.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "options-url",
+          "doc": "Where the options come from, as people type.",
+          "values": []
+        },
+        {
+          "name": "editable",
+          "doc": "People can add and rename options.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "hide-label",
+          "doc": "Hides the label from sight, not from screen readers.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        },
+        {
+          "name": "@changed",
+          "doc": "Runs when the component sends changed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-checkbox",
+      "doc": "A checkbox or switch with its label, hint and errors.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": "checked",
+          "doc": "Starts checked; the old input wins after a failed submit.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "value",
+          "doc": "The value sent when checked (on by default).",
+          "values": []
+        },
+        {
+          "name": "switch",
+          "doc": "Draws a switch.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "hide-label",
+          "doc": "Hides the label from sight, not from screen readers.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-radio",
+      "doc": "One choice out of a few options, as radio buttons.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":options",
+          "doc": "(required) The options: values, [value, label] pairs or [value, label, description].",
+          "values": []
+        },
+        {
+          "name": ":selected",
+          "doc": "The chosen value; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "inline",
+          "doc": "Puts short options on one line.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "columns",
+          "doc": "Lays a long list out in this many columns (2 or 3).",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-checkbox-list",
+      "doc": "Several choices out of a list, as checkboxes.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":options",
+          "doc": "(required) The options: values, [value, label] pairs or [value, label, description].",
+          "values": []
+        },
+        {
+          "name": ":selected",
+          "doc": "The values ticked at first; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "inline",
+          "doc": "Puts short options on one line.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "columns",
+          "doc": "Lays a long list out in this many columns (2 or 3).",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-toggle-buttons",
+      "doc": "A row of buttons, one or several pressed.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":options",
+          "doc": "(required) The options: values, [value, label] pairs or [value, label, description].",
+          "values": []
+        },
+        {
+          "name": ":selected",
+          "doc": "The pressed value, or values with multiple; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": "multiple",
+          "doc": "Any number pressed.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-file",
+      "doc": "A file field: a drop zone with the chosen files listed under it.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": "accept",
+          "doc": "The file types accepted.",
+          "values": []
+        },
+        {
+          "name": "multiple",
+          "doc": "Several files.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "current",
+          "doc": "The URL of the file stored now.",
+          "values": []
+        },
+        {
+          "name": "current-name",
+          "doc": "The stored file's name.",
+          "values": []
+        },
+        {
+          "name": "preview",
+          "doc": "Shows the chosen images.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-date-picker",
+      "doc": "A date field with a calendar.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":value",
+          "doc": "The starting date; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": "min",
+          "doc": "The earliest date.",
+          "values": []
+        },
+        {
+          "name": "max",
+          "doc": "The latest date.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "placeholder",
+          "doc": "Text shown while empty.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "readonly",
+          "doc": "The value can't be edited.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": ":disabled-dates",
+          "doc": "Dates that can't be picked.",
+          "values": []
+        },
+        {
+          "name": ":closed-weekdays",
+          "doc": "Weekdays that can't be picked.",
+          "values": []
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        },
+        {
+          "name": "@changed",
+          "doc": "Runs when the component sends changed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-tags-input",
+      "doc": "A field of tags: type a word, press Enter.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":value",
+          "doc": "The starting tags; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": ":suggestions",
+          "doc": "Tags offered while typing.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "required",
+          "doc": "Marks the field as required.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "placeholder",
+          "doc": "Text shown while empty.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "doc": "Turns the field off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "bag",
+          "doc": "The named error bag.",
+          "values": []
+        },
+        {
+          "name": "@changed",
+          "doc": "Runs when the component sends changed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-form-errors",
+      "doc": "Every error of the last submit, above the form.",
+      "attributes": [
+        {
+          "name": "title",
+          "doc": "The heading.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-form-grid",
+      "doc": "Fields side by side on wide screens, one column on phones.",
+      "attributes": [
+        {
+          "name": "columns",
+          "doc": "How many columns (2 by default).",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-repeater",
+      "doc": "Rows that people add, remove and move; the content is one row's fields.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name; rows are named `name[0][field]`.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":rows",
+          "doc": "The rows to show at first; the old input wins after a failed submit.",
+          "values": []
+        },
+        {
+          "name": "add-label",
+          "doc": "The text of the add button.",
+          "values": []
+        },
+        {
+          "name": "item-label",
+          "doc": "The title of each row (the label by default).",
+          "values": []
+        },
+        {
+          "name": "min",
+          "doc": "The fewest rows.",
+          "values": []
+        },
+        {
+          "name": "max",
+          "doc": "The most rows.",
+          "values": []
+        },
+        {
+          "name": "reorderable",
+          "doc": "Whether rows can move; `:reorderable=\"false\"` fixes their order.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        },
+        {
+          "name": "@added",
+          "doc": "Runs when the component sends added.",
+          "values": []
+        },
+        {
+          "name": "@removed",
+          "doc": "Runs when the component sends removed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-key-value",
+      "doc": "Pairs of text, like headers or settings: a key and a value per row.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The field's name.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":value",
+          "doc": "The pairs: a map, a KeyValues or a list of pairs.",
+          "values": []
+        },
+        {
+          "name": "key-label",
+          "doc": "The heading over the keys.",
+          "values": []
+        },
+        {
+          "name": "value-label",
+          "doc": "The heading over the values.",
+          "values": []
+        },
+        {
+          "name": "add-label",
+          "doc": "The text of the add button.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the field.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes in a form grid, or full.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-fieldset",
+      "doc": "A titled group of fields inside a long form.",
+      "attributes": [
+        {
+          "name": "legend",
+          "doc": "(required) The group's title.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the title.",
+          "values": []
+        },
+        {
+          "name": "columns",
+          "doc": "How many columns the fields use (1 by default).",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-show-when",
+      "doc": "Fields shown only while another field has one of the values.",
+      "attributes": [
+        {
+          "name": "field",
+          "doc": "(required) The name of the field to watch.",
+          "values": []
+        },
+        {
+          "name": "values",
+          "doc": "(required) One value, or a list with :values=\"[…]\".",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-hide-when",
+      "doc": "Fields hidden while another field has one of the values.",
+      "attributes": [
+        {
+          "name": "field",
+          "doc": "(required) The name of the field to watch.",
+          "values": []
+        },
+        {
+          "name": "values",
+          "doc": "(required) One value, or a list with :values=\"[…]\".",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-infolist",
+      "doc": "Labelled values of a record, in columns.",
+      "attributes": [
+        {
+          "name": "columns",
+          "doc": "How many columns the entries use (1 by default).",
+          "values": []
+        },
+        {
+          "name": "inline",
+          "doc": "Puts each label beside its value.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-entry",
+      "doc": "One labelled value in an infolist.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":value",
+          "doc": "The value to show.",
+          "values": []
+        },
+        {
+          "name": "format",
+          "doc": "How to show it: date, datetime, money, number, since, bool, color, image, key_value, markdown...",
+          "values": []
+        },
+        {
+          "name": ":badge",
+          "doc": "A map from value to badge colour.",
+          "values": []
+        },
+        {
+          "name": ":labels",
+          "doc": "A map from value to the text shown.",
+          "values": []
+        },
+        {
+          "name": "url",
+          "doc": "Makes the value a link.",
+          "values": []
+        },
+        {
+          "name": "new-tab",
+          "doc": "Opens the link in a new tab.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "copyable",
+          "doc": "Adds a copy button.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "tooltip",
+          "doc": "A title shown on hover.",
+          "values": []
+        },
+        {
+          "name": "placeholder",
+          "doc": "Shown when the value is empty.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line under the value.",
+          "values": []
+        },
+        {
+          "name": "prefix",
+          "doc": "Text before the value.",
+          "values": []
+        },
+        {
+          "name": "suffix",
+          "doc": "Text after the value.",
+          "values": []
+        },
+        {
+          "name": "limit",
+          "doc": "The most characters shown.",
+          "values": []
+        },
+        {
+          "name": "words",
+          "doc": "The most words shown.",
+          "values": []
+        },
+        {
+          "name": "list",
+          "doc": "How a list value is laid out.",
+          "values": [
+            "comma",
+            "lines",
+            "bullets"
+          ]
+        },
+        {
+          "name": "limit-list",
+          "doc": "The most items shown of a list.",
+          "values": []
+        },
+        {
+          "name": "decimals",
+          "doc": "Decimals of a number or money value.",
+          "values": []
+        },
+        {
+          "name": "currency",
+          "doc": "The currency code of a money value.",
+          "values": []
+        },
+        {
+          "name": "divide-by",
+          "doc": "Divides a money value by this.",
+          "values": []
+        },
+        {
+          "name": "date-format",
+          "doc": "A strftime format for dates.",
+          "values": []
+        },
+        {
+          "name": "image-size",
+          "doc": "The size of an image value, in pixels.",
+          "values": []
+        },
+        {
+          "name": "circular",
+          "doc": "Rounds an image value.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes, or full.",
+          "values": []
+        },
+        {
+          "name": "inline",
+          "doc": "Puts the label beside the value.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "hide-label",
+          "doc": "Hides the label from sight.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        },
+        {
+          "name": ":prefix-actions",
+          "doc": "Actions before the value.",
+          "values": []
+        },
+        {
+          "name": ":suffix-actions",
+          "doc": "Actions after the value.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-repeatable",
+      "doc": "A list of records inside a record, each shown as a small infolist.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "(required) The label.",
+          "values": []
+        },
+        {
+          "name": ":items",
+          "doc": "(required) The records to show.",
+          "values": []
+        },
+        {
+          "name": "columns",
+          "doc": "How many columns each record uses.",
+          "values": []
+        },
+        {
+          "name": "placeholder",
+          "doc": "Shown when there are no items.",
+          "values": []
+        },
+        {
+          "name": "span",
+          "doc": "How many columns it takes, or full.",
+          "values": []
+        },
+        {
+          "name": "hide-label",
+          "doc": "Hides the label from sight.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-list",
+      "doc": "A list of rows in a surface; write each row as an `li`.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "The list's id.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "The list's accessible name.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-card-grid",
+      "doc": "Cards in a grid that fills the row.",
+      "attributes": []
+    },
+    {
+      "name": "rx-media-card",
+      "doc": "A card that is one link: a picture, a title and notes.",
+      "attributes": [
+        {
+          "name": "href",
+          "doc": "(required) Where the card links.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "(required) The card's title.",
+          "values": []
+        },
+        {
+          "name": "image",
+          "doc": "The picture's URL.",
+          "values": []
+        },
+        {
+          "name": "subtitle",
+          "doc": "A line under the title, such as a price.",
+          "values": []
+        },
+        {
+          "name": "note",
+          "doc": "A note, such as Sold out.",
+          "values": []
+        },
+        {
+          "name": "dimmed",
+          "doc": "Greys the picture out.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "image-alt",
+          "doc": "The picture's alt text.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-progress",
+      "doc": "A bar showing how far along something is.",
+      "attributes": [
+        {
+          "name": "value",
+          "doc": "(required) How far along it is.",
+          "values": []
+        },
+        {
+          "name": "max",
+          "doc": "The value that means done (100 by default).",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "The bar's accessible name.",
+          "values": []
+        },
+        {
+          "name": "show-value",
+          "doc": "Whether the percentage shows; `:show-value=\"false\"` hides it.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-grid",
+      "doc": "The data grid of a `renox::grid` page; the content draws the `custom` columns.",
+      "attributes": [
+        {
+          "name": ":page",
+          "doc": "(required) The `GridPage` the handler built.",
+          "values": []
+        },
+        {
+          "name": ":tools",
+          "doc": "Extra content for the grid's toolbar.",
+          "values": []
+        },
+        {
+          "name": "@selected",
+          "doc": "Runs when the component sends selected.",
+          "values": []
+        },
+        {
+          "name": "@sorted",
+          "doc": "Runs when the component sends sorted.",
+          "values": []
+        },
+        {
+          "name": "@filtered",
+          "doc": "Runs when the component sends filtered.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-stats",
+      "doc": "Figures side by side: two per row on phones, `columns` from tablet width.",
+      "attributes": [
+        {
+          "name": "columns",
+          "doc": "How many per row (4 by default).",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-stat",
+      "doc": "One figure with an optional change, sparkline and link.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "(required) What the figure is.",
+          "values": []
+        },
+        {
+          "name": "value",
+          "doc": "(required) The figure, already formatted.",
+          "values": []
+        },
+        {
+          "name": "delta",
+          "doc": "The change in percent, shown with an arrow.",
+          "values": []
+        },
+        {
+          "name": "delta-label",
+          "doc": "What the change is against.",
+          "values": []
+        },
+        {
+          "name": "good",
+          "doc": "Which way is good (up by default).",
+          "values": [
+            "up",
+            "down",
+            "none"
+          ]
+        },
+        {
+          "name": ":trend",
+          "doc": "Numbers for a sparkline.",
+          "values": []
+        },
+        {
+          "name": "url",
+          "doc": "Makes the figure a link.",
+          "values": []
+        },
+        {
+          "name": "hint",
+          "doc": "A line shown when there is no delta.",
+          "values": []
+        },
+        {
+          "name": "decimals",
+          "doc": "Decimals of the delta (1 by default).",
+          "values": []
+        },
+        {
+          "name": "icon",
+          "doc": "One of the kit's icons.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-dashboard",
+      "doc": "Widgets in a grid: `columns` from tablet width up, one on phones.",
+      "attributes": [
+        {
+          "name": "columns",
+          "doc": "How many columns (2 by default).",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-widget",
+      "doc": "A card on a dashboard; its content is given, or loaded from `url`.",
+      "attributes": [
+        {
+          "name": "title",
+          "doc": "The heading.",
+          "values": []
+        },
+        {
+          "name": "description",
+          "doc": "A line under the heading.",
+          "values": []
+        },
+        {
+          "name": "span",
+          "doc": "Columns taken (2, 3 or full).",
+          "values": []
+        },
+        {
+          "name": "url",
+          "doc": "A fragment loaded into the card once the page is shown.",
+          "values": []
+        },
+        {
+          "name": "poll",
+          "doc": "Reload the fragment every this many seconds.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-period-filter",
+      "doc": "Links that set `?period=` for the figures and charts below.",
+      "attributes": [
+        {
+          "name": ":selected",
+          "doc": "(required) The handler's `Period`.",
+          "values": []
+        },
+        {
+          "name": ":options",
+          "doc": "[key, label] pairs.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "The navigation's accessible name.",
+          "values": []
+        },
+        {
+          "name": "custom",
+          "doc": "Whether a custom range is offered; `:custom=\"false\"` hides it.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-chart",
+      "doc": "A chart drawn as SVG with a data table; it calls the `chart(...)` function.",
+      "attributes": [
+        {
+          "name": "kind",
+          "doc": "(required) The kind of chart.",
+          "values": [
+            "line",
+            "area",
+            "bar",
+            "pie",
+            "doughnut",
+            "scatter",
+            "bubble",
+            "heatmap"
+          ]
+        },
+        {
+          "name": ":data",
+          "doc": "A series, a list of numbers or a trend.",
+          "values": []
+        },
+        {
+          "name": ":labels",
+          "doc": "The labels along the x axis.",
+          "values": []
+        },
+        {
+          "name": ":values",
+          "doc": "The numbers.",
+          "values": []
+        },
+        {
+          "name": ":series",
+          "doc": "Several named series.",
+          "values": []
+        },
+        {
+          "name": ":points",
+          "doc": "The points of a scatter or bubble chart.",
+          "values": []
+        },
+        {
+          "name": ":columns",
+          "doc": "A heatmap's column labels.",
+          "values": []
+        },
+        {
+          "name": ":rows",
+          "doc": "A heatmap's row labels.",
+          "values": []
+        },
+        {
+          "name": ":cells",
+          "doc": "A heatmap's cells.",
+          "values": []
+        },
+        {
+          "name": "name",
+          "doc": "The name of a single series.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "The chart's title.",
+          "values": []
+        },
+        {
+          "name": "height",
+          "doc": "The height in pixels (240 by default).",
+          "values": []
+        },
+        {
+          "name": "format",
+          "doc": "How values are shown.",
+          "values": [
+            "number",
+            "money",
+            "percent"
+          ]
+        },
+        {
+          "name": "decimals",
+          "doc": "Decimals shown.",
+          "values": []
+        },
+        {
+          "name": "currency",
+          "doc": "A currency code for money.",
+          "values": []
+        },
+        {
+          "name": "divide-by",
+          "doc": "Divides money values by this.",
+          "values": []
+        },
+        {
+          "name": "stacked",
+          "doc": "Stack the series.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "legend",
+          "doc": "Whether the legend shows.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "table",
+          "doc": "Whether the data table is offered.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "x-format",
+          "doc": "How the x labels are shown.",
+          "values": []
+        },
+        {
+          "name": "x-title",
+          "doc": "The x axis title.",
+          "values": []
+        },
+        {
+          "name": "y-title",
+          "doc": "The y axis title.",
+          "values": []
+        },
+        {
+          "name": "size-format",
+          "doc": "How bubble sizes are shown.",
+          "values": []
+        },
+        {
+          "name": "size-title",
+          "doc": "The size legend title.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The element's id.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-menu",
+      "doc": "A button that opens a menu of actions; its content is the items.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "(required) The button's label.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The menu list's id.",
+          "values": []
+        },
+        {
+          "name": "variant",
+          "doc": "The look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The size.",
+          "values": [
+            "small"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-menu-link",
+      "doc": "A link in a menu.",
+      "attributes": [
+        {
+          "name": "href",
+          "doc": "(required) The address; or use route.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "download",
+          "doc": "A file to save; the page stays.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "new-tab",
+          "doc": "Opens in a new tab.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "danger",
+          "doc": "Draws the item as a dangerous action.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-menu-action",
+      "doc": "A menu item that sends a form.",
+      "attributes": [
+        {
+          "name": "action",
+          "doc": "(required) The address the form is sent to; or use route.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "method",
+          "doc": "The HTTP method.",
+          "values": [
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "danger",
+          "doc": "Draws the item as a dangerous action.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-menu-section",
+      "doc": "A titled part of a menu.",
+      "attributes": [
+        {
+          "name": "title",
+          "doc": "(required) The section's heading.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-menu-separator",
+      "doc": "A line between parts of a menu.",
+      "attributes": []
+    },
+    {
+      "name": "rx-menu-open",
+      "doc": "A menu item that opens a sheet or dialog by its id.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The id of the sheet to open.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "danger",
+          "doc": "Draws the item as a dangerous action.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-link-tabs",
+      "doc": "Links that look like a segmented control, for switching between pages; from data (`items`) or from `<rx-link-tab>` children.",
+      "attributes": [
+        {
+          "name": ":items",
+          "doc": "A list of [href, label] pairs; or write `<rx-link-tab>` children instead.",
+          "values": []
+        },
+        {
+          "name": "current",
+          "doc": "With `items`: the href shown as chosen.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "The navigation's accessible name.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-link-tab",
+      "doc": "One link of `<rx-link-tabs>`; the label is its content or `label`.",
+      "attributes": [
+        {
+          "name": "href",
+          "doc": "(required) Where the link goes.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "The link's text; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "current",
+          "doc": "Draws the link as the chosen one (`aria-current=\"page\"`).",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-navbar",
+      "doc": "The bar across the top: brand, links, search and the account menu.",
+      "attributes": [
+        {
+          "name": "brand",
+          "doc": "The brand name.",
+          "values": []
+        },
+        {
+          "name": "href",
+          "doc": "Where the brand links to (`/` by default).",
+          "values": []
+        },
+        {
+          "name": "logo",
+          "doc": "The URL of the brand's logo image.",
+          "values": []
+        },
+        {
+          "name": "mark",
+          "doc": "Shows the brand's initial in a badge.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "width",
+          "doc": "How wide the bar's content is: narrow, wide or full.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "What screen readers call the navigation.",
+          "values": []
+        },
+        {
+          "name": "skip",
+          "doc": "Whether the skip link shows (`:skip=\"false\"` hides it).",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": ":tabs",
+          "doc": "The phone tab bar: a list of tabs.",
+          "values": []
+        },
+        {
+          "name": "tabs-label",
+          "doc": "What screen readers call the tab bar.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-nav-links",
+      "doc": "The navbar's links, kept together (a row that scrolls on phones).",
+      "attributes": []
+    },
+    {
+      "name": "rx-nav-link",
+      "doc": "One link of a navbar; `active` marks the current section.",
+      "attributes": [
+        {
+          "name": "href",
+          "doc": "(required) The address; or use route.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "active",
+          "doc": "Marks the current section, e.g. `:active=\"route_is('orders.*')\"`.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "badge",
+          "doc": "A count after the label.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-nav-search",
+      "doc": "The navbar's search: a toggle button and the box it opens.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "What screen readers call the toggle.",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The box's id.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-sidebar",
+      "doc": "Navigation down the side, for back offices.",
+      "attributes": [
+        {
+          "name": "brand",
+          "doc": "The brand name.",
+          "values": []
+        },
+        {
+          "name": "href",
+          "doc": "Where the brand links to (`/` by default).",
+          "values": []
+        },
+        {
+          "name": "logo",
+          "doc": "The URL of the brand's logo image.",
+          "values": []
+        },
+        {
+          "name": "mark",
+          "doc": "Shows the brand's initial in a badge (on by default).",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "label",
+          "doc": "What screen readers call the navigation.",
+          "values": []
+        },
+        {
+          "name": "skip",
+          "doc": "Whether the skip link shows (`:skip=\"false\"` hides it).",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-sidebar-link",
+      "doc": "One link of a sidebar; `active` marks the current section.",
+      "attributes": [
+        {
+          "name": "href",
+          "doc": "(required) The address; or use route.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "active",
+          "doc": "Marks the current section.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "badge",
+          "doc": "A count after the label.",
+          "values": []
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name, shown before the label.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-sidebar-section",
+      "doc": "A heading between groups of sidebar links.",
+      "attributes": [
+        {
+          "name": "title",
+          "doc": "(required) The heading; or give it as content.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-shell",
+      "doc": "The frame of a back office: a sidebar and the main column beside it.",
+      "attributes": []
+    },
+    {
+      "name": "rx-icon",
+      "doc": "One of the kit's icons, drawn inline in the text's colour.",
+      "attributes": [
+        {
+          "name": "name",
+          "doc": "(required) The icon's name (docs/ui.md lists them).",
+          "values": []
+        },
+        {
+          "name": "size",
+          "doc": "The size in pixels (20 by default).",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "Makes the icon mean something to screen readers; without it the icon is decoration.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-columns",
+      "doc": "Children side by side from tablet width up, one column on phones.",
+      "attributes": [
+        {
+          "name": "count",
+          "doc": "How many columns (2 by default).",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-thumbnail",
+      "doc": "A small square picture, for example in a table row.",
+      "attributes": [
+        {
+          "name": "src",
+          "doc": "(required) The picture's URL.",
+          "values": []
+        },
+        {
+          "name": "alt",
+          "doc": "The picture's alt text; empty by default.",
+          "values": []
+        },
+        {
+          "name": "href",
+          "doc": "Makes the picture a link.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-tab-panel",
+      "doc": "One panel for a `tabs(...)` control written as a macro; with tags use `<rx-tabs>` and `<rx-tab>`.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The tabs' id.",
+          "values": []
+        },
+        {
+          "name": "key",
+          "doc": "(required) The key of the tab this panel belongs to.",
+          "values": []
+        },
+        {
+          "name": "selected",
+          "doc": "Shows the panel at first.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-menu-button",
+      "doc": "A menu item that is a plain button, for what its attributes make it do (htmx).",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "danger",
+          "doc": "Draws the item as a dangerous action.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-action-group",
+      "doc": "Several actions behind one button; its content is the menu items.",
+      "attributes": [
+        {
+          "name": "label",
+          "doc": "The button's text; without it an icon button named \"Actions\".",
+          "values": []
+        },
+        {
+          "name": "id",
+          "doc": "The menu list's id.",
+          "values": []
+        },
+        {
+          "name": "icon",
+          "doc": "An icon's name.",
+          "values": []
+        },
+        {
+          "name": "variant",
+          "doc": "The look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The size.",
+          "values": [
+            "small"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-import-action",
+      "doc": "A button that opens a sheet to import a CSV file; the handler answers with an `ImportReport`.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The sheet's id.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The button's label.",
+          "values": []
+        },
+        {
+          "name": "action",
+          "doc": "(required) The address the file is sent to; or use route.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "(required) The sheet's heading.",
+          "values": []
+        },
+        {
+          "name": "description",
+          "doc": "A line under the heading.",
+          "values": []
+        },
+        {
+          "name": ":columns",
+          "doc": "The file's column names, shown to the reader.",
+          "values": []
+        },
+        {
+          "name": "template-url",
+          "doc": "A link to an empty file to fill in (`renox::import::template`).",
+          "values": []
+        },
+        {
+          "name": "submit-label",
+          "doc": "The submit button's text.",
+          "values": []
+        },
+        {
+          "name": "accept",
+          "doc": "The file types the field takes.",
+          "values": []
+        },
+        {
+          "name": "name",
+          "doc": "The file field's name (file by default).",
+          "values": []
+        },
+        {
+          "name": "variant",
+          "doc": "The button's look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The button's size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "The button's icon (upload by default).",
+          "values": []
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "button",
+          "doc": "Whether to draw the opening button.",
+          "values": [
+            "true",
+            "false"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rx-wizard-action",
+      "doc": "A button that opens a sheet holding a wizard; each `<rx-wizard-step>` inside is one step.",
+      "attributes": [
+        {
+          "name": "id",
+          "doc": "(required) The sheet's id.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The button's label.",
+          "values": []
+        },
+        {
+          "name": "action",
+          "doc": "(required) The address the form is sent to; or use route.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "doc": "(required) The sheet's heading.",
+          "values": []
+        },
+        {
+          "name": "submit-label",
+          "doc": "The last step's submit button.",
+          "values": []
+        },
+        {
+          "name": "description",
+          "doc": "A line under the heading.",
+          "values": []
+        },
+        {
+          "name": "method",
+          "doc": "The HTTP method.",
+          "values": [
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "name": "variant",
+          "doc": "The button's look.",
+          "values": [
+            "primary",
+            "secondary",
+            "plain",
+            "danger",
+            "plain-danger"
+          ]
+        },
+        {
+          "name": "size",
+          "doc": "The button's size.",
+          "values": [
+            "small"
+          ]
+        },
+        {
+          "name": "icon",
+          "doc": "The button's icon.",
+          "values": []
+        },
+        {
+          "name": "key",
+          "doc": "A keyboard shortcut.",
+          "values": []
+        },
+        {
+          "name": "slide-over",
+          "doc": "Slides in from the side.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "width",
+          "doc": "The width.",
+          "values": [
+            "sm",
+            "lg",
+            "xl"
+          ]
+        },
+        {
+          "name": "live",
+          "doc": "Live validation (on by default); `:live=\"false\"` turns it off.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "target",
+          "doc": "A selector the answer is swapped into.",
+          "values": []
+        },
+        {
+          "name": "swap",
+          "doc": "How the answer is swapped in.",
+          "values": []
+        },
+        {
+          "name": "enctype",
+          "doc": "The form's encoding, for files.",
+          "values": []
+        },
+        {
+          "name": "button",
+          "doc": "Whether to draw the opening button.",
+          "values": [
+            "true",
+            "false"
+          ]
+        },
+        {
+          "name": "@opened",
+          "doc": "Runs when the component sends opened.",
+          "values": []
+        },
+        {
+          "name": "@closed",
+          "doc": "Runs when the component sends closed.",
+          "values": []
+        },
+        {
+          "name": "@saved",
+          "doc": "Runs when the component sends saved.",
+          "values": []
+        },
+        {
+          "name": "@failed",
+          "doc": "Runs when the component sends failed.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-event-stream",
+      "doc": "Opens the notifications stream on a page without the bell, so `state.broadcast(...)` events arrive as DOM events.",
+      "attributes": []
+    },
+    {
+      "name": "rx-mail",
+      "doc": "A mail's layout: `{% extends %}` of the mail layout, with its content and footer.",
+      "attributes": [
+        {
+          "name": "subject",
+          "doc": "The mail's title (the layout's `<title>`).",
+          "values": []
+        },
+        {
+          "name": "layout",
+          "doc": "The layout's file name; renox/mail/layout.html by default. Plain text.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-mail-text",
+      "doc": "A mail's plain-text version (a `.txt` view): the text as written, with `{{ }}`, `rx-if` and `rx-for` (on a `<template>`).",
+      "attributes": []
+    },
+    {
+      "name": "rx-mail-button",
+      "doc": "A button for a mail, with its address written under it for clients that hide buttons.",
+      "attributes": [
+        {
+          "name": "url",
+          "doc": "(required) Where the button goes.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "doc": "(required) The label; or give it as content.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-mail-panel",
+      "doc": "A highlighted box in a mail.",
+      "attributes": []
+    },
+    {
+      "name": "rx-mail-table",
+      "doc": "A table for a mail: rows of cells, an optional heading and an optional total row.",
+      "attributes": [
+        {
+          "name": ":rows",
+          "doc": "(required) The rows: a list of lists of cells.",
+          "values": []
+        },
+        {
+          "name": ":head",
+          "doc": "The heading cells.",
+          "values": []
+        },
+        {
+          "name": ":total",
+          "doc": "The last row's cells, drawn in bold.",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "rx-mail-divider",
+      "doc": "A thin line between parts of a mail.",
+      "attributes": []
+    },
+    {
+      "name": "app-price-tag",
+      "doc": "An app component.",
+      "attributes": [
+        {
+          "name": "amount",
+          "doc": "(required)",
+          "values": []
+        },
+        {
+          "name": "size",
+          "doc": "Default: \"normal\"",
+          "values": []
+        }
+      ]
+    },
+    {
+      "name": "app-stock-badge",
+      "doc": "An app component.",
+      "attributes": [
+        {
+          "name": "stock",
+          "doc": "Default: (none)",
+          "values": []
+        }
+      ]
+    }
+  ],
+  "global_attributes": [
+    {
+      "name": "rx-if",
+      "doc": "Renders the element only when the expression is true."
+    },
+    {
+      "name": "rx-elif",
+      "doc": "Renders the element when the preceding rx-if (or rx-elif) was false and this expression is true."
+    },
+    {
+      "name": "rx-else",
+      "doc": "Renders the element when the preceding rx-if was false."
+    },
+    {
+      "name": "rx-for",
+      "doc": "Repeats the element: \"item in list\"."
+    },
+    {
+      "name": "can",
+      "doc": "Renders the element only when the user may do this (a gate or an ability)."
+    }
+  ]
+}

@@ -2,7 +2,7 @@ Third-party files in this directory, compiled into renox-learn and served
 by learn.renox.rs. codemirror-6.43.14.js is one bundle made by
 learn/editor/bundle.sh (esbuild 0.28.2, minified, legal comments removed)
 from the packages below, exactly the versions learn/editor/package-lock.json
-locks. Measured size: 648651 bytes (budget 900000, learn/tests/editor.rs).
+locks. Measured size: 648701 bytes (budget 900000, learn/tests/editor.rs).
 Every package is by Marijn Haverbeke and others, under the MIT licence; the
 licence texts are in licenses/.
 

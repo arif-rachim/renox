@@ -14,6 +14,7 @@ export {
   ViewPlugin,
   showPanel,
   placeholder,
+  tooltips,
 } from '@codemirror/view';
 export { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 export {

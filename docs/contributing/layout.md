@@ -390,7 +390,11 @@ learn/                     learn.renox.rs: the course (package `renox-learn`, pu
                            entry.mjs, bundle.sh building public/vendor/codemirror-<V>.js in a pinned
                            Node container, CI job `learn-editor`; samples/), public/editor.js
                            (`window.LearnEditor`, mounts textarea[data-learn-editor]), src/editor.rs
-                           (`GET /editor`, the playground, noindex), tests/editor.rs.
+                           (`GET /editor`, the playground, noindex; `/editor/data/{file}`),
+                           tests/editor.rs. Autocomplete (#529): editor/data/renox-api.json and
+                           stage-NN.json written by tests/editor_data.rs (+ editor_data/{api,models,
+                           tidy}.rs: Renox's API and the stages' models read with syn; snapshots,
+                           RENOX_UPDATE_SNAPSHOT=1), editor/data/tags/ by editor/stage-data.sh.
                            Links into the docs must name a page in PAGES (tests/learn.rs)
 benchmarks/                Renox vs bare Axum vs Laravel (FPM and Octane) in Docker, pinned to
                            2 cores and 1 GB, driven by oha (#333): its own cargo workspace

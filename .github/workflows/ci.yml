@@ -295,6 +295,10 @@ jobs:
       # its tests and checks, and stage 0 is still what `rnx new coffee` makes.
       - if: steps.changed.outputs.run == 'true'
         run: learn/course/run.sh
+      # The editor's tags per stage (view:data, #529) are committed: a stage
+      # whose components changed without regenerating them fails here.
+      - if: steps.changed.outputs.run == 'true'
+        run: learn/editor/stage-data.sh && git diff --exit-code -- learn/editor/data/tags
 
   learn-challenges:
     name: learn challenges (start fails, solution passes)

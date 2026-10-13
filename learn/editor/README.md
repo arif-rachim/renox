@@ -11,6 +11,7 @@ result is committed and compiled into `renox-learn` with the other public files.
 | `entry.mjs` | what the bundle exports: only CodeMirror's pieces, as `window.CM` |
 | `bundle.sh` | `npm ci` and esbuild in `node:24-bookworm-slim` pinned by digest; copies the bundle and the licences to `public/vendor/` |
 | `samples/` | the `/editor` playground's Rust and HTML text |
+| `data/`, `stage-data.sh` | the autocomplete's data (below) |
 | `../public/editor.js` | learn's own glue (plain ES2022, not bundled): `window.LearnEditor` |
 | `../public/vendor/NOTICE` | every package in the bundle, its version, licence and source |
 
@@ -32,6 +33,39 @@ LearnEditor.editors.get("src/main.rs");   // every mounted editor, by path
 
 `/editor` (noindex, in no sitemap) shows one editor of each kind; `/design` has a read-only
 one under `editor`.
+
+## Autocomplete
+
+Suggestions ([#529](https://github.com/arif-rachim/renox/issues/529)) come from data, not from
+type inference (the playground says so):
+
+| File | What | Made by |
+|---|---|---|
+| `data/renox-api.json` | Renox's public API: every item under `renox::` (path, kind, `prelude`, first doc sentence) and its members (methods, fns, consts, variants, with signature and the type they return) | `learn/tests/editor_data.rs` reads `crates/renox-core/src` and `crates/renox/src/lib.rs` with `syn` |
+| `data/tags/stage-NN.json` | each stage's `view:data` (the kit's `rx-*` tags and the stage's `<app-*>` components) | `stage-data.sh` |
+| `data/stage-NN.json` | the stage's models and typed columns (from its code) plus those tags | `learn/tests/editor_data.rs` |
+
+All are committed. After a change to Renox's API, a stage's models or its components:
+
+```bash
+learn/editor/stage-data.sh                                          # the tags (builds each stage)
+RENOX_UPDATE_SNAPSHOT=1 cargo test -p renox-learn --test editor_data   # the JSON files
+```
+
+`cargo test -p renox-learn --test editor_data` fails when a file is out of date, and the
+`learn-course` CI job when the tags are. `EDITOR_DATA_DEBUG=1` lists the public items no path
+reaches. `GET /editor/data/renox-api.json` and `/editor/data/stage-NN.json` serve them, minified;
+an editor with `data-stage="N"` fetches both and calls `setCompletions`.
+
+What is suggested (`public/editor.js`):
+
+- Rust: after `Model::` a stage model's columns (`MenuItem::PRICE`) and the `Model` trait's
+  functions; after `Type::` that type's functions, consts and variants; after `renox::db::` the
+  items one level down; after `.` the methods of what a chain of known calls returns
+  (`MenuItem::query().where_(…).` → `Query`'s methods), or every method name once a letter is
+  typed; a bare name: the prelude and the stage's models; inside `#[derive(`: the derives.
+- HTML: after `<` the stage's tags; inside an `rx-`/`app-`/`live-` tag its attributes and the
+  global ones (`rx-if`…); inside an attribute's quotes, its values.
 
 ## Rebuilding, or bumping a version
 

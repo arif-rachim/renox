@@ -16,3 +16,9 @@ tracing = "0.1.44"
 
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
+# tests/editor_data.rs reads Renox's API and the stages' models from source
+# (the versions the workspace already locks; no `span-locations`).
+syn = { version = "3", features = ["full"] }
+quote = "1.0.47"
+proc-macro2 = "1.0.107"
+heck = "0.5.0"

@@ -60,6 +60,8 @@ impl Module for Learn {
             .name("design")
             .get("/editor", editor::page)
             .name("editor")
+            .get("/editor/data/{file}", editor::data)
+            .name("editor.data")
             .get("/stages/{slug}", stage)
             .name("stage")
             .etag();

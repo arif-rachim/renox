@@ -26,6 +26,7 @@ It is a Renox app compiled into one binary (views and public files embedded), li
 | [`tests/learn.rs`](tests/learn.rs) | every route, the tags, the stages' order, links into the docs |
 | [`editor/`](editor), [`public/editor.js`](public/editor.js), [`src/editor.rs`](src/editor.rs) | the code editor: CodeMirror 6 vendored as one pinned bundle in `public/vendor/`, `window.LearnEditor`, the `/editor` playground ([editor/README.md](editor/README.md)) |
 | [`tests/editor.rs`](tests/editor.rs) | the playground, the bundle's budget and its NOTICE |
+| [`tests/editor_data.rs`](tests/editor_data.rs), [`editor/data/`](editor/data) | the autocomplete's data: Renox's API read from source with `syn`, each stage's models and tags (snapshots; `RENOX_UPDATE_SNAPSHOT=1`) |
 | [`deploy/`](deploy) | the systemd socket and service |
 
 ## Design system

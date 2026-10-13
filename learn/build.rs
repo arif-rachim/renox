@@ -1,5 +1,6 @@
 //! Also scans the stages of the course app (`course/stage-NN/`) for the code
-//! the chapters include (`build_course.rs`).
+//! the chapters include (`build_course.rs`), and compiles in the editor's
+//! autocomplete data (`editor/data/*.json`, `EDITOR_DATA`).
 //!
 //! Compiles the chapters in: every `content/stages/*.md` becomes an entry of
 //! `STAGE_FILES` (its file name and its text), so adding a chapter is adding
@@ -51,6 +52,35 @@ fn main() {
         ),
     )
     .unwrap();
+    // The editor's autocomplete data (src/editor.rs): every
+    // `editor/data/*.json` (not `tags/`, which the tests read).
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("editor/data");
+    println!("cargo:rerun-if-changed={}", data.display());
+    let mut files: Vec<_> = std::fs::read_dir(&data)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| p.extension().is_some_and(|x| x == "json"))
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    let mut out = String::from(
+        "/// The editor's data files: name without `.json`, and text (build.rs).\npub static EDITOR_DATA: &[(&str, &str)] = &[\n",
+    );
+    for path in &files {
+        println!("cargo:rerun-if-changed={}", path.display());
+        let name = path.file_stem().unwrap().to_string_lossy();
+        writeln!(
+            out,
+            "    ({name:?}, include_str!({:?})),",
+            path.display().to_string()
+        )
+        .unwrap();
+    }
+    out.push_str("];\n");
+    let target = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("editor_data.rs");
+    std::fs::write(target, out).unwrap();
     course::generate();
     challenges::generate();
 }
