@@ -1,0 +1,11 @@
+<rx-page layout="layouts/app.html" title="Menu">
+  <rx-page-header title="Menu" subtitle="What we serve today">
+    <rx-link-button rx-if="auth.check" route="menu.create" label="Add an item" variant="primary" icon="plus"/>
+  </rx-page-header>
+  <rx-table :rows="items" as="item" :key="item.id" caption="Menu">
+    <rx-column label="Name"><a href="{{ route('menu.show', item.id) }}">{{ item.name }}</a></rx-column>
+    <rx-column label="Price" align="num"><app-price-tag :amount="item.price"/></rx-column>
+    <rx-column label="Status"><app-stock-badge :stock="item.stock"/></rx-column>
+    <rx-slot name="empty"><rx-empty title="Nothing on the menu yet"/></rx-slot>
+  </rx-table>
+</rx-page>

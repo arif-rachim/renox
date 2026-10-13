@@ -1,0 +1,26 @@
+<rx-page layout="layouts/app.html" :title="page_title" :description="chapter.summary">
+<div class="wrap">
+  <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Course</a></li><li aria-current="page">Stage {{ chapter.number }}</li></ol></nav>
+  <header class="chapter__head">
+    <p class="eyebrow"><b>{{ chapter.number if chapter.number > 9 else "0" ~ chapter.number }}</b> Stage {{ chapter.number }} · {{ chapter.minutes }} min</p>
+    <h1 class="chapter__title">{{ chapter.title }}</h1>
+    <p class="chapter__summary">{{ chapter.summary }}</p>
+  </header>
+  <div class="chapter">
+    <aside rx-if="chapter.toc | length >= 2" class="toc" aria-labelledby="toc-title">
+      <p class="toc__title" id="toc-title">On this page</p>
+      <ol>
+        <li rx-for="h in chapter.toc" class="{{ 'toc__h3' if h.level == 3 else '' }}"><a href="#{{ h.id }}">{{ h.text }}</a></li>
+      </ol>
+    </aside>
+    <article class="prose" data-learn-stage="{{ chapter.slug }}">{{ chapter.html | safe }}</article>
+  </div>
+  <p><button type="button" class="rx-button rx-button--secondary learn-done" data-learn-done aria-pressed="false" hidden>Mark this stage as done</button></p>
+  <p rx-if="guide" class="deeper"><rx-icon name="book-open"/> Going deeper: <a href="{{ links.docs }}/docs/{{ guide }}">the {{ guide }} guide</a></p>
+  <nav class="pager" aria-label="Stages">
+    <a rx-if="prev" class="pager__link" rel="prev" href="/stages/{{ prev.slug }}"><span class="pager__label">← Previous</span><span class="pager__name">Stage {{ prev.number }}: {{ prev.title }}</span></a>
+    <a rx-if="next" class="pager__link pager__link--next" rel="next" href="/stages/{{ next.slug }}"><span class="pager__label">Next →</span><span class="pager__name">Stage {{ next.number }}: {{ next.title }}</span></a>
+    <p rx-if="soon" class="pager__soon">Next: Stage {{ soon.number }}, {{ soon.title }}, coming soon.</p>
+  </nav>
+</div>
+</rx-page>

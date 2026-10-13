@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "videos": {
+    "s05-add-item": {
+      "stage": 5,
+      "title": "Adding a menu item: errors appear next to the fields",
+      "width": 1280,
+      "height": 720,
+      "duration": 8.3,
+      "poster": {
+        "file": "s05-add-item.webp",
+        "bytes": 14896,
+        "sha256": "87e17c725cac3a5cbe687b2f5404c6622595239b0d11c9b36a1a6d51999e5a72"
+      },
+      "sources": [
+        {
+          "file": "s05-add-item.webm",
+          "bytes": 100466,
+          "sha256": "367c3676d3e0f3b3ccc4f1d240350758cbdf4f93d82221ca4daf2600ea835258",
+          "type": "video/webm"
+        },
+        {
+          "file": "s05-add-item.mp4",
+          "bytes": 84302,
+          "sha256": "b5253360f675017967de991b031b7884712a25a435c924278a223a0d74caf06e",
+          "type": "video/mp4"
+        }
+      ],
+      "scene_sha256": "b0ed9ae5702ebe9279a58101a80166b16b18b4e6f7f7d54d2c227900866346de",
+      "recorded_at": "2026-10-11"
+    },
+    "s06-drink-builder": {
+      "stage": 6,
+      "title": "The drink builder: every click sends the state and gets HTML back",
+      "width": 1280,
+      "height": 720,
+      "duration": 9.1,
+      "poster": {
+        "file": "s06-drink-builder.webp",
+        "bytes": 15500,
+        "sha256": "c67080c2acf86dad1af39c8974ccc153cf386d040ebcdff1b3ddc8bf3e630ff5"
+      },
+      "sources": [
+        {
+          "file": "s06-drink-builder.webm",
+          "bytes": 74884,
+          "sha256": "13ae520a0035ecad3b8d1975037fd9017f7cdd551d9d4a4760566c6817915b30",
+          "type": "video/webm"
+        },
+        {
+          "file": "s06-drink-builder.mp4",
+          "bytes": 62177,
+          "sha256": "17d60ca24a6dbe6ef999f17a86521127a15ec2942e7ab0fe1ab14d11967aab44",
+          "type": "video/mp4"
+        }
+      ],
+      "scene_sha256": "14c56dbbf06ec2132f522bda3d4693e813d0922a58a3f86537f2349b0e46cd66",
+      "recorded_at": "2026-10-11"
+    },
+    "s07-stock-counter": {
+      "stage": 7,
+      "title": "The stock counter: selling a portion and restocking",
+      "width": 1280,
+      "height": 720,
+      "duration": 5,
+      "poster": {
+        "file": "s07-stock-counter.webp",
+        "bytes": 13252,
+        "sha256": "9c69b0b50abb8a40897e1b6cca4f156f2ecf4233623c4dfa1b752889813f4423"
+      },
+      "sources": [
+        {
+          "file": "s07-stock-counter.webm",
+          "bytes": 49119,
+          "sha256": "368a78b644dee7b204126cb6313ccc9bd2d052c88550de2bce62c5c6ff85d201",
+          "type": "video/webm"
+        },
+        {
+          "file": "s07-stock-counter.mp4",
+          "bytes": 39287,
+          "sha256": "30c4492e961a359a93295d3a88d54be8cd72d7022c3c1171fb074d6bc24ef2ac",
+          "type": "video/mp4"
+        }
+      ],
+      "scene_sha256": "4430074a3607b06a1cadf4ddd7121a7ddd26c4f4e65ebf379bcbfb28151f2aa5",
+      "recorded_at": "2026-10-11"
+    }
+  }
+}

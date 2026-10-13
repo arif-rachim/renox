@@ -1,26 +1,32 @@
 <rx-page layout="layouts/app.html">
-<div class="wrap">
-  <header class="hero">
-    <p class="eyebrow">A course in {{ stages | length }} stages</p>
-    <h1>Build a web app in Rust with Renox, one stage at a time.</h1>
-    <p class="sub">You build one app, a product catalog with stock, from <code>rnx new</code> to a live component with tests. Each stage adds one idea, shows it running, and ends with a challenge you solve in the browser.</p>
-  </header>
+<header class="hero"><div class="wrap">
+  <p class="eyebrow"><b aria-hidden="true">●</b> A course in {{ stages | length }} stages</p>
+  <h1 class="hero__title">Build a web app in Rust with Renox, <span class="accent">one stage at a time.</span></h1>
+  <p class="hero__lead">You build one app, a coffee shop's menu, from <code>rnx new</code> to a live component with tests. Each stage adds one idea, shows it running, and ends with a challenge you solve in the browser.</p>
+  <p class="continue" data-learn-continue hidden><a class="rx-button rx-button--primary" href="#">Continue: <span></span> <rx-icon name="arrow-right"/></a></p>
+</div></header>
 
-  <section aria-labelledby="stages-title">
-    <h2 id="stages-title" class="section-title">The stages</h2>
-    <ol class="stages" role="list">
-      <li rx-for="s in stages" class="stage" id="{{ s.slug }}">
-        <span class="stage__number" aria-hidden="true">{{ s.number }}</span>
-        <div class="stage__body">
-          <h3><span class="visually-hidden">Stage {{ s.number }}: </span>{{ s.title }}</h3>
-          <p>{{ s.summary }}</p>
-          <ul class="topics" role="list" aria-label="What it covers">
-            <li rx-for="t in s.topics"><code>{{ t }}</code></li>
-          </ul>
-          <p class="stage__more">Coming soon. Until then, the guide: <a href="{{ links.docs }}/docs/{{ s.guide }}">{{ s.guide }}</a>.</p>
-        </div>
-      </li>
-    </ol>
-  </section>
-</div>
+<section class="band band--paper gridlines" aria-labelledby="stages-title"><div class="wrap">
+  <p class="eyebrow"><b>001</b> The stages</p>
+  <h2 id="stages-title" class="band__title">Nine stages, one app</h2>
+  <ol class="stages" role="list">
+    <li rx-for="s in stages" class="stage" id="{{ s.slug }}">
+      <span class="stage__number" aria-hidden="true">{{ s.number if s.number > 9 else "0" ~ s.number }}</span>
+      <div class="stage__body">
+        <h3 class="stage__title"><a rx-if="s.slug in chapters" href="/stages/{{ s.slug }}"><span class="visually-hidden">Stage {{ s.number }}: </span>{{ s.title }}</a><template rx-else><span class="visually-hidden">Stage {{ s.number }}: </span>{{ s.title }}</template></h3>
+        <p class="stage__summary">{{ s.summary }}</p>
+        <ul class="topics" role="list" aria-label="What it covers">
+          <li rx-for="t in s.topics"><code>{{ t }}</code></li>
+        </ul>
+        <p rx-if="s.slug not in chapters" class="stage__more">Coming soon. Until then, the guide: <a href="{{ links.docs }}/docs/{{ s.guide }}">{{ s.guide }}</a>.</p>
+      </div>
+    </li>
+  </ol>
+  <details class="reset" data-learn-reset hidden>
+    <summary>Reset my progress</summary>
+    <p>This forgets the stages you finished, your quiz answers and the challenges you marked, in this browser only.</p>
+    <button type="button" class="rx-button rx-button--secondary" data-learn-reset-confirm>Forget everything</button>
+  </details>
+  <p role="status" class="reset__status" data-learn-reset-status></p>
+</div></section>
 </rx-page>

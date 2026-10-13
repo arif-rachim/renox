@@ -2,3 +2,4 @@
 .env
 # Videos made by media/encode.sh are uploaded to the server, not committed.
 /media/out
+/course/target

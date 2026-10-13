@@ -1,0 +1,6 @@
+running 3 tests
+test menu_index::an_empty_menu_says_so ... ok
+test menu_index::items_come_in_order_within_a_category ... ok
+test the_menu_index_has_its_two_tests ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in …

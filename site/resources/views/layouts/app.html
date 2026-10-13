@@ -31,6 +31,7 @@
         <input class="rx-input" id="site-search" type="search" name="q" placeholder="Search the docs" value="{{ q if q is defined else '' }}">
       </form>
       <span class="rx-spacer"></span>
+      <a class="site-top-link" href="{{ learn }}">{{ icon("book-open") }}<span>Learn</span></a>
       <a class="site-top-link" href="{{ route('docs.show', 'tutorial') }}">{{ icon("graduation-cap") }}<span>Tutorial</span></a>
       <a class="site-top-link" href="{{ repository }}">{{ icon("github") }}<span>GitHub</span></a>
     {% endcall %}

@@ -1,0 +1,22 @@
+{#- The drink builder (src/app/home/drink_builder.rs). `state` is the
+    component's struct; `data` is what its `data` method returned. -#}
+<div class="rx-stack" id="drink-builder">
+  <div class="rx-row" id="drink-sizes">
+    <button type="button" id="size-small" class="rx-button rx-button--secondary" rx-click='size("small")'><span class="rx-button__label">Small</span></button>
+    <button type="button" id="size-medium" class="rx-button rx-button--secondary" rx-click='size("medium")'><span class="rx-button__label">Medium</span></button>
+    <button type="button" id="size-large" class="rx-button rx-button--secondary" rx-click='size("large")'><span class="rx-button__label">Large</span></button>
+  </div>
+  <div class="rx-row" id="drink-shots">
+    <button type="button" id="remove-shot" class="rx-button rx-button--secondary" rx-click="remove_shot" aria-label="One shot less"><span class="rx-button__label">-</span></button>
+    <span id="shots">{{ state.shots }} shot(s)</span>
+    <button type="button" id="add-shot" class="rx-button rx-button--secondary" rx-click="add_shot" aria-label="One shot more"><span class="rx-button__label">+</span></button>
+  </div>
+  <p class="rx-title" id="drink-price">A {{ state.size }} drink: {{ data.price | money }}</p>
+  <form rx-submit="order" novalidate>
+    <label class="rx-label" for="cup-name">Name on the cup</label>
+    <input class="rx-input" id="cup-name" name="name" rx-model.live="name" value="{{ state.name }}" autocomplete="off">
+    <p class="rx-error" data-error-for="name" aria-live="polite"></p>
+    <p class="rx-subtitle" id="drink-ready" rx-if="state.name">Ready for {{ state.name }}</p>
+    <button class="rx-button" id="order-drink"><span class="rx-button__label">Order</span></button>
+  </form>
+</div>

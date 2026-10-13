@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -256,6 +257,82 @@ jobs:
       # A reader who follows the tutorial must end up with an app that passes
       # cargo fmt --check, clippy and the tests the tutorial writes, and runs.
       - run: tests/tutorial/run.sh
+
+  learn-course:
+    name: learn course (stages 0-8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Runs only when learn/** or crates/** changed (the paths filter of a job),
+      # and on a manual run. Skipped steps leave the job green.
+      - id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" HEAD | grep -qE '^(learn|crates)/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing under learn/ or crates/ changed: skipped."
+          fi
+      - if: steps.changed.outputs.run == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - if: steps.changed.outputs.run == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            learn/course/stage-00 -> ../target
+      # Every stage of the course app compiles, is formatted and lint-free, passes
+      # its tests and checks, and stage 0 is still what `rnx new coffee` makes.
+      - if: steps.changed.outputs.run == 'true'
+        run: learn/course/run.sh
+
+  learn-challenges:
+    name: learn challenges (start fails, solution passes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Runs only when learn/** or crates/** changed (the paths filter of a job),
+      # and on a manual run. Skipped steps leave the job green.
+      - id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" HEAD | grep -qE '^(learn|crates)/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing under learn/ or crates/ changed: skipped."
+          fi
+      - if: steps.changed.outputs.run == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - if: steps.changed.outputs.run == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            learn/course/stage-00 -> ../target
+      # Every challenge: its start fails its test, its solution passes the test
+      # and clippy, and the outputs shown on the chapter are the recorded ones
+      # (learn/challenges/check.sh; RECORD=1 writes them).
+      - if: steps.changed.outputs.run == 'true'
+        run: learn/challenges/check.sh
 
   docker:
     name: docker (make:deploy)

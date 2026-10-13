@@ -183,7 +183,7 @@ async fn index() -> View {{
     write_new(
         &root.join("resources/views").join(&snake).join("index.html"),
         &format!(
-            "{{% extends \"layouts/app.html\" %}}\n\n{{% block content %}}\n<h1>{title}</h1>\n{{% endblock %}}\n"
+            "<rx-page layout=\"layouts/app.html\" title=\"{title}\">\n  <h1 class=\"rx-title\">{title}</h1>\n</rx-page>\n"
         ),
     )?;
     add_mod(&root.join("src/app/mod.rs"), &snake)?;
@@ -834,7 +834,9 @@ mod tests {
             code.contains(r#"Routes::new().get("/stock-items", index).name("stock_items.index")"#)
         );
         assert!(
-            read(&dir, "resources/views/stock_items/index.html").contains("<h1>Stock Items</h1>")
+            read(&dir, "resources/views/stock_items/index.html").contains(
+                "<rx-page layout=\"layouts/app.html\" title=\"Stock Items\">\n  <h1 class=\"rx-title\">Stock Items</h1>"
+            )
         );
         assert_eq!(
             read(&dir, "src/app/mod.rs"),

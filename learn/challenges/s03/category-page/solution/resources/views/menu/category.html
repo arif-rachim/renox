@@ -1,0 +1,10 @@
+<rx-page layout="layouts/app.html" title="{{ category.name }}">
+  <rx-page-header title="{{ category.name }}" subtitle="What we serve in this category">
+    <rx-link-button route="menu.index" label="Back to the menu" variant="plain"/>
+  </rx-page-header>
+  <rx-table :rows="items" as="item" :key="item.id" caption="{{ category.name }}">
+    <rx-column label="Name"><a href="{{ route('menu.show', item.id) }}">{{ item.name }}</a></rx-column>
+    <rx-column label="Price" align="num">{{ item.price | money }}</rx-column>
+    <rx-slot name="empty"><rx-empty title="Nothing in this category today"/></rx-slot>
+  </rx-table>
+</rx-page>

@@ -1,0 +1,21 @@
+{
+  "id": "s05-add-item",
+  "stage": 5,
+  "title": "Adding a menu item: errors appear next to the fields",
+  "viewport": { "width": 1280, "height": 720 },
+  "poster_at": 4.0,
+  "login": { "email": "bea@example.com", "password": "password123" },
+  "steps": [
+    { "goto": "/menu/new" },
+    { "pause": 800 },
+    { "type": ["input[name=name]", "Cortado"] },
+    { "click": "main button[type=submit]" },
+    { "wait": "[aria-invalid]" },
+    { "pause": 1500 },
+    { "type": ["textarea[name=description]", "Espresso with a splash of warm milk."] },
+    { "type": ["input[name=price]", "380"] },
+    { "click": "main button[type=submit]" },
+    { "wait": ".rx-toast" },
+    { "pause": 2000 }
+  ]
+}

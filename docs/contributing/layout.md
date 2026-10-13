@@ -5,7 +5,7 @@
 
 ```
 Cargo.toml                 workspace: members crates/*, examples/*, site, www, learn, tests/browser/fixture, tests/chaos
-                           (learn/course excluded: its own workspace); shared package
+                           (learn/course excluded: nine standalone apps, see learn/); shared package
                            metadata; rust-version (MSRV); argon2 opt-level for dev builds
 README.md                  front page (compiled as doctests: `ReadMe`)
 ROADMAP.md, CHANGELOG.md   plan + decisions; changes per milestone
@@ -370,11 +370,23 @@ learn/                     learn.renox.rs: the course (package `renox-learn`, pu
                            #538, skeleton #523), a Renox app compiled into one binary like www.
                            src/course.rs (the stages: number, slug, title, summary, topics, the
                            guide that goes deeper), src/lib.rs (routes, JSON-LD `Course`,
-                           sitemap, llms.txt), deploy/ (systemd, port 3100);
+                           sitemap, llms.txt, `/stages/{slug}`), src/content.rs (chapters:
+                           content/stages/NN-slug.md compiled in by build.rs, front matter,
+                           `Problem`s), src/directive.rs (the `learn:` directives and their
+                           parsed types), src/render.rs (Markdown to HTML, one `*_html` function
+                           per directive), src/code.rs + build_course.rs (the course app's
+                           `[learn:name]` regions, files and per-stage diffs, read by build.rs), resources/views/stage.html, public/learn.js (copy
+                           buttons), deploy/ (systemd, port 3100);
                            .github/workflows/release-learn.yml builds it for Renoxium's server.
-                           Coming (#524-#536): chapters in content/, the course app in
-                           learn/course/ (its own workspace, excluded from the root one), a
-                           CodeMirror 6 editor, challenges checked in a sandbox, screenshots and
+                           learn/course/: the course app `coffee`,
+                           stage-00 ... stage-08, each a standalone app (not a workspace: one
+                           package name, `coffee`, per stage; stage 0 is `rnx new coffee`)
+                           sharing one Cargo.lock and one target dir; run.sh checks them (CI
+                           job `learn-course`). media/screens.mjs (the chapters' screenshots, taken from the course app into public/img/sNN/, committed).
+                           media/{record.mjs,encode.sh,manifest.mjs,upload.sh,scenes/*.json,Containerfile.ffmpeg}
+                           (the chapters' videos, #534: recorded from the course app, encoded in a pinned
+                           container, uploaded by hand; only content/media.json is committed), src/media.rs.
+                           Coming (#526-#536): a CodeMirror 6 editor, challenges checked in a sandbox,
                            videos. Links into the docs must name a page in PAGES (tests/learn.rs)
 benchmarks/                Renox vs bare Axum vs Laravel (FPM and Octane) in Docker, pinned to
                            2 cores and 1 GB, driven by oha (#333): its own cargo workspace

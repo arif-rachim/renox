@@ -1,0 +1,13 @@
+{#- The stock counter (src/app/menu/stock_counter.rs). `state` holds only the
+    item's id; `data` is the item read from the database. -#}
+<div class="rx-stack" id="stock-counter">
+  <p class="rx-title" id="stock-left">
+    <span rx-if="data.item.stock is not none">{{ data.item.stock }} left</span>
+    <span rx-else>Not counted</span>
+  </p>
+  <div class="rx-row" rx-if="data.can_update" id="stock-actions">
+    <button type="button" id="sell" class="rx-button" rx-click="sell"><span class="rx-button__label">Sell one</span></button>
+    <button type="button" id="restock-6" class="rx-button rx-button--secondary" rx-click="restock(6)"><span class="rx-button__label">A tray of 6</span></button>
+    <button type="button" id="restock-12" class="rx-button rx-button--secondary" rx-click="restock(12)"><span class="rx-button__label">A tray of 12</span></button>
+  </div>
+</div>

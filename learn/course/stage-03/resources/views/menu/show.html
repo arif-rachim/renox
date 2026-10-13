@@ -1,0 +1,9 @@
+<rx-page layout="layouts/app.html" title="{{ item.name }}">
+  <rx-page-header title="{{ item.name }}" subtitle="{{ category.name }}">
+    <rx-link-button route="menu.index" label="Back to the menu" variant="plain"/>
+  </rx-page-header>
+  <rx-card>
+    <p rx-if="item.description">{{ item.description }}</p>
+    <p class="rx-title">{{ item.price | money }}</p>
+  </rx-card>
+</rx-page>

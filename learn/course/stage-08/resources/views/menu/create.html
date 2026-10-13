@@ -1,0 +1,17 @@
+<rx-page layout="layouts/app.html" title="New menu item">
+  <rx-form route="menu.store" live novalidate>
+    <rx-card title="New menu item">
+      <rx-form-errors/>
+      <rx-select name="category_id" label="Category" :options="categories" required/>
+      <rx-input name="name" label="Name" required/>
+      <rx-textarea name="description" label="Description" rows="3"/>
+      <rx-input name="price" label="Price" type="number" required hint="In cents: 450 is $4.50." inputmode="numeric"/>
+      <rx-input name="stock" label="Portions today" type="number" hint="Leave it empty for drinks that don't run out."/>
+      <rx-checkbox name="available" label="On the menu today" :checked="true" switch/>
+      <div class="rx-card__footer">
+        <rx-link-button route="menu.index" label="Cancel" variant="plain"/>
+        <rx-button label="Add to the menu"/>
+      </div>
+    </rx-card>
+  </rx-form>
+</rx-page>

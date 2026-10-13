@@ -11,10 +11,16 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="alternate" type="text/plain" title="The course for language models" href="/llms.txt">
+  <script src="{{ asset('theme.js') }}"></script>
+  <rx-ui/>
+  <link rel="preload" href="{{ asset('fonts/jetbrains-mono-latin-wght.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ asset('learn.css') }}">
+  <script src="{{ asset('learn.js') }}" defer></script>
+  <script src="{{ asset('challenge.js') }}" defer></script>
+  <script src="{{ asset('progress.js') }}" defer></script>
   <template rx-if="json_ld is defined and json_ld"><script type="application/ld+json">{{ json_ld | safe }}</script></template>
 </head>
-<body>
+<body class="rx-page learn">
 <a class="skip" href="#main">Skip to content</a>
 <header class="nav"><div class="wrap nav__in">
   <a class="logo" href="/" aria-label="Learn Renox, home"><i aria-hidden="true">R</i>learn renox</a>
@@ -23,13 +29,15 @@
     <a href="{{ links.docs }}">Docs</a>
     <a href="{{ links.github }}" rel="noopener">GitHub</a>
   </nav>
+  <button type="button" class="nav__theme" data-theme-toggle aria-pressed="false" hidden>Dark</button>
 </div></header>
 <main id="main">
 <rx-block name="content"/>
 </main>
 <footer class="foot"><div class="wrap foot__in">
-  <p>Learn Renox, the course of <a href="{{ links.www }}">Renox</a>, a batteries-included web framework for Rust. This site is built with Renox.</p>
-  <nav aria-label="More"><a href="{{ links.docs }}/docs/tutorial">Tutorial</a><a href="{{ links.docs }}/docs/cheatsheet">Cheat sheet</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></nav>
+  <div class="foot__brand"><a class="logo" href="/"><i aria-hidden="true">R</i>learn renox</a>
+    <p>Learn Renox, the course of <a href="{{ links.www }}">Renox</a>, a batteries-included web framework for Rust. This site is built with Renox.</p></div>
+  <nav aria-label="More"><h2>More</h2><a href="{{ links.docs }}/docs/tutorial">Tutorial</a><a href="{{ links.docs }}/docs/cheatsheet">Cheat sheet</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></nav>
 </div></footer>
 </body>
 </html>

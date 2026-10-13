@@ -1,0 +1,14 @@
+<rx-page layout="layouts/app.html" title="{{ item.name }}">
+  <rx-page-header title="{{ item.name }}" subtitle="{{ category.name }}">
+    <rx-link-button route="menu.index" label="Back to the menu" variant="plain"/>
+  </rx-page-header>
+  <rx-card>
+    <app-category-chip :name="category.name"/>
+    <p rx-if="item.description">{{ item.description }}</p>
+    <p>
+      <app-price-tag rx-if="category.name != 'Pastry'" :amount="item.price" size="large"> a cup</app-price-tag>
+      <app-price-tag rx-else :amount="item.price" size="large"/>
+    </p>
+    <app-stock-badge :stock="item.stock"/>
+  </rx-card>
+</rx-page>

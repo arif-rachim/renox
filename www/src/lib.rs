@@ -27,7 +27,7 @@ pub fn app() -> App {
         .embed(renox::embedded!())
         // What every view gets: the links that appear in the layout.
         .share("links", |_ctx: renox::view::ViewContext| async move {
-            Ok(json!({ "docs": landing::DOCS, "github": landing::REPOSITORY, "demo": landing::DEMO }))
+            Ok(json!({ "docs": landing::DOCS, "learn": landing::LEARN, "github": landing::REPOSITORY, "demo": landing::DEMO }))
         })
         // Google Analytics 4, in production only: the measurement id the
         // layout's gtag snippet uses (with the request's CSP nonce).
@@ -295,8 +295,9 @@ async fn llms(State(state): State<AppState>) -> Response {
         "# Renox\n\n> Renox is a batteries-included web framework for Rust, modelled on Laravel: Axum, HTMX and Alpine.js, SQLite or PostgreSQL. One dependency (`renox`, `use renox::prelude::*`) gives routing, sessions, CSRF, views (MiniJinja), models and migrations, validation, auth with roles and permissions, queues, a scheduler, mail, notifications, cache, storage, i18n, webhooks, a UI kit and a data grid. Apps compile into one binary. Open source, MIT OR Apache-2.0.\n\n",
     );
     text.push_str(&format!(
-        "- Docs: {docs}\n- Source: {repo}\n- Live demo (a bike shop with three stores): {demo}\n- Everything on this site as one text: {base}/llms-full.txt\n\n## Docs\n\n",
+        "- Docs: {docs}\n- Course (learn by building an app): {learn}\n- Source: {repo}\n- Live demo (a bike shop with three stores): {demo}\n- Everything on this site as one text: {base}/llms-full.txt\n\n## Docs\n\n",
         docs = landing::DOCS,
+        learn = landing::LEARN,
         repo = landing::REPOSITORY,
         demo = landing::DEMO,
     ));

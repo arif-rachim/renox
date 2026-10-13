@@ -1,0 +1,19 @@
+running 1 test
+test cheap_items_are_under_three_dollars_cheapest_first ... FAILED
+
+failures:
+
+---- cheap_items_are_under_three_dollars_cheapest_first stdout ----
+
+thread 'cheap_items_are_under_three_dollars_cheapest_first' panicked at tests/challenge_cheap_items.rs:28:5:
+assertion `left == right` failed
+  left: []
+ right: ["Sample cup", "Drip coffee"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    cheap_items_are_under_three_dollars_cheapest_first
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in …
+
+error: test failed, to rerun pass `--test challenge_cheap_items`
