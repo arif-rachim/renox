@@ -306,3 +306,14 @@ async fn the_data_routes_serve_json_and_404_otherwise() {
         app.get(missing).await.assert_status(404);
     }
 }
+
+#[test]
+fn crlf_sources_give_the_same_docs() {
+    // A Windows checkout has CRLF line ends: docs must not keep the `\r`.
+    let file = syn::parse_file("/// Hello there.\r\n/// More.\r\npub fn f() {}\r\n").unwrap();
+    let syn::Item::Fn(f) = &file.items[0] else {
+        panic!("a fn")
+    };
+    assert_eq!(api::doc_text(&f.attrs), "Hello there.\nMore.");
+    assert_eq!(api::first_sentence("First.\r\n\r\nSecond."), "First.");
+}

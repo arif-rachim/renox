@@ -81,7 +81,8 @@ fn exactly_one_codemirror_bundle_is_vendored_and_within_budget() {
 fn the_notice_names_every_locked_package_and_version() {
     let lock: serde_json::Value =
         serde_json::from_str(include_str!("../editor/package-lock.json")).unwrap();
-    let notice = include_str!("../public/vendor/NOTICE");
+    // A Windows checkout may have CRLF line ends.
+    let notice = include_str!("../public/vendor/NOTICE").replace("\r\n", "\n");
     let mut checked = 0;
     for (path, entry) in lock["packages"].as_object().unwrap() {
         if path.is_empty() || entry["dev"].as_bool() == Some(true) {

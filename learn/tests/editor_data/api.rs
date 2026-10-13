@@ -193,6 +193,8 @@ pub fn doc_text(attrs: &[Attribute]) -> String {
         .collect();
     lines
         .iter()
+        // A Windows checkout may have CRLF line ends.
+        .map(|l| l.trim_end_matches('\r'))
         .map(|l| l.strip_prefix(' ').unwrap_or(l))
         .collect::<Vec<_>>()
         .join("\n")
@@ -201,6 +203,7 @@ pub fn doc_text(attrs: &[Attribute]) -> String {
 /// The first sentence of the doc's first paragraph, Markdown kept, at most
 /// 160 characters.
 pub fn first_sentence(doc: &str) -> String {
+    let doc = doc.replace("\r\n", "\n");
     let paragraph = doc
         .split("\n\n")
         .map(str::trim)
@@ -956,7 +959,8 @@ fn doc_of_tokens(group: &proc_macro2::Group) -> Option<String> {
             let text = syn::parse2::<syn::LitStr>(TokenTree::Literal(lit.clone()).into())
                 .ok()?
                 .value();
-            Some(text.strip_prefix(' ').unwrap_or(&text).to_owned())
+            let text = text.trim_end_matches('\r');
+            Some(text.strip_prefix(' ').unwrap_or(text).to_owned())
         }
         _ => None,
     }
