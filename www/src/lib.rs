@@ -24,7 +24,7 @@ pub const SITE: &str = "https://renox.rs";
 
 pub fn app() -> App {
     App::new()
-        .embed(renox::embedded!())
+        .embed(renox_site::shared(renox::embedded!()))
         // What every view gets: the links that appear in the layout.
         .share("links", |_ctx: renox::view::ViewContext| async move {
             Ok(json!({ "docs": landing::DOCS, "learn": landing::LEARN, "github": landing::REPOSITORY, "demo": landing::DEMO }))
@@ -74,6 +74,8 @@ impl Module for Www {
             .etag();
         Routes::new()
             .merge(pages)
+            // tokens.css and the fonts, shared with docs.renox.rs (#545).
+            .merge(renox_site::shared_routes())
             .get("/blog/feed.xml", feed)
             .name("blog.feed")
             .get("/sitemap.xml", sitemap)

@@ -19,6 +19,7 @@
   <link rel="preconnect" href="https://docs.renox.rs">
   {#- Before the styles: the page lays out for its motion from the first paint (no shift when www.js loads). -#}
   <script nonce="{{ csp_nonce() }}">document.documentElement.className = "js";</script>
+  <link rel="stylesheet" href="{{ asset('tokens.css') }}">
   <link rel="stylesheet" href="{{ asset('www.css') }}">
   {%- if json_ld is defined and json_ld %}
   <script type="application/ld+json">{{ json_ld | safe }}</script>

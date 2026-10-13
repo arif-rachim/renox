@@ -177,3 +177,43 @@ async fn the_header_links_to_the_course() {
             .assert_see("<span>Learn</span>");
     }
 }
+
+#[renox::test]
+async fn the_design_system_is_the_shared_tokens() {
+    // site.css defines no colour or font: they are in tokens.css (#545).
+    let problems = renox_site::css_problems(include_str!("../public/site.css"));
+    assert!(problems.is_empty(), "site.css:\n{}", problems.join("\n"));
+    // The tokens hold the palettes and the fonts.
+    let tokens = include_str!("../public/tokens.css");
+    for needle in [
+        "--bg: #07090a",
+        "--accent: #ff6a2b",
+        "--paper: #f4f3ef",
+        ".rs {",
+        ".rs-dark {",
+        "@font-face",
+    ] {
+        assert!(tokens.contains(needle), "tokens.css has {needle}");
+    }
+    let app = site().await;
+    for path in ["/", "/docs/overview", "/search?q=model"] {
+        let html = app.get(path).await.text();
+        let tokens = html
+            .find("href=\"/tokens.css")
+            .unwrap_or_else(|| panic!("{path} links /tokens.css"));
+        let own = html.find("href=\"/site.css").expect("site.css");
+        assert!(tokens < own, "{path}: tokens.css comes before site.css");
+        assert!(
+            html.contains("<body class=\"rx-page rx-shell site rs\">"),
+            "{path}: the roles' class"
+        );
+        assert!(
+            html.contains("class=\"site-top rs-dark\""),
+            "{path}: the dark top bar"
+        );
+    }
+    app.get("/tokens.css").await.assert_ok();
+    app.get("/fonts/inter-latin-wght-4.1.woff2")
+        .await
+        .assert_ok();
+}

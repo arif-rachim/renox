@@ -1,0 +1,186 @@
+/* The design system of renox.rs, learn.renox.rs and docs.renox.rs (#545):
+   the one place that defines colours, fonts and the other tokens. Each site
+   serves this file at /tokens.css (renox_site::shared) and links it before
+   its own stylesheet, which uses the tokens and defines no colour or font.
+
+   - renox.rs's palette (:root, then the landing page's own colours);
+   - the reading sites' constants and roles: paper by default, renox.rs's
+     dark palette in dark mode (the system's, or data-theme="dark" on <html>),
+     set on an element with class "rs" (the <body> of learn and the docs);
+   - the UI kit's --rx-* tokens, re-coloured through the roles. */
+@font-face { font-family: "Inter"; font-weight: 100 900; font-display: swap; src: url("fonts/inter-latin-wght-4.1.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 100 800; font-display: swap; src: url("fonts/jetbrains-mono-latin-wght.woff2") format("woff2"); }
+
+/* renox.rs's palette. */
+:root {
+  --bg: #07090a; --bg-2: #0d1112; --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.14);
+  --fg: #eef2f0; --fg-2: #a9b3af; --fg-3: #77817e;
+  --accent: #ff6a2b; --accent-2: #ffb08a; --ok: #3ddc97;
+  --paper: #f4f3ef; --ink: #121615; --ink-2: #4a524f; --paper-line: rgba(18,22,21,.1);
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --wrap: min(1200px, 100% - 48px);
+  /* Code colours (the docs' highlighter classes). */
+  --hl-com: #6f7b77; --hl-kw: #ff8f6b; --hl-str: #9be3b4; --hl-num: #f2c66d; --hl-fn: #f0f3f2; --hl-ty: #8ab4ff;
+  --hl-mac: #d6a6ff; --hl-attr: #f2c66d; --hl-tag: #ff8f6b; --hl-prop: #8ab4ff; --hl-var: #ffb08a; --hl-tpl: #d6a6ff;
+}
+
+/* renox.rs's landing page: its other colours. */
+:root {
+  --accent-02: rgba(255,106,43,.02);
+  --accent-06: rgba(255,106,43,.06);
+  --accent-12: rgba(255,106,43,.12);
+  --accent-16: rgba(255,106,43,.16);
+  --accent-22: rgba(255,106,43,.22);
+  --accent-35: rgba(255,106,43,.35);
+  --accent-45: rgba(255,106,43,.45);
+  --accent-60: rgba(255,106,43,.6);
+  --accent-ink: #b4410f;
+  --black: #000;
+  --black-25: rgba(0,0,0,.25);
+  --black-35: rgba(0,0,0,.35);
+  --black-55: rgba(0,0,0,.55);
+  --black-6: rgba(0,0,0,.06);
+  --dot-green: #28c840;
+  --dot-red: #ff5f57;
+  --dot-yellow: #febc2e;
+  --on-accent-ink: #140a05;
+  --shadow-paper-18: rgba(30,25,15,.18);
+  --shadow-paper-8: rgba(30,25,15,.08);
+  --white: #fff;
+  --white-2: rgba(255,255,255,.02);
+  --white-2-5: rgba(255,255,255,.025);
+  --white-3: rgba(255,255,255,.03);
+  --white-5: rgba(255,255,255,.05);
+  --white-7: rgba(255,255,255,.07);
+  --www-bar-fill: #3a4240;
+  --www-browser: #fbfaf7;
+  --www-browser-bar: #f0eee9;
+  --www-browser-text: #666;
+  --www-browser-url: #555;
+  --www-code: #c9d1ce;
+  --www-crate: #f7f6f2;
+  --www-dim: #8d938f;
+  --www-dot: #2a2f31;
+  --www-gh-ink: #0b0d0e;
+  --www-highlight: #f2c66d;
+  --www-nav-glass: rgba(7,9,10,.74);
+  --www-no: #5b6461;
+  --www-ok-ink: #0d7a4f;
+  --www-ok-tint: #dff6ea;
+  --www-panel: rgba(13,17,18,.94);
+  --www-prose: #d6dcda;
+  --www-tile-from: #eae7df;
+  --www-tile-to: #f5f3ee;
+}
+
+/* The reading sites' constants (both modes): learn.renox.rs and docs.renox.rs. */
+:root {
+  --rs-on-accent: #07090a;      /* text on the orange (6.98:1; white is 2.86 and fails) */
+  --rs-logo-ink: #140a05;       /* the logo tile's R, as on renox.rs */
+  --rs-card-paper: #ffffff;     /* cards on paper, as www's .crates and .ex */
+  --rs-accent-ink: #b4410f;     /* the orange as text on paper (www's .light link) */
+  --rs-ok-paper: #0a6b44;       /* success on paper (darker than www's #0d7a4f, which the kit's badge tint drops to 4.40) */
+  --rs-warn-paper: #8a5a00;
+  --rs-bad-paper: #b42318;
+  --rs-warn-dark: #f2c66d;      /* www's .cmp td.h */
+  --rs-bad-dark: #ff5f57;       /* www's terminal dot */
+  --rs-dot-2: #febc2e;          /* www's terminal dots, with --rs-bad-dark first */
+  --rs-dot-3: #28c840;
+  --rs-line-2-paper: rgba(18,22,21,.2);
+  --rs-measure: 720px;          /* www's .prose */
+  --rs-toc: 220px;              /* www's blog TOC */
+  --rs-type-hero: 700 clamp(34px, 4vw, 54px)/1.03 var(--sans);  /* www's section h2 */
+  --rs-type-h1: 700 clamp(36px, 4.4vw, 56px)/1.05 var(--sans);  /* www's .page__head h1 */
+  --rs-type-h2: 700 28px/1.2 var(--sans);                        /* www's .prose h2 */
+  --rs-type-h3: 650 21px/1.3 var(--sans);
+  --rs-type-h4: 650 17px/1.3 var(--sans);
+  --rs-type-card: 650 18px/1.25 var(--sans);                     /* www's .f h3 */
+  --rs-type-lead: 400 18px/1.6 var(--sans);                      /* www's .sub */
+  --rs-type-prose: 400 17px/1.75 var(--sans);                    /* www's .prose */
+  --rs-type-ui: 400 15px/1.6 var(--sans);
+  --rs-type-small: 400 14px/1.6 var(--sans);
+  --rs-type-tag: 500 12px/1 var(--mono);                         /* www's .tag (uppercase, .08em) */
+  --rs-type-meta: 500 13px/1.5 var(--mono);                      /* www's .meta */
+  --rs-type-code: 400 13.5px/1.7 var(--mono);                    /* www's figure.code pre */
+  --rs-type-button: 600 15px/1 var(--sans);                      /* www's .btn */
+  --rs-radius-s: 7px;   /* small controls (www's copy button) */
+  --rs-radius: 10px;    /* buttons, callouts (www's .btn) */
+  --rs-radius-m: 14px;  /* code panels, quiz, pager (www's .term) */
+  --rs-radius-l: 16px;  /* cards (www's .posts a, .shot) */
+  --rs-shadow-lift: 0 10px 30px rgba(30,25,15,.08);   /* www's .ex a:hover */
+  --rs-shadow-shot: 0 30px 70px rgba(30,25,15,.18);   /* www's .shot */
+}
+
+/* Roles: paper (the default). */
+.rs {
+  color-scheme: light;
+  --rs-page: var(--paper);
+  --rs-surface: var(--rs-card-paper);
+  --rs-text: var(--ink);
+  --rs-text-2: var(--ink-2);
+  --rs-meta: var(--ink-2);          /* never www's .light .dim #8d938f: 2.82:1 */
+  --rs-line: var(--paper-line);
+  --rs-line-2: var(--rs-line-2-paper);
+  --rs-link: var(--rs-accent-ink);
+  --rs-number: var(--rs-accent-ink);  /* the "001" of eyebrows */
+  --rs-ok: var(--rs-ok-paper);
+  --rs-warn: var(--rs-warn-paper);
+  --rs-bad: var(--rs-bad-paper);
+  --rs-note: var(--ink-2);
+  --rs-important: var(--rs-accent-ink);
+  --rs-focus: var(--rs-accent-ink);
+  --rs-code-inline: color-mix(in srgb, var(--ink) 6%, transparent);
+  --rs-grid: var(--paper-line);     /* grid-paper lines */
+}
+/* Roles: dark (www's palette). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .rs {
+    color-scheme: dark;
+    --rs-page: var(--bg); --rs-surface: var(--bg-2); --rs-text: var(--fg); --rs-text-2: var(--fg-2);
+    --rs-meta: var(--fg-3); --rs-line: var(--line); --rs-line-2: var(--line-2); --rs-link: var(--accent-2);
+    --rs-number: var(--accent); --rs-ok: var(--ok); --rs-warn: var(--rs-warn-dark); --rs-bad: var(--rs-bad-dark);
+    --rs-note: var(--fg-2); --rs-important: var(--accent-2); --rs-focus: var(--accent);
+    --rs-code-inline: rgba(255,255,255,.07); --rs-grid: var(--line);
+  }
+}
+:root[data-theme="dark"] .rs {
+  color-scheme: dark;
+  --rs-page: var(--bg); --rs-surface: var(--bg-2); --rs-text: var(--fg); --rs-text-2: var(--fg-2);
+  --rs-meta: var(--fg-3); --rs-line: var(--line); --rs-line-2: var(--line-2); --rs-link: var(--accent-2);
+  --rs-number: var(--accent); --rs-ok: var(--ok); --rs-warn: var(--rs-warn-dark); --rs-bad: var(--rs-bad-dark);
+  --rs-note: var(--fg-2); --rs-important: var(--accent-2); --rs-focus: var(--accent);
+  --rs-code-inline: rgba(255,255,255,.07); --rs-grid: var(--line);
+}
+
+/* A dark band inside a paper page (the docs' top bar): the dark roles in
+   both modes. */
+.rs-dark {
+  color-scheme: dark;
+  --rs-page: var(--bg); --rs-surface: var(--bg-2); --rs-text: var(--fg); --rs-text-2: var(--fg-2);
+  --rs-meta: var(--fg-3); --rs-line: var(--line); --rs-line-2: var(--line-2); --rs-link: var(--accent-2);
+  --rs-number: var(--accent); --rs-ok: var(--ok); --rs-warn: var(--rs-warn-dark); --rs-bad: var(--rs-bad-dark);
+  --rs-note: var(--fg-2); --rs-important: var(--accent-2); --rs-focus: var(--accent);
+  --rs-code-inline: rgba(255,255,255,.07); --rs-grid: var(--line);
+  color: var(--rs-text);
+}
+
+/* The kit's components, coloured like renox.rs (both modes, through the roles). */
+.rs, .rs-dark {
+  --rx-font: var(--sans); --rx-font-display: var(--sans); --rx-mono: var(--mono);
+  --rx-accent: var(--accent); --rx-accent-hover: var(--accent); --rx-accent-pressed: var(--accent);
+  --rx-on-accent: var(--rs-on-accent); --rx-accent-text: var(--rs-link); --rx-info: var(--rs-link);
+  --rx-bg: var(--rs-page); --rx-surface: var(--rs-surface); --rx-surface-raised: var(--rs-surface);
+  --rx-label: var(--rs-text); --rx-secondary-label: var(--rs-text-2); --rx-tertiary-label: var(--rs-meta);
+  --rx-separator: var(--rs-line); --rx-border: var(--rs-line-2);
+  --rx-fill: color-mix(in srgb, var(--rs-text) 6%, transparent);
+  --rx-fill-strong: color-mix(in srgb, var(--rs-text) 12%, transparent);
+  --rx-success: var(--rs-ok); --rx-warning: var(--rs-warn); --rx-danger: var(--rs-bad); --rx-danger-text: var(--rs-bad);
+  --rx-focus: var(--rs-focus);
+  --rx-shadow: none; --rx-surface-border: 1px solid var(--rs-line);
+  --rx-button-radius: var(--rs-radius); --rx-button-padding: 10px 20px; --rx-badge-radius: 99px;
+  --rx-button-secondary-bg: transparent; --rx-button-secondary-hover: var(--rx-fill);
+  --rx-button-secondary-fg: var(--rs-text); --rx-button-secondary-ring: inset 0 0 0 1px var(--rs-line-2);
+  --rx-radius-s: var(--rs-radius); --rx-radius: var(--rs-radius-m); --rx-radius-l: var(--rs-radius-l);
+  --rx-sidebar-bg: var(--rs-page); --rx-material: var(--rs-page);
+}

@@ -40,15 +40,18 @@ later issue uses these tokens and classes and adds no colour, size or font of it
   Chapters sit on www's light paper; dark mode is www's dark palette (system preference, plus
   a toggle remembered in `localStorage` under `renox-learn:theme`, applied as `data-theme` on
   `<html>` by [`theme.js`](public/theme.js)).
-- **Tokens** are at the top of [`learn.css`](public/learn.css): www's `:root` block, copied
-  verbatim and checked by `the_www_tokens_match_renox_rs` (a change in www.css fails the test
-  until learn copies it), then learn's own `--learn-*` constants and **roles** (page, surface,
-  text, link, ok, warn, bad…) set on `body.learn` for paper and dark. The kit's `rx-button`,
-  `rx-badge` and `<rx-icon>` are re-coloured through a short list of `--rx-*` overrides there.
-  Use the roles (`var(--learn-text)`), not the raw colours, so a component follows the mode.
-- **Below the line `/* == end of tokens == */` there is no colour literal and no
-  `font-family`** (`the_stylesheet_keeps_colours_and_fonts_in_its_tokens`). A new colour is a
-  new token above the line, with its contrast checked against the table in #543.
+- **Tokens** live in one stylesheet shared by the three sites,
+  [`site/public/tokens.css`](../site/public/tokens.css)
+  ([#545](https://github.com/arif-rachim/renox/issues/545)), served by each at `/tokens.css`
+  (`renox_site::shared`, with the fonts) and linked before `learn.css`: renox.rs's `:root`
+  palette, the reading sites' `--rs-*` constants and **roles** (page, surface, text, link, ok,
+  warn, bad…) set on `.rs` (`<body class="rx-page learn rs">`) for paper and dark, `.rs-dark`
+  for a dark band, and the kit's `--rx-*` re-coloured through the roles. Use the roles
+  (`var(--rs-text)`), not the raw colours, so a component follows the mode.
+- **`learn.css` defines no colour literal and no `font-family`**
+  (`the_stylesheet_keeps_colours_and_fonts_in_the_tokens`); it may only point a role at another
+  token in the dark frame (`--rs-focus`, `--rs-link`) and set `--callout`. A new colour is a new
+  token in `tokens.css`, with its contrast checked against the table in #543.
 - **Classes:** the page frame uses unprefixed BEM (`nav`, `hero`, `eyebrow`, `stage`, `toc`,
   `pager`…); what the renderer puts inside `.prose` uses `learn-` (`learn-quiz`,
   `learn-challenge`, `learn-shot`, `learn-video`, `learn-code`, `learn-change`) plus the docs

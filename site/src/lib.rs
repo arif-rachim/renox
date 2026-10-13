@@ -19,6 +19,149 @@ use render::{RENDERED, REPOSITORY};
 /// The course.
 pub const LEARN: &str = "https://learn.renox.rs";
 
+/// The files the three sites (docs.renox.rs, renox.rs, learn.renox.rs) serve
+/// at the same path, from `public/`: the design system's stylesheet
+/// (`tokens.css`, the one place that defines colours and fonts, #545) and its
+/// fonts.
+pub const SHARED: &[(&str, &[u8])] = &[
+    ("tokens.css", include_bytes!("../public/tokens.css")),
+    (
+        "fonts/inter-latin-wght-4.1.woff2",
+        include_bytes!("../public/fonts/inter-latin-wght-4.1.woff2"),
+    ),
+    (
+        "fonts/jetbrains-mono-latin-wght.woff2",
+        include_bytes!("../public/fonts/jetbrains-mono-latin-wght.woff2"),
+    ),
+    (
+        "fonts/OFL-Inter.txt",
+        include_bytes!("../public/fonts/OFL-Inter.txt"),
+    ),
+    (
+        "fonts/OFL-JetBrainsMono.txt",
+        include_bytes!("../public/fonts/OFL-JetBrainsMono.txt"),
+    ),
+];
+
+/// Routes for [`SHARED`]: `/tokens.css` and `/fonts/{file}`, for renox.rs and
+/// learn.renox.rs. A release build also serves them as embedded public files
+/// ([`shared`]); these answer in debug builds and tests too, which read
+/// `public/` from the disk.
+pub fn shared_routes() -> Routes {
+    Routes::new()
+        .get("/tokens.css", shared_tokens)
+        .get("/fonts/{file}", shared_font)
+}
+
+fn shared_file(name: &str) -> Result<renox::axum::response::Response> {
+    use renox::axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
+    use renox::axum::response::IntoResponse;
+    let (_, bytes) = SHARED
+        .iter()
+        .find(|(file, _)| *file == name)
+        .ok_or(Error::NotFound)?;
+    let kind = match name.rsplit_once('.').map(|(_, ext)| ext) {
+        Some("css") => "text/css; charset=utf-8",
+        Some("woff2") => "font/woff2",
+        _ => "text/plain; charset=utf-8",
+    };
+    Ok((
+        [
+            (CONTENT_TYPE, kind),
+            (CACHE_CONTROL, "public, max-age=3600"),
+        ],
+        *bytes,
+    )
+        .into_response())
+}
+
+async fn shared_tokens() -> Result<renox::axum::response::Response> {
+    shared_file("tokens.css")
+}
+
+async fn shared_font(Path(file): Path<String>) -> Result<renox::axum::response::Response> {
+    shared_file(&format!("fonts/{file}"))
+}
+
+/// What in a site's stylesheet belongs in `tokens.css` instead: a colour
+/// literal (`#hex`, `rgb()`, `hsl()`, `white`, `black`) in a declaration, a
+/// `@font-face`, or a font family named outside a token (`font-family:
+/// "Inter"`; `font-family: var(--mono)` is fine). One line per problem;
+/// comments are ignored. The three sites' tests run it on their CSS.
+pub fn css_problems(css: &str) -> Vec<String> {
+    let mut plain = String::new();
+    let mut rest = css;
+    while let Some((before, after)) = rest.split_once("/*") {
+        plain.push_str(before);
+        rest = after.split_once("*/").map_or("", |(_, tail)| tail);
+    }
+    plain.push_str(rest);
+    let mut problems = Vec::new();
+    if plain.contains("@font-face") {
+        problems.push("@font-face (fonts are declared in tokens.css)".to_owned());
+    }
+    // A segment followed by `}` holds declarations; one followed by `{` is a selector.
+    let mut start = 0;
+    for (i, c) in plain.char_indices() {
+        if c != '{' && c != '}' {
+            continue;
+        }
+        let segment = &plain[start..i];
+        start = i + 1;
+        if c == '{' {
+            continue;
+        }
+        for declaration in segment.split(';') {
+            let Some((property, value)) = declaration.split_once(':') else {
+                continue;
+            };
+            let (property, value) = (property.trim(), value.trim());
+            let lower = value.to_ascii_lowercase();
+            let hex = value.match_indices('#').any(|(j, _)| {
+                let digits = value[j + 1..]
+                    .chars()
+                    .take_while(char::is_ascii_hexdigit)
+                    .count();
+                (3..=8).contains(&digits)
+            });
+            let named = lower
+                .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+                .any(|word| word == "white" || word == "black");
+            let function = ["rgb(", "rgba(", "hsl(", "hsla(", "oklch(", "hwb("]
+                .iter()
+                .any(|f| lower.contains(f));
+            if hex || named || function {
+                problems.push(format!("a colour literal: {property}: {value}"));
+            }
+            let family =
+                property == "font-family" && !(value.starts_with("var(") || value == "inherit");
+            if family || (property == "font" && value.contains('"')) {
+                problems.push(format!(
+                    "a font named outside the tokens: {property}: {value}"
+                ));
+            }
+        }
+    }
+    problems
+}
+
+/// `embedded` (an app's `renox::embedded!()`) plus [`SHARED`], so `/tokens.css`
+/// and the fonts are served, with `asset()` versions, by renox.rs and
+/// learn.renox.rs too. The app's own file wins where both have one.
+pub fn shared(embedded: renox::Embedded) -> renox::Embedded {
+    let mut public: Vec<(&'static str, &'static [u8])> = SHARED
+        .iter()
+        .filter(|(name, _)| !embedded.public.iter().any(|(own, _)| own == name))
+        .copied()
+        .collect();
+    public.extend_from_slice(embedded.public);
+    renox::Embedded {
+        // Built once per app; the slice lives as long as the process.
+        public: Box::leak(public.into_boxed_slice()),
+        ..embedded
+    }
+}
+
 pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())

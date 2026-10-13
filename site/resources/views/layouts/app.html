@@ -8,12 +8,14 @@
   {{ renox_head() }}
   <link rel="icon" href="data:,">
   <link rel="preload" href="{{ asset('fonts/jetbrains-mono-latin-wght.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ asset('fonts/inter-latin-wght-4.1.woff2') }}" as="font" type="font/woff2" crossorigin>
   {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('tokens.css') }}">
   <link rel="stylesheet" href="{{ asset('site.css') }}">
   <script src="{{ asset('site.js') }}" defer></script>
 </head>
 {#- The kit's shell: the guides in a sidebar (each with its icon), the page beside it. -#}
-<body class="rx-page rx-shell site">
+<body class="rx-page rx-shell site rs">
   {% from "renox/ui.html" import sidebar, navbar %}
   {% call sidebar("Renox", href=route('home'), label="Documentation") %}
     {%- for section in nav %}
@@ -24,6 +26,7 @@
     {%- endfor %}
   {% endcall %}
   <div class="rx-shell__main">
+    <div class="site-top rs-dark">
     {% call navbar(none, width="full", skip=false, label="Search and links") %}
       <form class="site-search" action="{{ route('search') }}" method="get" role="search">
         <label class="rx-visually-hidden" for="site-search">Search the docs</label>
@@ -35,6 +38,7 @@
       <a class="site-top-link" href="{{ route('docs.show', 'tutorial') }}">{{ icon("graduation-cap") }}<span>Tutorial</span></a>
       <a class="site-top-link" href="{{ repository }}">{{ icon("github") }}<span>GitHub</span></a>
     {% endcall %}
+    </div>
     <main class="rx-shell__content" id="main">
       {% block content %}{% endblock %}
     </main>

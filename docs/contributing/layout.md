@@ -352,6 +352,11 @@ site/                      the documentation site (package `renox-site`, publish
                            builds it for https://docs.renox.rs, whose server pulls
                            each new build (#141). A new guide in docs/ needs a line in
                            content.rs PAGES (and site/build.rs already watches docs/).
+                           public/tokens.css: the design system of the three sites (#545:
+                           renox.rs's palette, the --rs-* roles on .rs/.rs-dark, the kit's
+                           --rx-* re-coloured), the one place with colours and fonts; www and
+                           learn serve it and public/fonts/ through renox_site::{shared,
+                           shared_routes}; renox_site::css_problems checks each site's CSS.
                            Renoxium hosts it on their own server (not GitHub Pages: the
                            account's user site maps project sites to a personal domain)
 www/                       renox.rs: the landing page and blog (package `renox-www`, publish =

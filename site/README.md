@@ -23,8 +23,9 @@ the commit it was built from.
 | Markdown to HTML: heading anchors, the table of contents, doctest setup lines hidden, links between files turned into site addresses | [src/render.rs](src/render.rs) |
 | Routes, search, sitemap | [src/lib.rs](src/lib.rs) |
 | The kit's shell with the guides in the sidebar | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
-| Long-form text styles | [public/site.css](public/site.css) |
-| Every page renders, links land on headings that exist | [tests/site.rs](tests/site.rs) |
+| The design system shared by docs.renox.rs, renox.rs and learn.renox.rs: every colour, font and role, the kit's `--rx-*` re-coloured (#545) | [public/tokens.css](public/tokens.css), served at `/tokens.css` by the three sites (`renox_site::SHARED`, `shared`, `shared_routes`) with `public/fonts/` |
+| Long-form text styles, in that design (no colour or font of its own: `renox_site::css_problems`) | [public/site.css](public/site.css) |
+| Every page renders, links land on headings that exist, the pages link tokens.css | [tests/site.rs](tests/site.rs); in Chrome: `tests/browser/run.sh site-design` (overflow, WCAG AA, focus ring) |
 
 ## Where it runs
 

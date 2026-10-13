@@ -379,6 +379,14 @@
   editor is CodeMirror 6 with completions from Renox's API (extracted with `syn`) and
   `view:data`, challenges are compiled and tested in a container sandbox, videos are recorded
   by script and served from the server's disk. #523 is the skeleton (port 3100).
+  Since then: the course app is a coffee shop (learn/course/stage-00..08), challenges run on the
+  student's machine (no sandbox, #530/#532 not planned). The editor came back (2026-10-13):
+  #528 vendors CodeMirror 6 as one pinned bundle (learn/editor/bundle.sh, CI job
+  `learn-editor`, `/editor` playground), #529 adds its autocomplete (Renox's API read with `syn`
+  by learn/tests/editor_data.rs, each stage's models and `view:data` tags, committed as
+  snapshots). #545 moved the three sites onto one design system: site/public/tokens.css,
+  served by docs.renox.rs, renox.rs and learn.renox.rs (`renox_site::shared`), the only CSS
+  with colours and fonts.
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social

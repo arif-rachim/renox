@@ -9,6 +9,8 @@ on:
     paths:
       - "learn/**"
       - "site/src/**"
+      # tokens.css and the fonts, compiled in from the docs site (#545).
+      - "site/public/**"
       - "crates/**"
       - "Cargo.toml"
       - "Cargo.lock"
