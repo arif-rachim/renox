@@ -11,7 +11,7 @@
     <div>
       <p class="tag"><b aria-hidden="true">●</b> Open source · MIT / Apache-2.0 · Rust 1.94+</p>
       <h1 id="hero-title">Laravel's productivity.<br><span class="accent">Rust's guarantees.</span></h1>
-      <p class="lead">Renox is a batteries-included web framework for Rust. Routing, models, migrations, validation, auth, queues, mail, a UI kit and more, behind one dependency, compiled into one binary.</p>
+      <p class="lead">Renox is a batteries-included web framework for Rust. Routing, models, migrations, validation, auth, queues, mail, pages written as HTML tags, live components and more, behind one dependency, compiled into one binary.</p>
       <div class="hero__ctas">
         <a class="btn btn--primary" href="{{ links.docs }}/docs/tutorial">Start the tutorial →</a>
         <span class="install"><span aria-hidden="true">$</span><code>cargo install renox-cli</code><button type="button" data-copy="cargo install renox-cli">copy</button></span>
@@ -96,8 +96,27 @@
   </div>
 </div></section>
 
+<section class="s light" id="pages" aria-labelledby="pages-title"><div class="wrap">
+  <p class="tag"><b>004</b> New in 1.1</p>
+  <h2 id="pages-title">Write pages in HTML. <span class="dim">Let a Rust struct hold the state.</span></h2>
+  <p class="sub">Renox 1.1 adds <code>rx-*</code> tags for every part of a page, live components for the parts that need state, and checks that catch mistakes before a page is opened. <a href="{{ links.docs }}/docs/ui">The tags guide</a> and <a href="{{ links.docs }}/docs/live">the live components guide</a>.</p>
+  {%- for d in duos %}
+  <div class="duo reveal">
+    <h3 class="duo__name">{{ d.name }}</h3>
+    <p class="duo__text">{{ d.text }}</p>
+    <figure class="pane"><figcaption><b class="me">{{ d.left.file }}</b></figcaption><pre><code>{{ d.left.code | safe }}</code></pre></figure>
+    <figure class="pane"><figcaption><b>{{ d.right.file }}</b></figcaption><pre><code>{{ d.right.code | safe }}</code></pre></figure>
+  </div>
+  {%- endfor %}
+  <ul class="list" role="list">
+    <li><span class="n" aria-hidden="true">→</span><span><b>Your own tags.</b> <code>components/price_tag.html</code> is <code>&lt;app-price-tag&gt;</code>, with props declared in the file. <a href="{{ links.docs }}/docs/ui">Components as tags</a>.</span></li>
+    <li><span class="n" aria-hidden="true">→</span><span><b>Checks before the browser.</b> <code>rnx view:check</code> for templates, <code>rnx db:check</code> for models against tables, <code>rnx make:migration --auto</code> to write the difference as SQL.</span></li>
+    <li><span class="n" aria-hidden="true">→</span><span><b>Autocomplete in your editor.</b> <code>rnx view:data</code> writes the tag list VS Code and others read.</span></li>
+  </ul>
+</div></section>
+
 <section class="s" id="laravel" aria-labelledby="laravel-title"><div class="wrap">
-  <p class="tag"><b>004</b> Coming from Laravel?</p>
+  <p class="tag"><b>005</b> Coming from Laravel?</p>
   <h2 id="laravel-title">You already know Renox. <span class="dim">The compiler just checks your work now.</span></h2>
   <div class="morph" id="morph">
     <div class="morph__tabs" role="tablist" aria-label="Laravel and Renox, side by side">
@@ -118,7 +137,7 @@
 
 {%- if bench %}
 <section class="s" id="bench" aria-labelledby="bench-title"><div class="wrap">
-  <p class="tag"><b>005</b> Benchmarks</p>
+  <p class="tag"><b>006</b> Benchmarks</p>
   <h2 id="bench-title">All those batteries, <span class="dim">a tenth of Laravel&#39;s latency.</span></h2>
   <p class="sub">{{ bench.summary }}</p>
   <div class="bench">
@@ -142,7 +161,7 @@
 
 <section class="s" id="deploy" aria-labelledby="deploy-title"><div class="wrap ship">
   <div>
-    <p class="tag"><b>006</b> Deploy</p>
+    <p class="tag"><b>007</b> Deploy</p>
     <h2 id="deploy-title">Your whole app is one file. <span class="dim">Copy it. Run it.</span></h2>
     <p class="sub">Views, translations, migrations and public files are embedded at build time. The binary is its own CLI too: <code>migrate</code>, <code>queue:work</code>, <code>schedule:work</code>, <code>db:seed</code>. No PHP-FPM, no <code>node_modules</code>, no runtime to keep patched. <a href="{{ links.docs }}/docs/operations">Running Renox in production</a>.</p>
   </div>
@@ -158,7 +177,7 @@
 </div></section>
 
 <section class="s light" id="examples" aria-labelledby="examples-title"><div class="wrap">
-  <p class="tag"><b>007</b> Built with Renox</p>
+  <p class="tag"><b>008</b> Built with Renox</p>
   <h2 id="examples-title">Not a hello world. <span class="dim">A whole business.</span></h2>
   <p class="sub">The bike shop runs three stores that sell, rent and service bikes: checkout, rentals, a workshop, service plans, staff roles per store, reports. Every page explains which Renox feature it uses and why.</p>
   <div class="show">
@@ -173,7 +192,7 @@
 </div></section>
 
 <section class="s" id="compare" aria-labelledby="compare-title"><div class="wrap">
-  <p class="tag"><b>008</b> How it compares</p>
+  <p class="tag"><b>009</b> How it compares</p>
   <h2 id="compare-title">The productivity of a full-stack framework, <span class="dim">the footprint of a library.</span></h2>
   <div class="cmp-wrap"><table class="cmp">
     <thead><tr><th scope="col"><span class="sr">Feature</span></th><th scope="col" class="me">Renox</th><th scope="col">Laravel</th><th scope="col">Loco</th><th scope="col">Axum + crates</th></tr></thead>
@@ -187,7 +206,7 @@
 
 {%- if posts %}
 <section class="s" id="news" aria-labelledby="news-title"><div class="wrap">
-  <p class="tag"><b>009</b> From the blog</p>
+  <p class="tag"><b>010</b> From the blog</p>
   <h2 id="news-title">What's new in Renox.</h2>
   <ul class="posts" role="list">
     {%- for p in posts %}

@@ -25,7 +25,7 @@ pub struct Metric {
 pub fn metrics() -> Vec<Metric> {
     vec![
         Metric {
-            value: 1608,
+            value: 1750,
             suffix: "",
             label: "tests",
         },
@@ -35,9 +35,9 @@ pub fn metrics() -> Vec<Metric> {
             label: "line coverage, enforced",
         },
         Metric {
-            value: 72,
+            value: 99,
             suffix: "",
-            label: "UI kit components",
+            label: "rx-* tags for pages",
         },
         Metric {
             value: 130,
@@ -50,9 +50,9 @@ pub fn metrics() -> Vec<Metric> {
             label: "official plugins",
         },
         Metric {
-            value: 27,
+            value: 112,
             suffix: "",
-            label: "built-in commands",
+            label: "icons in the UI kit",
         },
     ]
 }
@@ -106,8 +106,8 @@ pub fn features() -> Vec<Feature> {
         Feature {
             icon: "▤",
             title: "Models & migrations",
-            text: "A query builder that checks column names, relations without N+1, migrations with batches, SQLite or PostgreSQL.",
-            code: "#[derive(Model)]",
+            text: "Typed columns, relations without N+1, migrations generated from your models, and db:check to catch drift. SQLite or PostgreSQL.",
+            code: "Product::PRICE.lt(20_000)",
             doc: "relations",
         },
         Feature {
@@ -140,9 +140,9 @@ pub fn features() -> Vec<Feature> {
         },
         Feature {
             icon: "▦",
-            title: "UI kit, grid & HTMX",
-            text: "72 accessible components, 112 icons, an editorial theme, a data grid with exports, and renox-blocks; htmx and Alpine.js built in.",
-            code: "{{ grid(orders) }}",
+            title: "Pages as tags",
+            text: "Write pages in HTML tags: 99 accessible rx-* tags, a data grid with exports, live components, htmx and Alpine.js built in.",
+            code: "<rx-table :rows=\"orders\">",
             doc: "ui",
         },
         Feature {
@@ -226,9 +226,9 @@ pub fn pipeline() -> Vec<Layer> {
             "VIEW",
             "view",
             "Views",
-            "MiniJinja templates, a UI kit of 70 components, htmx fragments and out-of-band swaps, error pages in your layout.",
+            "Pages written as rx-* tags that compile to MiniJinja when they load, live components, htmx fragments and out-of-band swaps, error pages in your layout.",
             "html",
-            "{% call card(\"Order #\" ~ order.id) %}\n  {{ infolist(order) }}\n{% endcall %}",
+            "<rx-card :title=\"'Order #' ~ order.id\">\n  <rx-table :rows=\"order.lines\" as=\"line\">\n    <rx-column label=\"Item\">{{ line.name }}</rx-column>\n  </rx-table>\n</rx-card>",
         ),
         layer(
             "200",
@@ -291,6 +291,60 @@ pub fn pairs() -> Vec<Pair> {
     ]
 }
 
+/// One panel of a code duo: a file name and its highlighted code.
+#[derive(Serialize)]
+pub struct Panel {
+    pub file: &'static str,
+    pub code: String,
+}
+
+/// Two panels side by side, with the sentence that ties them.
+#[derive(Serialize)]
+pub struct Duo {
+    pub name: &'static str,
+    pub text: &'static str,
+    pub left: Panel,
+    pub right: Panel,
+}
+
+/// The "Pages" section: pages as tags, and a live component.
+pub fn duos() -> Vec<Duo> {
+    let panel = |file, lang: &str, code: &str| Panel {
+        file,
+        code: renox_site::highlight::highlight(lang, code),
+    };
+    vec![
+        Duo {
+            name: "Pages are HTML tags",
+            text: "A page is a template of rx-* tags: the UI kit, forms, tables, navigation and layouts. They are compiled to MiniJinja when the template loads, so there is no build step and live reload keeps working. A wrong tag or attribute fails with the file, the line and a suggestion, and rnx view:check finds them all before a page is opened.",
+            left: panel(
+                "resources/views/orders/index.html",
+                "html",
+                "<rx-page layout=\"layouts/app.html\" title=\"Orders\">\n  <rx-page-header title=\"Orders\">\n    <rx-link-button route=\"orders.create\" label=\"New order\" variant=\"primary\"/>\n  </rx-page-header>\n  <rx-table :rows=\"orders\" caption=\"Orders\">\n    <rx-column label=\"Number\">{{ row.number }}</rx-column>\n    <rx-column label=\"Total\" align=\"num\">{{ row.total | money }}</rx-column>\n    <rx-slot name=\"empty\"><rx-empty title=\"No orders yet\"/></rx-slot>\n  </rx-table>\n</rx-page>",
+            ),
+            right: panel(
+                "rnx view:check",
+                "",
+                "orders/index.html:3: <rx-link-button> has no attribute\n  \"varient\"; did you mean \"variant\"? It takes: href, label,\n  variant, size, icon, badge, key, new-tab\nChecked 41 templates: 1 problems.",
+            ),
+        },
+        Duo {
+            name: "Live components",
+            text: "A part of a page whose state lives in a Rust struct, Renox's answer to Livewire. A button calls a method, the server changes the state and renders the component again, and the browser morphs the page into it. One struct and one template: no route, no fragment, no JavaScript. The state travels signed.",
+            left: panel(
+                "src/app/counter.rs",
+                "rust",
+                "#[derive(Serialize, Deserialize, Default)]\npub struct Counter {\n    count: i64,\n}\n\n#[renox::live_component(view = \"live/counter.html\")]\nimpl Counter {\n    #[live(action)]\n    async fn add(&mut self, _ctx: &mut LiveContext, n: i64) -> Result {\n        self.count += n;\n        Ok(())\n    }\n}",
+            ),
+            right: panel(
+                "resources/views/live/counter.html",
+                "html",
+                "<p>{{ state.count }}</p>\n<button type=\"button\" rx-click=\"add(1)\">+1</button>\n<button type=\"button\" rx-click=\"add(10)\">+10</button>\n\n{# on the page: <live-counter :component=\"counter\"/> #}",
+            ),
+        },
+    ]
+}
+
 /// A row of the comparison table: Renox, Laravel, Loco, Axum + crates.
 #[derive(Serialize)]
 pub struct Compare {
@@ -323,6 +377,10 @@ pub fn comparison() -> Vec<Compare> {
         Compare {
             what: "Admin panel, billing, OAuth plugins",
             cells: ["yes", "with packages", "no", "no"],
+        },
+        Compare {
+            what: "Live components, no JavaScript to write",
+            cells: ["yes", "with Livewire", "no", "no"],
         },
         Compare {
             what: "Deploys as one file",

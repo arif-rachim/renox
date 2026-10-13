@@ -42,6 +42,13 @@ async fn the_home_page_has_its_words_its_tags_and_its_structured_data() {
         .assert_see("tower-sessions")
         .assert_see("Not a hello world.")
         .assert_see("href=\"/blog/renox-1-0\"")
+        .assert_see("href=\"/blog/renox-1-1\"")
+        // The 1.1 section: pages as tags, a live component, the checks.
+        .assert_see("<h2 id=\"pages-title\">")
+        .assert_see("Live components")
+        .assert_see("rx-click")
+        .assert_see("rnx view:check")
+        .assert_see("\"version\":\"1.1.0\"")
         // The benchmark section, from content/benchmarks.json.
         .assert_see("<h2 id=\"bench-title\">")
         .assert_see("<tr class=\"me\"><th scope=\"row\">Renox</th>")
