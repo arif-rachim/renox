@@ -56,6 +56,7 @@ them (and nothing moves under `prefers-reduced-motion`). On top of that:
 | `llms.txt` (what Renox is, every docs page with one line, the posts), `llms-full.txt` (the landing page's text and every post) | [src/lib.rs](src/lib.rs) |
 | Each post as Markdown | `/blog/{slug}.md` |
 | One `h1` per page, descriptive link text, a skip link, `noindex` on the 404 page | the views |
+| Colours and fonts: the shared design system in [../site/public/tokens.css](../site/public/tokens.css), served at `/tokens.css` with the fonts (`renox_site::shared`); `public/www.css` uses its tokens and defines none (#545) | [public/www.css](public/www.css) |
 | Fast first paint: fonts preloaded, image sizes set, the script deferred, the layout set before the styles (no shift) | [layouts/app.html](resources/views/layouts/app.html) |
 
 [tests/www.rs](tests/www.rs) checks the tags, the structured data, the feed, the sitemap and

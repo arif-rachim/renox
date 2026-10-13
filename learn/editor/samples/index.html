@@ -1,0 +1,8 @@
+<rx-page layout="layouts/app.html" title="Menu">
+  {# Every item, with its price and what is left today. #}
+  <rx-table :rows="items" as="item" :key="item.id" caption="Menu">
+    <rx-column label="Name"><a href="{{ route('menu.show', item.id) }}">{{ item.name }}</a></rx-column>
+    <rx-column label="Price" align="num"><app-price-tag :amount="item.price"/></rx-column>
+    <rx-column label="Status"><app-stock-badge :stock="item.stock"/></rx-column>
+  </rx-table>
+</rx-page>

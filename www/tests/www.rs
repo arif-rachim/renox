@@ -195,3 +195,26 @@ async fn the_navigation_links_to_the_course() {
             .assert_see("<a href=\"https://learn.renox.rs\">Course</a>");
     }
 }
+
+#[renox::test]
+async fn the_design_system_is_the_shared_tokens() {
+    // www.css defines no colour or font: they are in renox-site's tokens.css (#545).
+    let problems = renox_site::css_problems(include_str!("../public/www.css"));
+    assert!(problems.is_empty(), "www.css:\n{}", problems.join("\n"));
+    let app = site().await;
+    let html = app.get("/").await.text();
+    let tokens = html
+        .find("href=\"/tokens.css")
+        .expect("/ links /tokens.css");
+    let own = html.find("href=\"/www.css").expect("www.css");
+    assert!(tokens < own, "tokens.css comes before www.css");
+    let css = app.get("/tokens.css").await;
+    css.assert_ok();
+    assert_eq!(css.text(), include_str!("../../site/public/tokens.css"));
+    for font in [
+        "inter-latin-wght-4.1.woff2",
+        "jetbrains-mono-latin-wght.woff2",
+    ] {
+        app.get(&format!("/fonts/{font}")).await.assert_ok();
+    }
+}

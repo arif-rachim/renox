@@ -295,6 +295,10 @@ jobs:
       # its tests and checks, and stage 0 is still what `rnx new coffee` makes.
       - if: steps.changed.outputs.run == 'true'
         run: learn/course/run.sh
+      # The editor's tags per stage (view:data, #529) are committed: a stage
+      # whose components changed without regenerating them fails here.
+      - if: steps.changed.outputs.run == 'true'
+        run: learn/editor/stage-data.sh && git diff --exit-code -- learn/editor/data/tags
 
   learn-challenges:
     name: learn challenges (start fails, solution passes)
@@ -333,6 +337,19 @@ jobs:
       # (learn/challenges/check.sh; RECORD=1 writes them).
       - if: steps.changed.outputs.run == 'true'
         run: learn/challenges/check.sh
+
+  learn-editor:
+    name: learn editor (the vendored CodeMirror bundle is what the lock makes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      # Rebuilds learn/public/vendor/codemirror-*.js from learn/editor's lock in
+      # the pinned Node container (Docker is on the runner); a hand-edited or
+      # stale bundle, or a licence not committed, leaves a diff and fails.
+      - run: learn/editor/bundle.sh
+      - run: git diff --exit-code -- learn/public/vendor
+      - run: test -z "$(git status --porcelain -- learn/public/vendor)"
 
   docker:
     name: docker (make:deploy)

@@ -13,38 +13,38 @@
     <h2 class="design__name">tokens</h2>
     <p class="design__note">The colour roles in the current mode. Every colour comes from a token; nothing below the tokens in learn.css defines one.</p>
     <div class="design__swatches">
-      <figure class="design__swatch design__swatch--page"><span></span><figcaption>--learn-page</figcaption></figure>
-      <figure class="design__swatch design__swatch--surface"><span></span><figcaption>--learn-surface</figcaption></figure>
-      <figure class="design__swatch design__swatch--text"><span></span><figcaption>--learn-text</figcaption></figure>
-      <figure class="design__swatch design__swatch--text-2"><span></span><figcaption>--learn-text-2</figcaption></figure>
-      <figure class="design__swatch design__swatch--meta"><span></span><figcaption>--learn-meta</figcaption></figure>
-      <figure class="design__swatch design__swatch--link"><span></span><figcaption>--learn-link</figcaption></figure>
+      <figure class="design__swatch design__swatch--page"><span></span><figcaption>--rs-page</figcaption></figure>
+      <figure class="design__swatch design__swatch--surface"><span></span><figcaption>--rs-surface</figcaption></figure>
+      <figure class="design__swatch design__swatch--text"><span></span><figcaption>--rs-text</figcaption></figure>
+      <figure class="design__swatch design__swatch--text-2"><span></span><figcaption>--rs-text-2</figcaption></figure>
+      <figure class="design__swatch design__swatch--meta"><span></span><figcaption>--rs-meta</figcaption></figure>
+      <figure class="design__swatch design__swatch--link"><span></span><figcaption>--rs-link</figcaption></figure>
       <figure class="design__swatch design__swatch--accent"><span></span><figcaption>--accent</figcaption></figure>
-      <figure class="design__swatch design__swatch--ok"><span></span><figcaption>--learn-ok</figcaption></figure>
-      <figure class="design__swatch design__swatch--warn"><span></span><figcaption>--learn-warn</figcaption></figure>
-      <figure class="design__swatch design__swatch--bad"><span></span><figcaption>--learn-bad</figcaption></figure>
+      <figure class="design__swatch design__swatch--ok"><span></span><figcaption>--rs-ok</figcaption></figure>
+      <figure class="design__swatch design__swatch--warn"><span></span><figcaption>--rs-warn</figcaption></figure>
+      <figure class="design__swatch design__swatch--bad"><span></span><figcaption>--rs-bad</figcaption></figure>
       <figure class="design__swatch design__swatch--code"><span></span><figcaption>--bg (code)</figcaption></figure>
     </div>
   </section>
 
   <section class="design__item" id="c-type" data-component="type">
     <h2 class="design__name">type</h2>
-    <p class="design__note">One line per --learn-type-* token. Inter for text, JetBrains Mono for code, eyebrows, numbers and meta.</p>
+    <p class="design__note">One line per --rs-type-* token. Inter for text, JetBrains Mono for code, eyebrows, numbers and meta.</p>
     <div class="design__type">
-      <p class="design__type-hero">Hero and section titles<small>--learn-type-hero</small></p>
-      <p class="design__type-h1">Page titles<small>--learn-type-h1</small></p>
-      <p class="design__type-h2">Chapter headings<small>--learn-type-h2</small></p>
-      <p class="design__type-h3">Sub-headings<small>--learn-type-h3</small></p>
-      <p class="design__type-h4">Small headings<small>--learn-type-h4</small></p>
-      <p class="design__type-card">Card titles<small>--learn-type-card</small></p>
-      <p class="design__type-lead">The lead paragraph under a title.<small>--learn-type-lead</small></p>
-      <p class="design__type-prose">Reading text in a chapter.<small>--learn-type-prose</small></p>
-      <p class="design__type-ui">Interface text.<small>--learn-type-ui</small></p>
-      <p class="design__type-small">Small interface text.<small>--learn-type-small</small></p>
-      <p class="design__type-tag">Tags and eyebrows<small>--learn-type-tag</small></p>
-      <p class="design__type-meta">Meta lines and captions<small>--learn-type-meta</small></p>
-      <p class="design__type-code">let price = 450;<small>--learn-type-code</small></p>
-      <p class="design__type-button">Button text<small>--learn-type-button</small></p>
+      <p class="design__type-hero">Hero and section titles<small>--rs-type-hero</small></p>
+      <p class="design__type-h1">Page titles<small>--rs-type-h1</small></p>
+      <p class="design__type-h2">Chapter headings<small>--rs-type-h2</small></p>
+      <p class="design__type-h3">Sub-headings<small>--rs-type-h3</small></p>
+      <p class="design__type-h4">Small headings<small>--rs-type-h4</small></p>
+      <p class="design__type-card">Card titles<small>--rs-type-card</small></p>
+      <p class="design__type-lead">The lead paragraph under a title.<small>--rs-type-lead</small></p>
+      <p class="design__type-prose">Reading text in a chapter.<small>--rs-type-prose</small></p>
+      <p class="design__type-ui">Interface text.<small>--rs-type-ui</small></p>
+      <p class="design__type-small">Small interface text.<small>--rs-type-small</small></p>
+      <p class="design__type-tag">Tags and eyebrows<small>--rs-type-tag</small></p>
+      <p class="design__type-meta">Meta lines and captions<small>--rs-type-meta</small></p>
+      <p class="design__type-code">let price = 450;<small>--rs-type-code</small></p>
+      <p class="design__type-button">Button text<small>--rs-type-button</small></p>
     </div>
   </section>
 
@@ -222,6 +222,17 @@
     <h2 class="design__name">changes</h2>
     <p class="design__note">What a stage changed in each file, as a fold-out diff: the output of the <code>learn:changes</code> directive for stage 2.</p>
     {{ changes | safe }}
+  </section>
+
+  <section class="design__item" id="c-editor" data-component="editor">
+    <h2 class="design__name">editor</h2>
+    <p class="design__note">The code editor, #528: CodeMirror 6 on a textarea[data-learn-editor] (editor.js), dark in both modes like the code panels. In HTML mode Renox's expressions and rx-/app-/live- tags are marked. This sample is read-only, so Tab moves on; in an editable one Tab indents, and Esc then Tab leaves. /editor is its playground.</p>
+    <figure class="learn-editor">
+      <figcaption class="learn-editor__bar"><span class="learn-editor__lang">HTML</span><span class="learn-editor__path">resources/views/menu/index.html</span></figcaption>
+      <textarea class="learn-editor__source" data-learn-editor="html" data-path="design/index.html" aria-label="HTML: resources/views/menu/index.html" spellcheck="false" rows="10" readonly>{{ editor_sample }}</textarea>
+    </figure>
+    <script src="{{ asset(codemirror) }}" defer></script>
+    <script src="{{ asset('editor.js') }}" defer></script>
   </section>
 
   <section class="design__item" id="c-callouts" data-component="callouts">

@@ -9,6 +9,8 @@ on:
     paths:
       - "www/**"
       - "site/src/**"
+      # tokens.css and the fonts, compiled in from the docs site (#545).
+      - "site/public/**"
       - "docs/**"
       - "crates/**"
       - "Cargo.toml"

@@ -19,6 +19,7 @@ pub mod content;
 pub mod course;
 pub mod design;
 pub mod directive;
+pub mod editor;
 pub mod media;
 pub mod render;
 
@@ -34,7 +35,7 @@ pub const REPOSITORY: &str = "https://github.com/arif-rachim/renox";
 
 pub fn app() -> App {
     App::new()
-        .embed(renox::embedded!())
+        .embed(renox_site::shared(renox::embedded!()))
         // What every view gets: the links that appear in the layout.
         .share("links", |_ctx: renox::view::ViewContext| async move {
             Ok(json!({ "docs": DOCS, "www": WWW, "github": REPOSITORY }))
@@ -57,11 +58,17 @@ impl Module for Learn {
             .name("home")
             .get("/design", design::page)
             .name("design")
+            .get("/editor", editor::page)
+            .name("editor")
+            .get("/editor/data/{file}", editor::data)
+            .name("editor.data")
             .get("/stages/{slug}", stage)
             .name("stage")
             .etag();
         Routes::new()
             .merge(pages)
+            // tokens.css and the fonts, shared with docs.renox.rs (#545).
+            .merge(renox_site::shared_routes())
             .get("/sitemap.xml", sitemap)
             .name("sitemap")
             .get("/llms.txt", llms)

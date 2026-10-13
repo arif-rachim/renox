@@ -14,13 +14,14 @@
   <script src="{{ asset('theme.js') }}"></script>
   <rx-ui/>
   <link rel="preload" href="{{ asset('fonts/jetbrains-mono-latin-wght.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ asset('tokens.css') }}">
   <link rel="stylesheet" href="{{ asset('learn.css') }}">
   <script src="{{ asset('learn.js') }}" defer></script>
   <script src="{{ asset('challenge.js') }}" defer></script>
   <script src="{{ asset('progress.js') }}" defer></script>
   <template rx-if="json_ld is defined and json_ld"><script type="application/ld+json">{{ json_ld | safe }}</script></template>
 </head>
-<body class="rx-page learn">
+<body class="rx-page learn rs">
 <a class="skip" href="#main">Skip to content</a>
 <header class="nav"><div class="wrap nav__in">
   <a class="logo" href="/" aria-label="Learn Renox, home"><i aria-hidden="true">R</i>learn renox</a>

@@ -1,40 +1,20 @@
-/* The documentation site: the kit's shell and tokens, plus long-form text
-   (the guides), code panels and a few pieces of its own. Colours come from
-   the kit, so dark mode follows; code panels are dark in both modes. */
+/* The documentation site: the kit's shell, plus long-form text (the guides),
+   code panels and a few pieces of its own, in renox.rs's design (#545). Every
+   colour and font comes from the shared /tokens.css (site/public/tokens.css):
+   this file defines none (tests/site.rs). */
 
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("fonts/jetbrains-mono-latin-wght.woff2") format("woff2");
-  font-weight: 100 800;
-  font-style: normal;
-  font-display: swap;
-}
+/* The kit's tokens follow renox.rs's roles (tokens.css, on <body class="rs">);
+   the top bar is a dark band (.rs-dark), code panels are dark in both modes. */
+.site-code, .rs-dark { --rs-focus: var(--accent); }
+.site :focus-visible { outline: 2px solid var(--rs-focus); outline-offset: 2px; }
 
-.site {
-  --site-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-  /* Code panels: an editor's dark theme, the same in light and dark mode. */
-  --site-code-bg: #1b1d2a;
-  --site-code-bar: #23263a;
-  --site-code-border: #2e3250;
-  --site-code-text: #e4e6f1;
-  --site-code-muted: #9ca3c4;
-  --site-hl-com: #8f97b8;
-  --site-hl-kw: #c792ea;
-  --site-hl-str: #b5e08b;
-  --site-hl-num: #f9a26c;
-  --site-hl-fn: #82aaff;
-  --site-hl-ty: #ffcb6b;
-  --site-hl-mac: #89ddff;
-  --site-hl-attr: #f78c9c;
-  --site-hl-tag: #f07178;
-  --site-hl-prop: #ffd580;
-  --site-hl-var: #ff9e80;
-  --site-hl-tpl: #5ccfe6;
-  --site-tip: #16a34a;
-  --site-warning: #d97706;
-  --site-caution: #dc2626;
-  --site-important: #9333ea;
-}
+/* The top bar: renox.rs's dark header, sticky over the page. */
+.site-top { position: sticky; top: 0; z-index: 30; }
+.site-top .rx-navbar { position: static; background: var(--bg); border-bottom: 1px solid var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* The sidebar's brand: renox.rs's logo (orange tile, mono word). */
+.site .rx-sidebar__brand { font: 700 18px/1 var(--mono); letter-spacing: -0.02em; text-transform: lowercase; }
+.site .rx-brand-mark { border-radius: 7px; color: var(--on-accent-ink); font: 700 15px/1 var(--mono); text-transform: uppercase; }
 
 /* Icons: the size of the text beside them. */
 .site-icon { width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em; }
@@ -47,7 +27,10 @@
   .site .rx-shell__content { padding: var(--rx-space-5) 1rem; }
 }
 
-/* The sidebar: a link per page with its icon. */
+/* The sidebar: a link per page with its icon; long names are cut, never
+   scrolled sideways. */
+.site .rx-sidebar { overflow-x: hidden; }
+.site-nav-link > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .site-nav-link { align-items: center; gap: 0.65rem; }
 .site-nav-link .site-icon { color: var(--rx-secondary-label); }
 .site-nav-link[aria-current="page"] .site-icon { color: var(--rx-accent-text); }
@@ -112,9 +95,8 @@
   height: 3rem;
   flex: none;
   border-radius: 0.9rem;
-  color: #fff;
-  background: linear-gradient(135deg, var(--rx-accent), #9333ea);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--rx-accent) 35%, transparent);
+  color: var(--on-accent-ink);
+  background: var(--accent);
 }
 .site-head__icon .site-icon { width: 1.6rem; height: 1.6rem; }
 .site-head__blurb { margin: 0.9rem 0 0; font: 400 1.15rem/1.5 var(--rx-font); color: var(--rx-secondary-label); }
@@ -193,7 +175,7 @@
 .site-prose strong { font-weight: 650; }
 /* Code in a sentence: tinted, and allowed to wrap so it never widens the page. */
 .site-prose :not(pre) > code {
-  font-family: var(--site-mono);
+  font-family: var(--mono);
   font-size: 0.86em;
   color: var(--rx-label);
   background: color-mix(in srgb, var(--rx-accent) 9%, var(--rx-fill));
@@ -243,11 +225,11 @@
 
 /* Code panels. */
 .site-code {
-  background: var(--site-code-bg);
-  border: 1px solid var(--site-code-border);
+  background: var(--bg);
+  border: 1px solid var(--line-2);
   border-radius: var(--rx-radius);
   overflow: hidden;
-  box-shadow: 0 8px 24px rgb(15 17 30 / 0.12);
+  box-shadow: var(--rs-shadow-lift);
 }
 .site-code__bar {
   display: flex;
@@ -255,8 +237,8 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.4rem 0.5rem 0.4rem 0.9rem;
-  background: var(--site-code-bar);
-  border-bottom: 1px solid var(--site-code-border);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line-2);
 }
 .site-code__lang {
   display: inline-flex;
@@ -264,24 +246,24 @@
   gap: 0.45rem;
   font: 600 0.78rem/1 var(--rx-font);
   letter-spacing: 0.02em;
-  color: var(--site-code-muted);
+  color: var(--fg-2);
 }
 .site-code__copy {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem 0.6rem;
-  border: 1px solid var(--site-code-border);
+  border: 1px solid var(--line-2);
   border-radius: 8px;
   background: transparent;
-  color: var(--site-code-muted);
+  color: var(--fg-2);
   font: 500 0.78rem/1 var(--rx-font);
   cursor: pointer;
 }
-.site-code__copy:hover, .site-code__copy:focus-visible { color: var(--site-code-text); border-color: var(--site-code-muted); }
+.site-code__copy:hover, .site-code__copy:focus-visible { color: var(--fg); border-color: var(--fg-2); }
 .site-code__copy[hidden] { display: none; }
 .site-code__copy .site-icon:nth-of-type(2) { display: none; }
-.site-code__copy.is-done { color: var(--site-hl-str); border-color: var(--site-hl-str); }
+.site-code__copy.is-done { color: var(--ok); border-color: var(--ok); }
 .site-code__copy.is-done .site-icon:nth-of-type(1) { display: none; }
 .site-code__copy.is-done .site-icon:nth-of-type(2) { display: inline; }
 .site-code pre {
@@ -290,30 +272,30 @@
   overflow-x: auto;
   background: none;
   border: 0;
-  color: var(--site-code-text);
-  font: 400 0.9rem/1.65 var(--site-mono);
+  color: var(--fg);
+  font: 400 0.9rem/1.65 var(--mono);
   font-variant-ligatures: none;
   tab-size: 4;
 }
 .site-code code { font: inherit; background: none; padding: 0; border: 0; color: inherit; }
 .site-code pre::-webkit-scrollbar { height: 10px; }
-.site-code pre::-webkit-scrollbar-thumb { background: var(--site-code-border); border-radius: 5px; }
-.hl-com { color: var(--site-hl-com); font-style: italic; }
-.hl-kw { color: var(--site-hl-kw); }
-.hl-str { color: var(--site-hl-str); }
-.hl-num, .hl-lit { color: var(--site-hl-num); }
-.hl-fn { color: var(--site-hl-fn); }
-.hl-ty { color: var(--site-hl-ty); }
-.hl-mac { color: var(--site-hl-mac); }
-.hl-attr, .hl-life { color: var(--site-hl-attr); }
-.hl-tag { color: var(--site-hl-tag); }
-.hl-prop { color: var(--site-hl-prop); }
-.hl-var { color: var(--site-hl-var); }
-.hl-tpl { color: var(--site-hl-tpl); font-weight: 600; }
+.site-code pre::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 5px; }
+.hl-com { color: var(--hl-com); font-style: italic; }
+.hl-kw { color: var(--hl-kw); }
+.hl-str { color: var(--hl-str); }
+.hl-num, .hl-lit { color: var(--hl-num); }
+.hl-fn { color: var(--hl-fn); }
+.hl-ty { color: var(--hl-ty); }
+.hl-mac { color: var(--hl-mac); }
+.hl-attr, .hl-life { color: var(--hl-attr); }
+.hl-tag { color: var(--hl-tag); }
+.hl-prop { color: var(--hl-prop); }
+.hl-var { color: var(--hl-var); }
+.hl-tpl { color: var(--hl-tpl); font-weight: 600; }
 
 /* Callouts: `> [!TIP]` and friends, and plain quotes. */
 .site-callout {
-  --callout: var(--rx-accent);
+  --callout: var(--rs-note);
   padding: 0.85rem 1.1rem;
   border: 1px solid color-mix(in srgb, var(--callout) 30%, transparent);
   border-left: 4px solid var(--callout);
@@ -328,12 +310,13 @@
   gap: 0.5rem;
   margin: 0;
   font: 650 0.95rem/1.3 var(--rx-font);
-  color: color-mix(in srgb, var(--callout) 80%, var(--rx-label));
+  color: var(--callout);
 }
-.site-callout--tip { --callout: var(--site-tip); }
-.site-callout--warning { --callout: var(--site-warning); }
-.site-callout--caution { --callout: var(--site-caution); }
-.site-callout--important { --callout: var(--site-important); }
+.site-callout--note { --callout: var(--rs-note); }
+.site-callout--tip { --callout: var(--rs-ok); }
+.site-callout--warning { --callout: var(--rs-warn); }
+.site-callout--caution { --callout: var(--rs-bad); }
+.site-callout--important { --callout: var(--rs-important); }
 .site-callout--quote { --callout: var(--rx-separator); color: var(--rx-secondary-label); }
 
 /* Previous and next: two cards. */
@@ -387,7 +370,6 @@
   border-radius: 1.5rem;
   background:
     radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--rx-accent) 18%, transparent), transparent 55%),
-    radial-gradient(circle at 90% 90%, color-mix(in srgb, #9333ea 16%, transparent), transparent 55%),
     var(--rx-surface);
   border: var(--rx-surface-border);
 }
@@ -397,14 +379,17 @@
 .site-hero__eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   margin: 0 0 1rem;
-  padding: 0.3rem 0.75rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--rs-line-2);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--rx-accent) 12%, transparent);
-  font: 600 0.85rem/1.2 var(--rx-font);
-  color: var(--rx-accent-text);
+  font: var(--rs-type-tag);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rs-text-2);
 }
+.site-hero__eyebrow .site-icon { color: var(--rs-number); }
 .site-hero__title {
   margin: 0 0 1.1rem;
   font: 700 clamp(2rem, 1.4rem + 2vw, 3rem)/1.1 var(--rx-font-display);
@@ -413,13 +398,10 @@
 }
 .site-hero__title em {
   font-style: normal;
-  background: linear-gradient(90deg, var(--rx-accent), #9333ea);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--rs-link);
 }
 .site-hero__lead { margin: 0 0 1.75rem; font: 400 1.15rem/1.6 var(--rx-font); color: var(--rx-secondary-label); max-width: 40rem; }
-.site-hero__lead code { font-family: var(--site-mono); font-size: 0.9em; }
+.site-hero__lead code { font-family: var(--mono); font-size: 0.9em; }
 .site-hero__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .site-hero__actions .site-icon { width: 1.1rem; height: 1.1rem; }
 .site-hero__code { display: grid; gap: 0.9rem; min-width: 0; }
@@ -435,7 +417,8 @@
 .site-home__heading .site-icon { color: var(--rx-accent-text); }
 .site-home__note { display: flex; gap: 0.6rem; margin: 0; font: var(--rx-type-note); color: var(--rx-secondary-label); }
 .site-home__note .site-icon { margin-top: 0.1rem; color: var(--rx-accent-text); }
-.site-home__note code { font-family: var(--site-mono); font-size: 0.92em; overflow-wrap: anywhere; }
+.site-home__note a { color: var(--rx-accent-text); text-underline-offset: 0.18em; }
+.site-home__note code { font-family: var(--mono); font-size: 0.92em; overflow-wrap: anywhere; }
 .site-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));

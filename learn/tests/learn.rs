@@ -186,9 +186,8 @@ async fn the_design_page_shows_every_component() {
     }
 }
 
-/// Every `--name: value;` declaration in `css`, values with their spaces collapsed.
-fn declarations(css: &str) -> std::collections::BTreeMap<String, String> {
-    // Without comments (www.css has one between its tokens).
+/// `css` without its comments.
+fn without_comments(css: &str) -> String {
     let mut plain = String::new();
     let mut rest = css;
     while let Some((before, after)) = rest.split_once("/*") {
@@ -197,66 +196,49 @@ fn declarations(css: &str) -> std::collections::BTreeMap<String, String> {
     }
     plain.push_str(rest);
     plain
-        .split(';')
-        .filter_map(|part| {
-            let part = part.rsplit('{').next().unwrap_or(part);
-            let (name, value) = part.trim().split_once(':')?;
-            let name = name.trim();
-            name.starts_with("--").then(|| {
-                (
-                    name.to_owned(),
-                    value.split_whitespace().collect::<Vec<_>>().join(" "),
-                )
-            })
-        })
-        .collect()
+}
+
+#[renox::test]
+async fn every_page_links_the_shared_tokens_before_learn_css() {
+    let app = site().await;
+    for path in ["/", "/stages/setup", "/design", "/editor", "/no-such-page"] {
+        let html = app.get(path).await.text();
+        let tokens = html
+            .find("href=\"/tokens.css")
+            .unwrap_or_else(|| panic!("{path} links /tokens.css"));
+        let own = html
+            .find("href=\"/learn.css")
+            .unwrap_or_else(|| panic!("{path} links /learn.css"));
+        assert!(tokens < own, "{path}: tokens.css comes first");
+        assert!(
+            html.contains("<body class=\"rx-page learn rs\">"),
+            "{path}: the roles' class"
+        );
+    }
+    // Served from renox-site's copy, with the fonts.
+    let css = app.get("/tokens.css").await;
+    css.assert_ok();
+    assert_eq!(css.text(), include_str!("../../site/public/tokens.css"));
+    app.get("/fonts/inter-latin-wght-4.1.woff2")
+        .await
+        .assert_ok();
+    app.get("/fonts/jetbrains-mono-latin-wght.woff2")
+        .await
+        .assert_ok();
 }
 
 #[test]
-fn the_www_tokens_match_renox_rs() {
-    let www = include_str!("../../www/public/www.css");
-    let learn = include_str!("../public/learn.css");
-    let www_root = www.split_once(":root {").unwrap().1;
-    let www_root = &www_root[..www_root.find('}').unwrap()];
-    let learn_block = learn
-        .split_once("/* www tokens:")
-        .and_then(|(_, rest)| rest.split_once("/* end of www tokens */"))
-        .expect("learn.css has the www tokens block")
-        .0;
-    // Skip the rest of the opening comment line.
-    let learn_block = learn_block.split_once("*/").unwrap().1;
-    let (want, have) = (declarations(www_root), declarations(learn_block));
-    assert!(want.len() > 20, "parsed {} tokens from www.css", want.len());
-    let mut problems = Vec::new();
-    for (name, value) in &want {
-        match have.get(name) {
-            None => problems.push(format!("missing in learn.css: {name}")),
-            Some(v) if v != value => {
-                problems.push(format!("differs: {name}: www {value} / learn {v}"))
-            }
-            _ => {}
-        }
-    }
-    for name in have.keys().filter(|n| !want.contains_key(*n)) {
-        problems.push(format!("extra in learn.css: {name}"));
-    }
-    assert!(problems.is_empty(), "{}", problems.join("\n"));
-}
-
-#[test]
-fn the_stylesheet_keeps_colours_and_fonts_in_its_tokens() {
-    let css = include_str!("../public/learn.css");
-    let marker = "/* == end of tokens == */";
-    assert_eq!(css.matches(marker).count(), 1, "one end-of-tokens line");
-    let below = css.split_once(marker).unwrap().1;
+fn the_stylesheet_keeps_colours_and_fonts_in_the_tokens() {
+    let css = without_comments(include_str!("../public/learn.css"));
+    // Roles it may point at other tokens (the dark frame) and the callouts' colour.
     let allowed = [
         "--callout",
-        "--learn-focus",
-        "--learn-link",
-        "--learn-text-2",
-        "--learn-number",
+        "--rs-focus",
+        "--rs-link",
+        "--rs-text-2",
+        "--rs-number",
     ];
-    for (n, line) in below.lines().enumerate() {
+    for line in css.lines() {
         let hex = line.match_indices('#').any(|(i, _)| {
             let digits = line[i + 1..]
                 .chars()
@@ -264,14 +246,10 @@ fn the_stylesheet_keeps_colours_and_fonts_in_its_tokens() {
                 .count();
             (3..=8).contains(&digits)
         });
-        for bad in ["rgb(", "rgba(", "hsl(", "font-family"] {
-            assert!(
-                !line.contains(bad),
-                "line {} below the tokens: {line}",
-                n + 1
-            );
+        for bad in ["rgb(", "rgba(", "hsl(", "font-family", "@font-face"] {
+            assert!(!line.contains(bad), "learn.css: {line}");
         }
-        assert!(!hex, "a colour literal below the tokens: {line}");
+        assert!(!hex, "a colour literal in learn.css: {line}");
         // A custom property defined here (`--name:` not inside var()).
         let mut rest = line;
         while let Some(i) = rest.find("--") {
@@ -286,7 +264,7 @@ fn the_stylesheet_keeps_colours_and_fonts_in_its_tokens() {
                 && !rest[..i].ends_with("var(");
             assert!(
                 !defines || allowed.contains(&name.as_str()),
-                "{name} is defined below the tokens: {line}"
+                "{name} is defined in learn.css (tokens go in site/public/tokens.css): {line}"
             );
             rest = &tail[2..];
         }

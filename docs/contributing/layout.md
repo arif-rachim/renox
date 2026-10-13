@@ -352,6 +352,11 @@ site/                      the documentation site (package `renox-site`, publish
                            builds it for https://docs.renox.rs, whose server pulls
                            each new build (#141). A new guide in docs/ needs a line in
                            content.rs PAGES (and site/build.rs already watches docs/).
+                           public/tokens.css: the design system of the three sites (#545:
+                           renox.rs's palette, the --rs-* roles on .rs/.rs-dark, the kit's
+                           --rx-* re-coloured), the one place with colours and fonts; www and
+                           learn serve it and public/fonts/ through renox_site::{shared,
+                           shared_routes}; renox_site::css_problems checks each site's CSS.
                            Renoxium hosts it on their own server (not GitHub Pages: the
                            account's user site maps project sites to a personal domain)
 www/                       renox.rs: the landing page and blog (package `renox-www`, publish =
@@ -386,8 +391,16 @@ learn/                     learn.renox.rs: the course (package `renox-learn`, pu
                            media/{record.mjs,encode.sh,manifest.mjs,upload.sh,scenes/*.json,Containerfile.ffmpeg}
                            (the chapters' videos, #534: recorded from the course app, encoded in a pinned
                            container, uploaded by hand; only content/media.json is committed), src/media.rs.
-                           Coming (#526-#536): a CodeMirror 6 editor, challenges checked in a sandbox,
-                           videos. Links into the docs must name a page in PAGES (tests/learn.rs)
+                           editor/ (#528: package.json + package-lock.json pinning CodeMirror 6,
+                           entry.mjs, bundle.sh building public/vendor/codemirror-<V>.js in a pinned
+                           Node container, CI job `learn-editor`; samples/), public/editor.js
+                           (`window.LearnEditor`, mounts textarea[data-learn-editor]), src/editor.rs
+                           (`GET /editor`, the playground, noindex; `/editor/data/{file}`),
+                           tests/editor.rs. Autocomplete (#529): editor/data/renox-api.json and
+                           stage-NN.json written by tests/editor_data.rs (+ editor_data/{api,models,
+                           tidy}.rs: Renox's API and the stages' models read with syn; snapshots,
+                           RENOX_UPDATE_SNAPSHOT=1), editor/data/tags/ by editor/stage-data.sh.
+                           Links into the docs must name a page in PAGES (tests/learn.rs)
 benchmarks/                Renox vs bare Axum vs Laravel (FPM and Octane) in Docker, pinned to
                            2 cores and 1 GB, driven by oha (#333): its own cargo workspace
                            (renox-app, axum-app; not a member of the root one), laravel/

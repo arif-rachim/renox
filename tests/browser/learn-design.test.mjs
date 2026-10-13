@@ -11,7 +11,7 @@ import { Browser } from './lib/cdp.mjs';
 import { start } from './lib/app.mjs';
 
 // learn/src/design.rs: COMPONENTS.len(). Keep both in step.
-const COMPONENTS = 31;
+const COMPONENTS = 32;
 
 let browser;
 let app;
